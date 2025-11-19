@@ -3094,14 +3094,17 @@ function extractPhenotypeIntent(qLower) {
     }
 
     
- // ==========================================================
+    // ==========================================================
     // 5. GLOBAL UI WRAPPERS & STARTUP
     // ==========================================================
 
     window.selectComp = function (id) {
         generateAndInjectSVG(); 
         
-        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected', 'active'));
+        document.querySelectorAll('.cilia-part').forEach(el =>
+            el.classList.remove('selected', 'active')
+        );
+
         const el = document.getElementById(id);
         if (el) el.classList.add('selected');
 
@@ -3109,42 +3112,48 @@ function extractPhenotypeIntent(qLower) {
         if (!data) return;
 
         const genes = getGenesByLocalization(data.title);
-
         const bar = document.getElementById('bottomBar');
+
         if (genes.length > 0) {
-            bar.innerHTML = `<h3>${data.title} (${genes.length} genes)</h3>
-            <div class="gene-list">${genes.slice(0, 40).map(g =>
-                `<span class="gene-badge" data-gene="${g.gene}">${g.gene}</span>`
-            ).join('')}${genes.length > 40 ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length - 40} more</span>` : ''}</div>`;
+            bar.innerHTML = `
+                <h3>${data.title} (${genes.length} genes)</h3>
+                <div class="gene-list">
+                    ${genes.slice(0, 40).map(g =>
+                        `<span class="gene-badge" data-gene="${g.gene}">${g.gene}</span>`
+                    ).join('')}
+                    ${genes.length > 40
+                        ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length - 40} more</span>`
+                        : ''}
+                </div>`;
         } else {
-            bar.innerHTML = `<h3>${data.title}</h3><p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
+            bar.innerHTML = `
+                <h3>${data.title}</h3>
+                <p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
         }
-    }
+    };
 
     window.searchGene = function (name) {
         const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
         if (!query) return;
-        addChatMessage(`Tell me about ${query}`, true); 
+        addChatMessage(`Tell me about ${query}`, true);
         handleGeneSearch(query, true);
-    }
+    };
 
-    // --- MODIFIED: This is the new button handler for the UMAP/scRNA plot ---
+    // --- MODIFIED: UMAP default plot ---
     window.showDefaultUMAP = function () {
         addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
-        // --- MODIFIED: Using simple, direct query ---
         handleAIQuery('plot default umap');
-    }
+    };
 
-    // --- NEW: Function for default phylogeny plot ---
+    // --- NEW: Default phylogeny plot ---
     window.showDefaultPhylogeny = function () {
-        addChatMessage(`Show Phylogenetics Analysis (Default Genes)`, true);
-        // --- MODIFIED: Using simple, direct query ---
+        addChatMessage('Show Phylogenetics Analysis (Default Genes)', true);
         handleAIQuery('plot default phylogeny');
-    }
+    };
 
     window.sendMsg = function () {
         handleUserSend();
-    }
+    };
 
     window.react = function (type) {
         if (type === 'up') {
@@ -3152,23 +3161,30 @@ function extractPhenotypeIntent(qLower) {
         } else {
             addChatMessage('Sorry about that. What specifically would help?', false);
         }
-    }
+    };
 
     window.clearChat = function () {
         if (confirm('Start new conversation?')) {
             document.getElementById('messages').innerHTML = '';
-            generateAndInjectSVG(); 
-            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected', 'active'));
+            generateAndInjectSVG();
+            document.querySelectorAll('.cilia-part').forEach(el =>
+                el.classList.remove('selected', 'active')
+            );
             addChatMessage('Welcome back! How can I help?', false);
         }
-    }
+    };
 
     window.downloadPlot = function (divId, filename) {
         const plotDiv = document.getElementById(divId);
         if (plotDiv && window.Plotly) {
-            Plotly.downloadImage(plotDiv, { format: 'png', filename: filename, width: 1200, height: 800 });
+            Plotly.downloadImage(plotDiv, {
+                format: 'png',
+                filename: filename,
+                width: 1200,
+                height: 800
+            });
         }
-    }
+    };
 
     // --- STARTUP ---
     if (document.readyState === 'loading') {
