@@ -179,95 +179,108 @@
     // 2. DATA LOADING & PROCESSING
     // ==========================================================
 
-    async function initCiliAI() {
-        console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
-        await loadCiliAIData(); 
-        
-        if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
-            console.error("CiliAI: Master data is empty. Database load failed.");
-            window.CiliAI.ready = false;
-            return;
-        }
-        
-        // NO buildLookups() needed!
-        window.CiliAI.ready = true;
-        console.log('CiliAI: Ready! Pre-compiled database loaded.');
+      /**
+         * The main initialization function.
+         */
+        async function initCiliAI() {
+            console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
+            updateStatus('Loading data...', 'loading');
+            await loadCiliAIData(); 
+            
+            if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
+                console.error("CiliAI: Master data is empty. Database load failed.");
+                updateStatus('Error', 'error');
+                window.CiliAI.ready = false;
+                return;
+            }
+            
+            window.CiliAI.ready = true;
+            console.log('CiliAI: Ready! Pre-compiled database loaded.');
+            
+            // 1. Update status
+            updateStatus('Ready', 'ready');
 
-        if (window.location.hash.includes('/ciliai')) {
-            setTimeout(displayCiliAIPage, 100);
-        }
-    }
+            // 2. *** FIX APPLIED HERE *** // Call the direct rendering function for the default plot immediately after data is ready
+            renderUMAPPlot(); 
+            // ***************************
 
-  /**
+            // The rest of your original logic
+            if (window.location.hash.includes('/ciliai')) {
+                // displayCiliAIPage(); // Assuming this function is correctly defined elsewhere
+            }
+        }
+
+
+    /**
      * Fetches the pre-compiled database files from GitHub.
      * (MODIFIED Nov 18 2025): Added cellDataCache builder for advanced UMAP plotting
      */
-    async function loadCiliAIData(timeoutMs = 60000) {
-        const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-        const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-        const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
+   async function loadCiliAIData(timeoutMs = 60000) {
+    const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+    const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
+    const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
 
-        try {
-            console.log(`Fetching main database: ${mainDbUrl}`);
-            console.log(`Fetching lookups: ${lookupsUrl}`);
-            
-            const [mainRes, lookupsRes] = await Promise.all([
-                fetch(mainDbUrl),
-                fetch(lookupsUrl)
-            ]);
+    try {
+        console.log(`Fetching main database: ${mainDbUrl}`);
+        console.log(`Fetching lookups: ${lookupsUrl}`);
+        
+        const [mainRes, lookupsRes] = await Promise.all([
+            fetch(mainDbUrl),
+            fetch(lookupsUrl)
+        ]);
 
-            if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
-            if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
-            
-            const mainData = await mainRes.json();
-            const lookupData = await lookupsRes.json();
-            
-            // Assign all the pre-processed data
-            window.CiliAI.masterData = mainData.masterData;
-            window.CiliAI.lookups = lookupData.lookups;
-            
-            // Assign the raw UMAP data
-            window.CiliAI_UMAP = mainData.umapData; 
-            window.CiliAI.data.umap = mainData.umapData; 
-            
-            // --- MODIFIED: Create the UMAP lookup map ---
-            window.CiliAI.lookups.umapByGene = {};
-            if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
-                for (const point of window.CiliAI_UMAP) {
-                    if (point.Gene) { 
-                        window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
-                    } 
+        if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
+        if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
+        
+        const mainData = await mainRes.json();
+        const lookupData = await lookupsRes.json();
+        
+        // Assign all the pre-processed data
+        window.CiliAI.masterData = mainData.masterData;
+        window.CiliAI.lookups = lookupData.lookups;
+        
+        // Assign the raw UMAP data
+        window.CiliAI_UMAP = mainData.umapData;
+        window.CiliAI.data.umap = mainData.umapData;
+        
+        // --- MODIFIED: Create the UMAP lookup map ---
+        window.CiliAI.lookups.umapByGene = {};
+        if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
+            for (const point of window.CiliAI_UMAP) {
+                if (point.Gene) {
+                    window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
                 }
             }
-
-            // Create a GeneMap from the masterData list for fast lookups by gene name
-            window.CiliAI.lookups.geneMap = {};
-            for (const gene of mainData.masterData) {
-                if (gene.Gene) {
-                    window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
-                }
-            }
-
-            // --- NEW: Build the cellDataCache for UMAP expression plotting ---
-            log("Building scRNA expression cache for UMAP...");
-            window.CiliAI.cellDataCache = {};
-            for (const gene of mainData.masterData) {
-                if (gene.Gene && gene.expression && gene.expression.scRNA) {
-                    // This creates the { GENE: { cell_type: value, ... } } structure
-                    window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
-                }
-            }
-            log("scRNA expression cache built.");
-            // --- END NEW SECTION ---
-
-            console.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
-            console.log('CiliAI: Lookups successfully loaded.');
-
-        } catch (err) {
-            console.error("Failed to load CiliAI master database:", err);
-            window.CiliAI.ready = false;
         }
+
+        // Create a GeneMap from the masterData list for fast lookups by gene name
+        window.CiliAI.lookups.geneMap = {};
+        for (const gene of mainData.masterData) {
+            if (gene.Gene) {
+                window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
+            }
+        }
+
+        // --- NEW: Build the cellDataCache for UMAP expression plotting ---
+        window.log("Building scRNA expression cache for UMAP...");
+        window.CiliAI.cellDataCache = {};
+        for (const gene of mainData.masterData) {
+            if (gene.Gene && gene.expression && gene.expression.scRNA) {
+                // This creates the { GENE: { cell_type: value, ... } } structure
+                window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
+            }
+        }
+        window.log("scRNA expression cache built.");
+        // --- END NEW SECTION ---
+
+        console.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
+        console.log('CiliAI: Lookups successfully loaded.');
+
+    } catch (err) {
+        console.error("Failed to load CiliAI master database:", err);
+        window.CiliAI.ready = false;
     }
+}
     
     /**
      * Normalizes a term for keyword matching.
@@ -326,6 +339,7 @@
         console.log("CiliAI: Page displayed.");
     };
 
+    
     
     function getPageHTML() {
         return `
