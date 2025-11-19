@@ -269,6 +269,7 @@ if (typeof window.addChatMessage !== "function") {
 
     // Expose initializer globally
     window.initCiliAI = initCiliAI;
+    window.renderUMAPPlot = renderUMAPPlot;
 
     /**
      * Fetches the pre-compiled database files from GitHub.
