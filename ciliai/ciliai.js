@@ -3237,7 +3237,7 @@ function extractPhenotypeIntent(qLower) {
 // GLOBAL EXPORTS (Required to expose local functions to window)
 // --- Add this block once, typically near the end of the file ---
 // ==========================================================
-
+window.renderUMAPPlot = renderUMAPPlot;
 window.sendMsg = handleUserSend;
 window.addChatMessage = addChatMessage;
 window.extractMultipleGenes = extractMultipleGenes;
