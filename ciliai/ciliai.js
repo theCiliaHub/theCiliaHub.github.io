@@ -416,7 +416,7 @@ window.displayCiliAIPage = async function () {
         console.log("CiliAI: Page displayed.");
     };
       
-  function getPageHTML() {
+ function getPageHTML() {
     return `
         <div class="container">
             <div class="left-panel">
@@ -432,8 +432,14 @@ window.displayCiliAIPage = async function () {
                 
                 <div class="panel-sections">
                     
-                    <div class="panel-section">
-                        <h3>Structure Map</h3>
+                    <div class="nav-group">
+                        <div class="nav-label">Dashboard</div>
+                        <button class="nav-item active" onclick="window.location.reload()">Overview</button>
+                        <button class="nav-item" onclick="displayCiliaPlotPage()">🔬 Cilia Analysis</button> 
+                    </div>
+
+                    <div class="nav-group">
+                        <div class="nav-label">Structure Map</div>
                         <div class="diagram-container">
                             <div class="interactive-cilium">
                                 <div id="cilia-svg"></div>
@@ -452,17 +458,15 @@ window.displayCiliAIPage = async function () {
                         </div>
                     </div>
                     
-                    <div class="panel-section">
-                        <h3>Quick Plots</h3>
-                        <div class="ciliai-quick-plots" style="padding: 10px 20px;">
-                            <button class="welcome-action-btn" onclick="showDefaultUMAP()">📊 Lung scRNA (FOXJ1)</button>
-                            <button class="welcome-action-btn" onclick="showDefaultPhylogeny()">🌳 Phylogeny Heatmap</button>
-                            <button class="welcome-action-btn" onclick="displayCiliaPlotPage()">🔬 Cilia Analysis</button>
-                        </div>
+                    <div class="nav-group">
+                        <div class="nav-label">Quick Plots</div>
+                        <button class="nav-item" onclick="showDefaultUMAP()">📊 Lung scRNA (FOXJ1)</button>
+                        <button class="nav-item" onclick="showDefaultPhylogeny()">🌳 Phylogeny Heatmap</button>
                     </div>
-                    
                 </div>
-                </div>
+                
+            </div>
+            
             <div class="right-panel">
                 <div class="welcome-section">
                     <h2>Welcome to CiliAI! 🎉</h2>
@@ -492,70 +496,92 @@ window.displayCiliAIPage = async function () {
             </div>
         </div>`;
 }
+    
 
 function injectPageCSS() {
     const styleId = 'ciliai-dynamic-styles';
     if (document.getElementById(styleId)) return;
 
-    const PRIMARY_BLUE = '#005b96';
-    const SECONDARY_BLUE = '#b3cde0';
+    const PRIMARY_BLUE = '#005b96'; // Primary brand color (darker blue)
+    const SECONDARY_BLUE = '#b3cde0'; // Secondary brand color (lighter blue/peach)
+    const ACCENT_TEXT_COLOR = '#333333';
 
     const css = `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         .content-area.content-area-full {
-            height: calc(100vh - 110px);
+            height: 100vh;
             padding: 0 !important; margin: 0 !important; overflow: hidden;
         }
-        .container { display: grid; grid-template-columns: 1fr 450px; height: 100%; width: 100%; gap: 0; overflow: hidden; }
-        .interactive-cilium.table-view-active { max-width: none !important; padding: 0 !important; border: none !important; box-shadow: none !important; height: 100%; }
+        .container { 
+            display: grid; 
+            grid-template-columns: 1fr 450px; /* Middle Viz Panel | Right Chat Panel */
+            height: 100vh; 
+            width: 100vw; 
+            overflow: hidden; 
+        }
         
-        /* General Colors */
-        .header { padding: 10px 20px; background: ${SECONDARY_BLUE}; color: ${PRIMARY_BLUE}; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-bottom: 1px solid #e1e8ed; }
+        /* --- BRANDING & HEADER --- */
+        .header { 
+            padding: 10px 20px; 
+            background: ${SECONDARY_BLUE}; 
+            color: ${PRIMARY_BLUE}; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); 
+            border-bottom: 1px solid ${PRIMARY_BLUE}; 
+        }
         .header h1 { font-size: 20px; font-weight: 600; margin-bottom: 2px; color: ${PRIMARY_BLUE}; }
-        .left-panel { display: flex; flex-direction: column; background: #f5f7fa; border-right: 1px solid #e1e8ed; overflow: hidden; }
+        .left-panel { display: flex; flex-direction: column; background: #f5f7fa; border-right: 1px solid ${SECONDARY_BLUE}; overflow: hidden; }
+        .panel-sections { overflow-y: auto; }
         
-        /* Toolbar/Input Styles */
-        .toolbar { padding: 10px 20px; background: white; border-bottom: 1px solid #e1e8ed; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .toolbar input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #d1d9e0; border-radius: 6px; font-size: 13px; }
-        .toolbar button { padding: 8px 15px; background: ${PRIMARY_BLUE}; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: 13px; }
-        .toolbar button:hover { background: #00477a; } /* Darker blue on hover */
+        /* --- TOOLBARS & BUTTONS --- */
+        .toolbar { padding: 10px 20px; background: white; border-bottom: 1px solid ${SECONDARY_BLUE}; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .toolbar input { border: 1px solid ${SECONDARY_BLUE}; }
+        .toolbar button, #generate-ciliaplot-btn { 
+            background: ${PRIMARY_BLUE}; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            transition: background-color 0.2s; 
+        }
+        .toolbar button:hover, #generate-ciliaplot-btn:hover { background: #00477a; } /* Darker blue on hover */
 
-        /* Status Colors */
-        .status.loading { background: #fff3cd; color: #856404; }
-        .status.ready { background: #d4edda; color: #155724; }
-        .status.error { background: #f8d7da; color: #721c24; }
-        
-        /* Cilia Diagram Colors */
+        /* --- NAVIGATION/MENU STYLES --- */
+        .nav-group { padding: 10px 20px; border-bottom: 1px solid #e1e8ed; }
+        .nav-label { font-size: 11px; text-transform: uppercase; color: ${PRIMARY_BLUE}; margin-bottom: 5px; font-weight: 600; }
+        .nav-item {
+            display: block; 
+            padding: 8px 12px; 
+            margin-bottom: 5px; 
+            background: ${SECONDARY_BLUE}70; /* Light blue background */
+            color: ${ACCENT_TEXT_COLOR}; 
+            border: 1px solid ${SECONDARY_BLUE}; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            text-align: left;
+            font-size: 13px;
+        }
+        .nav-item:hover { background: ${SECONDARY_BLUE}; color: ${PRIMARY_BLUE}; }
+        .nav-item.active { background: ${PRIMARY_BLUE}; color: white; }
+
+        /* --- VISUALIZATION BOARD (MIDDLE PANEL) --- */
+        .diagram-container { flex: 1; padding: 20px; overflow: auto; display: flex; justify-content: center; align-items: center; background: white; }
+        .interactive-cilium { border: 1px solid ${SECONDARY_BLUE}; }
         .cilia-part.selected, .cilia-part.active { filter: brightness(1.1); stroke: ${PRIMARY_BLUE} !important; stroke-width: 4 !important; }
-        .interactive-cilium { border: 1px solid ${SECONDARY_BLUE}; } /* Light blue border */
-
-        /* Chat/Result Colors */
-        .ciliai-message.user .ciliai-message-content { background: ${PRIMARY_BLUE}; color: white; border-radius: 18px 18px 4px 18px; }
-        .ai-result-card strong { color: ${PRIMARY_BLUE}; }
-        .ai-action { color: ${PRIMARY_BLUE}; text-decoration: none; font-weight: 600; }
         
-        /* Legends and Badges */
-        .legend-item:hover { background: ${SECONDARY_BLUE}70; }
-        .gene-badge { padding: 5px 10px; background: ${PRIMARY_BLUE}15; color: ${PRIMARY_BLUE}; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .gene-badge:hover { background: ${PRIMARY_BLUE}; color: white; }
+        /* --- CHAT/RESULT COLORS --- */
+        .ciliai-message.user .ciliai-message-content { background: ${PRIMARY_BLUE}; color: white; }
+        .ai-result-card strong, .ai-action { color: ${PRIMARY_BLUE}; font-weight: 600; }
         
-        /* New Welcome Button Styles */
+        /* --- QUICK PLOTS / WELCOME BUTTONS --- */
+        .ciliai-quick-plots { display: flex; flex-direction: column; gap: 8px; }
         .welcome-action-btn {
-            background: #f8f9fa;
+            background: ${SECONDARY_BLUE};
             color: ${PRIMARY_BLUE};
-            border: 1px solid ${SECONDARY_BLUE};
+            border: 1px solid ${PRIMARY_BLUE};
         }
         .welcome-action-btn:hover {
             background: ${PRIMARY_BLUE};
             color: white;
-            border-color: ${PRIMARY_BLUE};
-        }
-
-        /* Table Styles */
-        .ciliai-data-table td strong { color: ${PRIMARY_BLUE}; font-weight: 600; }
-
-        @media (max-width: 992px) {
-            .container { grid-template-columns: 1fr; height: calc(100vh - 110px); }
+            border-color: white;
         }
     `;
 
@@ -564,7 +590,6 @@ function injectPageCSS() {
     styleEl.textContent = css;
     document.head.appendChild(styleEl);
 }
-
 
 /**
  * Loads the external data files required only by the Cilia Analysis Page plots.
