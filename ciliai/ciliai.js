@@ -2730,291 +2730,287 @@ function extractPhenotypeIntent(qLower) {
         
         return `I found ${filteredGenes.length} gene(s) matching your criteria: <strong>${resultTitle}</strong>. Do you want to view the list?`;
    }
-    /**
-     * (REPLACEMENT) The Main "Level 1" Query Router
-     * (FIXED Nov 17 2025): Moved query check to top, integrated new terminology map.
-     */
-   async function handleAIQuery(query) {
-        const chatWindow = document.getElementById('messages');
-        if (!chatWindow) return;
 
-        // Validate query *before* any routing
-        if (!query) return;
-        const qLower = query.toLowerCase().trim();
+/**
+     * (REPLACEMENT) The Main "Level 1" Query Router
+     * (FIXED Nov 17 2025): Moved query check to top, integrated new terminology map.
+     * CORRECTED: Scoping issues (window. prefix added) and try/catch structure fixed.
+     */
+   async function handleAIQuery(query) {
+        const chatWindow = document.getElementById('messages');
+        if (!chatWindow) return;
 
-        log(`Routing query: ${query}`);
+        // Validate query *before* any routing
+        if (!query) return;
+        const qLower = query.toLowerCase().trim();
 
-        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
-        const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
-        if (simpleGreetings.includes(qLower)) {
-            log('Routing via: Intent (Greeting)');
-            addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
-            return;
-        }
-        
-        const terminologyQueries = {
-            // --- BASIC DEFINITIONS ---
-            "what is a cilium": "A cilium is a microtubule-based organelle extending from the cell surface. Primary cilia sense extracellular signals; motile cilia generate fluid flow. (Rosenbaum & Witman 2002)",
-            "what are cilia": "Cilia are conserved organelles on most eukaryotic cells. They function in sensory signaling (primary cilia) or motility (motile cilia). (Reiter, Blacque & Leroux 2012)",
-            "tell me about cilia": "Cilia detect environmental cues or move fluids, depending on type. Defects cause human genetic disorders called ciliopathies. (Hildebrandt & Benzing 2011)",
-            // --- IFT / TRAFFICKING --- 
-            "explain ift":  "Intraflagellar Transport (IFT) is the bidirectional movement of protein complexes along the axoneme, essential for assembling and maintaining cilia. (Kozminski et al. 1993; Cole 2003)",
-            "who discovered ift": "Keith Kozminski discovered Intraflagellar Transport in 1993 in Joel Rosenbaum’s lab using Chlamydomonas. (Kozminski et al. 1993)",
-            "what is ift-a": "IFT-A (Intraflagellar Transport A) is the retrograde IFT complex required for returning cargo from tip to base and for membrane protein gating. (Behal et al. 2012; Mukhopadhyay et al. 2010)",
-            "what is ift-b": "IFT-B is the anterograde IFT complex delivering axonemal building blocks from the base to the tip. It is essential for ciliogenesis. (Cole et al. 1998; Taschner & Lorentzen 2016)",
-            "what is ift88": "IFT88 is an IFT-B core protein required for cilium assembly. Mutation causes cilia loss and polycystic kidney disease in mouse. (Pazour et al. 2000)",
-            // --- BBSOME / CARGO TRAFFICKING ---
-            "what is the bbsome": "The BBSome, a protein complex of 8 Bardet-Biedl syndrome (BBS) proteins, is a trafficking complex that ferries membrane proteins, including GPCRs, into and out of cilia. Mutations cause Bardet-Biedl Syndrome. (Jin et al. 2010; Nachury et al. 2007)",
-            "list genes in bbsome": "The BBSome consists of BBS1, BBS2, BBS4, BBS5, BBS7, BBS8 (TTC8), BBS9, and BBIP1. (Nachury et al. 2007)",
-            // --- TRANSITION ZONE & BASE ---
-            "explain the transition zone": "The transition zone is the gate at the ciliary base that controls protein entry and exit via MKS and NPHP modules. (Garcia-Gonzalo & Reiter 2017)",
-            "what is the basal body": "The basal body is the modified mother centriole that nucleates and anchors the axoneme. (Reiter et al. 2012)",
-            "what is the transition fibre": "Transition fibres link the basal body to the membrane and help dock proteins entering the cilium. (Reiter et al. 2012)",
-            "what is the mks complex": "The Meckel–Gruber Syndrome (MKS) complex forms part of the transition zone architecture and maintains ciliary gating. (Garcia-Gonzalo & Reiter 2017)",
-            "what is the nphp complex": "The Nephronophthisis (NPHP) complex is a transition zone module required for proper gating and kidney function. (Reiter et al. 2012)",
-            // --- AXONEME / STRUCTURE ---
-            "what is the axoneme":  "The axoneme is the microtubule core of the cilium, usually organized as 9 outer doublets with or without a central pair. (Satir & Christensen 2007)",
-            "what is the 9+0 structure": "A 9+0 axoneme has nine microtubule doublets and no central pair, characteristic of primary cilia. (Satir & Christensen 2007)",
-            "what is the 9+2 structure": "A 9+2 axoneme has nine doublets plus a central pair, found in motile cilia. (Satir & Christensen 2007)",
-            // --- SIGNALING ---
-            "what is hedgehog signaling":  "Hedgehog signaling requires the primary cilium for Smoothened activation and Gli processing. (Goetz & Anderson 2010)",
-            "what are ciliary gpcrs":  "Ciliary G Protein-Coupled Receptors are signaling receptors enriched in the ciliary membrane, including SSTR3, GPR161, and MCHR1. (Mukhopadhyay et al. 2013)",
-            // --- MOTILE CILIA COMPONENTS ---
-            "what are dynein arms": "Dynein arms are ATP-powered motor complexes that drive motile cilia beating. Their loss causes Primary Ciliary Dyskinesia. (Fliegauf et al. 2007)",
-            "what is radial spoke": "The radial spoke is a structural complex linking outer doublets to the central pair, coordinating motility. (Warner 1976)",
-            "what is the central pair": "The central pair is the two microtubules in the 9+2 axoneme required for proper waveform regulation. (Satir & Christensen 2007)",
-            // --- CILIOGENESIS ---
-            "what is ciliogenesis":  "Ciliogenesis is the process of assembling a cilium, starting at the basal body and extending the axoneme. (Ishikawa & Marshall 2011)",
-            "what is distal appendage":  "Distal appendages are structures on the mother centriole required for docking to the membrane and initiating ciliogenesis. (Tanos et al. 2013)",
-            // --- DISEASES ---
-            "what are ciliopathies": "Ciliopathies are disorders caused by defects in cilia. They affect the brain, kidney, liver, eye, and skeleton. (Hildebrandt & Benzing 2011)",
-            "help me understand ciliopathies": "Ciliopathies result from structural or functional ciliary defects. Examples include Joubert Syndrome, MKS, BBS, NPHP, and PCD. (Reiter & Leroux 2017)",
-            "what is joubert syndrome":  "Joubert Syndrome is a ciliopathy with cerebellar vermis hypoplasia and the ‘molar tooth sign,’ caused by mutations in transition zone and IFT genes. (Romani et al. 2013)",
-            "what is meckel-gruber syndrome":  "MKS is a severe ciliopathy with brain malformations, kidney cysts, and polydactyly caused by MKS module gene defects. (Hartill et al. 2017)",
-            "what is primary ciliary dyskinesia": "PCD is caused by defects in motile cilia, leading to chronic infections, infertility, and left-right asymmetry defects. (Fliegauf et al. 2007)",
-            "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
-        };
+        window.log(`Routing query: ${query}`);
 
-        if (terminologyQueries[qLower]) {
-            log('Routing via: Intent (Terminology)');
-            addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
-            return;
-        }
+        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
+        const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
+        if (simpleGreetings.includes(qLower)) {
+            window.log('Routing via: Intent (Greeting)');
+            window.addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
+            return;
+        }
+        
+        const terminologyQueries = {
+            "what is a cilium": "A cilium is a microtubule-based organelle extending from the cell surface. Primary cilia sense extracellular signals; motile cilia generate fluid flow. (Rosenbaum & Witman 2002)",
+            "what are cilia": "Cilia are conserved organelles on most eukaryotic cells. They function in sensory signaling (primary cilia) or motility (motile cilia). (Reiter, Blacque & Leroux 2012)",
+            "tell me about cilia": "Cilia detect environmental cues or move fluids, depending on type. Defects cause human genetic disorders called ciliopathies. (Hildebrandt & Benzing 2011)",
+            "explain ift": "Intraflagellar Transport (IFT) is the bidirectional movement of protein complexes along the axoneme, essential for assembling and maintaining cilia. (Kozminski et al. 1993; Cole 2003)",
+            "who discovered ift": "Keith Kozminski discovered Intraflagellar Transport in 1993 in Joel Rosenbaum’s lab using Chlamydomonas. (Kozminski et al. 1993)",
+            "what is ift-a": "IFT-A (Intraflagellar Transport A) is the retrograde IFT complex required for returning cargo from tip to base and for membrane protein gating. (Behal et al. 2012; Mukhopadhyay et al. 2010)",
+            "what is ift-b": "IFT-B is the anterograde IFT complex delivering axonemal building blocks from the base to the tip. It is essential for ciliogenesis. (Cole et al. 1998; Taschner & Lorentzen 2016)",
+            "what is ift88": "IFT88 is an IFT-B core protein required for cilium assembly. Mutation causes cilia loss and polycystic kidney disease in mouse. (Pazour et al. 2000)",
+            "what is the bbsome": "The BBSome, a protein complex of 8 Bardet-Biedl syndrome (BBS) proteins, is a trafficking complex that ferries membrane proteins, including GPCRs, into and out of cilia. Mutations cause Bardet-Biedl Syndrome. (Jin et al. 2010; Nachury et al. 2007)",
+            "list genes in bbsome": "The BBSome consists of BBS1, BBS2, BBS4, BBS5, BBS7, BBS8 (TTC8), BBS9, and BBIP1. (Nachury et al. 2007)",
+            "explain the transition zone": "The transition zone is the gate at the ciliary base that controls protein entry and exit via MKS and NPHP modules. (Garcia-Gonzalo & Reiter 2017)",
+            "what is the basal body": "The basal body is the modified mother centriole that nucleates and anchors the axoneme. (Reiter et al. 2012)",
+            "what is the transition fibre": "Transition fibres link the basal body to the membrane and help dock proteins entering the cilium. (Reiter et al. 2012)",
+            "what is the mks complex": "The Meckel–Gruber Syndrome (MKS) complex forms part of the transition zone architecture and maintains ciliary gating. (Garcia-Gonzalo & Reiter 2017)",
+            "what is the nphp complex": "The Nephronophthisis (NPHP) complex is a transition zone module required for proper gating and kidney function. (Reiter et al. 2012)",
+            "what is the axoneme": "The axoneme is the microtubule core of the cilium, usually organized as 9 outer doublets with or without a central pair. (Satir & Christensen 2007)",
+            "what is the 9+0 structure": "A 9+0 axoneme has nine microtubule doublets and no central pair, characteristic of primary cilia. (Satir & Christensen 2007)",
+            "what is the 9+2 structure": "A 9+2 axoneme has nine doublets plus a central pair, found in motile cilia. (Satir & Christensen 2007)",
+            "what is hedgehog signaling": "Hedgehog signaling requires the primary cilium for Smoothened activation and Gli processing. (Goetz & Anderson 2010)",
+            "what are ciliary gpcrs": "Ciliary G Protein-Coupled Receptors are signaling receptors enriched in the ciliary membrane, including SSTR3, GPR161, and MCHR1. (Mukhopadhyay et al. 2013)",
+            "what are dynein arms": "Dynein arms are ATP-powered motor complexes that drive motile cilia beating. Their loss causes Primary Ciliary Dyskinesia. (Fliegauf et al. 2007)",
+            "what is radial spoke": "The radial spoke is a structural complex linking outer doublets to the central pair, coordinating motility. (Warner 1976)",
+            "what is the central pair": "The central pair is the two microtubules in the 9+2 axoneme required for proper waveform regulation. (Satir & Christensen 2007)",
+            "what is ciliogenesis": "Ciliogenesis is the process of assembling a cilium, starting at the basal body and extending the axoneme. (Ishikawa & Marshall 2011)",
+            "what is distal appendage": "Distal appendages are structures on the mother centriole required for docking to the membrane and initiating ciliogenesis. (Tanos et al. 2013)",
+            "what are ciliopathies": "Ciliopathies are disorders caused by defects in cilia. They affect the brain, kidney, liver, eye, and skeleton. (Hildebrandt & Benzing 2011)",
+            "help me understand ciliopathies": "Ciliopathies result from structural or functional ciliary defects. Examples include Joubert Syndrome, MKS, BBS, NPHP, and PCD. (Reiter & Leroux 2017)",
+            "what is joubert syndrome": "Joubert Syndrome is a ciliopathy with cerebellar vermis hypoplasia and the ‘molar tooth sign,’ caused by mutations in transition zone and IFT genes. (Romani et al. 2013)",
+            "what is meckel-gruber syndrome": "MKS is a severe ciliopathy with brain malformations, kidney cysts, and polydactyly caused by MKS module gene defects. (Hartill et al. 2017)",
+            "what is primary ciliary dyskinesia": "PCD is caused by defects in motile cilia, leading to chronic infections, infertility, and left-right asymmetry defects. (Fliegauf et al. 2007)",
+            "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
+        };
 
-        try {
-            if (!window.CiliAI.ready) {
-                addChatMessage("Data is still loading, please wait...", false);
-                return;
-            }
+        if (terminologyQueries[qLower]) {
+            window.log('Routing via: Intent (Terminology)');
+            window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
+            return;
+        }
 
-            let htmlResult = null;
-            let match;
+        // Start the main try block
+        try {
+            if (!window.CiliAI.ready) {
+                window.addChatMessage("Data is still loading, please wait...", false);
+                return;
+            }
 
-            // --- MODIFIED: Button intents moved to the TOP for priority ---
-            if (qLower === 'plot default umap') {
-                log('Routing via: Intent (Default UMAP Plot)');
-                handleUmapPlot('FOXJ1');
-                htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
-            }
-            else if (qLower === 'plot default phylogeny') {
-                log('Routing via: Intent (Default Phylogeny Plot)');
-                const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-                htmlResult = await routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
-            }
-            // --- END OF MOVED BLOCK ---
+            let htmlResult = null;
+            let match;
 
-            // =( 1 )= INTENT: COMPLEX (L2/L3) QUERIES
-            else if (htmlResult === null) {
-                htmlResult = handleComplexQuery(query);
-                if (htmlResult) {
-                    log('Routing via: Complex Query Engine (L2/L3)');
-                }
-            }
+            // --- MODIFIED: Button intents moved to the TOP for priority ---
+            if (qLower === 'plot default umap') {
+                window.log('Routing via: Intent (Default UMAP Plot)');
+                window.handleUmapPlot('FOXJ1');
+                htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
+            }
+            else if (qLower === 'plot default phylogeny') {
+                window.log('Routing via: Intent (Default Phylogeny Plot)');
+                const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+                htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
+            }
+            // --- END OF MOVED BLOCK ---
 
-            // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-            
-            // --- THIS IS THE FIX ---
-            // Added exclusions for "phylogen", "umap", and "scrna" to prevent misfiring
-            const isFollowUp = (
-                qLower === 'yes' || qLower === 'ok' || qLower === 'sure' ||
-                qLower.includes('view the list') || qLower.includes('show') ||
-                qLower.includes('please') || qLower.includes('display') || 
-                qLower.includes('yes please') || qLower.includes('provide the paper')
-            ) && 
-            !qLower.includes('phylogen') && 
-            !qLower.includes('umap') && 
-            !qLower.includes('scrna');
-            // --- END OF FIX ---
+            // =( 1 )= INTENT: COMPLEX (L2/L3) QUERIES
+            else if (htmlResult === null) {
+                htmlResult = window.handleComplexQuery(query);
+                if (htmlResult) {
+                    window.log('Routing via: Complex Query Engine (L2/L3)');
+                }
+            }
 
-            if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && lastQueryContext.type === null) {
-                log('Routing via: Intent (Ignored standalone "yes")');
-                return; // Do nothing, just stop processing
-            }
+            // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+            
+            // Added exclusions for "phylogen", "umap", and "scrna" to prevent misfiring
+            const isFollowUp = (
+                qLower === 'yes' || qLower === 'ok' || qLower === 'sure' ||
+                qLower.includes('view the list') || qLower.includes('show') ||
+                qLower.includes('please') || qLower.includes('display') || 
+                qLower.includes('yes please') || qLower.includes('provide the paper')
+            ) && 
+            !qLower.includes('phylogen') && 
+            !qLower.includes('umap') && 
+            !qLower.includes('scrna');
 
-            if (htmlResult === null && isFollowUp && lastQueryContext.type === 'list_followup') {
-                log('Routing via: Intent (Follow-up: Show List)');
-                showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
-                lastQueryContext = { type: null, data: [], term: null };
-                return; // No chat message needed
-            }
-            
-            // =( 3 )= INTENT: CONTEXTUAL FOLLOW-UP (Screen References)
-            else if (htmlResult === null && isFollowUp && lastQueryContext.type === 'screen_references') {
-                log('Routing via: Intent (Follow-up: Screen References)');
-                htmlResult = handleScreenReferenceFollowup();
-            }
+            if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && lastQueryContext.type === null) {
+                window.log('Routing via: Intent (Ignored standalone "yes")');
+                return; // Do nothing, just stop processing
+            }
 
-            // =( 4 )= INTENT: SCREENS / PHENOTYPES (HIGH PRIORITY)
-            else if (htmlResult === null && (
-                qLower.includes('loss-of-function') || qLower.includes('lof') ||
-                qLower.includes('overexpression') || qLower.includes('oe') ||
-                qLower.includes('percent ciliated') || qLower.includes('cilia length') ||
-                (qLower.includes('effect') && qLower.includes('of'))
-            )) {
-                log('Routing via: Intent (Screens/Effects)');
-                const genes = extractMultipleGenes(query);
-                if (genes.length > 0) {
-                    htmlResult = handleScreenQuery(genes[genes.length - 1]);
-                } else {
-                    htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
-                }
-            }
+            if (htmlResult === null && isFollowUp && lastQueryContext.type === 'list_followup') {
+                window.log('Routing via: Intent (Follow-up: Show List)');
+                window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+                lastQueryContext = { type: null, data: [], term: null };
+                return; // No chat message needed
+            }
+            
+            // =( 3 )= INTENT: CONTEXTUAL FOLLOW-UP (Screen References)
+            else if (htmlResult === null && isFollowUp && lastQueryContext.type === 'screen_references') {
+                window.log('Routing via: Intent (Follow-up: Screen References)');
+                htmlResult = window.handleScreenReferenceFollowup();
+            }
 
-            // =( 5 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?" (STRICTER REGEX)
-            else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
-                log('Routing via: Intent (High-Priority Get Details)');
-                htmlResult = await displayFullGeneInfo(match[1].toUpperCase());
-            }
+            // =( 4 )= INTENT: SCREENS / PHENOTYPES (HIGH PRIORITY)
+            else if (htmlResult === null && (
+                qLower.includes('loss-of-function') || qLower.includes('lof') ||
+                qLower.includes('overexpression') || qLower.includes('oe') ||
+                qLower.includes('percent ciliated') || qLower.includes('cilia length') ||
+                (qLower.includes('effect') && qLower.includes('of'))
+            )) {
+                window.log('Routing via: Intent (Screens/Effects)');
+                const genes = window.extractMultipleGenes(query);
+                if (genes.length > 0) {
+                    htmlResult = window.handleScreenQuery(genes[genes.length - 1]);
+                } else {
+                    htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
+                }
+            }
 
-            // =( 6 )= INTENT: ORTHOLOGS
-            else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
-                log('Routing via: Intent (Ortholog)');
-                htmlResult = handleOrthologQuery(match[1].toUpperCase(), match[2]);
-            }
-            else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
-                log('Routing via: Intent (Ortholog)');
-                htmlResult = handleOrthologQuery(match[2].toUpperCase(), match[1]);
-            }
+            // =( 5 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?" (STRICTER REGEX)
+            else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
+                window.log('Routing via: Intent (High-Priority Get Details)');
+                htmlResult = await window.displayFullGeneInfo(match[1].toUpperCase());
+            }
 
-            //=( 7 )= INTENT: COMPLEX / MODULE MEMBERS (Split Logic)
-            else if (htmlResult === null && (match = qLower.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
-                const term = match[1].replace(/^(the|a|an)\s/i, '').trim();
-                log('Routing via: Intent (Get Genes in Complex)');
-                htmlResult = handleSimpleComplexQuery(term, query); 
-            }
-            else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|part of|in complex)\s+(.+)/i))) {
-                log('Routing via: Intent (Get Complexes for Gene)');
-                const genes = extractMultipleGenes(match[1]);
-                if (genes.length > 0) {
-                    htmlResult = handleGeneInComplexQuery(genes[0]);
-                }
-            }
+            // =( 6 )= INTENT: ORTHOLOGS
+            else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
+                window.log('Routing via: Intent (Ortholog)');
+                htmlResult = window.handleOrthologQuery(match[1].toUpperCase(), match[2]);
+            }
+            else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
+                window.log('Routing via: Intent (Ortholog)');
+                htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
+            }
 
-            //=( 8 )= INTENT: DOMAINS
-            else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
-                log('Routing via: Intent (Domains)');
-                const genes = extractMultipleGenes(match[1]);
-                if (genes.length > 0) {
-                    htmlResult = handleDomainQuery(genes);
-                }
-            }
+            //=( 7 )= INTENT: COMPLEX / MODULE MEMBERS (Split Logic)
+            else if (htmlResult === null && (match = qLower.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
+                const term = match[1].replace(/^(the|a|an)\s/i, '').trim();
+                window.log('Routing via: Intent (Get Genes in Complex)');
+                htmlResult = window.handleSimpleComplexQuery(term, query);
+            }
+            else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|part of|in complex)\s+(.+)/i))) {
+                window.log('Routing via: Intent (Get Complexes for Gene)');
+                const genes = window.extractMultipleGenes(match[1]);
+                if (genes.length > 0) {
+                    htmlResult = window.handleGeneInComplexQuery(genes[0]);
+                }
+            }
 
-            //=( 9 )= INTENT: PHYLOGENY / EVOLUTION
-            else if (htmlResult === null && (
-                qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
-                qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
-                qLower.includes('mammalian specific') || qLower.includes('ciliary specific') ||
-                qLower.includes('table')
-            )) {
-                log('Routing via: Intent (Phylogeny Engine)');
-                htmlResult = await routePhylogenyAnalysis(query);
-            }
+            //=( 8 )= INTENT: DOMAINS
+            else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
+                window.log('Routing via: Intent (Domains)');
+                const genes = window.extractMultipleGenes(match[1]);
+                if (genes.length > 0) {
+                    htmlResult = window.handleDomainQuery(genes);
+                }
+            }
 
-            //=( 10 )= INTENT: FUNCTIONAL MODULES
-            else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
-                log('Routing via: Intent (Get Modules)');
-                const gene = match[1].toUpperCase();
-                const g = window.CiliAI.lookups.geneMap[gene];
-                if (g && g['Functional.category']) {
-                    htmlResult = formatListResult(`Functional Modules for ${gene}`, ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
-                } else {
-                    htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
-                }
-            }
+            //=( 9 )= INTENT: PHYLOGENY / EVOLUTION
+            else if (htmlResult === null && (
+                qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
+                qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
+                qLower.includes('mammalian specific') || qLower.includes('ciliary specific') ||
+                qLower.includes('table')
+            )) {
+                window.log('Routing via: Intent (Phylogeny Engine)');
+                htmlResult = await window.routePhylogenyAnalysis(query);
+            }
 
-            //=( 11 )= INTENT: scRNA Expression
-            else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression') || qLower.includes('expression of'))) {
-                log('Routing via: Intent (scRNA)');
-                const genes = extractMultipleGenes(query);
-                if (genes.length > 0) {
-                    htmlResult = handleScRnaQuery(genes); // This is the text summary
-                    htmlResult = htmlResult.replace(`</div>`, 
-                        `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-umap-plot" data-genes="${genes[0]}">View ${genes[0]} on UMAP</a></p></div>`);
-                } else {
-                    htmlResult = `Please specify which gene(s) you want to check expression for.`;
-                }
-            }
-                
-           //=( 12 )= INTENT: UMAP (VISUAL)
-            else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
-                log('Routing via: Intent (UMAP Plot)');
-                let gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : null;
-                
-                if (!gene && (qLower.includes('umap') || qLower.includes('lung scrna'))) {
-                    gene = 'FOXJ1';
-                    log('Defaulting UMAP plot to FOXJ1');
-                }
-                handleUmapPlot(gene);
-                htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p></div>`;
-            }
+            //=( 10 )= INTENT: FUNCTIONAL MODULES
+            else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
+                window.log('Routing via: Intent (Get Modules)');
+                const gene = match[1].toUpperCase();
+                const g = window.CiliAI.lookups.geneMap[gene];
+                if (g && g['Functional.category']) {
+                    htmlResult = window.formatListResult(`Functional Modules for ${gene}`, window.ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
+                } else {
+                    htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
+                }
+            }
 
-            //=( 13 )= INTENT: SIMPLE KEYWORD LISTS
-            if (htmlResult === null) {
-                const intent = flexibleIntentParser(query);
-                if (intent) {
-                    log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
-                    htmlResult = intent.handler(intent.entity, query);
-                }
-            }
+            //=( 11 )= INTENT: scRNA Expression
+            else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression') || qLower.includes('expression of'))) {
+                window.log('Routing via: Intent (scRNA)');
+                const genes = window.extractMultipleGenes(query);
+                if (genes.length > 0) {
+                    htmlResult = window.handleScRnaQuery(genes);
+                    htmlResult = htmlResult.replace(`</div>`,
+                        `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-umap-plot" data-genes="${genes[0]}">View ${genes[0]} on UMAP</a></p></div>`);
+                } else {
+                    htmlResult = `Please specify which gene(s) you want to check expression for.`;
+                }
+            }
+                
+           //=( 12 )= INTENT: UMAP (VISUAL)
+            else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
+                window.log('Routing via: Intent (UMAP Plot)');
+                let gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : null;
+                
+                if (!gene && (qLower.includes('umap') || qLower.includes('lung scrna'))) {
+                    gene = 'FOXJ1';
+                    window.log('Defaulting UMAP plot to FOXJ1');
+                }
+                window.handleUmapPlot(gene);
+                htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p></div>`;
+            }
 
-            //=( 14 )= INTENT: FALLBACK (GET DETAILS)
-            if (htmlResult === null) {
-                log(`Routing via: Fallback (Get Details)`);
-                let term = qLower;
-                if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
-                    term = match[1];
-                }
-                term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
-                
-                const genes = extractMultipleGenes(term);
-                
-                if (genes.length > 0) {
-                    htmlResult = await displayFullGeneInfo(genes[0]);
-                }
-            }
+            //=( 13 )= INTENT: SIMPLE KEYWORD LISTS
+            if (htmlResult === null) {
+                const intent = window.flexibleIntentParser(query);
+                if (intent) {
+                    window.log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
+                    htmlResult = intent.handler(intent.entity, query);
+                }
+            }
 
-            //=( 15 )= FINAL FALLBACK (ERROR)
-            if (htmlResult === null) {
-                log(`Routing via: Final Fallback (Error)`);
-                const genes = extractMultipleGenes(query);
-                if (genes.length > 0) {
-                    log(`Final fallback, found gene: ${genes[0]}`);
-                    htmlResult = await displayFullGeneInfo(genes[0]);
-                } else {
-                    htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
-                }
-            }
+            //=( 14 )= INTENT: FALLBACK (GET DETAILS)
+            if (htmlResult === null) {
+                window.log(`Routing via: Fallback (Get Details)`);
+                let term = qLower;
+                if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
+                    term = match[1];
+                }
+                term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
+                
+                const genes = window.extractMultipleGenes(term);
+                
+                if (genes.length > 0) {
+                    htmlResult = await window.displayFullGeneInfo(genes[0]);
+                }
+            }
 
-            // Send the final result to chat
-            if (htmlResult) {
-                addChatMessage(htmlResult, false);
-            }
+            //=( 15 )= FINAL FALLBACK (ERROR)
+            if (htmlResult === null) {
+                window.log(`Routing via: Final Fallback (Error)`);
+                const genes = window.extractMultipleGenes(query);
+                if (genes.length > 0) {
+                    window.log(`Final fallback, found gene: ${genes[0]}`);
+                    htmlResult = await window.displayFullGeneInfo(genes[0]);
+                } else {
+                    htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
+                }
+            }
 
-        } catch (e) {
-            console.error("Error in handleAIQuery:", e);
-            addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
-        }
-    }
+            // Send the final result to chat
+            if (htmlResult) {
+                window.addChatMessage(htmlResult, false);
+            }
+
+        // Close the main try block before the catch
+        } catch (e) {
+            console.error("Error in handleAIQuery:", e);
+            window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+        }
+    }
+
+
+
 
 /**
      * (NEW) Provides full reference details for screen keys
@@ -3194,3 +3190,4 @@ function extractPhenotypeIntent(qLower) {
     }
 
 })();
+
