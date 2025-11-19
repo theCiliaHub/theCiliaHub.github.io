@@ -54,11 +54,7 @@ if (typeof window.addChatMessage !== "function") {
     };
 }
 
-if (typeof window.handleUmapPlot !== "function") {
-    window.handleUmapPlot = async function (gene) {
-        console.warn(`handleUmapPlot(${gene}) placeholder called.`);
-    };
-}
+
     
     // ==========================================================
     // GLOBAL STATE
@@ -401,9 +397,9 @@ window.loadCiliAIData = async function (timeoutMs = 60000) {
         }
         
         // --- MODIFIED: Show FOXJ1 UMAP on load ---
-        // Calling handleUmapPlot here is redundant since initCiliAI already called renderUMAPPlot(), 
+        // Calling renderUMAPPlot here is redundant since initCiliAI already called renderUMAPPlot(), 
         // but we'll assume the desired chat message flow requires this for the chat panel update.
-        await window.handleUmapPlot('FOXJ1');
+        await window.renderUMAPPlot('FOXJ1');
         window.addChatMessage(`Displaying default Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.`, false);
         // --- END OF MODIFICATION ---
 
@@ -686,7 +682,7 @@ function injectPageCSS() {
                     // This block catches the click on "View [GENE] on UMAP"
                     else if (action === 'show-umap-plot') {
                         log(`Action: show-umap-plot for ${genes}`);
-                        handleUmapPlot(genes); // This will now show the plot
+                        renderUMAPPlot(genes); // This will now show the plot
                         return; // Stop processing
                     }
                     // --- END OF FIX ---
@@ -1307,7 +1303,8 @@ function formatListResult(title, genes, description = "") {
  * UMAP PLOT with CELL TYPE LABELS (RED COLOR)
  * Derived by merging displayUmapGeneExpression() cluster-labeling logic.
  */
-async function handleUmapPlot(geneSymbol) {
+
+async function renderUMAPPlot(geneSymbol) { // <-- CORRECTED NAME
     const plotDivId = 'cilia-svg';
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
@@ -2827,7 +2824,7 @@ function extractPhenotypeIntent(qLower) {
             // --- MODIFIED: Button intents moved to the TOP for priority ---
             if (qLower === 'plot default umap') {
                 window.log('Routing via: Intent (Default UMAP Plot)');
-                window.handleUmapPlot('FOXJ1');
+                window.renderUMAPPlot('FOXJ1');
                 htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
             }
             else if (qLower === 'plot default phylogeny') {
@@ -2976,7 +2973,7 @@ function extractPhenotypeIntent(qLower) {
                     gene = 'FOXJ1';
                     window.log('Defaulting UMAP plot to FOXJ1');
                 }
-                window.handleUmapPlot(gene);
+                window.renderUMAPPlot(gene);
                 htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p></div>`;
             }
 
