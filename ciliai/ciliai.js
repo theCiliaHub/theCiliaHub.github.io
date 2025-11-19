@@ -74,6 +74,13 @@ if (typeof window.addChatMessage !== "function") {
     window.neversPhylogenyCache = null;
     window.CiliAI_UMAP = null; // This will be populated from the master DB
 
+ // Expose initializer globally
+    window.initCiliAI = initCiliAI;
+    window.renderUMAPPlot = renderUMAPPlot;
+    window.sendMsg = handleUserSend;
+    window.handleAIQuery = handleAIQuery;
+
+    
     // --- Data Maps (These are now just for the AI brain) ---
 
 
@@ -267,10 +274,7 @@ if (typeof window.addChatMessage !== "function") {
         }
     }
 
-    // Expose initializer globally
-    window.initCiliAI = initCiliAI;
-    window.renderUMAPPlot = renderUMAPPlot;
-
+   
     /**
      * Fetches the pre-compiled database files from GitHub.
      * CORRECTED: Uses 'window.log' consistently.
@@ -1392,7 +1396,7 @@ async function renderUMAPPlot(geneSymbol) { // <-- CORRECTED NAME
         hovertext: sampledData.map(p => `Cell Type: ${p.cell_type}`),
         hoverinfo: 'text',
         marker: {
-            color: 'red',
+            color: '#ffb09c',
             size: 5,
             opacity: 0.8
         }
