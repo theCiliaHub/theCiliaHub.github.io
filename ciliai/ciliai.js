@@ -987,7 +987,17 @@ function formatListResult(title, genes, description = "") {
         `;
     }
 
-    function addChatMessage(html, isUser = false) {
+// Section 4A. Core Helper Functions
+
+function react(type) {
+    if (type === 'up') {
+        addChatMessage('Thanks for the feedback! 🙏', false);
+    } else {
+        addChatMessage('Sorry about that. What specifically would help?', false);
+    }
+}
+
+function addChatMessage(html, isUser = false) {
         const chatWindow = document.getElementById('messages');
         if (!chatWindow) return;
         const msg = document.createElement('div');
@@ -2649,7 +2659,7 @@ async function displayFullGeneInfo(geneSymbol) {
     return html;
 }
 
-
+    
     function getGenesByLocalization(term) {
         let normTerm = term.toLowerCase();
         const L = window.CiliAI.lookups;
@@ -3943,6 +3953,7 @@ function renderOrganelleUMAP(genes, container, custom) {
         window.handleAIQuery('plot default umap');
     };
 
+    
     // --- NEW: Default phylogeny plot ---
     window.showDefaultPhylogeny = function () {
         window.addChatMessage('Show Phylogenetics Analysis (Default Genes)', true);
