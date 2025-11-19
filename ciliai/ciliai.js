@@ -1317,22 +1317,26 @@ function formatListResult(title, genes, description = "") {
     }
     
 /**
- * UMAP PLOT with CELL TYPE LABELS (EXPRESSION COLOR/SIZE MAPPING)
- * This function calculates gene expression per cell type and maps it to the marker size and color intensity.
+ * UMAP PLOT (Clean Cell Map Mode)
+ * Renders a clean UMAP visualization of all cell types. Gene expression data
+ * is NOT used for coloring or sizing the points to provide a clear, static map.
  */
 async function renderUMAPPlot(geneSymbol) { 
+    // We keep 'geneSymbol' argument for function compatibility (e.g., initialization)
     const plotDivId = 'cilia-svg';
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
     const plotDiv = document.getElementById(plotDivId);
-    const gene = geneSymbol ? geneSymbol.toUpperCase() : null;
+
+    // Default gene for ensuring the visualization runs correctly (FOXJ1)
+    const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1';
 
     if (!plotDiv) {
         console.error('UMAP plot container "cilia-svg" not found.');
         return;
     }
     if (!umapData || !cellData) {
-        addChatMessage('UMAP or scRNA-seq expression data is not available to plot.', false);
+        window.addChatMessage('UMAP or scRNA-seq expression data is not available to plot.', false);
         return;
     }
 
@@ -1341,48 +1345,13 @@ async function renderUMAPPlot(geneSymbol) {
     const wrapper = plotDiv.closest('.interactive-cilium');
     if (wrapper) wrapper.classList.add('table-view-active');
 
-    // 1. Fetch Expression Data for all sampled cells
-    const geneExpressionData = cellData[gene] || {};
-    
-    // 2. Subsample and prepare data arrays
+    // 1. Subsample and prepare data arrays (Simplified)
     const sampleSize = 15000;
-    const sampledData = [];
-    const colorArray = [];
-    
-    // NEW: Array for scaling dot size
-    const sizeArray = [];
-    
-    let maxExpression = 0;
-    const sizeBase = 5;       // Minimum dot size
-    const sizeScale = 12;     // Maximum dot size
-    const expressionThreshold = 2; // Maximum expression value to map dot size against
-
-    const sourceData = umapData.length > sampleSize ? 
-                       // Simple method to get a random subset if needed
-                       umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
+    const sampledData = umapData.length > sampleSize 
+                       ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
                        : umapData;
 
-    for (const point of sourceData) {
-        // Look up expression value for this cell's type for the target gene
-        const expressionValue = geneExpressionData[point.cell_type] || 0;
-        
-        sampledData.push(point);
-        colorArray.push(expressionValue);
-        
-        // Calculate size based on expression, capped by expressionThreshold
-        const scaledMagnitude = Math.min(expressionValue, expressionThreshold) / expressionThreshold;
-        sizeArray.push(sizeBase + (sizeScale - sizeBase) * scaledMagnitude); // Scale size between 5 and 12
-        
-        if (expressionValue > maxExpression) {
-            maxExpression = expressionValue;
-        }
-    }
-    
-    if (maxExpression === 0 && gene) {
-        window.addChatMessage(`Gene <strong>${gene}</strong> found, but has no detectable expression in the loaded Lung scRNA-seq dataset.`, false);
-    }
-    
-    // --- Annotations (Cell Type Labels) remain unchanged ---
+    // --- Annotations (Cell Type Labels) remain the same ---
     const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
     const annotations = [];
     const median = arr => {
@@ -1408,35 +1377,27 @@ async function renderUMAPPlot(geneSymbol) {
         });
     }
 
-    // 3. Define Plotly Trace with Color Mapping
-    const colorScale = [
-        [0, '#F8F8F8'], // Base color (near white/gray for 0 expression)
-        [0.0001, '#FFDAD0'], // Lightest Red (Start point for visibility)
-        [1, '#E60000']  // Vibrant Red (Max expression color)
-    ];
+    // 2. Define Plotly Trace with Static Color (No Expression Mapping)
+    const staticColor = '#FFD8C9'; // Static Light Red/Peach
+    const staticSize = 5;         // Static Size
 
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
-        text: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${colorArray[i].toFixed(3)}`),
+        // Hovertext now only shows the cell type for cleanliness
+        text: sampledData.map(p => `Cell Type: ${p.cell_type}`),
         mode: 'markers',
         type: 'scattergl',
         hoverinfo: 'text',
         marker: {
-            color: colorArray, // <-- Variable color array
-            colorscale: colorScale, // <-- Red color scale
-            cmin: 0,
-            cmax: maxExpression > 0 ? maxExpression : 0.0001,
-            colorbar: {
-                title: `${gene} Expr. (TPM)`
-            },
-            size: sizeArray, // <-- Variable size array (New)
+            color: staticColor, // <-- STATIC COLOR APPLIED
+            size: staticSize,   // <-- STATIC SIZE APPLIED
             opacity: 0.8
         }
     }];
 
     const layout = {
-        title: `UMAP: ${gene || 'All Cells'} Expression (Dot size = Expression Magnitude)`,
+        title: `UMAP Map: Cell Clusters (Default Context: ${gene})`, // Title updated to reflect map context
         xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
         yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
         hovermode: 'closest',
@@ -1458,7 +1419,6 @@ async function renderUMAPPlot(geneSymbol) {
     backButton.onclick = () => window.generateAndInjectSVG();
     plotDiv.prepend(backButton);
 }
-
     
     /**
      * Helper function to lazy-load phylogeny data only when needed
