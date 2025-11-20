@@ -18,7 +18,7 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { height: 100%; font-family: 'Inter', sans-serif; background: #eef1f5; color: #003b63; overflow-y: auto; }
+        body, html { height: 100%; font-family: 'Inter', sans-serif; background: #eef1f5; color: #003b63; overflow: hidden; } /* Changed back to hidden to support full-height grid */
 
         /* --- Header --- */
         header {
@@ -29,38 +29,33 @@
             justify-content: space-between;
             align-items: center;
             font-size: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 60px; /* Fixed height for header */
         }
         header .logo { font-weight: bold; }
         header nav a { color: white; text-decoration: none; font-size: 16px; margin-left: 20px; }
         header nav a:hover { text-decoration: underline; }
 
-        /* --- Intro / About Section (Replaces old 'intro' and search bar) --- */
-        #about-section {
-            padding: 20px 30px;
-            background: white;
-            border-bottom: 1px solid #c5d6e5;
+        /* --- Main Layout --- */
+        #main-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            height: calc(100vh - 60px); /* Fill remaining viewport height */
+        }
+
+        /* --- Visualization Panel (Left) --- */
+        #umap-area {
+            padding: 20px;
             display: flex;
             flex-direction: column;
+            overflow: hidden; /* Important for plot containment */
         }
-        #about-section h2 { margin: 0 0 10px; color: var(--primary-blue); font-size: 20px; }
-        #about-section p { line-height: 1.5; font-size: 14px; margin-bottom: 10px; }
-        #about-section strong { font-weight: 600; }
-        .example-list {
-            margin-top: 10px;
-            padding: 10px;
-            background: #f0f7ff;
-            border-left: 4px solid var(--primary-blue);
-            border-radius: 6px;
-            font-size: 13px;
-        }
-        .example-list li { margin-bottom: 4px; }
-        .top-bar-controls {
+        .controls-bar {
             display: flex; 
             align-items: center; 
             justify-content: space-between; 
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px dashed var(--border-light);
+            margin-bottom: 20px; 
+            height: 40px;
         }
         .search-container { display: flex; gap: 10px; flex: 1; max-width: 600px; }
         .search-input { flex: 1; padding: 0 15px; border: 2px solid var(--border-light); border-radius: 8px; height: 40px; font-size: 14px; }
@@ -68,20 +63,6 @@
         .search-btn { padding: 0 20px; background: var(--primary-blue); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; height: 40px; }
         .search-btn:hover { background: #00477a; }
 
-        /* --- Main Layout --- */
-        #main-wrapper {
-            display: grid;
-            grid-template-columns: 1fr 400px; /* Adjusted to 400px for consistency with old design */
-            height: calc(100vh - 210px); /* Adjust height calculation */
-            min-height: 600px;
-        }
-
-        /* --- UMAP Panel --- */
-        #umap-area {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
         .viz-card {
             flex: 1;
             background: white;
@@ -104,12 +85,13 @@
         .save-btn:hover { background: var(--primary-blue); color: white; }
         #cilia-svg { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; }
 
-        /* --- Chatbox --- */
+        /* --- Chat Panel (Right) --- */
         #chatbox {
             background: #f8fafc;
             border-left: 1px solid var(--border-light);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         .chat-header { padding: 20px; border-bottom: 1px solid var(--border-light); }
         .chat-header h2 { font-size: 18px; color: var(--primary-blue); }
@@ -168,7 +150,6 @@
         .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
         .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
         .status.error { background: var(--status-error-bg); color: #c62828; }
-        
     </style>
 </head>
 <body>
@@ -176,38 +157,21 @@
 <header>
     <div class="logo">CiliAI</div>
     <nav>
-        <a href="#about-section">About</a>
+        <a href="index.html">Home</a>
+        <a href="about.html">About</a>
     </nav>
 </header>
 
-<div id="about-section">
-    <h2>About CiliAI</h2>
-    <p>I am an **AI assistant** designed to help you explore and analyze data on **ciliary biology**. You can ask questions or paste full gene lists.</p>
-    <p>My data comes from a pre-compiled database of over **23,000 genes**, enriched with **8 specialized datasets** (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
-
-    <div class="example-list">
-        **Examples of what I understand:**
-        <ul>
-            <li>**Gene Details:** "What is IFT88?" or "Describe ARL13B."</li>
-            <li>**Localization:** "List genes in the transition zone." or "Where is CEP290?"</li>
-            <li>**Complexes:** "What genes are in the BBSome?" or "Complex components of OFD1."</li>
-            <li>**Ciliopathies:** "Gene list of Joubert Syndrome." or "What genes cause PCD?"</li>
-            <li>**Phylogeny:** "Show conservation of IFT88."</li>
-            <li>**Domains:** "Which genes have WD40 domains?"</li>
-        </ul>
-    </div>
-
-    <div class="top-bar-controls">
-        <div class="search-container">
-            <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (e.g., IFT88, FOXJ1)...">
-            <button class="search-btn" onclick="window.searchGene()">Search</button>
-        </div>
-        <div id="dataStatus" class="status-badge loading">Loading...</div>
-    </div>
-</div>
-
 <div id="main-wrapper">
     <div id="umap-area">
+        <div class="controls-bar">
+            <div class="search-container">
+                <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (e.g., IFT88, FOXJ1)...">
+                <button class="search-btn" onclick="window.searchGene()">Search</button>
+            </div>
+            <div id="dataStatus" class="status-badge loading">Loading...</div>
+        </div>
+
         <div class="viz-card">
             <div class="viz-header">
                 <div class="viz-title">Visualization</div>
@@ -239,9 +203,6 @@
 </div>
 
 <script>
-    // NOTE: The main logic for plot rendering, AI query handling, etc.,
-    // is expected to be available from the linked external file, 'ciliAI.js'.
-
     // ========== CRITICAL: Initialize Global State (From original index.html) ==========
     window.CiliAI = {
         data: { umap: [] },
@@ -343,13 +304,15 @@
         }
     };
 
-    // ========== UI HANDLERS (From original index.html) ==========
+    // ========== UI HANDLERS (Updated for Chat/Enter functionality) ==========
     window.handleUserSend = function() {
-        const input = document.getElementById('userText'); // Changed from chatInput to userText
+        const input = document.getElementById('userText');
         if (!input || !input.value.trim()) return;
         const query = input.value.trim();
         window.addChatMessage(query, true);
         input.value = '';
+        input.rows = 2; // Reset textarea size
+        
         // CRITICAL: Call the logic router from ciliAI.js
         if (typeof window.handleAIQuery === 'function') {
             window.handleAIQuery(query);
@@ -363,6 +326,7 @@
         if (!input || !input.value.trim()) return;
         const gene = input.value.trim().toUpperCase();
         window.addChatMessage(`Tell me about ${gene}`, true);
+        
         // CRITICAL: Call the logic router from ciliAI.js
         if (typeof window.handleAIQuery === 'function') {
             window.handleAIQuery(`What is ${gene}?`);
@@ -371,44 +335,37 @@
         }
     };
 
-    // Renamed for clarity in the simplified UI, but keeps original UMAP functionality
     window.showDefaultUMAP = function() {
-        // This function is now only called implicitly via init() to set the default
-        // window.addChatMessage('Loading UMAP visualization for FOXJ1...', false); 
-        // CRITICAL: Call the renderer from ciliAI.js
         if (typeof window.renderUMAPPlot === 'function') {
             window.renderUMAPPlot('FOXJ1');
         }
     };
     
-    // Kept function but removed from UI as per 'No left panel' request
-    window.showDefaultPhylogeny = function() {
-        window.addChatMessage('Show Phylogenetics Analysis (Default Genes) 🌳', true);
-        if (typeof window.handleAIQuery === 'function') {
-            window.handleAIQuery('plot default phylogeny');
-        }
-    };
-
-    // downloadPlot is needed by the "Save" button in the viz-header
     window.downloadPlot = function(divId, filename) {
         if (typeof Plotly !== 'undefined') {
             Plotly.downloadImage(divId, {format: 'png', filename: filename});
         }
     };
+    
+    // Allow Enter key to send message and prevent default newline
+    document.getElementById('userText').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault(); // Prevent newline in textarea
+            window.handleUserSend();
+        }
+    });
 
-
-    // ========== INITIALIZATION (From original index.html) ==========
+    // ========== INITIALIZATION ==========
     async function init() {
         window.updateStatus('Loading databases...', 'loading');
         const loaded = await window.loadCiliAIData();
         if (loaded) {
             window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-            // The initial message in the chat is handled by the static HTML now, but log a success
             window.log(`Database loaded with ${window.CiliAI.masterData.length} genes!`);
             
             // CRITICAL: Display the default UMAP plot (FOXJ1)
             if (typeof window.renderUMAPPlot === 'function') {
-                window.showDefaultUMAP(); // Calls renderUMAPPlot('FOXJ1')
+                window.showDefaultUMAP();
             } else {
                  window.addChatMessage('Plotting engine is loading...', false);
             }
