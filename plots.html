@@ -306,10 +306,8 @@
         // =============================================================================
 
        // --- CRITICAL FIX: Use correct, stable raw URLs and file names ---
+// --- CRITICAL FIX: Use correct, stable raw URLs and file names ---
 async function loadAllData() {
-    // Note: We use the old file names (ciliahub_data.json, cilia_screens_data.json)
-    // because the internal plotting functions rely on them.
-
     const baseRawUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     const ciliaryGenesUrl = baseRawUrl + 'ciliahub_data.json';
     const screenDataUrl = baseRawUrl + 'cilia_screens_data.json'; 
@@ -327,17 +325,31 @@ async function loadAllData() {
         if (!screenDataResponse.ok) throw new Error(`HTTP ${screenDataResponse.status} for cilia_screens_data.json`);
 
         const ciliaryGeneArray = await ciliaryGenesResponse.json();
-        screenDatabase = await screenDataResponse.json();
+        // screenDatabase will temporarily hold the raw screen data object
+        const rawScreenData = await screenDataResponse.json(); 
         
         allGenes = ciliaryGeneArray;
-        ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene]));
         
-        // This is necessary because findAndMergeGenes expects screen data to be merged or accessible via screenDatabase
-        screenDatabase = {}; // Re-initialize as an object
-        ciliaryGeneArray.forEach(gene => {
-            if (gene.screens_summary && gene.gene) {
-                // Assuming screens_summary is contained within the ciliahub_data gene objects
-                screenDatabase[gene.gene.toUpperCase()] = gene.screens_summary;
+        // --- FIX 1: Filter out null/undefined entries before mapping ---
+        const validGenes = ciliaryGeneArray.filter(gene => gene && gene.gene);
+
+        // 1. Populate gene map (ciliaryGeneMap)
+        // Uses the correct field 'gene' and adds a check for its existence
+        ciliaryGeneMap = new Map(validGenes.map(gene => [gene.gene.toUpperCase(), gene]));
+        
+        // 2. Populate screen database (screenDatabase) 
+        // This maps the master list's screens_summary data into the required format.
+        screenDatabase = {};
+        validGenes.forEach(gene => {
+            const geneSymbol = gene.gene.toUpperCase();
+            if (gene.screens_summary) {
+                screenDatabase[geneSymbol] = gene.screens_summary;
+            }
+            // For older plotting compatibility, also attempt to merge rawScreenData if available 
+            // and not already present in the gene object.
+            if (rawScreenData[geneSymbol] && !gene.screens_summary) {
+                 gene.screens_summary = rawScreenData[geneSymbol];
+                 screenDatabase[geneSymbol] = rawScreenData[geneSymbol];
             }
         });
 
@@ -346,12 +358,12 @@ async function loadAllData() {
     } catch (error) {
         console.error("Failed to load required analysis data:", error);
         
-        // CRITICAL: Trigger the correct failure UI handling
+        // Trigger the correct failure UI handling
         window.alert(`Error: The main gene database is not yet loaded. Please wait a moment and try again. Reason: ${error.message}`);
     }
 }
 
-        function findAndMergeGenes(userInputArray) {
+function findAndMergeGenes(userInputArray) {
             const foundGenes = [];
             const seenGenes = new Set();
 
