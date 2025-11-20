@@ -512,16 +512,20 @@
             container.innerHTML = html;
         }
 
-        function updatePlotExplanation() {
-            const selectedPlot = document.querySelector('input[name="ciliaplot_type']:checked')?.value;
-            const explanationDiv = document.getElementById('plot-explanation');
-            
-            if (selectedPlot && PLOT_CONFIG[selectedPlot]) {
-                explanationDiv.innerHTML = `<div class="plot-explanation">${PLOT_CONFIG[selectedPlot].explanation}</div>`;
-            } else {
-                explanationDiv.innerHTML = '';
-            }
-        }
+// --- Corrected function definition ---
+/**
+ * Updates the explanation text below the plot type selector based on the current selection.
+ */
+function updatePlotExplanation() {
+    const selectedPlot = document.querySelector('input[name="ciliaplot_type"]:checked')?.value;
+    const explanationDiv = document.getElementById('plot-explanation');
+    
+    if (selectedPlot && PLOT_CONFIG[selectedPlot]) {
+        explanationDiv.innerHTML = `<div class="plot-explanation">${PLOT_CONFIG[selectedPlot].explanation}</div>`;
+    } else {
+        explanationDiv.innerHTML = '';
+    }
+}
         
         function updateCustomizationPanel() {
             const selectedPlot = document.querySelector('input[name="ciliaplot_type"]:checked')?.value;
