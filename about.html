@@ -1,113 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — About</title>
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+    
     <style>
         :root {
             --primary-blue: #005b96;
             --secondary-blue: #b3cde0;
+            --border-light: #e1e8ed;
         }
-        body {
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            background: #eef1f5;
-            color: #003b63;
-        }
-        /* --- Header --- */
-        header {
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { height: 100%; font-family: 'Inter', sans-serif; background: #f1f5f9; overflow-y: auto; }
+
+        /* --- Top Navigation Bar (Reused from index.html) --- */
+        .top-navbar {
             background: var(--primary-blue);
             color: white;
-            padding: 15px 30px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            font-size: 24px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 0 20px;
             height: 60px;
+            border-bottom: 1px solid var(--primary-blue);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        header .logo { font-weight: bold; }
-        header nav a { color: white; text-decoration: none; font-size: 16px; margin-left: 20px; }
-        header nav a:hover { text-decoration: underline; }
 
-        .content-wrapper {
-            max-width: 900px;
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 30px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0 15px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* --- Main Content Area for About --- */
+        .about-content {
+            padding: 40px;
+            max-width: 800px;
             margin: 40px auto;
-            padding: 30px;
             background: white;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         }
-        h1 {
+
+        .about-content h1 {
             color: var(--primary-blue);
-            font-size: 28px;
-            border-bottom: 2px solid var(--secondary-blue);
+            margin-bottom: 25px;
+            border-bottom: 2px solid var(--border-light);
             padding-bottom: 10px;
-            margin-bottom: 20px;
         }
-        h2 {
-            color: #004b7d;
-            font-size: 20px;
-            margin-top: 25px;
-            margin-bottom: 10px;
-        }
-        p {
+
+        .about-content p {
             line-height: 1.6;
             margin-bottom: 15px;
             font-size: 16px;
         }
-        ul {
-            list-style: none;
-            padding: 0;
-        }
-        .example-list {
-            margin-top: 15px;
-            padding: 15px;
-            background: #f0f7ff;
-            border-left: 4px solid var(--primary-blue);
-            border-radius: 6px;
-            font-size: 15px;
-        }
-        .example-list li { 
-            margin-bottom: 8px; 
-            padding-left: 20px;
-            position: relative;
-        }
-        .example-list li:before {
-            content: "•";
-            color: var(--primary-blue);
-            font-weight: bold;
-            display: inline-block;
-            width: 1em;
-            margin-left: -1em;
-        }
-        strong { font-weight: 700; }
     </style>
 </head>
 <body>
-
-<header>
-    <div class="logo">CiliAI</div>
-    <nav>
-        <a href="index.html">Home</a>
-        <a href="about.html">About</a>
+    <nav class="top-navbar">
+        <div class="brand">
+            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
+            <div>
+                <div>CiliAI</div>
+                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
+            </div>
+        </div>
+        
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="plots.html">Cilia Analysis</a></li>
+            <li><a href="about.html" class="active">About</a></li>
+        </ul>
     </nav>
-</header>
 
-<div class="content-wrapper">
-    <h1>About CiliAI</h1>
-    <p>I am an **AI assistant** designed to help you explore and analyze data on **ciliary biology**. You can ask questions or paste full gene lists.</p>
-    
-    <h2>Data Sources</h2>
-    <p>My data comes from a pre-compiled database of over **23,000 genes**, enriched with **8 specialized datasets** (CORUM, UMAP, scRNA, Phylogeny, etc.). This comprehensive integration allows for deep contextual analysis of ciliary genes.</p>
-    
-    <h2>Capabilities</h2>
-    <p>CiliAI is built to understand natural language queries related to genetics, protein function, localization, and disease. When you paste a list of genes, CiliAI automatically annotates and classifies the list based on the underlying datasets.</p>
-
-    <div class="example-list">
-        **Examples of what I understand:**
+    <div class="about-content">
+        <h1>About CiliAI</h1>
+        <p>I am an **AI assistant** designed to help you explore and analyze data on **ciliary biology**. You can ask questions or paste full gene lists. Here are examples of what I understand:</p>
+        
+        <h2>Capabilities and Examples</h2>
         <ul>
             <li>**Gene Details:** "What is IFT88?" or "Describe ARL13B."</li>
             <li>**Localization:** "List genes in the transition zone." or "Where is CEP290?"</li>
@@ -116,8 +114,10 @@
             <li>**Phylogeny:** "Show conservation of IFT88."</li>
             <li>**Domains:** "Which genes have WD40 domains?"</li>
         </ul>
+        
+        <h2>Data Sources</h2>
+        <p>My data comes from a pre-compiled database of over **23,000 genes**, enriched with **8 specialized datasets** (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
+        <p>For more detailed information, please refer to the project repository.</p>
     </div>
-</div>
-
 </body>
 </html>
