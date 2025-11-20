@@ -305,44 +305,51 @@
         // DATA FETCHING & MAPPING (Unified Data Loading - From User's Request)
         // =============================================================================
 
-        async function loadAllData() {
-            const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-            const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-            const lookupsUrl = baseUrl + 'ciliAI_lookups.json'; 
+       // --- CRITICAL FIX: Use correct, stable raw URLs and file names ---
+async function loadAllData() {
+    // Note: We use the old file names (ciliahub_data.json, cilia_screens_data.json)
+    // because the internal plotting functions rely on them.
 
-            try {
-                window.log(`Fetching main database: ${mainDbUrl}`);
-                const [mainRes, lookupsRes] = await Promise.all([fetch(mainDbUrl), fetch(lookupsUrl)]);
+    const baseRawUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+    const ciliaryGenesUrl = baseRawUrl + 'ciliahub_data.json';
+    const screenDataUrl = baseRawUrl + 'cilia_screens_data.json'; 
 
-                if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
-                if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
+    try {
+        window.log(`Fetching main gene array: ${ciliaryGenesUrl}`);
+        window.log(`Fetching screen data: ${screenDataUrl}`);
 
-                const mainData = await mainRes.json();
-                
-                const masterGeneData = mainData.masterData || [];
-                
-                // 1. Populate master gene list (allGenes)
-                allGenes = masterGeneData;
-                
-                // 2. Populate gene map (ciliaryGeneMap)
-                ciliaryGeneMap = new Map(masterGeneData.map(gene => [gene.gene.toUpperCase(), gene]));
-                
-                // 3. Populate screen database (screenDatabase) 
-                screenDatabase = {};
-                masterGeneData.forEach(gene => {
-                    if (gene.screens_summary && gene.gene) {
-                        screenDatabase[gene.gene.toUpperCase()] = gene.screens_summary;
-                    }
-                });
+        const [ciliaryGenesResponse, screenDataResponse] = await Promise.all([
+            fetch(ciliaryGenesUrl),
+            fetch(screenDataUrl)
+        ]);
 
-                window.log(`Successfully loaded and mapped ${ciliaryGeneMap.size} genes for plotting.`);
+        if (!ciliaryGenesResponse.ok) throw new Error(`HTTP ${ciliaryGenesResponse.status} for ciliahub_data.json`);
+        if (!screenDataResponse.ok) throw new Error(`HTTP ${screenDataResponse.status} for cilia_screens_data.json`);
 
-            } catch (error) {
-                console.error("Failed to load required analysis data:", error);
-                const container = document.getElementById('plot-page-container');
-                if (container) container.querySelector('.content-area').innerHTML = `<p style="color:red; text-align:center;">Failed to load essential data. Please check network connection.</p>`;
+        const ciliaryGeneArray = await ciliaryGenesResponse.json();
+        screenDatabase = await screenDataResponse.json();
+        
+        allGenes = ciliaryGeneArray;
+        ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene]));
+        
+        // This is necessary because findAndMergeGenes expects screen data to be merged or accessible via screenDatabase
+        screenDatabase = {}; // Re-initialize as an object
+        ciliaryGeneArray.forEach(gene => {
+            if (gene.screens_summary && gene.gene) {
+                // Assuming screens_summary is contained within the ciliahub_data gene objects
+                screenDatabase[gene.gene.toUpperCase()] = gene.screens_summary;
             }
-        }
+        });
+
+        window.log(`Successfully loaded and mapped ${ciliaryGeneMap.size} genes for plotting.`);
+
+    } catch (error) {
+        console.error("Failed to load required analysis data:", error);
+        
+        // CRITICAL: Trigger the correct failure UI handling
+        window.alert(`Error: The main gene database is not yet loaded. Please wait a moment and try again. Reason: ${error.message}`);
+    }
+}
 
         function findAndMergeGenes(userInputArray) {
             const foundGenes = [];
