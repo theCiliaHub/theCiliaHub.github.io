@@ -962,6 +962,89 @@ function updatePlotExplanation() {
 // =============================================================================
 // --- NEW PLOT RENDERING FUNCTION ---
 
+// =============================================================================
+// PLOT RENDERING FUNCTION: CILIA EFFECTS SCATTER
+// =============================================================================
+
+function renderCiliaEffectsScatterPlot(genes, custom) {
+    clearAllPlots('plot-display-area');
+    
+    // Mapping qualitative results to numeric coordinates
+    const effectMap = {
+        'increase': 1, 'decrease': -1, 'no effect': 0, '—': 0, 'n/a': 0, 'not reported': 0, 'Increase': 1, 'Decrease': -1, 'No effect': 0
+    };
+    const labelMap = { 1: 'Increase', -1: 'Decrease', 0: 'No Effect / N/A' };
+    
+    const dataPoints = [];
+    genes.forEach(gene => {
+        const loF_length_raw = String(gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—').toLowerCase().trim();
+        const overExp_length_raw = String(gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—').toLowerCase().trim();
+        
+        const loF_val = effectMap[loF_length_raw] || 0;
+        const overExp_val = effectMap[overExp_length_raw] || 0;
+        
+        // Only plot if we have at least one reported effect
+        if (loF_val !== 0 || overExp_val !== 0 || loF_length_raw !== '—' || overExp_length_raw !== '—') {
+            dataPoints.push({
+                x: loF_val,
+                y: overExp_val,
+                gene: gene.gene,
+                text: `Gene: ${gene.gene}<br>LoF Effect: ${labelMap[loF_val]}<br>Overexpression Effect: ${labelMap[overExp_val]}`,
+                // Color based on conflict (opposite effects) vs consensus (same effect or one effect)
+                color: loF_val * overExp_val < 0 ? '#d62728' : (loF_val * overExp_val > 0 ? '#2ca02c' : '#ff7f0e') // Red for conflict, Green for agree, Orange for neutral/NA
+            });
+        }
+    });
+
+    if (dataPoints.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No Cilia Length Perturbation data found for these genes.</p>';
+        return;
+    }
+
+    const data = [{
+        x: dataPoints.map(d => d.x),
+        y: dataPoints.map(d => d.y),
+        text: dataPoints.map(d => d.text),
+        mode: 'markers',
+        type: 'scatter',
+        hoverinfo: 'text',
+        marker: {
+            size: custom.bubbleSize || 18,
+            color: dataPoints.map(d => d.color),
+            line: { color: '#000', width: 1 }
+        }
+    }];
+
+    const layout = {
+        title: { 
+            text: custom.title || 'Cilia Length Perturbation: Loss-of-Function vs. Overexpression', 
+            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
+        },
+        xaxis: {
+            title: { text: 'Loss-of-Function Effect (Cilia Length)', font: custom.axisTitleFont },
+            tickvals: [-1, 0, 1],
+            ticktext: ['Decrease', 'No Effect/N/A', 'Increase'],
+            range: [-1.2, 1.2],
+            zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
+        },
+        yaxis: {
+            title: { text: 'Overexpression Effect (Cilia Length)', font: custom.axisTitleFont },
+            tickvals: [-1, 0, 1],
+            ticktext: ['Decrease', 'No Effect/N/A', 'Increase'],
+            range: [-1.2, 1.2],
+            zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
+        },
+        showlegend: false,
+        width: custom.figureWidth,
+        height: custom.figureHeight,
+        margin: { l: 150, r: 80, b: 100, t: 80 },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
+    };
+
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+}
+        
 /**
  * Renders a categorical scatter plot comparing two LoF effects: Cilia Length Change vs. Ciliated Cell Percentage Change.
  * Data Source: 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)' and 'Percentage of ciliated cells (increase/decrease/no effect)'
