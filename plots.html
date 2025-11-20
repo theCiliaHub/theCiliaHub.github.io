@@ -963,38 +963,64 @@ function updatePlotExplanation() {
 // --- NEW PLOT RENDERING FUNCTION ---
 
 // =============================================================================
-// PLOT RENDERING FUNCTION: CILIA EFFECTS SCATTER
+// PLOT RENDERING FUNCTION: CILIA EFFECTS SCATTER (FIXED)
 // =============================================================================
 
 function renderCiliaEffectsScatterPlot(genes, custom) {
     clearAllPlots('plot-display-area');
-    
-    // Mapping qualitative results to numeric coordinates
+
+    // Mapping qualitative results to numeric coordinates. Using regex for robustness.
     const effectMap = {
-        'increase': 1, 'decrease': -1, 'no effect': 0, '—': 0, 'n/a': 0, 'not reported': 0, 'Increase': 1, 'Decrease': -1, 'No effect': 0
+        'increase': 1, 
+        'decrease': -1, 
+        'no effect': 0,
+        'no effect or no change': 0, // Catching variations
+        '—': 0, 
+        'n/a': 0, 
+        'not reported': 0
     };
+    
     const labelMap = {
     1: 'Increase', 
     '-1': 'Decrease', // FIXED: Quoting the negative key ensures reliable parsing.
     0: 'No Effect / N/A'
     };
+    
     const dataPoints = [];
+    
+    // Helper to standardize and lookup the effect value
+    const getEffectValueAndLabel = (gene, key) => {
+        let raw = String(gene[key] || '—').toLowerCase().trim();
+        // Clean the raw string (remove parentheses, trailing periods, etc.)
+        raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim();
+        
+        const value = effectMap[raw] !== undefined ? effectMap[raw] : 0;
+        const label = raw === '—' || raw === 'n/a' || raw === 'not reported' ? 'Not Reported' : labelMap[value];
+        
+        return { value, label };
+    };
+
     genes.forEach(gene => {
-        const loF_length_raw = String(gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—').toLowerCase().trim();
-        const overExp_length_raw = String(gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—').toLowerCase().trim();
+        const loF_key = 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)';
+        const overExp_key = 'Overexpression effects on cilia length (increase/decrease/no effect)';
+
+        const loF = getEffectValueAndLabel(gene, loF_key);
+        const overExp = getEffectValueAndLabel(gene, overExp_key);
         
-        const loF_val = effectMap[loF_length_raw] || 0;
-        const overExp_val = effectMap[overExp_length_raw] || 0;
-        
-        // Only plot if we have at least one reported effect
-        if (loF_val !== 0 || overExp_val !== 0 || loF_length_raw !== '—' || overExp_length_raw !== '—') {
+        const hasPerturbationData = (
+            String(gene[loF_key] || '—').trim() !== '—' || 
+            String(gene[overExp_key] || '—').trim() !== '—'
+        );
+
+        // Plot if there is any reported data, even if both map to 'No Effect' (value=0)
+        if (hasPerturbationData) {
             dataPoints.push({
-                x: loF_val,
-                y: overExp_val,
+                x: loF.value,
+                y: overExp.value,
                 gene: gene.gene,
-                text: `Gene: ${gene.gene}<br>LoF Effect: ${labelMap[loF_val]}<br>Overexpression Effect: ${labelMap[overExp_val]}`,
-                // Color based on conflict (opposite effects) vs consensus (same effect or one effect)
-                color: loF_val * overExp_val < 0 ? '#d62728' : (loF_val * overExp_val > 0 ? '#2ca02c' : '#ff7f0e') // Red for conflict, Green for agree, Orange for neutral/NA
+                text: `<b>Gene:</b> ${gene.gene}<br><b>LoF Effect:</b> ${loF.label}<br><b>Overexpression Effect:</b> ${overExp.label}`,
+                // Color logic: Red for conflict, Green for agree, Orange for neutral/partial info
+                color: loF.value * overExp.value < 0 ? '#d62728' : (loF.value * overExp.value > 0 ? '#2ca02c' : '#ff7f0e')
             });
         }
     });
@@ -1047,6 +1073,9 @@ function renderCiliaEffectsScatterPlot(genes, custom) {
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
+
+        
+
         
 /**
  * Renders a categorical scatter plot comparing two LoF effects: Cilia Length Change vs. Ciliated Cell Percentage Change.
