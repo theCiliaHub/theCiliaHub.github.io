@@ -203,7 +203,7 @@
 </div>
 
 <script>
-    // CRITICAL FIX 1: Initialize the global state object first
+    // 1. Initialize Global State Object FIRST (CRITICAL DEPENDENCY)
     window.CiliAI = {
         data: { umap: [] },
         masterData: [],
@@ -214,7 +214,7 @@
         CiliAI_UMAP: null 
     };
 
-    // ========== CORE UI FALLBACKS / HELPERS ==========
+    // 2. Define Helper Functions (Required by the chat logic in ciliAI.js)
     if (typeof window.log !== "function") {
         window.log = (msg) => console.log(`[CiliAI] ${msg}`);
     }
@@ -236,8 +236,15 @@
             statusEl.className = `status-badge status ${state}`; 
         }
     };
+    
+    // Plotly Helper
+    window.downloadPlot = function(divId, filename) {
+        if (typeof Plotly !== 'undefined') {
+            Plotly.downloadImage(divId, {format: 'png', filename: filename});
+        }
+    };
 
-    // ========== DATA LOADING (Retrieves all master data) ==========
+    // 3. Define Data Loading Logic (Which populates window.CiliAI)
     window.loadCiliAIData = async function(timeoutMs = 60000) {
         const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
         const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
@@ -245,10 +252,7 @@
         
         try {
             window.log(`Fetching main database: ${mainDbUrl}`);
-            const [mainRes, lookupsRes] = await Promise.all([
-                fetch(mainDbUrl),
-                fetch(lookupsUrl)
-            ]);
+            const [mainRes, lookupsRes] = await Promise.all([fetch(mainDbUrl), fetch(lookupsUrl)]);
 
             if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
             if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
@@ -256,7 +260,6 @@
             const mainData = await mainRes.json();
             const lookupData = await lookupsRes.json();
 
-            // Populate CiliAI global object
             window.CiliAI.masterData = mainData.masterData || [];
             window.CiliAI.lookups = lookupData.lookups || {};
             window.CiliAI_UMAP = mainData.umapData || [];
@@ -292,8 +295,8 @@
             return false;
         }
     };
-
-    // ========== UI HANDLERS ==========
+    
+    // 4. Define UI Handlers (Which call logic from ciliAI.js)
     window.handleUserSend = function() {
         const input = document.getElementById('userText');
         if (!input || !input.value.trim()) return;
@@ -302,16 +305,13 @@
         input.value = '';
         input.rows = 2;
         
-        // CRITICAL FIX 2: Check for external logic availability and ready state
-        if (typeof window.handleAIQuery === 'function') {
-            if (window.CiliAI.ready) {
-                window.handleAIQuery(query);
-            } else {
-                window.addChatMessage('Database still loading. Please wait a moment before querying.', false);
-            }
+        // Ensure core logic and data are ready before making the expensive call
+        if (typeof window.handleAIQuery === 'function' && window.CiliAI.ready) {
+            window.handleAIQuery(query);
+        } else if (!window.CiliAI.ready) {
+            window.addChatMessage('Database is still loading. Please wait a moment before querying.', false);
         } else {
-            // This suggests ciliAI.js failed to load.
-            window.addChatMessage('CiliAI logic engine is not available. Check script link.', false);
+             window.addChatMessage('CiliAI logic engine is not available. Please ensure the external script loaded.', false);
         }
     };
 
@@ -321,52 +321,42 @@
         const gene = input.value.trim().toUpperCase();
         window.addChatMessage(`Tell me about ${gene}`, true);
         
-        if (typeof window.handleAIQuery === 'function') {
-            if (window.CiliAI.ready) {
-                window.handleAIQuery(`What is ${gene}?`);
-            } else {
-                window.addChatMessage('Database still loading. Please wait a moment before querying.', false);
-            }
+        if (typeof window.handleAIQuery === 'function' && window.CiliAI.ready) {
+            window.handleAIQuery(`What is ${gene}?`);
+        } else if (!window.CiliAI.ready) {
+            window.addChatMessage('Database is still loading. Please wait a moment before searching.', false);
         } else {
-            window.addChatMessage('CiliAI logic engine is not available. Check script link.', false);
+             window.addChatMessage('CiliAI logic engine is not available. Please ensure the external script loaded.', false);
         }
     };
 
     window.showDefaultUMAP = function() {
-        // This function relies on renderUMAPPlot from ciliAI.js
+        // Only attempt to render if the function exists
         if (typeof window.renderUMAPPlot === 'function') {
             window.renderUMAPPlot('FOXJ1');
         } else {
-             window.log('renderUMAPPlot not yet available.');
+             window.log('renderUMAPPlot not available yet.');
         }
     };
-    
-    window.downloadPlot = function(divId, filename) {
-        if (typeof Plotly !== 'undefined') {
-            Plotly.downloadImage(divId, {format: 'png', filename: filename});
-        }
-    };
-    
-    // ========== INITIALIZATION ==========
+
+    // 5. Initialization Function
     async function init() {
         window.updateStatus('Loading databases...', 'loading');
         
-        // Load data, defining core lookups and CiliAI.ready
         const loaded = await window.loadCiliAIData();
 
         if (loaded) {
             window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
             window.log(`Database loaded with ${window.CiliAI.masterData.length} genes!`);
             
-            // CRITICAL: Display the default UMAP plot (FOXJ1) now that data is loaded
+            // Now that data is loaded and ciliAI.js is loaded (next line), we can plot
             window.showDefaultUMAP();
-            
         } else {
             window.updateStatus('Failed to load', 'error');
         }
     }
 
-    // CRITICAL FIX 3: Add event listener for Enter key
+    // 6. Set up Event Listeners
     document.getElementById('userText').addEventListener('keydown', function(event) {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
@@ -374,13 +364,14 @@
         }
     });
 
-    // Start initialization when the DOM is ready
+    // 7. Start the Application flow only after the DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
 </script>
+
 <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
 </body>
 </html>
