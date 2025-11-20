@@ -3507,6 +3507,20 @@ function renderOrganelleUMAP(genes, container, custom) {
         }
     }; 
 
+// CRITICAL: Must be defined in ciliAI.js
+window.generateAndInjectSVG = function() {
+    const svgContainer = document.getElementById('cilia-svg');
+    if (!svgContainer) return;
+    
+    // Minimal SVG placeholder (as agreed upon previously)
+    const svgHTML = `
+        <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="16" fill="#005b96">Ciliary Diagram Placeholder</text>
+            </svg>`;
+    
+    svgContainer.innerHTML = svgHTML;
+};
+
 // ==========================================================
 // GLOBAL EXPOSURE (REQUIRED FOR index.html)
 // ==========================================================
