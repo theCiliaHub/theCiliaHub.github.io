@@ -987,7 +987,7 @@ function renderCiliaEffectsScatterPlot(genes, custom) {
     };
     
     // Labels for the output axes and hover text
-    const valueToLabelMap = { 1: 'Increase (Longer)', -1: 'Decrease (Shorter)', 0: 'Baseline/No Effect' };
+    const valueToLabelMap = { 1: 'Increase (Longer)', '-1': 'Decrease (Shorter)', 0: 'Baseline/No Effect' };
     const NOT_REPORTED_LABEL = 'Not Reported / N/A';
 
     // Helper to extract a numeric value (-1, 0, 1) and a clean string label.
@@ -1051,7 +1051,6 @@ function renderCiliaEffectsScatterPlot(genes, custom) {
         }
     });
 
-    // ... (rest of the plot rendering code remains the same)
 
     if (dataPoints.length === 0) {
         document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No Cilia Length Perturbation data found for these genes that wasn\'t marked as "Not Reported" or "—".</p>';
