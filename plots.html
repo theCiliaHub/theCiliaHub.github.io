@@ -498,15 +498,15 @@ function findAndMergeGenes(userInputArray) {
 
         // --- Plot Configuration ---
         const PLOT_CONFIG = {
-    'multi_category_manhattan': { label: 'Gene Feature Overview (Default)', explanation: 'A comprehensive plot showing gene associations across seven major categories: Localization, Complexes, Domains, Ciliopathies, Screens, Orthologs, and Phenotype.' },
-    'enrichment_bubble': { label: 'Functional Enrichment (Bubble)', explanation: 'Analyzes functional category enrichment (significance by color, size by count).' },
+    'multi_category_manhattan': { label: 'Gene Feature Overview', explanation: 'A comprehensive plot showing gene associations across seven major categories: Localization, Complexes, Domains, Ciliopathies, Screens, Orthologs, and Phenotype.' },
+    'enrichment_bubble': { label: 'Functional Enrichment', explanation: 'Analyzes functional category enrichment (significance by color, size by count).' },
     'expression_heatmap': { label: 'Tissue Expression Heatmap', explanation: 'Shows tissue-specific expression patterns of your genes.' },
     'screen_summary_heatmap': { label: 'Functional Screen Summary', explanation: 'Visualizes results from multiple key functional genomics screens (Kim, Wheway, Roosing, Breslow, Basu).' },
-    'network': { label: 'Complex Network (Force-Directed)', explanation: 'Visualizes protein-protein interactions and complex associations among your genes.' },
-    'phylogeny_bar': { label: 'Phylogenetic Conservation Summary', explanation: 'A bar chart summarizing the conservation status (species count) of the genes across different phylogenetic groups.' },
-    'cilia_effects_scatter': { label: 'Cilia Length Perturbation Scatter', explanation: 'Compares the effects of Loss-of-Function vs. Overexpression on cilia length.' },
-    'ortholog_heatmap': { label: 'Ortholog Presence Heatmap', explanation: 'A binary heatmap showing the presence or absence of orthologs in Mouse, C. elegans, and Zebrafish.' },
-    'lof_cilia_vs_count_scatter': { label: 'LoF Cilia/Count Dual Effect (NEW)', explanation: 'Categorical scatter plot comparing the LoF effect on Cilia Length vs. LoF effect on Ciliated Cell Percentage.' }
+    'network': { label: 'Complex Network ', explanation: 'Visualizes protein-protein interactions and complex associations among your genes.' },
+    'phylogeny_bar': { label: 'Phylogenetic Conservation', explanation: 'A bar chart summarizing the conservation status (species count) of the genes across different phylogenetic groups.' },
+    'cilia_effects_scatter': { label: 'Cilia Length Perturbation', explanation: 'Compares the effects of Loss-of-Function vs. Overexpression on cilia length.' },
+    'ortholog_heatmap': { label: 'Ortholog Presence ', explanation: 'A binary heatmap showing the presence or absence of orthologs in Mouse, C. elegans, and Zebrafish.' },
+    'lof_cilia_vs_count_scatter': { label: 'LoF Cilia/Count Dual Effect', explanation: 'Categorical scatter plot comparing the LoF effect on Cilia Length vs. LoF effect on Ciliated Cell Percentage.' }
     // REMOVED: functional_bar, localization_bubble, balloon_plot, venn_diagram, ciliopathy_associations, organelle_radar, organelle_umap
 };
         function populatePlotTypes() {
@@ -960,73 +960,101 @@ function updatePlotExplanation() {
 // =============================================================================
 // ENHANCED PLOTLY.JS RENDERING FUNCTIONS
 // =============================================================================
-// --- NEW PLOT RENDERING FUNCTION ---
-
 // =============================================================================
 // PLOT RENDERING FUNCTION: CILIA EFFECTS SCATTER (FIXED)
 // =============================================================================
-
 function renderCiliaEffectsScatterPlot(genes, custom) {
     clearAllPlots('plot-display-area');
 
-    // Mapping qualitative results to numeric coordinates. Using regex for robustness.
-    const effectMap = {
-        'increase': 1, 
+    // --- MAPPING LOGIC (Robust against non-standard text) ---
+    const rawToValueMap = {
+        // Decrease (-1)
         'decrease': -1, 
-        'no effect': 0,
-        'no effect or no change': 0, // Catching variations
-        '—': 0, 
-        'n/a': 0, 
-        'not reported': 0
+        'shorter': -1,           // NEW: Captures "Shorter" (from your example data)
+        'reduced': -1,           // NEW: Captures "Reduced cilia numbers" (from your example data)
+        'loss': -1,              // Catches terms like "Loss of cilia"
+        'fail': -1,              // Catches terms like "Failed to form"
+
+        // Increase (1)
+        'increase': 1, 
+        'longer': 1, 
+        'supernumerary': 1,      // Catches specific increase terms
+        
+        // No Effect (0)
+        'no effect': 0, 
+        'no change': 0, 
+        'baseline': 0
     };
     
-    const labelMap = {
-    1: 'Increase', 
-    '-1': 'Decrease', // FIXED: Quoting the negative key ensures reliable parsing.
-    0: 'No Effect / N/A'
-    };
-    
-    const dataPoints = [];
-    
-    // Helper to standardize and lookup the effect value
-    const getEffectValueAndLabel = (gene, key) => {
+    // Labels for the output axes and hover text
+    const valueToLabelMap = { 1: 'Increase (Longer)', -1: 'Decrease (Shorter)', 0: 'Baseline/No Effect' };
+    const NOT_REPORTED_LABEL = 'Not Reported / N/A';
+
+    // Helper to extract a numeric value (-1, 0, 1) and a clean string label.
+    const getEffectData = (gene, key) => {
         let raw = String(gene[key] || '—').toLowerCase().trim();
-        // Clean the raw string (remove parentheses, trailing periods, etc.)
-        raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim();
+        raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim(); // Clean surrounding junk
         
-        const value = effectMap[raw] !== undefined ? effectMap[raw] : 0;
-        const label = raw === '—' || raw === 'n/a' || raw === 'not reported' ? 'Not Reported' : labelMap[value];
+        let value = 0;
+        let label = NOT_REPORTED_LABEL;
         
-        return { value, label };
+        // Check for specific reported values
+        for (const [phrase, val] of Object.entries(rawToValueMap)) {
+            // Use includes to match 'reduced cilia numbers' with 'reduced'
+            if (raw.includes(phrase)) {
+                value = val;
+                label = valueToLabelMap[value];
+                return { value, label };
+            }
+        }
+        
+        // If no effect found, check 'Not Reported' type synonyms
+        if (raw.includes('not reported') || raw === '—' || raw === 'n/a') {
+            return { value: 0, label: NOT_REPORTED_LABEL };
+        }
+        
+        // Handle explicit but unmapped terms like 'Decreased' which is often capitalized
+        if (raw === 'decreased') {
+             return { value: -1, label: valueToLabelMap[-1] };
+        }
+        
+        // Final fallback for non-standard terms
+        return { value: 0, label: `Unmapped: ${raw}` }; 
     };
 
+    const dataPoints = [];
+    
     genes.forEach(gene => {
         const loF_key = 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)';
         const overExp_key = 'Overexpression effects on cilia length (increase/decrease/no effect)';
 
-        const loF = getEffectValueAndLabel(gene, loF_key);
-        const overExp = getEffectValueAndLabel(gene, overExp_key);
+        const loF = getEffectData(gene, loF_key);
+        const overExp = getEffectData(gene, overExp_key);
         
-        const hasPerturbationData = (
-            String(gene[loF_key] || '—').trim() !== '—' || 
-            String(gene[overExp_key] || '—').trim() !== '—'
-        );
+        // Determine if the gene has any data reported at all in those fields
+        const loF_raw_val = String(gene[loF_key] || '—').trim();
+        const overExp_raw_val = String(gene[overExp_key] || '—').trim();
 
-        // Plot if there is any reported data, even if both map to 'No Effect' (value=0)
-        if (hasPerturbationData) {
+        const isReported = (loF_raw_val !== '—' && loF_raw_val !== 'Not Reported') || 
+                           (overExp_raw_val !== '—' && overExp_raw_val !== 'Not Reported');
+        
+        // Plot only if at least one effect is explicitly reported, even if it maps to value 0.
+        if (isReported) {
             dataPoints.push({
                 x: loF.value,
                 y: overExp.value,
                 gene: gene.gene,
                 text: `<b>Gene:</b> ${gene.gene}<br><b>LoF Effect:</b> ${loF.label}<br><b>Overexpression Effect:</b> ${overExp.label}`,
-                // Color logic: Red for conflict, Green for agree, Orange for neutral/partial info
+                // Color logic: Red for conflict, Green for consensus, Orange for neutral/baseline effects
                 color: loF.value * overExp.value < 0 ? '#d62728' : (loF.value * overExp.value > 0 ? '#2ca02c' : '#ff7f0e')
             });
         }
     });
 
+    // ... (rest of the plot rendering code remains the same)
+
     if (dataPoints.length === 0) {
-        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No Cilia Length Perturbation data found for these genes.</p>';
+        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No Cilia Length Perturbation data found for these genes that wasn\'t marked as "Not Reported" or "—".</p>';
         return;
     }
 
@@ -1052,14 +1080,14 @@ function renderCiliaEffectsScatterPlot(genes, custom) {
         xaxis: {
             title: { text: 'Loss-of-Function Effect (Cilia Length)', font: custom.axisTitleFont },
             tickvals: [-1, 0, 1],
-            ticktext: ['Decrease', 'No Effect/N/A', 'Increase'],
+            ticktext: ['Decrease', 'Baseline/N/A', 'Increase'],
             range: [-1.2, 1.2],
             zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
         },
         yaxis: {
             title: { text: 'Overexpression Effect (Cilia Length)', font: custom.axisTitleFont },
             tickvals: [-1, 0, 1],
-            ticktext: ['Decrease', 'No Effect/N/A', 'Increase'],
+            ticktext: ['Decrease', 'Baseline/N/A', 'Increase'],
             range: [-1.2, 1.2],
             zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
         },
