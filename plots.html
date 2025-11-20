@@ -279,12 +279,6 @@
              window.log = (msg) => console.log(`[CiliAI Plot] ${msg}`);
         }
         window.alert = function(msg) { console.error("UI ALERT TRIGGERED:", msg); }; 
-
-        // --- EXPRESSION DATA VARIABLES ---
-        let plotExpressionData = {};
-        let plotExpressionLoaded = false;
-        let pendingHeatmapRequest = null;
-        
         // --- ENHANCED ORGANELLE DATA ---
         const organelleMarkerProfiles = {
             "Lysosome": [0.1, 0.2, 0.3, 0.8, 0.9, 0.7, 0.4, 0.2], "Cytosol": [0.4, 0.5, 0.3, 0.3, 0.3, 0.4, 0.4, 0.3],
