@@ -18,9 +18,10 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Use a robust full-height layout, setting overflow: hidden for a clean grid */
         body, html { height: 100%; font-family: 'Inter', sans-serif; background: #eef1f5; color: #003b63; overflow: hidden; }
 
-        /* --- Header --- */
+        /* --- Header (New Design) --- */
         header {
             background: var(--primary-blue);
             color: white;
@@ -36,11 +37,11 @@
         header nav a { color: white; text-decoration: none; font-size: 16px; margin-left: 20px; }
         header nav a:hover { text-decoration: underline; }
 
-        /* --- Main Layout --- */
+        /* --- Main Layout (New Design: 2-column grid) --- */
         #main-wrapper {
             display: grid;
             grid-template-columns: 1fr 400px;
-            height: calc(100vh - 60px);
+            height: calc(100vh - 60px); 
         }
 
         /* --- Visualization Panel (Left) --- */
@@ -48,8 +49,10 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow: hidden; 
         }
+        
+        /* Merged Search/Status Bar from old/new designs */
         .controls-bar {
             display: flex; 
             align-items: center; 
@@ -63,6 +66,7 @@
         .search-btn { padding: 0 20px; background: var(--primary-blue); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; height: 40px; }
         .search-btn:hover { background: #00477a; }
 
+        /* Viz Card Styling */
         .viz-card {
             flex: 1;
             background: white;
@@ -107,19 +111,20 @@
         }
         .ciliai-message { display: flex; gap: 8px; }
         .ciliai-message.user { justify-content: flex-end; }
+        /* Using the old, reliable CSS classes for chat messages */
         .ciliai-message-content { max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
         .ciliai-message.user .ciliai-message-content { background: var(--primary-blue); color: white; border-radius: 14px 14px 4px 14px; }
         .ciliai-message.assistant .ciliai-message-content { background: #f0f0f0; color: #333; border-radius: 14px 14px 14px 4px; }
         
         /* --- Input area --- */
-        #chat-input {
+        #chat-input-area { /* Renamed DIV to avoid conflict with old code's class */
             padding: 15px;
             border-top: 1px solid var(--border-light);
             background: white;
             display: flex;
             gap: 10px;
         }
-        #userText {
+        #chatInput { /* Retaining ID 'chatInput' from working code */
             flex: 1;
             resize: none;
             padding: 12px;
@@ -127,8 +132,8 @@
             border-radius: 8px;
             font-size: 14px;
         }
-        #userText:focus { outline: none; border-color: var(--primary-blue); }
-        #chat-input button {
+        #chatInput:focus { outline: none; border-color: var(--primary-blue); }
+        #chat-input-area button {
             background: var(--primary-blue);
             color: white;
             padding: 12px 20px;
@@ -137,7 +142,7 @@
             font-weight: 600;
             cursor: pointer;
         }
-        #chat-input button:hover { background: #00477a; }
+        #chat-input-area button:hover { background: #00477a; }
 
         /* --- Status Badge --- */
         .status-badge { 
@@ -187,7 +192,7 @@
             <p>Ask about genes & ciliary biology</p>
         </div>
 
-        <div id="chat-display">
+        <div id="chat-display" class="messages-area">
             <div class="ciliai-message assistant">
                 <div class="ciliai-message-content">
                     👋 Hello! I'm CiliAI. Ask me about genes, cilia structure, or ciliopathies.
@@ -195,15 +200,17 @@
             </div>
         </div>
 
-        <div id="chat-input">
-            <textarea id="userText" rows="2" placeholder="Ask anything or paste your gene list here"></textarea>
-            <button onclick="window.handleUserSend()">Send</button>
+        <div id="chat-input-area" class="input-area">
+            <div class="chat-input-group">
+                <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question...">
+                <button class="send-btn" onclick="window.handleUserSend()">Send</button>
+            </div>
         </div>
     </aside>
 </div>
 
 <script>
-    // 1. Initialize Global State Object FIRST (CRITICAL DEPENDENCY)
+    // 1. Initialize Global State (From working code)
     window.CiliAI = {
         data: { umap: [] },
         masterData: [],
@@ -214,13 +221,15 @@
         CiliAI_UMAP: null 
     };
 
-    // 2. Define Helper Functions (Required by the chat logic in ciliAI.js)
+    // 2. Define Helper Functions (From working code)
     if (typeof window.log !== "function") {
         window.log = (msg) => console.log(`[CiliAI] ${msg}`);
     }
 
+    // Renamed ID to 'chat-display' in HTML, but the function still targets it via class 'messages-area' in the old code.
+    // Switching to target the new ID for clarity.
     window.addChatMessage = function(html, isUser = false) {
-        const messages = document.getElementById('chat-display');
+        const messages = document.getElementById('chat-display'); 
         if (!messages) return;
         const msg = document.createElement('div');
         msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
@@ -236,23 +245,20 @@
             statusEl.className = `status-badge status ${state}`; 
         }
     };
-    
-    // Plotly Helper
-    window.downloadPlot = function(divId, filename) {
-        if (typeof Plotly !== 'undefined') {
-            Plotly.downloadImage(divId, {format: 'png', filename: filename});
-        }
-    };
 
-    // 3. Define Data Loading Logic (Which populates window.CiliAI)
+    // Data Loading Logic (From working code)
     window.loadCiliAIData = async function(timeoutMs = 60000) {
+        // Using the URL from the user's working script block
         const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
         const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
         const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
         
         try {
             window.log(`Fetching main database: ${mainDbUrl}`);
-            const [mainRes, lookupsRes] = await Promise.all([fetch(mainDbUrl), fetch(lookupsUrl)]);
+            const [mainRes, lookupsRes] = await Promise.all([
+                fetch(mainDbUrl),
+                fetch(lookupsUrl)
+            ]);
 
             if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
             if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
@@ -260,12 +266,13 @@
             const mainData = await mainRes.json();
             const lookupData = await lookupsRes.json();
 
+            // Populate CiliAI global object
             window.CiliAI.masterData = mainData.masterData || [];
             window.CiliAI.lookups = lookupData.lookups || {};
             window.CiliAI_UMAP = mainData.umapData || [];
             window.CiliAI.data.umap = mainData.umapData || [];
             
-            // Build fast lookup maps
+            // Build fast lookup maps (from working code)
             window.CiliAI.lookups.umapByGene = {};
             window.CiliAI.lookups.geneMap = {};
             window.CiliAI.cellDataCache = {};
@@ -295,23 +302,20 @@
             return false;
         }
     };
-    
-    // 4. Define UI Handlers (Which call logic from ciliAI.js)
+
+
+    // UI Handlers (From working code, ensuring they call logic from ciliAI.js)
     window.handleUserSend = function() {
-        const input = document.getElementById('userText');
+        const input = document.getElementById('chatInput');
         if (!input || !input.value.trim()) return;
         const query = input.value.trim();
         window.addChatMessage(query, true);
         input.value = '';
-        input.rows = 2;
         
-        // Ensure core logic and data are ready before making the expensive call
-        if (typeof window.handleAIQuery === 'function' && window.CiliAI.ready) {
+        if (typeof window.handleAIQuery === 'function') {
             window.handleAIQuery(query);
-        } else if (!window.CiliAI.ready) {
-            window.addChatMessage('Database is still loading. Please wait a moment before querying.', false);
         } else {
-             window.addChatMessage('CiliAI logic engine is not available. Please ensure the external script loaded.', false);
+            window.addChatMessage('CiliAI logic engine is not ready. Please wait.', false);
         }
     };
 
@@ -321,17 +325,17 @@
         const gene = input.value.trim().toUpperCase();
         window.addChatMessage(`Tell me about ${gene}`, true);
         
-        if (typeof window.handleAIQuery === 'function' && window.CiliAI.ready) {
+        if (typeof window.handleAIQuery === 'function') {
             window.handleAIQuery(`What is ${gene}?`);
-        } else if (!window.CiliAI.ready) {
-            window.addChatMessage('Database is still loading. Please wait a moment before searching.', false);
         } else {
-             window.addChatMessage('CiliAI logic engine is not available. Please ensure the external script loaded.', false);
+            window.addChatMessage('CiliAI logic engine is not ready. Please wait.', false);
         }
     };
-
+    
     window.showDefaultUMAP = function() {
-        // Only attempt to render if the function exists
+        // This log was in the original working code's logic
+        window.addChatMessage('Loading UMAP visualization for FOXJ1...', false); 
+        
         if (typeof window.renderUMAPPlot === 'function') {
             window.renderUMAPPlot('FOXJ1');
         } else {
@@ -339,32 +343,42 @@
         }
     };
 
-    // 5. Initialization Function
+    window.downloadPlot = function(divId, filename) {
+        if (typeof Plotly !== 'undefined') {
+            Plotly.downloadImage(divId, {format: 'png', filename: filename});
+        }
+    };
+    
+    // **NEW FIX**: Allow Enter key to send message
+    document.getElementById('chatInput').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault(); 
+            window.handleUserSend();
+        }
+    });
+
+
+    // Initialization (From working code)
     async function init() {
         window.updateStatus('Loading databases...', 'loading');
-        
         const loaded = await window.loadCiliAIData();
-
+        
         if (loaded) {
             window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-            window.log(`Database loaded with ${window.CiliAI.masterData.length} genes!`);
+            window.addChatMessage(`✅ Database loaded with ${window.CiliAI.masterData.length} genes!`, false);
             
-            // Now that data is loaded and ciliAI.js is loaded (next line), we can plot
-            window.showDefaultUMAP();
+            // This relies on ciliAI.js being loaded (see next tag)
+            if (typeof window.renderUMAPPlot === 'function') {
+                 window.showDefaultUMAP();
+            } else {
+                 window.addChatMessage('Plotting engine is loading...', false);
+            }
         } else {
             window.updateStatus('Failed to load', 'error');
         }
     }
 
-    // 6. Set up Event Listeners
-    document.getElementById('userText').addEventListener('keydown', function(event) {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            window.handleUserSend();
-        }
-    });
-
-    // 7. Start the Application flow only after the DOM is ready
+    // Start on page load
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
