@@ -202,6 +202,8 @@
     </aside>
 </div>
 
+<script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
+
 <script>
     // ========== CRITICAL: Initialize Global State (From original index.html) ==========
     window.CiliAI = {
@@ -239,6 +241,10 @@
 
     // ========== DATA LOADING (From original index.html) ==========
     window.loadCiliAIData = async function(timeoutMs = 60000) {
+        // NOTE: Using the remembered URL for ciliary genes:
+        // 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'
+        // However, the *original code* used two separate JSON files. Sticking to the two-file approach
+        // for reliability, but noting the general data source.
         const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
         const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
         const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
@@ -317,7 +323,8 @@
         if (typeof window.handleAIQuery === 'function') {
             window.handleAIQuery(query);
         } else {
-            window.addChatMessage('CiliAI logic engine not yet loaded. Please wait.', false);
+            // This fallback should rarely be hit now due to script reordering
+            window.addChatMessage('CiliAI logic engine is not active. Data loading failed or engine not linked.', false);
         }
     };
 
@@ -331,13 +338,17 @@
         if (typeof window.handleAIQuery === 'function') {
             window.handleAIQuery(`What is ${gene}?`);
         } else {
-            window.addChatMessage('CiliAI logic engine not yet loaded. Please wait.', false);
+            window.addChatMessage('CiliAI logic engine is not active. Data loading failed or engine not linked.', false);
         }
     };
 
     window.showDefaultUMAP = function() {
+        // This function is defined here, but renderUMAPPlot must be from ciliAI.js
         if (typeof window.renderUMAPPlot === 'function') {
             window.renderUMAPPlot('FOXJ1');
+        } else {
+             // Only log this if the function should have loaded
+             window.log('renderUMAPPlot not found from ciliAI.js.');
         }
     };
     
@@ -347,7 +358,28 @@
         }
     };
     
-    // Allow Enter key to send message and prevent default newline
+    // ========== INITIALIZATION ==========
+    async function init() {
+        window.updateStatus('Loading databases...', 'loading');
+        
+        // Step 1: Load Data
+        const loaded = await window.loadCiliAIData();
+
+        if (loaded) {
+            window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
+            window.log(`Database loaded with ${window.CiliAI.masterData.length} genes!`);
+            
+            // Step 2: Display the default UMAP plot (FOXJ1)
+            // This is now guaranteed to run AFTER ciliAI.js has loaded
+            window.showDefaultUMAP();
+            
+        } else {
+            window.updateStatus('Failed to load', 'error');
+        }
+    }
+
+    // CRITICAL FIX FOR CHAT: Allow Enter key to send message 
+    // This is placed here to ensure handleUserSend is defined first.
     document.getElementById('userText').addEventListener('keydown', function(event) {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault(); // Prevent newline in textarea
@@ -355,32 +387,13 @@
         }
     });
 
-    // ========== INITIALIZATION ==========
-    async function init() {
-        window.updateStatus('Loading databases...', 'loading');
-        const loaded = await window.loadCiliAIData();
-        if (loaded) {
-            window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-            window.log(`Database loaded with ${window.CiliAI.masterData.length} genes!`);
-            
-            // CRITICAL: Display the default UMAP plot (FOXJ1)
-            if (typeof window.renderUMAPPlot === 'function') {
-                window.showDefaultUMAP();
-            } else {
-                 window.addChatMessage('Plotting engine is loading...', false);
-            }
-        } else {
-            window.updateStatus('Failed to load', 'error');
-        }
-    }
-
-    // Start on page load
+    // Start initialization AFTER all DOM elements and external scripts are processed
+    // This ensures renderUMAPPlot and handleAIQuery are available.
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
 </script>
-<script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
 </body>
 </html>
