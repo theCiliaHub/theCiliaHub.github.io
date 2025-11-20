@@ -975,10 +975,11 @@ function renderLofCiliaVsCountScatter(genes, custom) {
     const effectMap = {
         'increase': 1, 'decrease': -1, 'no effect': 0, '—': 0, 'n/a': 0, 'not reported': 0, 'Increase': 1, 'Decrease': -1, 'No effect': 0
     };
-    const labelMap = {
-        1: 'Increase', -1: 'Decrease', 0: 'No Effect / N/A'
+   const labelMap = {
+    1: 'Increase', 
+    '-1': 'Decrease', // FIXED: Quoting the negative key ensures reliable parsing.
+    0: 'No Effect / N/A'
     };
-    
     const dataPoints = [];
     genes.forEach(gene => {
         const loF_length_raw = String(gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—').toLowerCase().trim();
