@@ -498,20 +498,17 @@ function findAndMergeGenes(userInputArray) {
 
         // --- Plot Configuration ---
         const PLOT_CONFIG = {
-            'localization_bubble': { label: 'Gene Localizations', explanation: 'Displays the subcellular localizations of your genes as bubbles. Each bubble represents a gene-localization pair, helping you visualize where your genes are found within the cell.' },
-            'functional_bar': { label: 'Functional Categories', explanation: 'Shows the distribution of functional categories among your genes. Bars represent the count of genes in each functional category, revealing the primary functions of your gene set.' },
-            'enrichment_bubble': { label: 'Enrichment Analysis', explanation: 'Analyzes functional category enrichment in your gene set compared to the background. Bubble size indicates gene count, color represents significance (p-value).' },
-            'balloon_plot': { label: 'Function vs Localization', explanation: 'Creates a heatmap showing the relationship between functional categories and subcellular localizations. Color intensity represents the number of genes with both properties.' },
-            'venn_diagram': { label: 'Gene Set Comparison', explanation: 'Compares your gene list with the ciliary reference gene set, showing overlaps and unique genes. Numbers represent exact gene matches only.' },
-            'network': { label: 'Complex Network', explanation: 'Visualizes protein-protein interactions and complex associations among your genes. Connected nodes indicate genes that participate in the same protein complexes.' },
-            'organelle_radar': { label: 'Organelle Radar', explanation: 'Compares the organellar profile of your gene set against known organellar markers. Each axis represents a different subcellular compartment.' },
-            'organelle_umap': { label: 'Organelle UMAP', explanation: 'Projects genes onto a 2D UMAP based on their organellar localization patterns. Genes with similar localization profiles cluster together.' },
-            'expression_heatmap': { label: 'Expression Heatmap', explanation: 'Shows tissue-specific expression patterns of your genes. Color intensity represents expression levels across different tissues and cell types.' },
-            'multi_category_manhattan': { label: 'Gene Feature Overview', explanation: 'A comprehensive plot showing gene associations across five major categories: Subcellular Localization, Protein Complexes, Protein Domains, Ciliopathies, and Ciliogenesis Screens.' },
-            'screen_summary_heatmap': { label: 'Screen Summary Heatmap', explanation: 'Visualizes results from five key functional genomics screens (Kim, Wheway, Roosing, Breslow, Basu) as a color-coded heatmap.' },
-            'ciliopathy_associations': { label: 'Genes vs Ciliopathies', explanation: 'Displays the associations between genes and ciliopathies as markers. Each marker represents a gene-ciliopathy association, helping visualize disease links.' }
-        };
-
+    'multi_category_manhattan': { label: 'Gene Feature Overview (Default)', explanation: 'A comprehensive plot showing gene associations across seven major categories: Localization, Complexes, Domains, Ciliopathies, Screens, Orthologs, and Phenotype.' },
+    'enrichment_bubble': { label: 'Functional Enrichment (Bubble)', explanation: 'Analyzes functional category enrichment (significance by color, size by count).' },
+    'expression_heatmap': { label: 'Tissue Expression Heatmap', explanation: 'Shows tissue-specific expression patterns of your genes.' },
+    'screen_summary_heatmap': { label: 'Functional Screen Summary', explanation: 'Visualizes results from multiple key functional genomics screens (Kim, Wheway, Roosing, Breslow, Basu).' },
+    'network': { label: 'Complex Network (Force-Directed)', explanation: 'Visualizes protein-protein interactions and complex associations among your genes.' },
+    'phylogeny_bar': { label: 'Phylogenetic Conservation Summary', explanation: 'A bar chart summarizing the conservation status (species count) of the genes across different phylogenetic groups.' },
+    'cilia_effects_scatter': { label: 'Cilia Length Perturbation Scatter', explanation: 'Compares the effects of Loss-of-Function vs. Overexpression on cilia length.' },
+    'ortholog_heatmap': { label: 'Ortholog Presence Heatmap', explanation: 'A binary heatmap showing the presence or absence of orthologs in Mouse, C. elegans, and Zebrafish.' },
+    'lof_cilia_vs_count_scatter': { label: 'LoF Cilia/Count Dual Effect (NEW)', explanation: 'Categorical scatter plot comparing the LoF effect on Cilia Length vs. LoF effect on Ciliated Cell Percentage.' }
+    // REMOVED: functional_bar, localization_bubble, balloon_plot, venn_diagram, ciliopathy_associations, organelle_radar, organelle_umap
+};
         function populatePlotTypes() {
             const container = document.getElementById('ciliaplot-type-selector');
             if (!container) return;
@@ -963,115 +960,90 @@ function updatePlotExplanation() {
 // =============================================================================
 // ENHANCED PLOTLY.JS RENDERING FUNCTIONS
 // =============================================================================
+// --- NEW PLOT RENDERING FUNCTION ---
 
-function renderBubblePlot(genes, custom) {
-    const plotData = [];
+/**
+ * Renders a categorical scatter plot comparing two LoF effects: Cilia Length Change vs. Ciliated Cell Percentage Change.
+ * Data Source: 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)' and 'Percentage of ciliated cells (increase/decrease/no effect)'
+ * @param {object[]} genes - The array of merged gene data.
+ * @param {object} custom - Customization options from the UI.
+ */
+function renderLofCiliaVsCountScatter(genes, custom) {
+    clearAllPlots('plot-display-area');
+
+    // Mapping qualitative results to coordinate labels
+    const effectMap = {
+        'increase': 1, 'decrease': -1, 'no effect': 0, '—': 0, 'n/a': 0, 'not reported': 0, 'Increase': 1, 'Decrease': -1, 'No effect': 0
+    };
+    const labelMap = {
+        1: 'Increase', -1: 'Decrease', 0: 'No Effect / N/A'
+    };
+    
+    const dataPoints = [];
     genes.forEach(gene => {
-        const localizations = getCleanArray(gene, 'localization');
-        if (localizations.length > 0) {
-            plotData.push({
-                x: localizations, 
-                y: Array(localizations.length).fill(gene.gene),
-                mode: 'markers', 
-                type: 'scatter', 
-                name: gene.gene,
-                marker: { 
-                    size: custom.bubbleSize || 15, 
-                    color: '#c8d9ed',
-                    line: { color: '#3f51b5', width: 1 }
-                }, 
-                hoverinfo: 'x+y'
+        const loF_length_raw = String(gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—').toLowerCase().trim();
+        const loF_count_raw = String(gene['Percentage of ciliated cells (increase/decrease/no effect)'] || '—').toLowerCase().trim();
+        
+        const loF_length_val = effectMap[loF_length_raw] || 0;
+        const loF_count_val = effectMap[loF_count_raw] || 0;
+        
+        if (loF_length_val !== 0 || loF_count_val !== 0 || loF_length_raw !== '—' || loF_count_raw !== '—') {
+             dataPoints.push({
+                x: loF_length_val,
+                y: loF_count_val,
+                gene: gene.gene,
+                text: `Gene: ${gene.gene}<br>Cilia Length LoF: ${labelMap[loF_length_val]}<br>Ciliated Cell % LoF: ${labelMap[loF_count_val]}`,
+                color: loF_length_val * loF_count_val > 0 ? '#ff8c00' : '#4CAF50' // Orange for agreeing effect (both increase/decrease), Green for others
             });
         }
     });
-    
-    const layout = {
-        title: { 
-            text: custom.title || 'Gene Subcellular Localizations', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
-        },
-        xaxis: { 
-            title: { text: 'Localization', font: custom.axisTitleFont }, 
-            visible: custom.showX, 
-            linecolor: '#000', 
-            linewidth: 2, 
-            mirror: true,
-            showgrid: false,
-            zeroline: false,
-            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
-        },
-        yaxis: { 
-            title: { text: 'Gene', font: custom.axisTitleFont }, 
-            visible: custom.showY, 
-            linecolor: '#000', 
-            linewidth: 2, 
-            mirror: true,
-            showgrid: false,
-            zeroline: false,
-            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
-        },
-        showlegend: false, 
-        width: custom.figureWidth,
-        height: custom.figureHeight,
-        margin: { l: 120, r: 20, b: 100, t: 80 },
-        plot_bgcolor: 'white', 
-        paper_bgcolor: 'white'
-    };
-    
-    Plotly.newPlot('plot-display-area', plotData, layout, { responsive: true });
-}
 
-function renderBarPlot(genes, custom) {
-    const categoryCounts = new Map();
-    genes.forEach(gene => {
-        getCleanArray(gene, 'functional_category').forEach(cat => {
-            categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
-        });
-    });
-    
-    const sorted = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]);
+    if (dataPoints.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No Loss-of-Function data on Cilia Length or Cell Count found for these genes.</p>';
+        return;
+    }
+
     const data = [{
-        x: sorted.map(e => e[1]), 
-        y: sorted.map(e => e[0]), 
-        type: 'bar', 
-        orientation: 'h', 
-        marker: { color: '#4CAF50' },
-        width: custom.barWidth || 0.8
+        x: dataPoints.map(d => d.x),
+        y: dataPoints.map(d => d.y),
+        text: dataPoints.map(d => d.text),
+        mode: 'markers',
+        type: 'scatter',
+        hoverinfo: 'text',
+        marker: {
+            size: custom.bubbleSize || 18,
+            color: dataPoints.map(d => d.color),
+            line: { color: '#000', width: 1 }
+        }
     }];
-    
+
     const layout = {
         title: { 
-            text: custom.title || 'Functional Category Counts', 
+            text: custom.title || 'Loss-of-Function Effect: Cilia Length vs. Ciliated Cell Count', 
             font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
         },
-        xaxis: { 
-            title: { text: 'Number of Genes', font: custom.axisTitleFont }, 
-            visible: custom.showX, 
-            linecolor: '#000', 
-            linewidth: 2, 
-            mirror: true,
-            showgrid: false,
-            zeroline: false,
-            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
+        xaxis: {
+            title: { text: 'LoF Effect on Cilia Length (X-Axis)', font: custom.axisTitleFont },
+            tickvals: [-1, 0, 1],
+            ticktext: ['Decrease', 'No Effect/N/A', 'Increase'],
+            range: [-1.2, 1.2],
+            zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
         },
-        yaxis: { 
-            title: { text: 'Category', font: custom.axisTitleFont }, 
-            visible: custom.showY, 
-            automargin: true, 
-            linecolor: '#000', 
-            linewidth: 2, 
-            mirror: true,
-            showgrid: false,
-            zeroline: false,
-            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
+        yaxis: {
+            title: { text: 'LoF Effect on Ciliated Cell % (Y-Axis)', font: custom.axisTitleFont },
+            tickvals: [-1, 0, 1],
+            ticktext: ['Decrease', 'No Effect/N/A', 'Increase'],
+            range: [-1.2, 1.2],
+            zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
         },
+        showlegend: false,
         width: custom.figureWidth,
         height: custom.figureHeight,
-        margin: { l: 250, r: 20, b: 50, t: 80 },
-        plot_bgcolor: 'white', 
+        margin: { l: 150, r: 80, b: 100, t: 80 },
+        plot_bgcolor: 'white',
         paper_bgcolor: 'white'
     };
-    
+
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
@@ -1162,62 +1134,6 @@ function renderEnrichmentBubblePlot(genes, custom) {
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
-function renderBalloonPlot(genes, custom) {
-    const localizationCounts = new Map();
-    const functionalCounts = new Map();
-    genes.forEach(gene => {
-        getCleanArray(gene, 'localization').forEach(loc => localizationCounts.set(loc, (localizationCounts.get(loc) || 0) + 1));
-        getCleanArray(gene, 'functional_category').forEach(func => functionalCounts.set(func, (functionalCounts.get(func) || 0) + 1));
-    });
-    const localizations = [...localizationCounts.keys()];
-    const functions = [...functionalCounts.keys()];
-    const zData = functions.map(func => {
-        return localizations.map(loc => {
-            return genes.filter(gene => {
-                const geneLocs = getCleanArray(gene, 'localization');
-                const geneFuncs = getCleanArray(gene, 'functional_category');
-                return geneLocs.includes(loc) && geneFuncs.includes(func);
-            }).length;
-        });
-    });
-    
-    const data = [{ 
-        type: 'heatmap', 
-        x: localizations, 
-        y: functions, 
-        z: zData, 
-        colorscale: 'Blues', 
-        showscale: true 
-    }];
-    
-    const layout = { 
-        title: { 
-            text: custom.title || 'Function vs Localization', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor },
-            y: 0.95 
-        }, 
-        xaxis: { 
-            title: { text: 'Localization', font: custom.axisTitleFont }, 
-            visible: custom.showX, 
-            tickangle: -45, 
-            automargin: true,
-            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
-        }, 
-        yaxis: { 
-            title: { text: 'Functional Category', font: custom.axisTitleFont }, 
-            visible: custom.showY, 
-            automargin: true,
-            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
-        }, 
-        width: custom.figureWidth,
-        height: custom.figureHeight,
-        margin: { l: 200, r: 50, b: 180, t: 80 }, 
-        plot_bgcolor: 'white', 
-        paper_bgcolor: 'white'
-    };
-    
-    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
-}
 
 async function renderVennDiagram(genes, custom = {}) {
     const plotContainer = document.getElementById('plot-display-area');
@@ -1281,62 +1197,6 @@ async function renderVennDiagram(genes, custom = {}) {
 // NEW PLOT FUNCTION: GENES VS CILIOPATHY ASSOCIATIONS
 // =============================================================================
 
-function renderCiliopathyPlot(genes, custom) {
-    const plotData = [];
-    genes.forEach(gene => {
-        const ciliopathies = getCleanArray(gene, 'ciliopathy');
-        if (ciliopathies.length > 0) {
-            plotData.push({
-                x: ciliopathies, 
-                y: Array(ciliopathies.length).fill(gene.gene),
-                mode: 'markers', 
-                type: 'scatter', 
-                name: gene.gene,
-                marker: { 
-                    size: custom.bubbleSize || 15, 
-                    color: '#ffd9d9',
-                    line: { color: '#d62728', width: 1 }
-                }, 
-                hoverinfo: 'x+y'
-            });
-        }
-    });
-    
-    const layout = {
-        title: { 
-            text: custom.title || 'Gene vs Ciliopathy Associations', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
-        },
-        xaxis: { 
-            title: { text: 'Ciliopathy', font: custom.axisTitleFont }, 
-            visible: custom.showX, 
-            linecolor: '#000', 
-            linewidth: 2, 
-            mirror: true,
-            showgrid: false,
-            zeroline: false,
-            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
-        },
-        yaxis: { 
-            title: { text: 'Gene', font: custom.axisTitleFont }, 
-            visible: custom.showY, 
-            linecolor: '#000', 
-            linewidth: 2, 
-            mirror: true,
-            showgrid: false,
-            zeroline: false,
-            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
-        },
-        showlegend: false, 
-        width: custom.figureWidth,
-        height: custom.figureHeight,
-        margin: { l: 120, r: 20, b: 100, t: 80 },
-        plot_bgcolor: 'white', 
-        paper_bgcolor: 'white'
-    };
-    
-    Plotly.newPlot('plot-display-area', plotData, layout, { responsive: true });
-}
 
 // =============================================================================
 // NETWORK VISUALIZATION WITH CONTAINER BOUNDS
@@ -1474,225 +1334,7 @@ function renderComplexNetwork(genes, container, custom) {
     
     currentPlotInstance = { destroy: () => svg.remove() };
 }
-
-// =============================================================================
-// ENHANCED ORGANELLE VISUALIZATIONS
-// =============================================================================
-
-function renderOrganelleRadarPlot(genes, container, custom) {
-    clearAllPlots(container.id);
-    container.innerHTML = `<canvas style="max-width: 100%; max-height: 100%;"></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    
-    const userProfile = new Array(fractionLabels.length).fill(0);
-    let contributingGenes = 0;
-    
-    genes.forEach(gene => {
-        const localizations = getCleanArray(gene, 'localization');
-        let geneAdded = false;
-        localizations.forEach(loc => {
-            const matchedProfile = Object.keys(organelleMarkerProfiles).find(key => 
-                loc.toLowerCase().includes(key.toLowerCase()) || 
-                key.toLowerCase().includes(loc.toLowerCase())
-            );
-            if (matchedProfile) {
-                organelleMarkerProfiles[matchedProfile].forEach((val, i) => userProfile[i] += val);
-                geneAdded = true;
-            }
-        });
-        if (geneAdded) contributingGenes++;
-    });
-    
-    if (contributingGenes === 0) {
-        container.innerHTML = '<p style="text-align: center; padding: 50px;">No genes mapped to organellar profiles.</p>';
-        return;
-    }
-    
-    userProfile.forEach((val, i) => userProfile[i] /= contributingGenes);
-    
-    const datasets = Object.entries(organelleMarkerProfiles).map(([name, data], i) => {
-    const isCiliary = ["Cilia", "Transition zone", "Basal body"].includes(name);
-    return {
-        label: name,
-        data: data,
-        borderColor: isCiliary ? "#1abc9c" : d3.schemeTableau10[i % 10],
-        backgroundColor: isCiliary ? "#1abc9c20" : d3.schemeTableau10[i % 10] + '20',
-        borderWidth: isCiliary ? 3 : 2,
-        hidden: false,
-        pointRadius: 3
-    };
-});
-
-    
-    datasets.push({
-        label: 'Your Gene Set',
-        data: userProfile,
-        borderColor: '#e74c3c',
-        backgroundColor: '#e74c3c20',
-        borderWidth: 3,
-        pointRadius: 4,
-        hidden: false
-    });
-    
-    currentPlotInstance = new Chart(ctx, {
-        type: 'radar',
-        data: {
-            labels: fractionLabels,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: custom.title || "Organellar Profile Comparison",
-                    font: { 
-                        size: custom.titleFontSize || 16,
-                        family: custom.fontFamily,
-                        color: custom.fontColor
-                    }
-                },
-                legend: {
-                    position: 'bottom',
-                    labels: { 
-                        usePointStyle: true,
-                        font: {
-                            family: custom.fontFamily,
-                            size: 12
-                        }
-                    }
-                }
-            },
-            scales: {
-                r: {
-                    beginAtZero: true,
-                    max: 1.0,
-                    ticks: { stepSize: 0.2 }
-                }
-            }
-        }
-    });
-}
-
-function renderOrganelleUMAP(genes, container, custom) {
-    clearAllPlots(container.id);
-    container.innerHTML = `<canvas style="max-width: 100%; max-height: 100%;"></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    
-    const backgroundDatasets = Object.entries(precomputedUMAP).map(([name, data], i) => ({
-        label: name,
-        data: data,
-        backgroundColor: d3.schemeCategory10[i % 10] + '77',
-        pointRadius: 3,
-        pointHoverRadius: 5
-    }));
-    
-    const userGeneData = [];
-    genes.forEach((gene, i) => {
-        const localizations = getCleanArray(gene, 'localization');
-        for (const organelle in precomputedUMAP) {
-            if (localizations.some(loc => 
-                organelle.toLowerCase().includes(loc.toLowerCase()) || 
-                loc.toLowerCase().includes(organelle.toLowerCase())
-            )) {
-                const basePoint = precomputedUMAP[organelle][i % precomputedUMAP[organelle].length];
-                userGeneData.push({
-                    ...basePoint,
-                    gene: gene.gene,
-                    organelle: organelle
-                });
-                return;
-            }
-        }
-    });
-    
-    if (userGeneData.length === 0) {
-        container.innerHTML = '<p style="text-align: center; padding: 50px;">No genes mapped to the UMAP projection.</p>';
-        return;
-    }
-    
-    const userDataset = {
-        label: 'Your Genes',
-        data: userGeneData,
-        backgroundColor: '#e74c3c',
-        borderColor: '#c0392b',
-        pointRadius: 8,
-        pointHoverRadius: 10,
-        borderWidth: 2
-    };
-    
-    currentPlotInstance = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-            datasets: [...backgroundDatasets, userDataset]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: custom.title || "Organellar UMAP Projection",
-                    font: { 
-                        size: custom.titleFontSize || 16,
-                        family: custom.fontFamily,
-                        color: custom.fontColor
-                    }
-                },
-                legend: {
-                    position: 'bottom',
-                    labels: { 
-                        usePointStyle: true,
-                        font: {
-                            family: custom.fontFamily,
-                            size: 12
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            if (context.dataset.label === 'Your Genes') {
-                                const point = context.parsed;
-                                const dataPoint = userGeneData[context.dataIndex];
-                                return `${dataPoint.gene} (${dataPoint.organelle})`;
-                            }
-                            return context.dataset.label;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    display: true,
-                    title: {
-                        display: true,
-                        text: 'UMAP 1',
-                        font: {
-                            family: custom.fontFamily,
-                            size: custom.axisTitleFont.size,
-                            color: custom.axisTitleFont.color
-                        }
-                    }
-                },
-                y: {
-                    display: true,
-                    title: {
-                        display: true,
-                        text: 'UMAP 2',
-                        font: {
-                            family: custom.fontFamily,
-                            size: custom.axisTitleFont.size,
-                            color: custom.axisTitleFont.color
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
+        
 // =============================================================================
 // EXPRESSION HEATMAP (MAINTAINED FROM ORIGINAL)
 // =============================================================================
@@ -2204,12 +1846,12 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
             return expressionData;
         }
 
-        // =============================================================================
-        // MAIN ORCHESTRATOR (As provided by user)
-        // =============================================================================
+// =============================================================================
+// MAIN ORCHESTRATOR (As provided by user)
+// =============================================================================
 
-        // 🔄 UPDATED: This is the new version of the main function
-        async function generateAnalysisPlots() {
+// 🔄 Updated: This function must be modified to exclude the removed plots and include the new one.
+async function generateAnalysisPlots() {
             if (typeof ciliaryGeneMap === 'undefined' || ciliaryGeneMap.size === 0) {
                 alert("Error: The main gene database is not yet loaded. Please wait a moment and try again.");
                 return;
@@ -2246,24 +1888,23 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
                  plotContainer.innerHTML = 'Expression data is loading in the background. Please wait...';
                  return;
             }
-
-            switch (plotType) {
-                case 'expression_heatmap': renderExpressionHeatmap(plotExpressionData, foundGenes); break;
-                case 'localization_bubble': renderBubblePlot(foundGenes, custom); break;
-                case 'functional_bar': renderBarPlot(foundGenes, custom); break;
-                case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
-                case 'organelle_radar': renderOrganelleRadarPlot(foundGenes, plotContainer, custom); break;
-                case 'organelle_umap': renderOrganelleUMAP(foundGenes, plotContainer, custom); break;
-                case 'enrichment_bubble': renderEnrichmentBubblePlot(foundGenes, custom); break;
-                case 'balloon_plot': renderBalloonPlot(foundGenes, custom); break;
-                case 'venn_diagram': renderVennDiagram(foundGenes, custom); break;
-                case 'multi_category_manhattan': renderMultiCategoryPlot(foundGenes, custom); break;
-                case 'ciliopathy_associations': renderCiliopathyPlot(foundGenes, custom); break;
-                case 'screen_summary_heatmap': renderScreenSummaryHeatmap(foundGenes, custom); break;
-                default: plotContainer.innerHTML = 'This plot type is not yet implemented.';
-            }
-        }
-
+        
+    switch (plotType) {
+        case 'expression_heatmap': renderExpressionHeatmap(plotExpressionData, foundGenes); break;
+        // REMOVED: case 'localization_bubble', case 'functional_bar', case 'balloon_plot', case 'ciliopathy_associations'
+        // REMOVED: case 'organelle_radar', case 'organelle_umap', case 'venn_diagram' (kept for now, but suggested for removal)
+        case 'enrichment_bubble': renderEnrichmentBubblePlot(foundGenes, custom); break;
+        case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
+        case 'multi_category_manhattan': renderMultiCategoryPlot(foundGenes, custom); break;
+        case 'screen_summary_heatmap': renderScreenSummaryHeatmap(foundGenes, custom); break;
+        case 'phylogeny_bar': renderPhylogenyBarPlot(foundGenes, custom); break; 
+        case 'cilia_effects_scatter': renderCiliaEffectsScatterPlot(foundGenes, custom); break;
+        case 'ortholog_heatmap': renderOrthologHeatmap(foundGenes, custom); break;
+        // NEW PLOT ADDED
+        case 'lof_cilia_vs_count_scatter': renderLofCiliaVsCountScatter(foundGenes, custom); break; 
+        default: plotContainer.innerHTML = 'This plot type is not yet implemented or has been removed.';
+    }
+}        
 
         // =============================================================================
         // DOWNLOAD FUNCTION (As provided by user)
