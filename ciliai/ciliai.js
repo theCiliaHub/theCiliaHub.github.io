@@ -2734,25 +2734,40 @@ function extractPhenotypeIntent(qLower) {
      * (FIXED Nov 17 2025): Moved query check to top, integrated new terminology map.
      * CORRECTED: Scoping issues (window. prefix added) and try/catch structure fixed.
      */
-   async function handleAIQuery(query) {
-        const chatWindow = document.getElementById('messages');
-        if (!chatWindow) return;
 
-        // Validate query *before* any routing
-        if (!query) return;
-        const qLower = query.toLowerCase().trim();
+/**
+ * (REPLACEMENT) The Main "Level 1" Query Router
+ * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
+ */
+async function handleAIQuery(query) {
+    const chatWindow = document.getElementById('messages');
+    if (!chatWindow) return;
 
-        window.log(`Routing query: ${query}`);
+    // Validate query *before* any routing
+    if (!query) return;
+    const qLower = query.toLowerCase().trim();
 
-        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
-        const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
-        if (simpleGreetings.includes(qLower)) {
-            window.log('Routing via: Intent (Greeting)');
-            window.addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
-            return;
-        }
-        
-        const terminologyQueries = {
+    window.log(`Routing query: ${query}`);
+
+    try {
+        if (!window.CiliAI.ready) {
+            window.addChatMessage("Data is still loading, please wait...", false);
+            return;
+        }
+
+        let htmlResult = null;
+        let match;
+
+        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
+        const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
+        const terminologyQueries = window.terminologyQueries || {};
+        
+        if (simpleGreetings.includes(qLower)) {
+            window.log('Routing via: Intent (Greeting)');
+            window.addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
+            return;
+        }
+        const terminologyQueries = {
             "what is a cilium": "A cilium is a microtubule-based organelle extending from the cell surface. Primary cilia sense extracellular signals; motile cilia generate fluid flow. (Rosenbaum & Witman 2002)",
             "what are cilia": "Cilia are conserved organelles on most eukaryotic cells. They function in sensory signaling (primary cilia) or motility (motile cilia). (Reiter, Blacque & Leroux 2012)",
             "tell me about cilia": "Cilia detect environmental cues or move fluids, depending on type. Defects cause human genetic disorders called ciliopathies. (Hildebrandt & Benzing 2011)",
@@ -2785,63 +2800,13 @@ function extractPhenotypeIntent(qLower) {
             "what is primary ciliary dyskinesia": "PCD is caused by defects in motile cilia, leading to chronic infections, infertility, and left-right asymmetry defects. (Fliegauf et al. 2007)",
             "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
         };
-
-        if (terminologyQueries[qLower]) {
-            window.log('Routing via: Intent (Terminology)');
-            window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
-            return;
-        }
-
-        // Start the main try block
-        try {
-            if (!window.CiliAI.ready) {
-                window.addChatMessage("Data is still loading, please wait...", false);
-                return;
-            }
-
-            let htmlResult = null;
-            let match;
-
-            // --- MODIFIED: Button intents moved to the TOP for priority ---
-            if (qLower === 'plot default umap') {
-                window.log('Routing via: Intent (Default UMAP Plot)');
-                window.renderUMAPPlot('FOXJ1');
-                htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
-            }
-            else if (qLower === 'plot default phylogeny') {
-                window.log('Routing via: Intent (Default Phylogeny Plot)');
-                const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-                htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
-            }
-            // --- END OF MOVED BLOCK ---
-
-         // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
-    const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
-    if (simpleGreetings.includes(qLower)) {
-        window.log('Routing via: Intent (Greeting)');
-        window.addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
-        return;
-    }
-    
-    const terminologyQueries = window.terminologyQueries || {}; 
-    if (terminologyQueries[qLower]) {
-        window.log('Routing via: Intent (Terminology)');
-        window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
-        return;
-    }
-
-    // Start the main try block
-    try {
-        if (!window.CiliAI.ready) {
-            window.addChatMessage("Data is still loading, please wait...", false);
+        if (terminologyQueries[qLower]) {
+            window.log('Routing via: Intent (Terminology)');
+            window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
             return;
         }
 
-        let htmlResult = null;
-        let match;
-        
         // --- High Priority Plot Buttons (Immediate Actions) ---
-        
         if (qLower === 'plot default umap') {
             window.log('Routing via: Intent (Default UMAP Plot)');
             window.renderUMAPPlot('FOXJ1');
@@ -2853,54 +2818,51 @@ function extractPhenotypeIntent(qLower) {
             htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
         }
         
-        // =( 1 )= INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES (NEW HIGHEST PRIORITY)
-        
+        // =( 1 )= INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES (Highest Priority for Filtering)
         const intentChecker = window.flexibleIntentParser(query);
-        const termA = match && match[1] ? match[1].trim() : '';
-        const termB = match && match[2] ? match[2].trim() : '';
 
-        if (htmlResult === null) {
-            if (intentChecker) {
-                const intents = {
-                    disease: extractDiseaseIntent(qLower),
-                    expression: extractExpressionIntent(qLower),
-                    complex: extractComplexIntent(qLower)
-                };
+        if (htmlResult === null && intentChecker) {
+             const intents = {
+                disease: window.extractDiseaseIntent(qLower),
+                expression: window.extractExpressionIntent(qLower),
+                complex: window.extractComplexIntent(qLower)
+            };
 
-                // Case 1A: Complex AND Disease (e.g., BBSome genes causing Joubert Syndrome)
-                if (intents.complex && intents.disease) {
-                    htmlResult = window.handleGeneInDiseaseQuery(intents.complex, intents.disease);
-                }
-                // Case 1B: Disease AND Expression/Tissue (e.g., Joubert Syndrome genes expressed in kidney)
-                else if (intents.disease && intents.expression) {
-                    htmlResult = window.handleTissueSpecificDiseaseQuery(intents.disease, intents.expression);
-                }
-                // Case 1C: Simple Complex Query (e.g., "Genes in BBSome") - Fall back to L1 handler
-                else if (intents.complex) {
-                    htmlResult = window.handleSimpleComplexQuery(intents.complex, query);
-                }
+            // Case 1A: Complex AND Disease (e.g., BBSome genes causing Joubert Syndrome)
+            if (intents.complex && intents.disease) {
+                window.log('Routing via: Intent (Complex + Disease)');
+                htmlResult = window.handleGeneInDiseaseQuery(intents.complex, intents.disease);
+            }
+            // Case 1B: Disease AND Expression/Tissue (e.g., Joubert Syndrome genes expressed in kidney)
+            else if (intents.disease && intents.expression) {
+                window.log('Routing via: Intent (Disease + Expression)');
+                htmlResult = window.handleTissueSpecificDiseaseQuery(intents.disease, intents.expression);
+            }
+            // Case 1C: Simple Complex Query (e.g., "Genes in BBSome") - Fall back to L1 handler
+            else if (intents.complex) {
+                window.log('Routing via: Intent (Simple Complex List)');
+                htmlResult = window.handleSimpleComplexQuery(intents.complex, query);
             }
         }
-
-        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
         
-        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower === 'sure' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
+        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
                          !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
-        if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && lastQueryContext.type === null) {
+        if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && window.lastQueryContext.type === null) {
             window.log('Routing via: Intent (Ignored standalone "yes")');
-            return; // Do nothing, just stop processing
+            return;
         }
 
-        if (htmlResult === null && isFollowUp && lastQueryContext.type === 'list_followup') {
+        if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'list_followup') {
             window.log('Routing via: Intent (Follow-up: Show List)');
             window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
             window.lastQueryContext = { type: null, data: [], term: null };
-            return; // No chat message needed
+            return;
         }
         
         // =( 3 )= INTENT: CONTEXTUAL FOLLOW-UP (Screen References)
-        else if (htmlResult === null && isFollowUp && lastQueryContext.type === 'screen_references') {
+        else if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'screen_references') {
             window.log('Routing via: Intent (Follow-up: Screen References)');
             htmlResult = window.handleScreenReferenceFollowup();
         }
@@ -2909,8 +2871,7 @@ function extractPhenotypeIntent(qLower) {
         else if (htmlResult === null && (
             qLower.includes('loss-of-function') || qLower.includes('lof') ||
             qLower.includes('overexpression') || qLower.includes('oe') ||
-            qLower.includes('percent ciliated') || qLower.includes('cilia length') ||
-            (qLower.includes('effect') && qLower.includes('of'))
+            qLower.includes('percent ciliated') || qLower.includes('cilia length') || (qLower.includes('effect') && qLower.includes('of'))
         )) {
             window.log('Routing via: Intent (Screens/Effects)');
             const genes = window.extractMultipleGenes(query);
@@ -2937,16 +2898,7 @@ function extractPhenotypeIntent(qLower) {
             htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
         }
 
-        // =( 7 )= INTENT: COMPLEX / MODULE MEMBERS (Split Logic - remaining simple complex logic)
-        else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|part of|in complex)\s+(.+)/i))) {
-            window.log('Routing via: Intent (Get Complexes for Gene)');
-            const genes = window.extractMultipleGenes(match[1]);
-            if (genes.length > 0) {
-                htmlResult = window.handleGeneInComplexQuery(genes[0]);
-            }
-        }
-
-        // =( 8 )= INTENT: DOMAINS
+        // =( 7 )= INTENT: DOMAINS
         else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
             window.log('Routing via: Intent (Domains)');
             const genes = window.extractMultipleGenes(match[1]);
@@ -2955,7 +2907,7 @@ function extractPhenotypeIntent(qLower) {
             }
         }
 
-        // =( 9 )= INTENT: PHYLOGENY / EVOLUTION
+        // =( 8 )= INTENT: PHYLOGENY / EVOLUTION
         else if (htmlResult === null && (
             qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
             qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
@@ -2966,7 +2918,7 @@ function extractPhenotypeIntent(qLower) {
             htmlResult = await window.routePhylogenyAnalysis(query);
         }
 
-        // =( 10 )= INTENT: FUNCTIONAL MODULES
+        // =( 9 )= INTENT: FUNCTIONAL MODULES
         else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
             window.log('Routing via: Intent (Get Modules)');
             const gene = match[1].toUpperCase();
@@ -2978,7 +2930,7 @@ function extractPhenotypeIntent(qLower) {
             }
         }
 
-        // =( 11 )= INTENT: scRNA Expression
+        // =( 10 )= INTENT: scRNA Expression
         else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression') || qLower.includes('expression of'))) {
             window.log('Routing via: Intent (scRNA)');
             const genes = window.extractMultipleGenes(query);
@@ -2991,29 +2943,23 @@ function extractPhenotypeIntent(qLower) {
             }
         }
             
-        // =( 12 )= INTENT: UMAP (VISUAL)
+        // =( 11 )= INTENT: UMAP (VISUAL) - Simplified UMAP/Lung scRNA
         else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
             window.log('Routing via: Intent (UMAP Plot)');
             let gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : null;
             
-            if (!gene && (qLower.includes('umap') || qLower.includes('lung scrna'))) {
-                gene = 'FOXJ1';
-                window.log('Defaulting UMAP plot to FOXJ1');
-            }
+            if (!gene && (qLower.includes('umap') || qLower.includes('lung scrna'))) { gene = 'FOXJ1'; }
             
             window.renderUMAPPlot(gene);
 
             htmlResult = `<div class="ai-result-card">
                 <p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p>
-                <p style="margin-top: 10px;">
-                    <a href="#" class="ai-action" onclick="downloadUMAPDataAsCSV('${gene}')">
-                        ⬇️ Download UMAP Data (CSV)
-                    </a>
-                </p>
+                <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="downloadUMAPDataAsCSV('${gene}')">⬇️ Download UMAP Data (CSV)</a></p>
             </div>`;
         }
 
-        // =( 13 )= INTENT: SIMPLE KEYWORD LISTS
+
+        // =( 12 )= INTENT: SIMPLE KEYWORD LISTS (Catch-all for simple Localization/Disease/Domain lookups)
         else if (htmlResult === null) {
             const intent = window.flexibleIntentParser(query);
             if (intent) {
@@ -3022,7 +2968,8 @@ function extractPhenotypeIntent(qLower) {
             }
         }
 
-        // =( 14 )= INTENT: FALLBACK (GET DETAILS)
+
+        // =( 13 )= INTENT: FALLBACK (GET DETAILS)
         if (htmlResult === null) {
             window.log(`Routing via: Fallback (Get Details)`);
             let term = qLower;
@@ -3038,35 +2985,21 @@ function extractPhenotypeIntent(qLower) {
             }
         }
 
-        // =( 15 )= FINAL FALLBACK (ERROR)
-        if (htmlResult === null) {
-            window.log(`Routing via: Final Fallback (Error)`);
-            const genes = window.extractMultipleGenes(query);
-            if (genes.length > 0) {
-                window.log(`Final fallback, found gene: ${genes[0]}`);
-                htmlResult = await window.displayFullGeneInfo(genes[0]);
-            } else {
-                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
-            }
-        }
-
-        // =( 16 )= INTENT: GENE SET ANALYSIS
+        // =( 14 )= INTENT: GENE SET ANALYSIS
         const enrichmentMatch = qLower.match(/enrichment for (.+)/);
         const compareMatch = qLower.match(/compare (.+) and (.+)/);
 
         if (enrichmentMatch) {
             window.log('Routing via: Intent (Gene Set Enrichment)');
             const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
-            const terms = getEnrichedGOTerms(geneList);
+            const terms = window.getEnrichedGOTerms(geneList);
             
             if (terms.length === 0) {
                 htmlResult = "Not enough genes provided, or no significant enrichment found.";
             } else {
                 let html = `<div class="ai-result-card"><h4>Gene Set Enrichment for ${geneList.length} Genes</h4>`;
                 html += `<p>Top enriched biological terms (simulated):</p><ul>`;
-                terms.forEach(t => {
-                    html += `<li><strong>${t.term}</strong>: Found ${t.count} genes (p-value ${t.pval.toExponential(1)})</li>`;
-                });
+                terms.forEach(t => { html += `<li><strong>${t.term}</strong>: Found ${t.count} genes (p-value ${t.pval.toExponential(1)})</li>`; });
                 html += `</ul></div>`;
                 htmlResult = html;
             }
@@ -3079,18 +3012,22 @@ function extractPhenotypeIntent(qLower) {
             const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
             const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
 
-            const jaccardIndex = calculateJaccard(setA, setB);
+            const jaccardIndex = window.calculateJaccard(setA, setB);
             const overlapCount = Math.round(jaccardIndex * (setA.length + setB.length));
             
-            htmlResult = `
-                <div class="ai-result-card">
-                    <h4>Gene Set Comparison: ${termA} vs. ${termB}</h4>
-                    <p><strong>Genes in ${termA}:</strong> ${setA.length}</p>
-                    <p><strong>Genes in ${termB}:</strong> ${setB.length}</p>
-                    <p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p>
-                    <p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p>
-                </div>
-            `;
+            htmlResult = `<div class="ai-result-card"><h4>Gene Set Comparison: ${termA} vs. ${termB}</h4><p><strong>Genes in ${termA}:</strong> ${setA.length}</p><p><strong>Genes in ${termB}:</strong> ${setB.length}</p><p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p><p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p></div>`;
+        }
+
+        // =( 15 )= FINAL FALLBACK (ERROR)
+        if (htmlResult === null) {
+            window.log(`Routing via: Final Fallback (Error)`);
+            const genes = window.extractMultipleGenes(query);
+            if (genes.length > 0) {
+                window.log(`Final fallback, found gene: ${genes[0]}`);
+                htmlResult = await window.displayFullGeneInfo(genes[0]);
+            } else {
+                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
+            }
         }
 
         // Send the final result to chat
@@ -3148,8 +3085,6 @@ function downloadUMAPDataAsCSV(geneSymbol) {
     window.addChatMessage(`Downloaded UMAP data for <strong>${gene}</strong> as ${filename}.`, false);
 }
     
-
-
 
 /**
      * (NEW) Provides full reference details for screen keys
