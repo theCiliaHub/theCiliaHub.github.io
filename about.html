@@ -11,6 +11,7 @@
             --primary-blue: #005b96;
             --secondary-blue: #b3cde0;
             --border-light: #e1e8ed;
+            --accent-text: #333333;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -63,7 +64,7 @@
         /* --- Main Content Area for About --- */
         .about-content {
             padding: 40px;
-            max-width: 800px;
+            max-width: 900px;
             margin: 40px auto;
             background: white;
             border-radius: 12px;
@@ -77,10 +78,111 @@
             padding-bottom: 10px;
         }
 
+        .about-content h2 {
+            color: var(--primary-blue);
+            font-size: 1.5rem;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--secondary-blue);
+            padding-bottom: 5px;
+        }
+        
+        .about-content h3 {
+            color: var(--accent-text);
+            font-size: 1.25rem;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
         .about-content p {
             line-height: 1.6;
             margin-bottom: 15px;
             font-size: 16px;
+        }
+        
+        .about-content ul {
+            list-style: none; /* Removed default list style for structured content */
+            padding-left: 0;
+        }
+        
+        .about-content li {
+            margin-bottom: 10px;
+            padding-left: 10px;
+            border-left: 2px solid var(--secondary-blue);
+        }
+        
+        .about-content a {
+            color: var(--primary-blue);
+            text-decoration: none;
+        }
+        
+        .about-content a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Specific Styles for Contact/Cite Section */
+        .page-section {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+        
+        .contact-info, .cite-list, .feedback-form {
+            padding: 20px;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            background: #f8fbfc;
+        }
+        
+        .contact-info ul, .cite-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .contact-info li, .cite-list li {
+            border-left: none; /* Override general li style for clean contact list */
+            font-size: 1rem;
+            padding-left: 0;
+            margin-bottom: 5px;
+        }
+
+        /* Feedback Form Specifics */
+        #feedback-form {
+            display: flex;
+            flex-direction: column;
+        }
+        #feedback-form label {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            color: var(--accent-text);
+        }
+        #feedback-text {
+            height: 100px;
+            padding: 10px;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            margin-bottom: 15px;
+            resize: vertical;
+        }
+        .search-btn {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        .search-btn:hover {
+            background: #00477a;
+        }
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            font-weight: 500;
         }
     </style>
 </head>
@@ -103,6 +205,7 @@
 
     <div class="about-content">
         <h1>About CiliAI</h1>
+        
         <p>I am an **AI assistant** designed to help you explore and analyze data on **ciliary biology**. You can ask questions or paste full gene lists. Here are examples of what I understand:</p>
         
         <h2>Capabilities and Examples</h2>
@@ -118,6 +221,50 @@
         <h2>Data Sources</h2>
         <p>My data comes from a pre-compiled database of over **23,000 genes**, enriched with **8 specialized datasets** (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
         <p>For more detailed information, please refer to the project repository.</p>
+        
+        
+        <div class="page-section">
+            <h2>Contact & Cite</h2>
+            
+            <div class="contact-info">
+                <h3>Contact Us ✉️</h3>
+                <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">Reach out to our team for questions, collaborations, or feedback.</p>
+                <ul>
+                    <li><strong>Dr. Oktay I. Kaplan Lab:</strong> <a href="mailto:oktay.kaplan@agu.edu.tr">oktay.kaplan@agu.edu.tr</a></li>
+                    <li><strong>Ferhan Yenisert:</strong> <a href="mailto:ferhan.yenisert@agu.edu.tr">ferhan.yenisert@agu.edu.tr</a></li>
+                </ul>
+                <p style="font-size: 0.9rem; color: #7f8c8d; margin-top: 1rem;">We aim to respond within 48 hours. Please include your affiliation and query details.</p>
+            </div>
+            
+            <div class="cite-list">
+                <h3>Cite CiliaHub 📝</h3>
+                <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">Please cite the following papers when using CiliaHub data in your research:</p>
+                <ul>
+                    <li>
+                        Ferhan Yenisert &amp; Oktay I. Kaplan; 
+                        <strong>Expanded Catalog of Gold Standard Ciliary Gene List. Integration of Novel Ciliary Genes into the Ciliome.</strong>
+                        <br>bioRxiv preprint:
+                        <a href="https://www.biorxiv.org/content/10.1101/2025.08.22.671678v1"
+                        target="_blank" rel="noopener noreferrer"
+                        aria-label="Open bioRxiv preprint in a new tab">
+                        https://www.biorxiv.org/content/10.1101/2025.08.22.671678v1
+                        </a>
+                    </li>
+                </ul>
+                <p style="font-size: 0.9rem; color: #7f8c8d; margin-top: 1rem;">The reference related to ciliary function of genes can be found on the gene specific page.</p>
+            </div>
+            
+            <div class="feedback-form">
+                <h3>Feedback 💡</h3>
+                <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">We value your input to improve CiliaHub.</p>
+                <form id="feedback-form">
+                    <label for="feedback-text" style="font-weight: 600;">Your Feedback:</label>
+                    <textarea id="feedback-text" name="feedback" required aria-label="Enter your feedback"></textarea>
+                    <button type="submit" class="search-btn btn btn-primary" aria-label="Submit feedback">Submit Feedback</button>
+                </form>
+                <div id="feedback-status" class="status-message" style="display: none;"></div>
+            </div>
+        </div>
     </div>
 </body>
 </html>
