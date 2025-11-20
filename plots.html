@@ -680,47 +680,6 @@ function updatePlotExplanation() {
             }
         }
 
-
-        // =============================================================================
-        // ENHANCED ORGANELLE PROFILES
-        // =============================================================================
-
-        const organelleMarkerProfiles = {
-            "Lysosome": [0.1, 0.2, 0.3, 0.8, 0.9, 0.7, 0.4, 0.2],
-            "Cytosol": [0.4, 0.5, 0.3, 0.3, 0.3, 0.4, 0.4, 0.3],
-            "Nucleus": [0.9, 0.8, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1],
-            "Mitochondria": [0.8, 0.9, 0.7, 0.2, 0.1, 0.1, 0.2, 0.3],
-            "Endosome": [0.2, 0.3, 0.6, 0.8, 0.7, 0.5, 0.3, 0.2],
-            "Endoplasmic reticulum": [0.2, 0.4, 0.8, 0.3, 0.2, 0.1, 0.5, 0.7],
-            "Centrosome": [0.1, 0.2, 0.7, 0.9, 0.8, 0.3, 0.1, 0.1],
-            "Golgi": [0.1, 0.2, 0.5, 0.2, 0.2, 0.2, 0.8, 0.9],
-            "Autophagosomes": [0.1, 0.1, 0.4, 0.7, 0.8, 0.6, 0.3, 0.2],
-            "Cilia": [0.9, 0.9, 0.8, 0.7, 0.5, 0.3, 0.3, 0.2],
-            "Transition zone": [0.8, 0.8, 0.9, 0.7, 0.4, 0.2, 0.2, 0.1],
-            "Basal body": [0.85, 0.85, 0.8, 0.6, 0.3, 0.2, 0.1, 0.1],
-            "Ciliary associated gene": [0.1, 0.1, 0.2, 0.8, 0.9, 0.6, 0.2, 0.1],
-            "Peroxisome": [0.3, 0.4, 0.6, 0.5, 0.4, 0.3, 0.7, 0.8]
-        };
-
-        const precomputedUMAP = {
-            "Lysosome": Array.from({length: 40}, (_, i) => ({gene: `LYS${i}`, x: 2 + Math.random()*2, y: 8 + Math.random()*2})),
-            "Cytosol": Array.from({length: 60}, (_, i) => ({gene: `CYT${i}`, x: 5 + Math.random()*2, y: 5 + Math.random()*2})),
-            "Nucleus": Array.from({length: 70}, (_, i) => ({gene: `NUC${i}`, x: 9 + Math.random()*1.5, y: 1 + Math.random()*2})),
-            "Mitochondria": Array.from({length: 60}, (_, i) => ({gene: `MT${i}`, x: 1 + Math.random()*2, y: 2 + Math.random()*2})),
-            "Endosome": Array.from({length: 35}, (_, i) => ({gene: `END${i}`, x: 7 + Math.random()*2, y: 7 + Math.random()*2})),
-            "Endoplasmic reticulum": Array.from({length: 45}, (_, i) => ({gene: `ER${i}`, x: 3 + Math.random()*2, y: 6 + Math.random()*2})),
-            "Centrosome": Array.from({length: 40}, (_, i) => ({gene: `CENT${i}`, x: 6 + Math.random()*2, y: 7 + Math.random()*2})),
-            "Golgi": Array.from({length: 35}, (_, i) => ({gene: `GOLGI${i}`, x: 4 + Math.random()*2, y: 8 + Math.random()*2})),
-            "Autophagosomes": Array.from({length: 30}, (_, i) => ({gene: `AUTO${i}`, x: 2 + Math.random()*2, y: 6 + Math.random()*2})),
-            "Cilia": Array.from({length: 50}, (_, i) => ({gene: `CILIA${i}`, x: 8 + Math.random()*1.5, y: 9 + Math.random()*1.5})),
-            "Transition zone": Array.from({length: 30}, (_, i) => ({gene: `TZ${i}`, x: 8 + Math.random()*1.5, y: 7 + Math.random()*1.5})),
-            "Basal body": Array.from({length: 30}, (_, i) => ({gene: `BB${i}`, x: 7 + Math.random()*1.5, y: 6 + Math.random()*1.5})),
-            "Ciliary associated gene": Array.from({length: 50}, (_, i) => ({gene: `CIL${i}`, x: 8 + Math.random()*2, y: 8 + Math.random()*2})),
-            "Peroxisome": Array.from({length: 25}, (_, i) => ({gene: `PEROX${i}`, x: 6 + Math.random()*2, y: 3 + Math.random()*2}))
-        };
-
-        const fractionLabels = ['Fr 1', 'Fr 2', 'Fr 3', 'Fr 4', 'Fr 5', 'Fr 6', 'Fr 7', 'Fr 8'];
-
         // =============================================================================
         // PLOT RENDERING FUNCTIONS (All functions provided by the user are included here)
         // =============================================================================
