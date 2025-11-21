@@ -1110,39 +1110,86 @@ const rawToValueMap = {
  * @param {object[]} genes - The array of merged gene data.
  * @param {object} custom - Customization options from the UI.
  */
+// =============================================================================
+// PLOT RENDERING FUNCTION: LoF Cilia/Count Scatter (CLEANED)
+// =============================================================================
+
 function renderLofCiliaVsCountScatter(genes, custom) {
     clearAllPlots('plot-display-area');
 
-    // Mapping qualitative results to coordinate labels
-    const effectMap = {
-        'increase': 1, 'decrease': -1, 'no effect': 0, '—': 0, 'n/a': 0, 'not reported': 0, 'Increase': 1, 'Decrease': -1, 'No effect': 0
+    // --- MAPPING LOGIC (Robust against non-standard text) ---
+    const rawToValueMap = {
+        // Decrease (-1)
+        'decrease': '-1', 'shorter': '-1', 'reduced': '-1', 'loss': '-1', 'fail': '-1', 'absent': '-1',
+        'shorter cilia': '-1', 'reduced cilia numbers': '-1', 'decreased cilia numbers': '-1', 'short cilia':'-1', 
+
+        // Increase (1)
+        'increase': 1, 'longer': 1, 'supernumerary': 1, 'longer cilia': 1, 'increased cilia numbers': 1,
+        
+        // No Effect (0)
+        'no effect': 0, 'no change': 0, 'baseline': 0
     };
-   const labelMap = {
-    1: 'Increase', 
-    '-1': 'Decrease', // FIXED: Quoting the negative key ensures reliable parsing.
-    0: 'No Effect / N/A'
+    
+    const valueToLabelMap = { 1: 'Increase (Longer)', '-1': 'Decrease (Shorter)', 0: 'Baseline/No Effect' };
+    const NOT_REPORTED_KEYWORDS = ['—', 'n/a', 'not reported', 'notreported', 'not evaluated'];
+    const NOT_REPORTED_LABEL = 'Not Reported / N/A';
+
+    // Helper to extract a numeric value (-1, 0, 1) and a clean string label.
+    const getEffectData = (gene, key) => {
+        let raw = String(gene[key] || '—').toLowerCase().trim();
+        raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim(); 
+        
+        let value = 0;
+        let label = NOT_REPORTED_LABEL;
+        let isReported = false;
+        
+        // 1. Check for 'Not Reported' status first
+        if (NOT_REPORTED_KEYWORDS.includes(raw) || raw.length === 0) {
+            return { value: 0, label: NOT_REPORTED_LABEL, isReported: false };
+        }
+        
+        // 2. Map reported terms to a value
+        isReported = true;
+        for (const [phrase, val] of Object.entries(rawToValueMap)) {
+            if (raw.includes(phrase)) {
+                value = val;
+                label = valueToLabelMap[value];
+                return { value, label, isReported: true };
+            }
+        }
+        
+        // 3. Fallback for genuinely unmapped but reported text
+        return { value: 0, label: `Unmapped: ${raw}`, isReported: true }; 
     };
+
     const dataPoints = [];
+    
     genes.forEach(gene => {
-        const loF_length_raw = String(gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—').toLowerCase().trim();
-        const loF_count_raw = String(gene['Percentage of ciliated cells (increase/decrease/no effect)'] || '—').toLowerCase().trim();
+        const loF_len_key = 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)';
+        const loF_count_key = 'Percentage of ciliated cells (increase/decrease/no effect)';
+
+        const loF_len = getEffectData(gene, loF_len_key);
+        const loF_count = getEffectData(gene, loF_count_key);
         
-        const loF_length_val = effectMap[loF_length_raw] || 0;
-        const loF_count_val = effectMap[loF_count_raw] || 0;
+        const isReported = loF_len.isReported || loF_count.isReported;
         
-        if (loF_length_val !== 0 || loF_count_val !== 0 || loF_length_raw !== '—' || loF_count_raw !== '—') {
-             dataPoints.push({
-                x: loF_length_val,
-                y: loF_count_val,
+        if (isReported) {
+            dataPoints.push({
+                x: loF_len.value,
+                y: loF_count.value,
                 gene: gene.gene,
-                text: `Gene: ${gene.gene}<br>Cilia Length LoF: ${labelMap[loF_length_val]}<br>Ciliated Cell % LoF: ${labelMap[loF_count_val]}`,
-                color: loF_length_val * loF_count_val > 0 ? '#ff8c00' : '#4CAF50' // Orange for agreeing effect (both increase/decrease), Green for others
+                // --- CLEANED HOVER TEXT: Only LoF Length and LoF Count ---
+                text: `<b>Gene:</b> ${gene.gene}<br>` + 
+                      `<b>Cilia Length LoF:</b> ${loF_len.label}<br>` + 
+                      `<b>Ciliated Cell % LoF:</b> ${loF_count.label}`,
+                // -----------------------------------------------------
+                color: loF_len.value * loF_count.value < 0 ? '#d62728' : (loF_len.value * loF_count.value > 0 ? '#2ca02c' : '#ff7f0e')
             });
         }
     });
 
     if (dataPoints.length === 0) {
-        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No Loss-of-Function data on Cilia Length or Cell Count found for these genes.</p>';
+        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">The filter successfully excluded all genes explicitly marked as "Not Reported" or "—". No other perturbation data was found.</p>';
         return;
     }
 
@@ -1166,16 +1213,16 @@ function renderLofCiliaVsCountScatter(genes, custom) {
             font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
         },
         xaxis: {
-            title: { text: 'LoF Effect on Cilia Length (X-Axis)', font: custom.axisTitleFont },
+            title: { text: 'Loss-of-Function Effect (Cilia Length)', font: custom.axisTitleFont },
             tickvals: [-1, 0, 1],
-            ticktext: ['Decrease', 'No Effect/N/A', 'Increase'],
+            ticktext: ['Decrease', 'Baseline/N/A', 'Increase'],
             range: [-1.2, 1.2],
             zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
         },
         yaxis: {
             title: { text: 'LoF Effect on Ciliated Cell % (Y-Axis)', font: custom.axisTitleFont },
             tickvals: [-1, 0, 1],
-            ticktext: ['Decrease', 'No Effect/N/A', 'Increase'],
+            ticktext: ['Decrease', 'Baseline/N/A', 'Increase'],
             range: [-1.2, 1.2],
             zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
         },
