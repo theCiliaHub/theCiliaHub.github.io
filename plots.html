@@ -963,6 +963,9 @@ function updatePlotExplanation() {
 // =============================================================================
 // PLOT RENDERING FUNCTION: CILIA EFFECTS SCATTER (FIXED)
 // =============================================================================
+
+        
+        
 function renderCiliaEffectsScatterPlot(genes, custom) {
     clearAllPlots('plot-display-area');
 
@@ -998,36 +1001,37 @@ const rawToValueMap = {
     const NOT_REPORTED_KEYWORDS = ['—', 'n/a', 'not reported', 'notreported', 'not evaluated'];
     const NOT_REPORTED_LABEL = 'Not Reported / N/A';
 
-    // Helper to extract a numeric value (-1, 0, 1) and a clean string label.
-    const getEffectData = (gene, key) => {
-        let raw = String(gene[key] || '—').toLowerCase().trim();
-        raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim(); 
-        
-        let value = 0;
-        let label = NOT_REPORTED_LABEL;
-        
-        // 1. Check for 'Not Reported' status first
-        if (NOT_REPORTED_KEYWORDS.includes(raw) || raw.length === 0) {
-            return { value: 0, label: NOT_REPORTED_LABEL, isReported: false };
+// Helper to extract a numeric value (-1, 0, 1) and a clean string label.
+const getEffectData = (gene, key) => {
+    let raw = String(gene[key] || '—').toLowerCase().trim();
+    raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim(); 
+    
+    let value = 0;
+    let label = NOT_REPORTED_LABEL;
+    let isReported = false; // Initialize to false
+
+    // 1. Check for 'Not Reported' status first
+    if (NOT_REPORTED_KEYWORDS.includes(raw) || raw.length === 0) {
+        return { value: 0, label: NOT_REPORTED_LABEL, isReported: false }; // Remains false for true 'N/A'
+    }
+    
+    // 2. If it's NOT a 'Not Reported' keyword, it IS reported data, regardless of the value.
+    isReported = true; // <-- THIS IS THE CRITICAL LOGIC FIX
+
+    // 3. Map all reported terms (including 'no effect')
+    for (const [phrase, val] of Object.entries(rawToValueMap)) {
+        if (raw.includes(phrase)) {
+            value = val;
+            label = valueToLabelMap[value];
+            
+            // Return here, explicitly marking it as reported
+            return { value, label, isReported: true }; 
         }
-        
-        // 2. Map reported terms to a value
-        for (const [phrase, val] of Object.entries(rawToValueMap)) {
-            if (raw.includes(phrase)) {
-                value = val;
-                label = valueToLabelMap[value];
-                return { value, label, isReported: true };
-            }
-        }
-        
-        // 3. Handle explicit but unmapped reports (e.g., "Decreased" capitalization)
-        if (raw.includes('decreased')) {
-             return { value: -1, label: valueToLabelMap[-1], isReported: true };
-        }
-        
-        // Final fallback for genuinely unmapped text (e.g., "unknown value")
-        return { value: 0, label: `Unmapped: ${raw}`, isReported: true }; 
-    };
+    }
+    
+    // 4. Fallback for genuinely unmapped but reported text (we keep the default value=0)
+    return { value: 0, label: `Unmapped: ${raw}`, isReported: true }; 
+};
 
     const dataPoints = [];
     
