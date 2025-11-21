@@ -967,59 +967,66 @@ function renderCiliaEffectsScatterPlot(genes, custom) {
     clearAllPlots('plot-display-area');
 
     // --- MAPPING LOGIC (Robust against non-standard text) ---
-    const rawToValueMap = {
-        // Decrease (-1)
-        'decrease': -1, 
-        'shorter': -1,           // NEW: Captures "Shorter" (from your example data)
-        'reduced': -1,           // NEW: Captures "Reduced cilia numbers" (from your example data)
-        'loss': -1,              // Catches terms like "Loss of cilia"
-        'fail': -1,              // Catches terms like "Failed to form"
+    // --- MAPPING LOGIC (Robust against non-standard text) ---
+const rawToValueMap = {
+    // Decrease (-1)
+    'decrease': -1, 
+    'shorter': -1,              // Catches terms like "Shorter" 
+    'shorter cilia': -1,        // NEW
+    'short cilia': -1,          // NEW
+    'reduced': -1, 
+    'reduced cilia numbers': -1, // NEW
+    'decreased cilia numbers': -1, // NEW
+    'loss': -1, 
+    'fail': -1, 
 
-        // Increase (1)
-        'increase': 1, 
-        'longer': 1, 
-        'supernumerary': 1,      // Catches specific increase terms
-        
-        // No Effect (0)
-        'no effect': 0, 
-        'no change': 0, 
-        'baseline': 0
-    };
+    // Increase (1)
+    'increase': 1, 
+    'longer': 1, 
+    'longer cilia': 1,          // NEW
+    'increased cilia numbers': 1, // NEW
+    'supernumerary': 1, 
+    
+    // No Effect (0)
+    'no effect': 0, 
+    'no change': 0, 
+    'baseline': 0
+};
     
     // Labels for the output axes and hover text
-    const valueToLabelMap = { 1: 'Increase (Longer)', '-1': 'Decrease (Shorter)', 0: 'Baseline/No Effect' };
+    const valueToLabelMap = { 1: 'Increase (Longer)', -1: 'Decrease (Shorter)', 0: 'Baseline/No Effect' };
+    const NOT_REPORTED_KEYWORDS = ['—', 'n/a', 'not reported', 'notreported', 'not evaluated'];
     const NOT_REPORTED_LABEL = 'Not Reported / N/A';
 
     // Helper to extract a numeric value (-1, 0, 1) and a clean string label.
     const getEffectData = (gene, key) => {
         let raw = String(gene[key] || '—').toLowerCase().trim();
-        raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim(); // Clean surrounding junk
+        raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim(); 
         
         let value = 0;
         let label = NOT_REPORTED_LABEL;
         
-        // Check for specific reported values
+        // 1. Check for 'Not Reported' status first
+        if (NOT_REPORTED_KEYWORDS.includes(raw) || raw.length === 0) {
+            return { value: 0, label: NOT_REPORTED_LABEL, isReported: false };
+        }
+        
+        // 2. Map reported terms to a value
         for (const [phrase, val] of Object.entries(rawToValueMap)) {
-            // Use includes to match 'reduced cilia numbers' with 'reduced'
             if (raw.includes(phrase)) {
                 value = val;
                 label = valueToLabelMap[value];
-                return { value, label };
+                return { value, label, isReported: true };
             }
         }
         
-        // If no effect found, check 'Not Reported' type synonyms
-        if (raw.includes('not reported') || raw === '—' || raw === 'n/a') {
-            return { value: 0, label: NOT_REPORTED_LABEL };
+        // 3. Handle explicit but unmapped reports (e.g., "Decreased" capitalization)
+        if (raw.includes('decreased')) {
+             return { value: -1, label: valueToLabelMap[-1], isReported: true };
         }
         
-        // Handle explicit but unmapped terms like 'Decreased' which is often capitalized
-        if (raw === 'decreased') {
-             return { value: -1, label: valueToLabelMap[-1] };
-        }
-        
-        // Final fallback for non-standard terms
-        return { value: 0, label: `Unmapped: ${raw}` }; 
+        // Final fallback for genuinely unmapped text (e.g., "unknown value")
+        return { value: 0, label: `Unmapped: ${raw}`, isReported: true }; 
     };
 
     const dataPoints = [];
@@ -1031,29 +1038,23 @@ function renderCiliaEffectsScatterPlot(genes, custom) {
         const loF = getEffectData(gene, loF_key);
         const overExp = getEffectData(gene, overExp_key);
         
-        // Determine if the gene has any data reported at all in those fields
-        const loF_raw_val = String(gene[loF_key] || '—').trim();
-        const overExp_raw_val = String(gene[overExp_key] || '—').trim();
-
-        const isReported = (loF_raw_val !== '—' && loF_raw_val !== 'Not Reported') || 
-                           (overExp_raw_val !== '—' && overExp_raw_val !== 'Not Reported');
+        // --- CRITICAL FIX: Base filtering entirely on the helper function's result ---
+        const isReported = loF.isReported || overExp.isReported;
         
-        // Plot only if at least one effect is explicitly reported, even if it maps to value 0.
         if (isReported) {
             dataPoints.push({
                 x: loF.value,
                 y: overExp.value,
                 gene: gene.gene,
                 text: `<b>Gene:</b> ${gene.gene}<br><b>LoF Effect:</b> ${loF.label}<br><b>Overexpression Effect:</b> ${overExp.label}`,
-                // Color logic: Red for conflict, Green for consensus, Orange for neutral/baseline effects
                 color: loF.value * overExp.value < 0 ? '#d62728' : (loF.value * overExp.value > 0 ? '#2ca02c' : '#ff7f0e')
             });
         }
     });
 
-
     if (dataPoints.length === 0) {
-        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No Cilia Length Perturbation data found for these genes that wasn\'t marked as "Not Reported" or "—".</p>';
+        // Updated error message to confirm that the filter logic is working, but data is sparse.
+        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">The filter successfully excluded all genes explicitly marked as "Not Reported" or "—". No other perturbation data was found.</p>';
         return;
     }
 
@@ -1100,10 +1101,9 @@ function renderCiliaEffectsScatterPlot(genes, custom) {
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
-
         
 
-        
+      
 /**
  * Renders a categorical scatter plot comparing two LoF effects: Cilia Length Change vs. Ciliated Cell Percentage Change.
  * Data Source: 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)' and 'Percentage of ciliated cells (increase/decrease/no effect)'
