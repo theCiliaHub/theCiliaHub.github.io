@@ -376,31 +376,44 @@ async function loadAllData() {
 
         
 function findAndMergeGenes(userInputArray) {
-            const foundGenes = [];
-            const seenGenes = new Set();
+    const foundGenes = [];
+    const seenGenes = new Set();
+    
+    // CRITICAL: Ensure we use the correct global map variable
+    const geneMap = window.ciliaryGeneMap; 
+    if (!geneMap || geneMap.size === 0) {
+         // Should not happen if loadAllData was successful, but safety first.
+         return { foundGenes: [] }; 
+    }
 
-            userInputArray.forEach(query => {
-                const geneSymbol = query.toUpperCase().trim();
-                if (!geneSymbol || seenGenes.has(geneSymbol)) return;
+    userInputArray.forEach(query => {
+        const geneSymbol = query.toUpperCase().trim();
+        if (!geneSymbol || seenGenes.has(geneSymbol)) return;
 
-                if (ciliaryGeneMap.has(geneSymbol)) {
-                    let geneData = { ...ciliaryGeneMap.get(geneSymbol) };
-                    
-                    if (screenDatabase[geneSymbol]) {
-                        geneData.screens_summary = screenDatabase[geneSymbol];
-                    }
-                    
-                    foundGenes.push(geneData);
-                    seenGenes.add(geneSymbol);
-                }
-            });
+        // 1. Retrieve the gene object using the uppercase symbol
+        if (geneMap.has(geneSymbol)) {
+            let geneData = { ...geneMap.get(geneSymbol) };
             
-            return { foundGenes };
+            // 2. CRITICAL FIX: Ensure the lowercase 'gene' field exists for plot consumption.
+            // Assuming the actual symbol is stored in the 'Gene' field in the raw data.
+            geneData.gene = geneData.Gene || geneData.gene || geneSymbol; 
+
+            // 3. Merge screen data
+            if (window.screenDatabase && window.screenDatabase[geneSymbol]) {
+                geneData.screens_summary = window.screenDatabase[geneSymbol];
+            }
+            
+            foundGenes.push(geneData);
+            seenGenes.add(geneSymbol);
         }
+    });
+    
+    return { foundGenes };
+}
         
-        // =============================================================================
-        // UTILITIES (Including previously missing data handlers)
-        // =============================================================================
+// =============================================================================
+ // UTILITIES (Including previously missing data handlers)
+// =============================================================================
         
         function sanitize(s) {
             if (!s) return null;
