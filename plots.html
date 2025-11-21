@@ -1077,79 +1077,84 @@ function renderCiliaEffectsScatterPlot(genes, custom) {
  * @param {object} custom - Customization options from the UI.
  */
 // =============================================================================
-// PLOT RENDERING FUNCTION: LoF Cilia/Count Scatter (CLEANED)
+// PLOT RENDERING FUNCTION: LoF Cilia/Count Scatter (STRING VALUE FIXED)
 // =============================================================================
 
 function renderLofCiliaVsCountScatter(genes, custom) {
     clearAllPlots('plot-display-area');
 
-    // --- MAPPING LOGIC (Robust against non-standard text) ---
+    // --- MAPPING LOGIC (All values are now quoted strings) ---
     const rawToValueMap = {
-        // Decrease (-1)
+        // Decrease ('-1')
         'decrease': '-1', 'shorter': '-1', 'reduced': '-1', 'loss': '-1', 'fail': '-1', 'absent': '-1',
-        'shorter cilia': '-1', 'reduced cilia numbers': '-1', 'decreased cilia numbers': '-1', 'short cilia':'-1', 
-
-        // Increase (1)
-        'increase': 1, 'longer': 1, 'supernumerary': 1, 'longer cilia': 1, 'increased cilia numbers': 1,
-        
-        // No Effect (0)
-        'no effect': 0, 'no change': 0, 'baseline': 0
+        'shorter cilia': '-1', 'reduced cilia numbers': '-1', 'decreased cilia numbers': '-1', 'short cilia': '-1', 
+        // Increase ('1')
+        'increase': '1', 'longer': '1', 'supernumerary': '1', 'longer cilia': '1', 'increased cilia numbers': '1',
+        // No Effect ('0')
+        'no effect': '0', 'no change': '0', 'baseline': '0'
     };
     
-    const valueToLabelMap = { 1: 'Increase (Longer)', '-1': 'Decrease (Shorter)', 0: 'Baseline/No Effect' };
+    // Labels must use the quoted string keys for lookups
+    const valueToLabelMap = { '1': 'Increase (Longer)', '-1': 'Decrease (Shorter)', '0': 'Baseline/No Effect' };
     const NOT_REPORTED_KEYWORDS = ['—', 'n/a', 'not reported', 'notreported', 'not evaluated'];
     const NOT_REPORTED_LABEL = 'Not Reported / N/A';
 
-    // Helper to extract a numeric value (-1, 0, 1) and a clean string label.
+    // Helper to extract a string value ('-1', '0', '1') and a clean string label.
     const getEffectData = (gene, key) => {
         let raw = String(gene[key] || '—').toLowerCase().trim();
         raw = raw.replace(/\(.*\)/g, '').replace(/[.,]$/g, '').trim(); 
         
-        let value = 0;
+        let value = '0'; // Default value is string '0'
         let label = NOT_REPORTED_LABEL;
         let isReported = false;
-        
-        // 1. Check for 'Not Reported' status first
+
+        // 1. Check for 'Not Reported' status
         if (NOT_REPORTED_KEYWORDS.includes(raw) || raw.length === 0) {
-            return { value: 0, label: NOT_REPORTED_LABEL, isReported: false };
+            return { value: '0', label: NOT_REPORTED_LABEL, isReported: false };
         }
         
-        // 2. Map reported terms to a value
+        // 2. If reported, map the term.
         isReported = true;
         for (const [phrase, val] of Object.entries(rawToValueMap)) {
             if (raw.includes(phrase)) {
                 value = val;
                 label = valueToLabelMap[value];
-                return { value, label, isReported: true };
+                return { value, label, isReported: true }; 
             }
         }
         
-        // 3. Fallback for genuinely unmapped but reported text
-        return { value: 0, label: `Unmapped: ${raw}`, isReported: true }; 
+        // 3. Fallback for unmapped but reported text.
+        return { value: '0', label: `Unmapped: ${raw}`, isReported: true }; 
     };
-
+    
     const dataPoints = [];
     
     genes.forEach(gene => {
         const loF_len_key = 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)';
         const loF_count_key = 'Percentage of ciliated cells (increase/decrease/no effect)';
+        const overExp_len_key = 'Overexpression effects on cilia length (increase/decrease/no effect)'; 
 
         const loF_len = getEffectData(gene, loF_len_key);
         const loF_count = getEffectData(gene, loF_count_key);
-        
+        const overExp_len = getEffectData(gene, overExp_len_key);
+
         const isReported = loF_len.isReported || loF_count.isReported;
         
         if (isReported) {
+            // NOTE: We must convert the string values ('-1', '1') back to numbers for Plotly's coordinates (x, y).
+            const x_coord = parseFloat(loF_len.value);
+            const y_coord = parseFloat(loF_count.value);
+            
             dataPoints.push({
-                x: loF_len.value,
-                y: loF_count.value,
+                x: x_coord, // Use numeric coordinate
+                y: y_coord, // Use numeric coordinate
                 gene: gene.gene,
-                // --- CLEANED HOVER TEXT: Only LoF Length and LoF Count ---
-                text: `<b>Gene:</b> ${gene.gene}<br>` + 
-                      `<b>Cilia Length LoF:</b> ${loF_len.label}<br>` + 
-                      `<b>Ciliated Cell % LoF:</b> ${loF_count.label}`,
-                // -----------------------------------------------------
-                color: loF_len.value * loF_count.value < 0 ? '#d62728' : (loF_len.value * loF_count.value > 0 ? '#2ca02c' : '#ff7f0e')
+                text: `<b>Gene:</b> ${gene.gene}<br>` +
+                      `<b>LoF Length:</b> ${loF_len.label}<br>` + 
+                      `<b>LoF Cell %:</b> ${loF_count.label}<br>` +
+                      `<b>OE Length:</b> ${overExp_len.label}`,
+                // Color logic uses numeric coordinates
+                color: x_coord * y_coord < 0 ? '#d62728' : (x_coord * y_coord > 0 ? '#2ca02c' : '#ff7f0e')
             });
         }
     });
@@ -1159,50 +1164,36 @@ function renderLofCiliaVsCountScatter(genes, custom) {
         return;
     }
 
+    // ... (Plotly rendering uses the numeric dataPoints and string-based tick labels)
+    
     const data = [{
-        x: dataPoints.map(d => d.x),
-        y: dataPoints.map(d => d.y),
-        text: dataPoints.map(d => d.text),
-        mode: 'markers',
-        type: 'scatter',
-        hoverinfo: 'text',
-        marker: {
-            size: custom.bubbleSize || 18,
-            color: dataPoints.map(d => d.color),
-            line: { color: '#000', width: 1 }
-        }
+        x: dataPoints.map(d => d.x), y: dataPoints.map(d => d.y),
+        text: dataPoints.map(d => d.text), mode: 'markers', type: 'scatter', hoverinfo: 'text',
+        marker: { size: custom.bubbleSize || 18, color: dataPoints.map(d => d.color), line: { color: '#000', width: 1 } }
     }];
 
     const layout = {
-        title: { 
-            text: custom.title || 'Loss-of-Function Effect: Cilia Length vs. Ciliated Cell Count', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
-        },
+        title: { text: custom.title || 'LoF Effect: Cilia Length vs. Ciliated Cell Count', font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } },
         xaxis: {
             title: { text: 'Loss-of-Function Effect (Cilia Length)', font: custom.axisTitleFont },
-            tickvals: [-1, 0, 1],
-            ticktext: ['Decrease', 'Baseline/N/A', 'Increase'],
-            range: [-1.2, 1.2],
+            tickvals: [-1, 0, 1], ticktext: [valueToLabelMap['-1'], valueToLabelMap['0'], valueToLabelMap['1']], range: [-1.2, 1.2],
             zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
         },
         yaxis: {
             title: { text: 'LoF Effect on Ciliated Cell % (Y-Axis)', font: custom.axisTitleFont },
-            tickvals: [-1, 0, 1],
-            ticktext: ['Decrease', 'Baseline/N/A', 'Increase'],
-            range: [-1.2, 1.2],
+            tickvals: [-1, 0, 1], ticktext: [valueToLabelMap['-1'], valueToLabelMap['0'], valueToLabelMap['1']], range: [-1.2, 1.2],
             zeroline: true, zerolinewidth: 2, zerolinecolor: '#ccc'
         },
         showlegend: false,
-        width: custom.figureWidth,
-        height: custom.figureHeight,
+        width: custom.figureWidth, height: custom.figureHeight,
         margin: { l: 150, r: 80, b: 100, t: 80 },
-        plot_bgcolor: 'white',
-        paper_bgcolor: 'white'
+        plot_bgcolor: 'white', paper_bgcolor: 'white'
     };
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
+        
 function renderEnrichmentBubblePlot(genes, custom) {
     const plotContainer = document.getElementById('plot-display-area');
     clearAllPlots('plot-display-area');
