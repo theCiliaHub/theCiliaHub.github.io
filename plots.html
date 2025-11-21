@@ -1952,50 +1952,58 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
 // =============================================================================
 // MAIN ORCHESTRATOR (As provided by user)
 // =============================================================================
-
-// 🔄 Updated: This function must be modified to exclude the removed plots and include the new one.
+/**
+ * Orchestrates the gene lookup, data filtering, and renders the selected plot type.
+ * This version uses the final, optimized plot list and assumes embedded expression data.
+ */
 async function generateAnalysisPlots() {
-            if (typeof ciliaryGeneMap === 'undefined' || ciliaryGeneMap.size === 0) {
-                alert("Error: The main gene database is not yet loaded. Please wait a moment and try again.");
-                return;
-            }
-
-            const plotContainer = document.getElementById('plot-display-area');
-            plotContainer.innerHTML = '<em>Searching genes and generating plot...</em>';
-            clearAllPlots('plot-display-area');
-
-            const rawInput = document.getElementById('ciliaplot-genes-input').value;
-            const originalQueries = rawInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
-            
-            if (originalQueries.length === 0) {
-                plotContainer.innerHTML = 'Please enter at least one gene.';
-                updateGeneSummaryTable([], []);
-                return;
-            }
-
-            const { foundGenes } = findAndMergeGenes(originalQueries);
-            
-            updateGeneSummaryTable(originalQueries, foundGenes);
-
-            if (foundGenes.length === 0) {
-                plotContainer.innerHTML = 'None of the provided genes were found in the CiliaHub database.';
-                return;
-            }
-
-            const plotType = document.querySelector('input[name="ciliaplot_type"]:checked').value;
-            const custom = getPlotCustomization(plotType); // Pass plotType to customization
-            
-            // Handle deferred loading for Expression Heatmap
-            if (plotType === 'expression_heatmap' && !plotExpressionLoaded) {
-                 pendingHeatmapRequest = { foundGenes };
-                 plotContainer.innerHTML = 'Expression data is loading in the background. Please wait...';
-                 return;
-            }
+    // 1. CRITICAL SYNCHRONIZATION CHECK: Use window.ciliaryGeneMap for global scope access
+    if (typeof window.ciliaryGeneMap === 'undefined' || window.ciliaryGeneMap.size === 0) {
+        // Use console.warn to avoid disruptive UI alert loop and exit gracefully.
+        console.warn("Attempted to generate plot before data finished loading. Please wait a moment for the initial data fetch to complete.");
         
+        // Use window.alert ONLY if the user clicks the button too fast and the app is perceived as broken.
+        // For robustness in this environment, we'll keep the console warning.
+        return;
+    }
+
+    const plotContainer = document.getElementById('plot-display-area');
+    plotContainer.innerHTML = '<em>Searching genes and generating plot...</em>';
+    clearAllPlots('plot-display-area');
+
+    const rawInput = document.getElementById('ciliaplot-genes-input').value;
+    const originalQueries = rawInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
+    
+    if (originalQueries.length === 0) {
+        plotContainer.innerHTML = 'Please enter at least one gene.';
+        updateGeneSummaryTable([], []);
+        return;
+    }
+
+    const { foundGenes } = findAndMergeGenes(originalQueries);
+    
+    updateGeneSummaryTable(originalQueries, foundGenes);
+
+    if (foundGenes.length === 0) {
+        plotContainer.innerHTML = 'None of the provided genes were found in the CiliaHub database.';
+        return;
+    }
+
+    const plotType = document.querySelector('input[name="ciliaplot_type"]:checked').value;
+    const custom = getPlotCustomization(plotType); // Pass plotType to customization
+    
+    // --- Expression Heatmap Logic (Updated for EMBEDDED Data) ---
+    // Since expression data is embedded in the gene object, we bypass the need for a deferred loading file fetch.
+    // The previous 'if (plotType === 'expression_heatmap' && !plotExpressionLoaded)' check is now effectively removed 
+    // because plotExpressionLoaded is set to true in loadAllData.
+    
     switch (plotType) {
-        case 'expression_heatmap': renderExpressionHeatmap(plotExpressionData, foundGenes); break;
-        // REMOVED: case 'localization_bubble', case 'functional_bar', case 'balloon_plot', case 'ciliopathy_associations'
-        // REMOVED: case 'organelle_radar', case 'organelle_umap', case 'venn_diagram' (kept for now, but suggested for removal)
+        case 'expression_heatmap': 
+            // The function signature now relies on embedded data within foundGenes. 
+            // The empty {} placeholder is kept for compatibility with the function's signature if needed.
+            renderExpressionHeatmap({}, foundGenes); 
+            break;
+            
         case 'enrichment_bubble': renderEnrichmentBubblePlot(foundGenes, custom); break;
         case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
         case 'multi_category_manhattan': renderMultiCategoryPlot(foundGenes, custom); break;
@@ -2003,11 +2011,13 @@ async function generateAnalysisPlots() {
         case 'phylogeny_bar': renderPhylogenyBarPlot(foundGenes, custom); break; 
         case 'cilia_effects_scatter': renderCiliaEffectsScatterPlot(foundGenes, custom); break;
         case 'ortholog_heatmap': renderOrthologHeatmap(foundGenes, custom); break;
+        
         // NEW PLOT ADDED
-        case 'lof_cilia_vs_count_scatter': renderLofCiliaVsCountScatter(foundGenes, custom); break; 
+        case 'lof_cilia_vs_count_scatter': renderLofDualEffectPlot(foundGenes, custom); break; 
+        
         default: plotContainer.innerHTML = 'This plot type is not yet implemented or has been removed.';
     }
-}     
+}
 
         // =============================================================================
         // DOWNLOAD FUNCTION (As provided by user)
