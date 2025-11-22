@@ -406,7 +406,7 @@
     const colorUnknown  = document.getElementById('color-unknown')?.value || '#ff7f0e';
 
     const axisWidth = 2;
-    const textSize = 14;
+    const textSize = 12; // Reduced base text size
 
     // EFFECT MAP
     const effectMap = {
@@ -439,22 +439,25 @@
         };
     });
 
-    // ======== OPTIMIZED SPACING ========
-    const xCompression = 0.28;   // Further reduced for minimal horizontal distance
-    const rowTop = 1.25;
-    const rowMid = 1.00;
-    const rowBot = 0.75;         // Minimal vertical distance between rows
+    // ======== OPTIMIZED SPACING FOR LARGE DATASETS ========
+    const geneCount = processed.length;
+    const xSpacing = Math.max(0.15, 0.4 - (geneCount * 0.002)); // Dynamic spacing based on gene count
+    const rowSpacing = 0.8;
+    
+    const rowTop = 2.0;
+    const rowMid = 1.0;
+    const rowBot = 0.0;
     const rowPositions = { oe: rowTop, lof: rowMid, pct: rowBot };
 
     const phenotypeRows = [
-        { key: 'oe',  y: rowTop, label: "Overexpression Effects<br>(Cilia Length)" },
-        { key: 'lof', y: rowMid, label: "Loss-of-Function<br>(Cilia Length)" },
-        { key: 'pct', y: rowBot, label: "% of Ciliated Cells" }
+        { key: 'oe',  y: rowTop, label: "Overexpression<br>Cilia Length" },
+        { key: 'lof', y: rowMid, label: "Loss-of-Function<br>Cilia Length" },
+        { key: 'pct', y: rowBot, label: "% Ciliated Cells" }
     ];
 
-    // TRACE BUILDER with collision avoidance
+    // TRACE BUILDER with better collision avoidance
     const traces = [];
-    const markerPositions = {}; // Track positions to avoid overlaps
+    const markerPositions = new Set();
 
     Object.entries(effectMap).forEach(([key, info]) => {
         const xs = [], ys = [], texts = [], rawVals = [];
@@ -462,25 +465,25 @@
         phenotypeRows.forEach(row => {
             processed.forEach((g, i) => {
                 if (g[row.key].effect === key) {
-                    const baseX = i * xCompression;
+                    const baseX = i * xSpacing;
                     const baseY = rowPositions[row.key];
                     
-                    // Check for collisions and adjust position if needed
+                    // Find non-overlapping position
                     let finalX = baseX;
                     let finalY = baseY;
-                    let attempts = 0;
-                    const maxAttempts = 10;
+                    let offset = 0;
+                    const maxOffset = 0.1;
                     
-                    while (attempts < maxAttempts) {
-                        const posKey = `${finalX.toFixed(2)}_${finalY.toFixed(2)}`;
-                        if (!markerPositions[posKey]) {
-                            markerPositions[posKey] = true;
+                    while (offset <= maxOffset) {
+                        const posKey = `${finalX.toFixed(3)}_${finalY.toFixed(3)}`;
+                        if (!markerPositions.has(posKey)) {
+                            markerPositions.add(posKey);
                             break;
                         }
-                        // Small random adjustment to avoid overlap
-                        finalX = baseX + (Math.random() - 0.5) * 0.05;
-                        finalY = baseY + (Math.random() - 0.5) * 0.02;
-                        attempts++;
+                        // Try different offsets
+                        offset += 0.01;
+                        finalX = baseX + (Math.random() - 0.5) * offset;
+                        finalY = baseY + (Math.random() - 0.5) * offset * 0.5;
                     }
 
                     xs.push(finalX);
@@ -497,94 +500,127 @@
                 y: ys,
                 mode: 'markers',
                 marker: {
-                    size: 16, // Slightly smaller to reduce overlap risk
+                    size: 10, // Smaller markers for dense data
                     color: info.color,
-                    line: { color: 'white', width: 1 }
+                    line: { color: 'white', width: 0.5 },
+                    opacity: 0.8
                 },
                 name: info.label,
+                text: texts,
                 customdata: rawVals,
-                hovertemplate: "<b>%{text}</b><br>%{customdata}<extra></extra>"
+                hovertemplate: "<b>%{text}</b><br>Effect: %{customdata}<extra></extra>"
             });
         }
     });
 
-    // LAYOUT
+    // LAYOUT OPTIMIZED FOR LARGE DATASETS
     const layout = {
         title: {
-            text: custom.title || "Ciliary Phenotypes",
-            font: { size: 26, color: "#005b96" },
-            x: 0.5
+            text: custom.title || "Ciliary Phenotypes Analysis",
+            font: { size: 20, color: "#005b96" }, // Smaller title
+            x: 0.5,
+            y: 0.95
         },
 
         xaxis: {
             title: "",
-            tickvals: processed.map((_, i) => i * xCompression),
-            ticktext: processed.map(d => `<i>${d.gene}</i>`),
-            tickangle: -45,
+            tickvals: processed.map((_, i) => i * xSpacing),
+            ticktext: processed.map(d => {
+                // Abbreviate long gene names or use first 6 chars
+                return d.gene.length > 8 ? d.gene.substring(0, 6) + "..." : d.gene;
+            }),
+            tickangle: -90, // Vertical labels to prevent overlap
             tickfont: { 
-                size: textSize, 
+                size: Math.max(8, 12 - geneCount * 0.02), // Dynamic font size
                 color: "black", 
-                family: "Arial", 
-                weight: "bold" 
+                family: "Arial" 
             },
             showline: true,
             linecolor: "black",
             linewidth: axisWidth,
             mirror: true,
             showgrid: true,
-            gridcolor: 'rgba(200, 200, 200, 0.2)', // Light grid
-            gridwidth: 1
+            gridcolor: 'rgba(200, 200, 200, 0.1)',
+            gridwidth: 1,
+            zeroline: false,
+            automargin: true
         },
 
         yaxis: {
             tickvals: [rowTop, rowMid, rowBot],
             ticktext: phenotypeRows.map(row => row.label),
             tickfont: { 
-                size: textSize + 2, // Slightly smaller for better fit
+                size: 10, // Smaller Y-axis labels
                 color: "black", 
-                family: "Arial", 
-                weight: "bold" 
+                family: "Arial"
             },
             showline: true,
             linecolor: "black",
             linewidth: axisWidth,
             mirror: true,
             showgrid: true,
-            gridcolor: 'rgba(200, 200, 200, 0.2)', // Light grid
+            gridcolor: 'rgba(200, 200, 200, 0.2)',
             gridwidth: 1,
-            // Remove secondary line by ensuring mirror doesn't create duplicates
-            zeroline: false
+            zeroline: false,
+            fixedrange: true // Prevent accidental zoom on Y-axis
         },
 
         legend: {
             orientation: "h",
             yanchor: "bottom",
-            y: 1.12, // Moved slightly up to accommodate tighter spacing
+            y: -0.3, // Move legend below plot
             xanchor: "center",
             x: 0.5,
-            bgcolor: "rgba(255,255,255,0.95)",
+            bgcolor: "rgba(255,255,255,0.9)",
             bordercolor: "#ccc",
             borderwidth: 1,
-            font: { size: textSize - 1 } // Slightly smaller legend
+            font: { size: 10 },
+            itemwidth: 30
         },
 
-        margin: { l: 180, r: 50, t: 140, b: 140 }, // Reduced margins for tighter layout
-        height: 700, // Reduced height for denser layout
+        margin: { 
+            l: 120, // Reduced left margin for shorter labels
+            r: 40, 
+            t: 80,   // Reduced top margin
+            b: 150   // Increased bottom margin for vertical labels
+        },
+        
+        height: 500 + (geneCount * 2), // Dynamic height based on data size
+        width: Math.max(800, geneCount * 15), // Dynamic width
+        
         plot_bgcolor: "white",
         paper_bgcolor: "white",
         
-        // Additional layout improvements
+        // Performance and interaction improvements
         hovermode: 'closest',
-        dragmode: 'zoom'
+        dragmode: 'pan',
+        showspikes: false
     };
+
+    // For very large datasets, consider alternative visualization
+    if (geneCount > 100) {
+        console.warn(`Large dataset detected: ${geneCount} genes. Consider filtering or pagination.`);
+        
+        // Add a warning annotation
+        layout.annotations = [{
+            x: 0.5,
+            y: 1.05,
+            xref: 'paper',
+            yref: 'paper',
+            text: `Displaying ${geneCount} genes - use hover for details`,
+            showarrow: false,
+            font: { size: 10, color: 'orange' },
+            bgcolor: 'rgba(255,255,255,0.8)'
+        }];
+    }
 
     Plotly.newPlot("plot-display-area", traces, layout, {
         responsive: true,
-        displayModeBar: true
+        displayModeBar: true,
+        scrollZoom: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d']
     });
-}
-
-    
+}  
         
 // 6. Expression Heatmap (mock)
 function renderExpressionHeatmap(genes, custom) {
