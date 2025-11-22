@@ -399,189 +399,126 @@
        function renderLofDualEffect(genes, custom) {
     clearPlot();
 
-    // === USER CUSTOMIZATION ===
-    const colorShort    = document.getElementById('color-short')?.value || '#d62728';  // decrease
-    const colorLonger   = document.getElementById('color-longer')?.value || '#2ca02c'; // increase
-    const colorNoEffect = document.getElementById('color-noeffect')?.value || '#7f7f7f';
-    const colorUnknown  = document.getElementById('color-unknown')?.value || '#bdbdbd';
-    const axisWidth     = parseInt(document.getElementById('axis-linewidth')?.value) || 2;
-    const textSize      = parseInt(document.getElementById('text-size')?.value) || 14;
-    const textBold      = document.getElementById('text-bold')?.checked;
-    const viewMode      = document.getElementById('view-mode')?.value || 'plot';
+    const colorDecrease = '#d62728';
+    const colorIncrease = '#2ca02c';
+    const colorNoEffect = '#cccc00';
+    const colorUnknown  = '#999999';
 
-    // === EFFECT MAPPING ===
+    const textSize = 14;
+
     const effectMap = {
-        decrease: { 
-            keywords: ['short', 'decrease', 'reduced', 'loss', 'absent', 'decreased'], 
-            color: colorShort,
-            label: 'Decrease' 
-        },
-        increase: { 
-            keywords: ['long', 'increase', 'increased', 'supernumerary'], 
-            color: colorLonger,
-            label: 'Increase' 
-        },
-        noEffect: { 
-            keywords: ['no effect', 'no change', 'baseline'], 
-            color: colorNoEffect,
-            label: 'No Effect' 
-        },
-        unknown: { 
-            keywords: ['—', 'n/a', 'not reported', 'not evaluated', '', 'unknown'], 
-            color: colorUnknown,
-            label: 'Not Reported' 
-        }
+        decrease: { keywords: ['short','decrease','reduced','loss','absent'], color: colorDecrease, label: 'Decrease' },
+        increase: { keywords: ['long','increase','increased'], color: colorIncrease, label: 'Increase' },
+        noEffect: { keywords: ['no effect','no change'], color: colorNoEffect, label: 'No Effect' },
+        unknown:  { keywords: ['—','n/a','not reported','not evaluated',''], color: colorUnknown, label: 'Not Reported' }
     };
 
-    function classifyEffect(str) {
-        if (!str) return 'unknown';
-        const lower = String(str).toLowerCase().trim();
-        for (const [key, info] of Object.entries(effectMap)) {
-            if (info.keywords.some(kw => lower.includes(kw))) {
-                return key;
-            }
+    function classifyEffect(s) {
+        if (!s) return 'unknown';
+        const t = s.toLowerCase();
+        for (const [k, info] of Object.entries(effectMap)) {
+            if (info.keywords.some(kw => t.includes(kw))) return k;
         }
         return 'unknown';
     }
 
-    // === PREPARE A 3-AXIS MATRIX ===
+    // Prepare data
     const processed = genes.map(g => ({
         gene: g.gene,
-        oeCilia: {
-            raw: g['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'not reported',
-            effect: classifyEffect(g['Overexpression effects on cilia length (increase/decrease/no effect)'])
-        },
-        lofCilia: {
-            raw: g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'not reported',
-            effect: classifyEffect(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])
-        },
-        percentCiliated: {
-            raw: g['Percentage of ciliated cells (increase/decrease/no effect)'] || 'not reported',
-            effect: classifyEffect(g['Percentage of ciliated cells (increase/decrease/no effect)'])
-        }
+        oe:  { raw: g['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'not reported',
+               effect: classifyEffect(g['Overexpression effects on cilia length (increase/decrease/no effect)']) },
+        lof: { raw: g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'not reported',
+               effect: classifyEffect(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)']) },
+        pct: { raw: g['Percentage of ciliated cells (increase/decrease/no effect)'] || 'not reported',
+               effect: classifyEffect(g['Percentage of ciliated cells (increase/decrease/no effect)']) }
     }));
 
-    const phenotypeOrder = [
-        { key: 'oeCilia',         label: 'Overexpression – Cilia Length', y: 2.5 },
-        { key: 'lofCilia',        label: 'LoF – Cilia Length',           y: 1.5 },
-        { key: 'percentCiliated', label: '% Ciliated Cells',             y: 0.5 }
-    ];
+    const rowPositions = {
+        oe:  2.3,
+        lof: 1.5,
+        pct: 0.7
+    };
 
-    if (viewMode === 'table') {
-        // TABLE MODE
-        let html = `
-        <div style="padding:20px; font-size:14px; overflow:auto; max-height:${custom.height}px;">
-            <h3 style="color:#005b96; margin-bottom:16px;">Phenotype Summary Table</h3>
-            <table style="width:100%; border-collapse:collapse;">
-                <thead style="background:#005b96; color:white;">
-                <tr>
-                    <th style="padding:12px;">Gene</th>
-                    <th style="padding:12px;">OE Cilia Length</th>
-                    <th style="padding:12px;">LoF Cilia Length</th>
-                    <th style="padding:12px;">% Ciliated Cells</th>
-                </tr>
-                </thead><tbody>`;
-
-        processed.forEach(p => {
-            html += `
-            <tr style="border-bottom:1px solid #eee;">
-                <td style="padding:12px; font-weight:bold;">${p.gene}</td>
-                <td style="padding:12px;">${effectMap[p.oeCilia.effect].label}</td>
-                <td style="padding:12px;">${effectMap[p.lofCilia.effect].label}</td>
-                <td style="padding:12px;">${effectMap[p.percentCiliated.effect].label}</td>
-            </tr>`;
-        });
-
-        html += `</tbody></table></div>`;
-        document.getElementById('plot-display-area').innerHTML = html;
-        return;
-    }
-
-    // === HEATMAP-LIKE TILE PLOT ===
+    // Build scatter traces (one per phenotype)
     const traces = [];
 
-    Object.entries(effectMap).forEach(([key, info]) => {
-        const xVals = [];
-        const yVals = [];
-        const hovers = [];
+    function addPhenotypeRow(rowKey, label) {
+        const x = [];
+        const y = [];
+        const colors = [];
+        const hover = [];
 
-        processed.forEach((gene, i) => {
-            phenotypeOrder.forEach(row => {
-                if (gene[row.key].effect === key) {
-                    xVals.push(i);
-                    yVals.push(row.y);
-                    hovers.push(
-                        `<b>${gene.gene}</b><br>${row.label}<br>${info.label}<br><i>${gene[row.key].raw}</i>`
-                    );
-                }
-            });
+        processed.forEach((g, i) => {
+            const eff = g[rowKey].effect;
+            x.push(i);
+            y.push(rowPositions[rowKey]);
+            colors.push(effectMap[eff].color);
+            hover.push(`<b>${g.gene}</b><br>${label}<br>${effectMap[eff].label}<br><i>${g[rowKey].raw}</i>`);
         });
 
-        if (xVals.length > 0) {
-            traces.push({
-                x: xVals,
-                y: yVals,
-                mode: 'markers',
-                marker: {
-                    symbol: 'square',
-                    size: 55,
-                    color: info.color,
-                    line: { width: 1, color: 'white' }
-                },
-                hovertemplate: "%{customdata}<extra></extra>",
-                customdata: hovers,
-                name: info.label
-            });
-        }
-    });
+        traces.push({
+            x, y,
+            mode: 'markers+text',
+            text: processed.map(p => ""), // no text on points
+            marker: { size: 18, color: colors, symbol: 'circle' },
+            hovertemplate: "%{customdata}<extra></extra>",
+            customdata: hover,
+            showlegend: false
+        });
+    }
+
+    addPhenotypeRow("oe",  "Overexpression – Cilia Length");
+    addPhenotypeRow("lof", "LoF – Cilia Length");
+    addPhenotypeRow("pct", "% Ciliated Cells");
+
+    // ===== TOP LABELS (like your example) =====
+    const annotations = processed.map((g, i) => ({
+        x: i,
+        y: 3.15,
+        text: g.gene,
+        font: { size: textSize, color: 'black' },
+        showarrow: false,
+        textangle: -45,
+        yanchor: 'bottom'
+    }));
+
+    // Gene names italic: wrap with <i>…</i>
+    const geneNamesItalic = processed.map(p => `<i>${p.gene}</i>`);
 
     const layout = {
         title: {
-            text: custom.title || 'Ciliary Phenotype Matrix (OE / LoF / % Ciliated)',
-            font: { size: custom.titleSize || 24, color: '#005b96' },
-            x: 0.5
+            text: custom.title || 'Ciliary Phenotype Summary',
+            font: { size: 24, color: '#003366' }
         },
         xaxis: {
             tickvals: processed.map((_, i) => i),
-            ticktext: processed.map(p => p.gene),
+            ticktext: geneNamesItalic,
             tickangle: -45,
-            showgrid: false,
-            zeroline: false,
-            showline: true,
-            linecolor: 'black',
-            linewidth: axisWidth,
-            mirror: true
+            showgrid: true,
+            gridcolor: '#dddddd',
+            zeroline: false
         },
         yaxis: {
-            tickvals: phenotypeOrder.map(p => p.y),
-            ticktext: phenotypeOrder.map(p => p.label),
-            showgrid: false,
-            zeroline: false,
-            showline: true,
-            linecolor: 'black',
-            linewidth: axisWidth,
-            mirror: true,
-            range: [-0.2, 3.2]
+            tickvals: [0.7, 1.5, 2.3],
+            ticktext: [
+                '% Ciliated Cells',
+                'LoF – Cilia Length',
+                'OE – Cilia Length'
+            ],
+            range: [0, 3.4],
+            showgrid: true,
+            gridcolor: '#eeeeee',
+            zeroline: false
         },
-        height: custom.height || 760,
-        width: custom.width || 1300,
-        margin: { l: 180, r: 200, t: 100, b: 120 },
+        annotations,
+        height: 780,
+        width: 1400,
+        margin: { l: 200, r: 200, t: 100, b: 200 },
         plot_bgcolor: 'white',
-        paper_bgcolor: 'white',
-        legend: {
-            x: 1.02,
-            y: 0.5,
-            bgcolor: 'rgba(255,255,255,0.95)',
-            bordercolor: '#ddd',
-            borderwidth: 1,
-            font: { size: textSize }
-        }
+        paper_bgcolor: 'white'
     };
 
-    Plotly.newPlot('plot-display-area', traces, layout, {
-        responsive: true,
-        displayModeBar: true
-    });
+    Plotly.newPlot('plot-display-area', traces, layout);
 }
 
         
