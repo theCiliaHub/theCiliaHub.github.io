@@ -397,104 +397,188 @@
         // 5. LoF Dual Effect Scatter
         // FIXED: LoF Dual Effect Scatter Plot (Categorical Y-axis, Gene X-axis, Colors by Effect)
         function renderLofDualEffect(genes, custom) {
-            clearPlot();
+    clearPlot();
 
-            // Step 1: Mapping Logic for Effects
-            const effectMapping = {
-                short: { keywords: ['shorter', 'reduced', 'decrease', 'loss', 'absent', 'short cilia', 'decreased cilia numbers'], color: '#d62728', label: 'Short/Decrease' },
-                longer: { keywords: ['longer', 'increased', 'supernumerary', 'increase', 'longer cilia', 'increased cilia numbers'], color: '#2ca02c', label: 'Longer/Increase' },
-                noEffect: { keywords: ['no effect', 'no change', 'baseline'], color: '#7f7f7f', label: 'No Effect' },
-                unknown: { keywords: ['—', 'n/a', 'not reported', 'not evaluated', ''], color: '#ff7f0e', label: 'Unknown' }
-            };
+    // Get user customizations
+    const colorShort = document.getElementById('color-short')?.value || '#d62728';
+    const colorLonger = document.getElementById('color-longer')?.value || '#2ca02c';
+    const colorNoEffect = document.getElementById('color-noeffect')?.value || '#7f7f7f';
+    const colorUnknown = document.getElementById('color-unknown')?.value || '#ff7f0e';
+    const axisWidth = parseInt(document.getElementById('axis-linewidth')?.value) || 2;
+    const textSize = parseInt(document.getElementById('text-size')?.value) || 14;
+    const textBold = document.getElementById('text-bold')?.checked;
+    const viewMode = document.getElementById('view-mode')?.value || 'plot';
 
-            function getEffectCategory(rawValue) {
-                if (!rawValue || rawValue.trim() === '') return 'unknown';
-                const lower = rawValue.toLowerCase().trim();
-                for (const [cat, info] of Object.entries(effectMapping)) {
-                    if (info.keywords.some(kw => lower.includes(kw.toLowerCase()))) return cat;
-                }
-                return 'unknown'; // Fallback
-            }
+    const effectMapping = {
+        short: { keywords: ['shorter', 'reduced', 'decrease', 'loss', 'absent', 'short', 'decreased cilia'], color: colorShort, label: 'Short/Decrease' },
+        longer: { keywords: ['longer', 'increased', 'supernumerary', 'increase', 'long cilia', 'increased cilia'], color: colorLonger, label: 'Longer/Increase' },
+        noEffect: { keywords: ['no effect', 'no change', 'baseline'], color: colorNoEffect, label: 'No Effect' },
+        unknown: { keywords: ['—', 'n/a', 'not reported', 'not evaluated', ''], color: colorUnknown, label: 'Unknown/Not Reported' }
+    };
 
-            // Step 2: Extract Data for Each Gene
-            const points = [];
-            genes.forEach(gene => {
-                // Cilia Length (X = gene, Y = category position)
-                const lenRaw = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 
-                               (gene.screens_summary ? gene.screens_summary.find(s => s.result)?.result : '') || 'not reported';
-                const lenCat = getEffectCategory(lenRaw);
-                points.push({
-                    x: gene.gene,
-                    y: 2.5, // Upper position for Cilia Length
-                    category: 'Cilia Length',
-                    effect: lenCat,
-                    raw: lenRaw,
-                    color: effectMapping[lenCat].color,
-                    size: lenCat === 'unknown' ? 8 : 12 // Smaller for unknown
-                });
-
-                // % Ciliated Cells (Y = lower position)
-                const cellRaw = gene['Percentage of ciliated cells (increase/decrease/no effect)'] || 
-                                (gene.screens_summary ? gene.screens_summary.find(s => s.result?.includes('numbers'))?.result : '') || 'not reported';
-                const cellCat = getEffectCategory(cellRaw);
-                points.push({
-                    x: gene.gene,
-                    y: 0.5, // Lower position for % Cells
-                    category: '% Ciliated Cells',
-                    effect: cellCat,
-                    raw: cellRaw,
-                    color: effectMapping[cellCat].color,
-                    size: cellCat === 'unknown' ? 8 : 12
-                });
-            });
-
-            // Step 3: Create Traces by Effect Type (for Legend)
-            const effectTypes = Object.keys(effectMapping);
-            const traces = effectTypes.map(effectType => {
-                const effectPoints = points.filter(p => p.effect === effectType);
-                return {
-                    x: effectPoints.map(p => p.x),
-                    y: effectPoints.map(p => p.y),
-                    mode: 'markers',
-                    marker: {
-                        color: effectMapping[effectType].color,
-                        size: effectPoints.map(p => p.size),
-                        symbol: 'circle',
-                        line: { color: 'white', width: 1 }
-                    },
-                    name: effectMapping[effectType].label,
-                    text: effectPoints.map(p => `<b>${p.x}</b><br>${p.category}: ${p.effect.toUpperCase()}<br>Raw: ${p.raw}`),
-                    hovertemplate: '%{text}<extra></extra>',
-                    showlegend: true
-                };
-            });
-
-            // Step 4: Layout with Custom Y-Axis
-            const layout = {
-                title: { text: custom.title || 'LoF Dual Effect: Cilia Length vs. % Ciliated Cells', font: { size: custom.titleSize } },
-                xaxis: {
-                    title: 'Genes',
-                    tickmode: 'array',
-                    tickvals: genes.map(g => g.gene),
-                    tickangle: -45
-                },
-                yaxis: {
-                    title: 'LoF Effects',
-                    tickvals: [0.5, 2.5],
-                    ticktext: ['% Ciliated Cells', 'Cilia Length'],
-                    range: [0, 3],
-                    zeroline: false,
-                    showgrid: true
-                },
-                height: custom.height,
-                width: custom.width,
-                legend: { orientation: 'v', x: 1.02, y: 0.5 },
-                plot_bgcolor: 'white'
-            };
-
-            Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
+    function getEffectCategory(rawValue) {
+        if (!rawValue || rawValue.trim() === '') return 'unknown';
+        const lower = String(rawValue).toLowerCase().trim();
+        for (const [cat, info] of Object.entries(effectMapping)) {
+            if (info.keywords.some(kw => lower.includes(kw))) return cat;
         }
+        return 'unknown';
+    }
 
+    // Build data points
+    const plotData = [];
+    const tableData = [];
+
+    genes.forEach(gene => {
+        const lenRaw = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'not reported';
+        const cellRaw = gene['Percentage of ciliated cells (increase/decrease/no effect)'] || 'not reported';
+
+        const lenCat = getEffectCategory(lenRaw);
+        const cellCat = getEffectCategory(cellRaw);
+
+        // For plot
+        plotData.push({
+            gene: gene.gene,
+            ciliaLength: { effect: lenCat, raw: lenRaw },
+            ciliatedCells: { effect: cellCat, raw: cellRaw }
+        });
+
+        // For table
+        tableData.push({
+            Gene: gene.gene,
+            'Cilia Length': effectMapping[lenCat].label,
+            'Raw (Length)': lenRaw,
+            '% Ciliated Cells': effectMapping[cellCat].label,
+            'Raw (Cells)': cellRaw
+        });
+    });
+
+    // TABLE VIEW
+    if (viewMode === 'table') {
+        let tableHTML = `
+            <div style="padding:20px; font-family:Arial; overflow:auto; max-height:${custom.height}px;">
+                <h3 style="margin-bottom:16px; color:#005b96;">LoF Dual Effect - Data Table</h3>
+                <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                    <thead style="background:#005b96; color:white;">
+                        <tr>
+                            <th style="padding:12px; text-align:left;">Gene</th>
+                            <th style="padding:12px; text-align:left;">Cilia Length</th>
+                            <th style="padding:12px; text-align:left;">Raw Value</th>
+                            <th style="padding:12px; text-align:left;">% Ciliated Cells</th>
+                            <th style="padding:12px; text-align:left;">Raw Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        tableData.forEach(row => {
+            tableHTML += `
+                <tr style="border-bottom:1px solid #ddd;">
+                    <td style="padding:12px; font-weight:bold;">${row.Gene}</td>
+                    <td style="padding:12px;">${row['Cilia Length']}</td>
+                    <td style="padding:12px; font-size:12px; color:#666;">${row['Raw (Length)']}</td>
+                    <td style="padding:12px;">${row['% Ciliated Cells']}</td>
+                    <td style="padding:12px; font-size:12px; color:#666;">${row['Raw (Cells)']}</td>
+                </tr>`;
+        });
+
+        tableHTML += `</tbody></table></div>`;
+        document.getElementById('plot-display-area').innerHTML = tableHTML;
+        return;
+    }
+
+    // PLOT VIEW (FANCY!)
+    const traces = [];
+    const legendItems = [];
+
+    Object.entries(effectMapping).forEach(([key, info]) => {
+        const points = [];
+
+        plotData.forEach((d, i) => {
+            if (d.ciliaLength.effect === key) {
+                points.push({ x: i, y: 2.2, gene: d.gene, category: 'Cilia Length', raw: d.ciliaLength.raw });
+            }
+            if (d.ciliatedCells.effect === key) {
+                points.push({ x: i, y: 0.8, gene: d.gene, category: '% Ciliated Cells', raw: d.ciliatedCells.raw });
+            }
+        });
+
+        if (points.length > 0) {
+            traces.push({
+                x: points.map(p => p.x),
+                y: points.map(p => p.y),
+                mode: 'markers+text',
+                text: points.map(p => p.gene),
+                textposition: 'top center',
+                textfont: { size: textSize, family: 'Arial', color: textBold ? 'black' : '#333' },
+                marker: {
+                    size: 22,
+                    color: info.color,
+                    line: { color: 'white', width: 3 }
+                },
+                name: info.label,
+                hovertemplate: `<b>${points[0]?.gene || ''}</b><br>${points[0]?.category || ''}: <b>${info.label}</b><br>Raw: %{text}<extra></extra>`,
+                legendgroup: key,
+                showlegend: true
+            });
+
+            legendItems.push({ color: info.color, label: info.label });
+        }
+    });
+
+    const layout = {
+        title: {
+            text: custom.title || 'Loss-of-Function Dual Effect',
+            font: { size: custom.titleSize || 24, family: 'Arial', color: '#005b96' }
+        },
+        xaxis: {
+            title: { text: 'Genes', font: { size: textSize + 2 } },
+            tickvals: plotData.map((_, i) => i),
+            ticktext: plotData.map(d => d.gene),
+            tickangle: -45,
+            showline: true,
+            linewidth: axisWidth,
+            linecolor: 'black',
+            mirror: true,
+            zeroline: false,
+            showgrid: false
+        },
+        yaxis: {
+            title: null,
+            tickvals: [0.8, 2.2],
+            ticktext: ['% Ciliated Cells', 'Cilia Length'],
+            tickfont: { size: textSize + 4, family: 'Arial', color: '#005b96' },
+            range: [0, 3],
+            showline: true,
+            linewidth: axisWidth,
+            linecolor: 'black',
+            mirror: true,
+            showgrid: false,
+            zeroline: false
+        },
+        height: custom.height || 700,
+        width: custom.width || 1100,
+        margin: { l: 120, r: 180, t: 100, b: 140 },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white',
+        legend: {
+            x: 1.02,
+            y: 0.5,
+            bgcolor: 'rgba(255,255,255,0.9)',
+            bordercolor: '#ddd',
+            borderwidth: 1,
+            font: { size: textSize }
+        },
+        shapes: [
+            { type: 'line', x0: -0.5, x1: plotData.length - 0.5, y0: 1.5, y1: 1.5, xref: 'x', yref: 'y', line: { color: '#666', width: 1, dash: 'dot' } }
+        ],
+        annotations: [
+            { xref: 'paper', yref: 'paper', x: 0.5, y: 1.05, text: 'Cilia Length', showarrow: false, font: { size: textSize + 6, color: '#005b96', family: 'Arial' } },
+            { xref: 'paper', yref: 'paper', x: 0.5, y: -0.1, text: '% Ciliated Cells', showarrow: false, font: { size: textSize + 6, color: '#005b96', family: 'Arial' } }
+        ]
+    };
+
+    Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
+}
         // 6. Expression Heatmap (mock)
         function renderExpressionHeatmap(genes, custom) {
             clearPlot();
@@ -630,6 +714,40 @@ ARL13B</textarea>
                         <div id="customization-panel">
                             <h3>Customization</h3>
                             <div class="customization-grid">
+                            <div class="form-group">
+    <label>Short/Decrease Color</label>
+    <input type="color" id="color-short" value="#d62728">
+</div>
+<div class="form-group">
+    <label>Longer/Increase Color</label>
+    <input type="color" id="color-longer" value="#2ca02c">
+</div>
+<div class="form-group">
+    <label>No Effect Color</label>
+    <input type="color" id="color-noeffect" value="#7f7f7f">
+</div>
+<div class="form-group">
+    <label>Unknown Color</label>
+    <input type="color" id="color-unknown" value="#ff7f0e">
+</div>
+<div class="form-group">
+    <label>Axis Line Width</label>
+    <input type="number" id="axis-linewidth" value="2" min="1" max="5">
+</div>
+<div class="form-group">
+    <label>Text Size</label>
+    <input type="number" id="text-size" value="14" min="10" max="24">
+</div>
+<div class="form-group">
+    <label><input type="checkbox" id="text-bold" checked> Bold Text</label>
+</div>
+<div class="form-group full-width">
+    <label>View Mode</label>
+    <select id="view-mode">
+        <option value="plot">Interactive Plot</option>
+        <option value="table">Data Table</option>
+    </select>
+</div>
                                 <div class="form-group"><label>Title</label><input id="custom-title" value="CiliAI Analysis"></div>
                                 <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
                                 <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
