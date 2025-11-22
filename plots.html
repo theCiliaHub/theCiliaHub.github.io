@@ -439,21 +439,22 @@
         };
     });
 
-    // ======== SPACING CONTROL (MINIMIZED) ========
-    const xCompression = 0.35;   // ⬅ makes dots closer horizontally
-    const rowTop = 1.20;
+    // ======== OPTIMIZED SPACING ========
+    const xCompression = 0.28;   // Further reduced for minimal horizontal distance
+    const rowTop = 1.25;
     const rowMid = 1.00;
-    const rowBot = 0.80;         // ⬅ rows almost touching
+    const rowBot = 0.75;         // Minimal vertical distance between rows
     const rowPositions = { oe: rowTop, lof: rowMid, pct: rowBot };
 
     const phenotypeRows = [
-        { key: 'oe',  y: rowTop  },
-        { key: 'lof', y: rowMid  },
-        { key: 'pct', y: rowBot  }
+        { key: 'oe',  y: rowTop, label: "Overexpression Effects<br>(Cilia Length)" },
+        { key: 'lof', y: rowMid, label: "Loss-of-Function<br>(Cilia Length)" },
+        { key: 'pct', y: rowBot, label: "% of Ciliated Cells" }
     ];
 
-    // TRACE BUILDER
+    // TRACE BUILDER with collision avoidance
     const traces = [];
+    const markerPositions = {}; // Track positions to avoid overlaps
 
     Object.entries(effectMap).forEach(([key, info]) => {
         const xs = [], ys = [], texts = [], rawVals = [];
@@ -461,8 +462,29 @@
         phenotypeRows.forEach(row => {
             processed.forEach((g, i) => {
                 if (g[row.key].effect === key) {
-                    xs.push(i * xCompression);
-                    ys.push(rowPositions[row.key]);
+                    const baseX = i * xCompression;
+                    const baseY = rowPositions[row.key];
+                    
+                    // Check for collisions and adjust position if needed
+                    let finalX = baseX;
+                    let finalY = baseY;
+                    let attempts = 0;
+                    const maxAttempts = 10;
+                    
+                    while (attempts < maxAttempts) {
+                        const posKey = `${finalX.toFixed(2)}_${finalY.toFixed(2)}`;
+                        if (!markerPositions[posKey]) {
+                            markerPositions[posKey] = true;
+                            break;
+                        }
+                        // Small random adjustment to avoid overlap
+                        finalX = baseX + (Math.random() - 0.5) * 0.05;
+                        finalY = baseY + (Math.random() - 0.5) * 0.02;
+                        attempts++;
+                    }
+
+                    xs.push(finalX);
+                    ys.push(finalY);
                     texts.push(g.gene);
                     rawVals.push(g[row.key].raw);
                 }
@@ -475,7 +497,7 @@
                 y: ys,
                 mode: 'markers',
                 marker: {
-                    size: 20,
+                    size: 16, // Slightly smaller to reduce overlap risk
                     color: info.color,
                     line: { color: 'white', width: 1 }
                 },
@@ -499,45 +521,61 @@
             tickvals: processed.map((_, i) => i * xCompression),
             ticktext: processed.map(d => `<i>${d.gene}</i>`),
             tickangle: -45,
-            tickfont: { size: textSize, color: "black", family: "Arial", weight: "bold" },
+            tickfont: { 
+                size: textSize, 
+                color: "black", 
+                family: "Arial", 
+                weight: "bold" 
+            },
             showline: true,
             linecolor: "black",
             linewidth: axisWidth,
             mirror: true,
-            showgrid: false
+            showgrid: true,
+            gridcolor: 'rgba(200, 200, 200, 0.2)', // Light grid
+            gridwidth: 1
         },
 
         yaxis: {
             tickvals: [rowTop, rowMid, rowBot],
-            ticktext: [
-                "Overexpression Effects<br>(Cilia Length)",
-                "Loss-of-Function<br>(Cilia Length)",
-                "% of Ciliated Cells"
-            ],
-            tickfont: { size: textSize + 4, color: "black", family: "Arial", weight: "bold" },
+            ticktext: phenotypeRows.map(row => row.label),
+            tickfont: { 
+                size: textSize + 2, // Slightly smaller for better fit
+                color: "black", 
+                family: "Arial", 
+                weight: "bold" 
+            },
             showline: true,
             linecolor: "black",
             linewidth: axisWidth,
             mirror: true,
-            showgrid: false
+            showgrid: true,
+            gridcolor: 'rgba(200, 200, 200, 0.2)', // Light grid
+            gridwidth: 1,
+            // Remove secondary line by ensuring mirror doesn't create duplicates
+            zeroline: false
         },
 
         legend: {
             orientation: "h",
             yanchor: "bottom",
-            y: 1.15,
+            y: 1.12, // Moved slightly up to accommodate tighter spacing
             xanchor: "center",
             x: 0.5,
             bgcolor: "rgba(255,255,255,0.95)",
             bordercolor: "#ccc",
             borderwidth: 1,
-            font: { size: textSize }
+            font: { size: textSize - 1 } // Slightly smaller legend
         },
 
-        margin: { l: 200, r: 50, t: 150, b: 150 },
-        height: 800,
+        margin: { l: 180, r: 50, t: 140, b: 140 }, // Reduced margins for tighter layout
+        height: 700, // Reduced height for denser layout
         plot_bgcolor: "white",
-        paper_bgcolor: "white"
+        paper_bgcolor: "white",
+        
+        // Additional layout improvements
+        hovermode: 'closest',
+        dragmode: 'zoom'
     };
 
     Plotly.newPlot("plot-display-area", traces, layout, {
