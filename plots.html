@@ -1939,11 +1939,6 @@ function renderComplexNetwork(genes, container, custom) {
 // =============================================================================
 // EXPRESSION HEATMAP (MAINTAINED FROM ORIGINAL)
 // =============================================================================
-
-let plotExpressionData = {};
-let plotExpressionLoaded = false;
-let pendingHeatmapRequest = null;
-
 async function loadPlotExpressionData() {
     try {
         console.log("Loading expression data for heatmap...");
