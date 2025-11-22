@@ -2252,8 +2252,12 @@ function setPlotType(newType) {
  * Orchestrates the gene lookup, data filtering, and renders the selected plot type.
  * This version uses the final, optimized plot list and assumes embedded expression data.
  */
+/**
+ * Orchestrates the gene lookup, data filtering, and renders the selected plot type.
+ * This version uses the final, optimized plot list and assumes embedded expression data.
+ */
 async function generateAnalysisPlots() {
-    // 1. CRITICAL SYNCHRONIZATION CHECK
+    // 1. CRITICAL SYNCHRONIZATION CHECK: Ensures ciliaryGeneMap is loaded.
     if (typeof window.ciliaryGeneMap === 'undefined' || window.ciliaryGeneMap.size === 0) {
         console.warn("Attempted to generate plot before data finished loading. Please wait a moment for the initial data fetch to complete.");
         return;
@@ -2285,11 +2289,22 @@ async function generateAnalysisPlots() {
     const plotType = document.querySelector('input[name="ciliaplot_type"]:checked').value;
     const custom = getPlotCustomization(plotType);
     
-    // --- Expression Heatmap Logic: Bypassing Deferred Loading (OK) ---
-    // The previous 'if (plotType === 'expression_heatmap' && !plotExpressionLoaded)' check is removed.
+    // --- Plotting Switch ---
     
+    // Check if the selected plot type is the phylogenetic heatmap (which uses a router function)
+    const isPhylogenyPlot = plotType.includes('phylogeny'); 
+
+    if (isPhylogenyPlot) {
+        // Retrieve the source preference from the custom object (where the dynamic choice is stored)
+        const source = custom.phylogenySource || 'nevers'; 
+        // Call the router function we defined earlier: renderPhylogenyData(genes, source, 'heatmap')
+        renderPhylogenyData(foundGenes, source, 'heatmap');
+        return; 
+    }
+
     switch (plotType) {
         case 'expression_heatmap': 
+            // Data is embedded, so we pass an empty object (ignored) and the foundGenes.
             renderExpressionHeatmap({}, foundGenes); 
             break;
             
@@ -2298,15 +2313,6 @@ async function generateAnalysisPlots() {
         case 'multi_category_manhattan': renderMultiCategoryPlot(foundGenes, custom); break;
         case 'screen_summary_heatmap': renderScreenSummaryHeatmap(foundGenes, custom); break;
         
-        // --- CRITICAL CHANGE for Phylogenetic Plot ---
-        // This plot now uses the generic router function, assuming 'phylogeny_bar' (or similar) is the key.
-        case 'phylogeny_bar': // Assuming this is the key used for the Phylogeny Heatmap plot type
-            // Determine the source based on customization (defaults to Nevers if not set)
-            const source = custom.phylogenySource || 'nevers'; 
-            // Call the router function we defined earlier: renderPhylogenyData(genes, source, 'heatmap')
-            renderPhylogenyData(foundGenes, source, 'heatmap');
-            break;
-            
         case 'cilia_effects_scatter': renderCiliaEffectsScatterPlot(foundGenes, custom); break;
         case 'ortholog_heatmap': renderOrthologHeatmap(foundGenes, custom); break; 
         case 'lof_cilia_vs_count_scatter': renderLofDualEffectPlot(foundGenes, custom); break; 
