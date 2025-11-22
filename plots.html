@@ -399,175 +399,154 @@
        function renderLofDualEffect(genes, custom) {
     clearPlot();
 
-    // === USER CUSTOMIZATION (can extend later) ===
-    const colorDecrease = document.getElementById('color-short')?.value   || '#d62728';
-    const colorIncrease = document.getElementById('color-longer')?.value  || '#2ca02c';
-    const colorNoEffect = document.getElementById('color-noeffect')?.value|| '#7f7f7f';
+    // USER COLORS
+    const colorShort    = document.getElementById('color-short')?.value || '#d62728';
+    const colorLonger   = document.getElementById('color-longer')?.value || '#2ca02c';
+    const colorNoEffect = document.getElementById('color-noeffect')?.value || '#7f7f7f';
     const colorUnknown  = document.getElementById('color-unknown')?.value || '#ff7f0e';
-    const axisLineWidth = parseInt(document.getElementById('axis-linewidth')?.value) || 2;
-    const textSize      = parseInt(document.getElementById('text-size')?.value)      || 14;
-    const textBold      = document.getElementById('text-bold')?.checked            || false;
-    const viewMode      = document.getElementById('view-mode')?.value               || 'plot';
 
+    const axisWidth = 2;
+    const textSize = 14;
+
+    // EFFECT MAP
     const effectMap = {
-        decrease: { keywords: ['short','decrease','reduced','loss','absent'],     color: colorDecrease, label: 'Decrease' },
-        increase: { keywords: ['long','increase','increased','supernumerary'],    color: colorIncrease, label: 'Increase' },
-        noEffect: { keywords: ['no effect','no change','baseline'],                color: colorNoEffect, label: 'No Effect' },
-        unknown:  { keywords: ['—','n/a','not reported','not evaluated',''],      color: colorUnknown,  label: 'Not Reported' }
+        short:    { keywords: ['short','decrease','reduced','loss','absent'], color: colorShort,   label: 'Decrease' },
+        longer:   { keywords: ['long','increase','increased'], color: colorLonger, label: 'Increase' },
+        noEffect: { keywords: ['no effect','no change'],       color: colorNoEffect, label: 'No Effect' },
+        unknown:  { keywords: ['not reported','n/a',''],       color: colorUnknown, label: 'Not Reported' }
     };
 
     function classifyEffect(str) {
         if (!str) return 'unknown';
-        const lower = String(str).toLowerCase().trim();
+        const lower = String(str).toLowerCase();
         for (const [key, info] of Object.entries(effectMap)) {
             if (info.keywords.some(kw => lower.includes(kw))) return key;
         }
         return 'unknown';
     }
 
-    // === Data preparation ===
-    const processed = genes.map(g => ({
-        gene: g.Gene || g.gene,
-        oe:  { raw: g['Overexpression effects on cilia length (increase/decrease/no effect)']       || 'not reported',
-               effect: classifyEffect(g['Overexpression effects on cilia length (increase/decrease/no effect)']) },
-        lof: { raw: g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'not reported',
-               effect: classifyEffect(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)']) },
-        pct: { raw: g['Percentage of ciliated cells (increase/decrease/no effect)']                              || 'not reported',
-               effect: classifyEffect(g['Percentage of ciliated cells (increase/decrease/no effect)']) }
-    }));
+    // DATA PREP
+    const processed = genes.map(g => {
+        const oeRaw  = g['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'not reported';
+        const lofRaw = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'not reported';
+        const pRaw   = g['Percentage of ciliated cells (increase/decrease/no effect)'] || 'not reported';
 
-    const rowPositions = {
-        oe:  2.3,
-        lof: 1.5,
-        pct: 0.7
-    };
-
-    if (viewMode === 'table') {
-        // Produce table mode …
-        let html = `<div style="padding:20px; font-size:14px; overflow:auto; max-height:${custom.height}px;">
-            <h3 style="color:#005b96; margin-bottom:16px;">Phenotype Summary Table</h3>
-            <table style="width:100%; border-collapse:collapse;">
-            <thead style="background:#005b96; color:white;">
-              <tr>
-                <th style="padding:12px; text-align:left;">Gene</th>
-                <th style="padding:12px; text-align:left;">OE (Cilia Length)</th>
-                <th style="padding:12px; text-align:left;">LoF (Cilia Length)</th>
-                <th style="padding:12px; text-align:left;">% Ciliated Cells</th>
-              </tr>
-            </thead><tbody>`;
-        processed.forEach(d => {
-            html += `<tr style="border-bottom:1px solid #eee;">
-                       <td style="padding:12px; font-weight:bold;">${d.gene}</td>
-                       <td style="padding:12px;">${effectMap[d.oe.effect].label}</td>
-                       <td style="padding:12px;">${effectMap[d.lof.effect].label}</td>
-                       <td style="padding:12px;">${effectMap[d.pct.effect].label}</td>
-                     </tr>`;
-        });
-        html += `</tbody></table></div>`;
-        document.getElementById('plot-display-area').innerHTML = html;
-        return;
-    }
-
-    // === Plot mode: scatter (close spacing) ===
-    const traces = [];
-    const phenotypeRows = [
-      { key: 'oe',  label: 'Overexpression effects (Cilia Length)', y: 2.3 },
-      { key: 'lof', label: 'Loss-of-Function (Cilia Length)',       y: 1.5 },
-      { key: 'pct', label: '% of Ciliated Cells',                  y: 0.7 }
-    ];
-
-    phenotypeRows.forEach(row => {
-        const x  = [];
-        const y  = [];
-        const col= [];
-        const hov= [];
-
-        processed.forEach((g,i) => {
-            x.push(i);
-            y.push(row.y);
-            const eff = g[row.key].effect;
-            col.push(effectMap[eff].color);
-            hov.push(`<b>${g.gene}</b><br>${row.label}<br>${effectMap[eff].label}<br><i>${g[row.key].raw}</i>`);
-        });
-
-        traces.push({
-            x,
-            y,
-            mode: 'markers',
-            marker: {
-              size: 20,
-              color: col,
-              symbol: 'circle',
-              line: { width: 1, color: 'white' }
-            },
-            hovertemplate: "%{customdata}<extra></extra>",
-            customdata: hov,
-            name: row.label,
-            showlegend: false
-        });
+        return {
+            gene: g.gene,
+            oe:  { raw: oeRaw,  effect: classifyEffect(oeRaw) },
+            lof: { raw: lofRaw, effect: classifyEffect(lofRaw) },
+            pct: { raw: pRaw,   effect: classifyEffect(pRaw) }
+        };
     });
 
-    // Build legend atop plot
-    const legendItems = Object.entries(effectMap).map(([key,info]) => ({
-        label: info.label,
-        color: info.color
-    }));
+    // ======== SPACING CONTROL (MINIMIZED) ========
+    const xCompression = 0.35;   // ⬅ makes dots closer horizontally
+    const rowTop = 1.20;
+    const rowMid = 1.00;
+    const rowBot = 0.80;         // ⬅ rows almost touching
+    const rowPositions = { oe: rowTop, lof: rowMid, pct: rowBot };
 
+    const phenotypeRows = [
+        { key: 'oe',  y: rowTop  },
+        { key: 'lof', y: rowMid  },
+        { key: 'pct', y: rowBot  }
+    ];
+
+    // TRACE BUILDER
+    const traces = [];
+
+    Object.entries(effectMap).forEach(([key, info]) => {
+        const xs = [], ys = [], texts = [], rawVals = [];
+
+        phenotypeRows.forEach(row => {
+            processed.forEach((g, i) => {
+                if (g[row.key].effect === key) {
+                    xs.push(i * xCompression);
+                    ys.push(rowPositions[row.key]);
+                    texts.push(g.gene);
+                    rawVals.push(g[row.key].raw);
+                }
+            });
+        });
+
+        if (xs.length > 0) {
+            traces.push({
+                x: xs,
+                y: ys,
+                mode: 'markers',
+                marker: {
+                    size: 20,
+                    color: info.color,
+                    line: { color: 'white', width: 1 }
+                },
+                name: info.label,
+                customdata: rawVals,
+                hovertemplate: "<b>%{text}</b><br>%{customdata}<extra></extra>"
+            });
+        }
+    });
+
+    // LAYOUT
     const layout = {
         title: {
-          text: custom.title || 'Ciliary Phenotype Matrix',
-          font: { size: custom.titleSize || 24, color: '#003366' },
-          x: 0.5
+            text: custom.title || "Ciliary Phenotypes",
+            font: { size: 26, color: "#005b96" },
+            x: 0.5
         },
+
         xaxis: {
-          tickvals: processed.map((_, i) => i),
-          ticktext: processed.map(d => `<i>${d.gene}</i>`),
-          tickangle: -45,
-          tickfont: { size: textSize, color: '#000', family: 'Arial', weight: textBold?'bold':'normal' },
-          showgrid: false,
-          zeroline: true,
-          zerolinewidth: axisLineWidth,
-          zerolinecolor: '#000',
-          showline: true,
-          linecolor: '#000',
-          linewidth: axisLineWidth,
-          mirror: true
+            title: "",
+            tickvals: processed.map((_, i) => i * xCompression),
+            ticktext: processed.map(d => `<i>${d.gene}</i>`),
+            tickangle: -45,
+            tickfont: { size: textSize, color: "black", family: "Arial", weight: "bold" },
+            showline: true,
+            linecolor: "black",
+            linewidth: axisWidth,
+            mirror: true,
+            showgrid: false
         },
+
         yaxis: {
-          tickvals: phenotypeRows.map(r => r.y),
-          ticktext: phenotypeRows.map(r => r.label),
-          tickfont: { size: textSize, color: '#000', family: 'Arial', weight: textBold?'bold':'normal' },
-          showgrid: false,
-          zeroline: true,
-          zerolinewidth: axisLineWidth,
-          zerolinecolor: '#000',
-          showline: true,
-          linecolor: '#000',
-          linewidth: axisLineWidth,
-          mirror: true,
-          range: [0, 3.0]
+            tickvals: [rowTop, rowMid, rowBot],
+            ticktext: [
+                "Overexpression Effects<br>(Cilia Length)",
+                "Loss-of-Function<br>(Cilia Length)",
+                "% of Ciliated Cells"
+            ],
+            tickfont: { size: textSize + 4, color: "black", family: "Arial", weight: "bold" },
+            showline: true,
+            linecolor: "black",
+            linewidth: axisWidth,
+            mirror: true,
+            showgrid: false
         },
-        height: custom.height || 750,
-        width: 1400,
-        margin: { l: 250, r: 200, t: 120, b: 140 },
-        plot_bgcolor: 'white',
-        paper_bgcolor: 'white',
-        annotations: [
-          {
-            xref: 'paper', yref: 'paper',
-            x: 0.5, y: 1.08,
-            text: legendItems.map(li => `<span style="color:${li.color}; font-weight:bold;">■</span> ${li.label}`).join(' &nbsp;&nbsp; '),
-            showarrow: false,
-            font: { size: textSize+2, color: '#000' },
-            xanchor: 'center'
-          }
-        ],
-        showlegend: false
+
+        legend: {
+            orientation: "h",
+            yanchor: "bottom",
+            y: 1.15,
+            xanchor: "center",
+            x: 0.5,
+            bgcolor: "rgba(255,255,255,0.95)",
+            bordercolor: "#ccc",
+            borderwidth: 1,
+            font: { size: textSize }
+        },
+
+        margin: { l: 200, r: 50, t: 150, b: 150 },
+        height: 800,
+        plot_bgcolor: "white",
+        paper_bgcolor: "white"
     };
 
-    Plotly.newPlot('plot-display-area', traces, layout, {responsive: true});
+    Plotly.newPlot("plot-display-area", traces, layout, {
+        responsive: true,
+        displayModeBar: true
+    });
 }
 
+    
         
 // 6. Expression Heatmap (mock)
 function renderExpressionHeatmap(genes, custom) {
