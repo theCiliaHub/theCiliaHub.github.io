@@ -395,24 +395,104 @@
         }
 
         // 5. LoF Dual Effect Scatter
+        // FIXED: LoF Dual Effect Scatter Plot (Categorical Y-axis, Gene X-axis, Colors by Effect)
         function renderLofDualEffect(genes, custom) {
             clearPlot();
-            const points = genes.map(g => {
-                const len = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '';
-                const cnt = g['Percentage of ciliated cells (increase/decrease/no effect)'] || '';
+
+            // Step 1: Mapping Logic for Effects
+            const effectMapping = {
+                short: { keywords: ['shorter', 'reduced', 'decrease', 'loss', 'absent', 'short cilia', 'decreased cilia numbers'], color: '#d62728', label: 'Short/Decrease' },
+                longer: { keywords: ['longer', 'increased', 'supernumerary', 'increase', 'longer cilia', 'increased cilia numbers'], color: '#2ca02c', label: 'Longer/Increase' },
+                noEffect: { keywords: ['no effect', 'no change', 'baseline'], color: '#7f7f7f', label: 'No Effect' },
+                unknown: { keywords: ['—', 'n/a', 'not reported', 'not evaluated', ''], color: '#ff7f0e', label: 'Unknown' }
+            };
+
+            function getEffectCategory(rawValue) {
+                if (!rawValue || rawValue.trim() === '') return 'unknown';
+                const lower = rawValue.toLowerCase().trim();
+                for (const [cat, info] of Object.entries(effectMapping)) {
+                    if (info.keywords.some(kw => lower.includes(kw.toLowerCase()))) return cat;
+                }
+                return 'unknown'; // Fallback
+            }
+
+            // Step 2: Extract Data for Each Gene
+            const points = [];
+            genes.forEach(gene => {
+                // Cilia Length (X = gene, Y = category position)
+                const lenRaw = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 
+                               (gene.screens_summary ? gene.screens_summary.find(s => s.result)?.result : '') || 'not reported';
+                const lenCat = getEffectCategory(lenRaw);
+                points.push({
+                    x: gene.gene,
+                    y: 2.5, // Upper position for Cilia Length
+                    category: 'Cilia Length',
+                    effect: lenCat,
+                    raw: lenRaw,
+                    color: effectMapping[lenCat].color,
+                    size: lenCat === 'unknown' ? 8 : 12 // Smaller for unknown
+                });
+
+                // % Ciliated Cells (Y = lower position)
+                const cellRaw = gene['Percentage of ciliated cells (increase/decrease/no effect)'] || 
+                                (gene.screens_summary ? gene.screens_summary.find(s => s.result?.includes('numbers'))?.result : '') || 'not reported';
+                const cellCat = getEffectCategory(cellRaw);
+                points.push({
+                    x: gene.gene,
+                    y: 0.5, // Lower position for % Cells
+                    category: '% Ciliated Cells',
+                    effect: cellCat,
+                    raw: cellRaw,
+                    color: effectMapping[cellCat].color,
+                    size: cellCat === 'unknown' ? 8 : 12
+                });
+            });
+
+            // Step 3: Create Traces by Effect Type (for Legend)
+            const effectTypes = Object.keys(effectMapping);
+            const traces = effectTypes.map(effectType => {
+                const effectPoints = points.filter(p => p.effect === effectType);
                 return {
-                    x: len.includes('decrease') ? -1 : len.includes('increase') ? 1 : 0,
-                    y: cnt.includes('decrease') ? -1 : cnt.includes('increase') ? 1 : 0,
-                    gene: g.gene
+                    x: effectPoints.map(p => p.x),
+                    y: effectPoints.map(p => p.y),
+                    mode: 'markers',
+                    marker: {
+                        color: effectMapping[effectType].color,
+                        size: effectPoints.map(p => p.size),
+                        symbol: 'circle',
+                        line: { color: 'white', width: 1 }
+                    },
+                    name: effectMapping[effectType].label,
+                    text: effectPoints.map(p => `<b>${p.x}</b><br>${p.category}: ${p.effect.toUpperCase()}<br>Raw: ${p.raw}`),
+                    hovertemplate: '%{text}<extra></extra>',
+                    showlegend: true
                 };
             });
-            Plotly.newPlot('plot-display-area', [{
-                x: points.map(p=>p.x), y: points.map(p=>p.y), text: points.map(p=>p.gene),
-                mode: 'markers', marker: { size: 20, color: points.map(p => p.x*p.y > 0 ? '#4CAF50' : '#e74c3c') }
-            }], {
-                title: "LoF Dual Effect", xaxis: { title: "Cilia Length", zeroline: true },
-                yaxis: { title: "Ciliated Cell %", zeroline: true }, height: custom.height
-            });
+
+            // Step 4: Layout with Custom Y-Axis
+            const layout = {
+                title: { text: custom.title || 'LoF Dual Effect: Cilia Length vs. % Ciliated Cells', font: { size: custom.titleSize } },
+                xaxis: {
+                    title: 'Genes',
+                    tickmode: 'array',
+                    tickvals: genes.map(g => g.gene),
+                    tickangle: -45
+                },
+                yaxis: {
+                    title: 'LoF Effects',
+                    tickvals: [0.5, 2.5],
+                    ticktext: ['% Ciliated Cells', 'Cilia Length'],
+                    range: [0, 3],
+                    zeroline: false,
+                    showgrid: true
+                },
+                height: custom.height,
+                width: custom.width,
+                legend: { orientation: 'v', x: 1.02, y: 0.5 },
+                plot_bgcolor: 'white'
+            };
+
+            Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
         }
 
         // 6. Expression Heatmap (mock)
@@ -452,29 +532,74 @@
             }], { title: "Cilia Perturbation Effects", height: custom.height });
         }
 
-        // MAIN GENERATOR
-        function generatePlot() {
-            const input = document.getElementById('ciliaplot-genes-input').value.trim();
-            if (!input) return alert("Enter gene symbols");
-            const genes = findGenes(input);
-            if (genes.length === 0) return alert("No genes found");
-            const type = document.querySelector('input[name="plottype"]:checked').value;
-            const custom = getCustom();
+// MAIN GENERATOR
+function generatePlot() {
+    const input = document.getElementById('ciliaplot-genes-input').value.trim();
+    if (!input) {
+        alert("Please enter at least one gene symbol.");
+        return;
+    }
 
-            const renderers = {
-                'multi_category_manhattan': renderMultiCategoryManhattan,
-                'enrichment_bubble': renderEnrichmentBubble,
-                'phylogeny_heatmap': renderPhylogenyHeatmap,
-                'screen_summary_heatmap': renderScreenSummaryHeatmap,
-                'lof_cilia_vs_count_scatter': renderLofDualEffect,
-                'expression_heatmap': renderExpressionHeatmap,
-                'network': renderComplexNetwork,
-                'ortholog_heatmap': renderOrthologHeatmap,
-                'cilia_effects_scatter': renderCiliaEffectsScatter
-            };
+    // Show loading state
+    const plotArea = document.getElementById('plot-display-area');
+    plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:18px;">Searching genes and generating plot...</div>';
 
-            renderers[type](genes, custom);
-        }
+    const queries = input.split(/[\s,\n;]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+    const genes = findGenes(input);
+
+    // Update gene summary table (if you add one later)
+    if (genes.length === 0) {
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;">
+                <strong>No genes found in the CiliaHub database</strong><br><br>
+                <small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small>
+            </div>`;
+        return;
+    }
+
+    // Success message
+    console.log(`Found ${genes.length} gene(s): ${genes.map(g => g.gene).join(', ')}`);
+
+    const type = document.querySelector('input[name="plottype"]:checked').value;
+    const custom = getCustom();
+
+    // Enhanced renderer map with fallbacks
+    const renderers = {
+        'multi_category_manhattan': renderMultiCategoryManhattan,
+        'enrichment_bubble': renderEnrichmentBubble,
+        'phylogeny_heatmap': renderPhylogenyHeatmap,
+        'screen_summary_heatmap': renderScreenSummaryHeatmap,
+        'lof_cilia_vs_count_scatter': renderLofDualEffect,        // Fixed & working
+        'expression_heatmap': renderExpressionHeatmap,
+        'network': renderComplexNetwork,
+        'ortholog_heatmap': renderOrthologHeatmap,
+        'cilia_effects_scatter': renderCiliaEffectsScatter
+    };
+
+    const renderer = renderers[type];
+
+    if (!renderer) {
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">
+                Plot type "${type}" not implemented yet.
+            </div>`;
+        return;
+    }
+
+    try {
+        renderer(genes, custom);
+    } catch (error) {
+        console.error("Plot rendering error:", error);
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;">
+                <strong>Plot failed to render</strong><br><br>
+                <small>${error.message}</small><br><br>
+                <button onclick="generatePlot()" style="padding:10px 20px; background:#005b96; color:white; border:none; border-radius:6px; cursor:pointer;">
+                    Try Again
+                </button>
+            </div>`;
+    }
+}
 
         // PAGE SETUP
         function setupPage() {
