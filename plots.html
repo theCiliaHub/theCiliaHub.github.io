@@ -399,106 +399,82 @@
         function renderLofDualEffect(genes, custom) {
     clearPlot();
 
-    // Get user customizations
-    const colorShort = document.getElementById('color-short')?.value || '#d62728';
-    const colorLonger = document.getElementById('color-longer')?.value || '#2ca02c';
+    // === USER CUSTOMIZATION ===
+    const colorShort    = document.getElementById('color-short')?.value || '#d62728';
+    const colorLonger   = document.getElementById('color-longer')?.value || '#2ca02c';
     const colorNoEffect = document.getElementById('color-noeffect')?.value || '#7f7f7f';
-    const colorUnknown = document.getElementById('color-unknown')?.value || '#ff7f0e';
-    const axisWidth = parseInt(document.getElementById('axis-linewidth')?.value) || 2;
-    const textSize = parseInt(document.getElementById('text-size')?.value) || 14;
-    const textBold = document.getElementById('text-bold')?.checked;
-    const viewMode = document.getElementById('view-mode')?.value || 'plot';
+    const colorUnknown  = document.getElementById('color-unknown')?.value || '#ff7f0e';
+    const axisWidth     = parseInt(document.getElementById('axis-linewidth')?.value) || 2;
+    const textSize      = parseInt(document.getElementById('text-size')?.value) || 14;
+    const textBold      = document.getElementById('text-bold')?.checked;
+    const viewMode      = document.getElementById('view-mode')?.value || 'plot';
 
-    const effectMapping = {
-        short: { keywords: ['shorter', 'reduced', 'decrease', 'loss', 'absent', 'short', 'decreased cilia'], color: colorShort, label: 'Short/Decrease' },
-        longer: { keywords: ['longer', 'increased', 'supernumerary', 'increase', 'long cilia', 'increased cilia'], color: colorLonger, label: 'Longer/Increase' },
-        noEffect: { keywords: ['no effect', 'no change', 'baseline'], color: colorNoEffect, label: 'No Effect' },
-        unknown: { keywords: ['—', 'n/a', 'not reported', 'not evaluated', ''], color: colorUnknown, label: 'Unknown/Not Reported' }
+    // === EFFECT MAPPING ===
+    const effectMap = {
+        short:    { keywords: ['short', 'decrease', 'reduced', 'loss', 'absent', 'decreased'], color: colorShort,   label: 'Short/Decrease' },
+        longer:   { keywords: ['long', 'increase', 'increased', 'supernumerary'],       color: colorLonger,  label: 'Longer/Increase' },
+        noEffect: { keywords: ['no effect', 'no change', 'baseline'],                  color: colorNoEffect,label: 'No Effect' },
+        unknown:  { keywords: ['—', 'n/a', 'not reported', 'not evaluated', ''],      color: colorUnknown, label: 'Unknown' }
     };
 
-    function getEffectCategory(rawValue) {
-        if (!rawValue || rawValue.trim() === '') return 'unknown';
-        const lower = String(rawValue).toLowerCase().trim();
-        for (const [cat, info] of Object.entries(effectMapping)) {
-            if (info.keywords.some(kw => lower.includes(kw))) return cat;
+    function classifyEffect(str) {
+        if (!str) return 'unknown';
+        const lower = String(str).toLowerCase().trim();
+        for (const [key, info] of Object.entries(effectMap)) {
+            if (info.keywords.some(kw => lower.includes(kw))) return key;
         }
         return 'unknown';
     }
 
-    // Build data points
-    const plotData = [];
-    const tableData = [];
-
-    genes.forEach(gene => {
+    // === DATA PREPARATION ===
+    const data = genes.map(gene => {
         const lenRaw = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'not reported';
         const cellRaw = gene['Percentage of ciliated cells (increase/decrease/no effect)'] || 'not reported';
-
-        const lenCat = getEffectCategory(lenRaw);
-        const cellCat = getEffectCategory(cellRaw);
-
-        // For plot
-        plotData.push({
+        return {
             gene: gene.gene,
-            ciliaLength: { effect: lenCat, raw: lenRaw },
-            ciliatedCells: { effect: cellCat, raw: cellRaw }
-        });
-
-        // For table
-        tableData.push({
-            Gene: gene.gene,
-            'Cilia Length': effectMapping[lenCat].label,
-            'Raw (Length)': lenRaw,
-            '% Ciliated Cells': effectMapping[cellCat].label,
-            'Raw (Cells)': cellRaw
-        });
+            ciliaLength: { raw: lenRaw, effect: classifyEffect(lenRaw) },
+            ciliatedCells: { raw: cellRaw, effect: classifyEffect(cellRaw) }
+        };
     });
 
-    // TABLE VIEW
+    // === TABLE MODE ===
     if (viewMode === 'table') {
-        let tableHTML = `
-            <div style="padding:20px; font-family:Arial; overflow:auto; max-height:${custom.height}px;">
-                <h3 style="margin-bottom:16px; color:#005b96;">LoF Dual Effect - Data Table</h3>
-                <table style="width:100%; border-collapse:collapse; font-size:14px;">
-                    <thead style="background:#005b96; color:white;">
-                        <tr>
-                            <th style="padding:12px; text-align:left;">Gene</th>
-                            <th style="padding:12px; text-align:left;">Cilia Length</th>
-                            <th style="padding:12px; text-align:left;">Raw Value</th>
-                            <th style="padding:12px; text-align:left;">% Ciliated Cells</th>
-                            <th style="padding:12px; text-align:left;">Raw Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-        
-        tableData.forEach(row => {
-            tableHTML += `
-                <tr style="border-bottom:1px solid #ddd;">
-                    <td style="padding:12px; font-weight:bold;">${row.Gene}</td>
-                    <td style="padding:12px;">${row['Cilia Length']}</td>
-                    <td style="padding:12px; font-size:12px; color:#666;">${row['Raw (Length)']}</td>
-                    <td style="padding:12px;">${row['% Ciliated Cells']}</td>
-                    <td style="padding:12px; font-size:12px; color:#666;">${row['Raw (Cells)']}</td>
-                </tr>`;
+        let html = `<div style="padding:20px; font-size:14px; overflow:auto; max-height:${custom.height}px;">
+            <h3 style="color:#005b96; margin-bottom:16px;">LoF Dual Effect - Data Table</h3>
+            <table style="width:100%; border-collapse:collapse;">
+                <thead style="background:#005b96; color:white;">
+                    <tr>
+                        <th style="padding:12px; text-align:left;">Gene</th>
+                        <th style="padding:12px; text-align:left;">Cilia Length</th>
+                        <th style="padding:12px; text-align:left;">% Ciliated Cells</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        data.forEach(d => {
+            html += `<tr style="border-bottom:1px solid #eee;">
+                <td style="padding:12px; font-weight:bold;">${d.gene}</td>
+                <td style="padding:12px;">${effectMap[d.ciliaLength.effect].label}</td>
+                <td style="padding:12px;">${effectMap[d.ciliatedCells.effect].label}</td>
+            </tr>`;
         });
-
-        tableHTML += `</tbody></table></div>`;
-        document.getElementById('plot-display-area').innerHTML = tableHTML;
+        html += `</tbody></table></div>`;
+        document.getElementById('plot-display-area').innerHTML = html;
         return;
     }
 
-    // PLOT VIEW (FANCY!)
+    // === PLOT MODE (BEAUTIFUL & CLEAN) ===
     const traces = [];
-    const legendItems = [];
+    const legendEntries = [];
 
-    Object.entries(effectMapping).forEach(([key, info]) => {
+    Object.entries(effectMap).forEach(([key, info]) => {
         const points = [];
 
-        plotData.forEach((d, i) => {
+        data.forEach((d, i) => {
             if (d.ciliaLength.effect === key) {
-                points.push({ x: i, y: 2.2, gene: d.gene, category: 'Cilia Length', raw: d.ciliaLength.raw });
+                points.push({ x: i, y: 2.3, gene: d.gene, type: 'Cilia Length', raw: d.ciliaLength.raw });
             }
             if (d.ciliatedCells.effect === key) {
-                points.push({ x: i, y: 0.8, gene: d.gene, category: '% Ciliated Cells', raw: d.ciliatedCells.raw });
+                points.push({ x: i, y: 0.7, gene: d.gene, type: '% Ciliated Cells', raw: d.ciliatedCells.raw });
             }
         });
 
@@ -509,78 +485,87 @@
                 mode: 'markers+text',
                 text: points.map(p => p.gene),
                 textposition: 'top center',
-                textfont: { size: textSize, family: 'Arial', color: textBold ? 'black' : '#333' },
+                textfont: {
+                    size: textSize,
+                    family: 'Arial',
+                    color: textBold ? '#000' : '#333'
+                },
                 marker: {
-                    size: 22,
+                    size: 28,
                     color: info.color,
-                    line: { color: 'white', width: 3 }
+                    line: { color: 'white', width: 4 }
                 },
                 name: info.label,
-                hovertemplate: `<b>${points[0]?.gene || ''}</b><br>${points[0]?.category || ''}: <b>${info.label}</b><br>Raw: %{text}<extra></extra>`,
+                hovertemplate: `<b>%{text}</b><br>${points[0].type}: <b>${info.label}</b><br>Raw: %{customdata}<extra></extra>`,
+                customdata: points.map(p => p.raw),
                 legendgroup: key,
                 showlegend: true
             });
-
-            legendItems.push({ color: info.color, label: info.label });
+            legendEntries.push({ color: info.color, label: info.label });
         }
     });
 
     const layout = {
         title: {
-            text: custom.title || 'Loss-of-Function Dual Effect',
-            font: { size: custom.titleSize || 24, family: 'Arial', color: '#005b96' }
+            text: custom.title || 'Loss-of-Function (LoF) Dual Effect',
+            font: { size: custom.titleSize || 24, color: '#005b96' },
+            x: 0.5,
+            xanchor: 'center'
         },
         xaxis: {
-            title: { text: 'Genes', font: { size: textSize + 2 } },
-            tickvals: plotData.map((_, i) => i),
-            ticktext: plotData.map(d => d.gene),
+            title: { text: 'Genes', font: { size: textSize + 4 } },
+            tickvals: data.map((_, i) => i),
+            ticktext: data.map(d => d.gene),
             tickangle: -45,
             showline: true,
             linewidth: axisWidth,
             linecolor: 'black',
             mirror: true,
             zeroline: false,
-            showgrid: false
+            showgrid: false,
+            fixedrange: true
         },
         yaxis: {
-            title: null,
-            tickvals: [0.8, 2.2],
+            tickvals: [0.7, 2.3],
             ticktext: ['% Ciliated Cells', 'Cilia Length'],
-            tickfont: { size: textSize + 4, family: 'Arial', color: '#005b96' },
+            tickfont: { size: textSize + 6, color: '#005b96' },
             range: [0, 3],
             showline: true,
             linewidth: axisWidth,
             linecolor: 'black',
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            fixedrange: true
         },
-        height: custom.height || 700,
+        height: custom.height || 720,
         width: custom.width || 1100,
-        margin: { l: 120, r: 180, t: 100, b: 140 },
+        margin: { l: 140, r: 180, t: 100, b: 120 },
         plot_bgcolor: 'white',
         paper_bgcolor: 'white',
         legend: {
             x: 1.02,
             y: 0.5,
-            bgcolor: 'rgba(255,255,255,0.9)',
+            bgcolor: 'rgba(255,255,255,0.95)',
             bordercolor: '#ddd',
             borderwidth: 1,
             font: { size: textSize }
         },
         shapes: [
-            { type: 'line', x0: -0.5, x1: plotData.length - 0.5, y0: 1.5, y1: 1.5, xref: 'x', yref: 'y', line: { color: '#666', width: 1, dash: 'dot' } }
-        ],
-        annotations: [
-            { xref: 'paper', yref: 'paper', x: 0.5, y: 1.05, text: 'Cilia Length', showarrow: false, font: { size: textSize + 6, color: '#005b96', family: 'Arial' } },
-            { xref: 'paper', yref: 'paper', x: 0.5, y: -0.1, text: '% Ciliated Cells', showarrow: false, font: { size: textSize + 6, color: '#005b96', family: 'Arial' } }
+            { type: 'line', x0: -0.5, x1: data.length - 0.5, y0: 1.5, y1: 1.5, line: { color: '#ddd', width: 1, dash: 'dot' } }
         ]
     };
 
-    Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
+    Plotly.newPlot('plot-display-area', traces, layout, {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    });
 }
-        // 6. Expression Heatmap (mock)
-        function renderExpressionHeatmap(genes, custom) {
+
+        
+// 6. Expression Heatmap (mock)
+function renderExpressionHeatmap(genes, custom) {
             clearPlot();
             const tissues = ["Brain","Lung","Kidney","Liver"];
             const z = genes.map(() => tissues.map(() => Math.random()));
