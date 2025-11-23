@@ -445,9 +445,11 @@
     
     // Reduced vertical spacing between rows
    // EXTREMELY MINIMIZED vertical spacing
-    const rowTop = 0.82;
-    const rowMid = 0.80;  
-    const rowBot = 0.78;
+  // rowTop - rowMid = distance between Overexpression and Loss-of-Function rows
+// rowMid - rowBot = distance between Loss-of-Function and % Ciliated Cells rows
+    const rowTop = 0.60;
+    const rowMid = 0.60;  
+    const rowBot = 0.60;
     const rowPositions = { oe: rowTop, lof: rowMid, pct: rowBot };
 
     const phenotypeRows = [
