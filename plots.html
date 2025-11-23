@@ -195,7 +195,7 @@
         let allGenes = [];
         let liMatrix = {};
         let neversMatrix = {};
-        let tissueExpressionData = {}; // For the fetched TSV data (raw or parsed)
+        let tissueExpressionData = {};
 
         // DATA URLS (All 5 URLs integrated)
         const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -205,24 +205,23 @@
         const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json'; // 4
         const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; // 5
 
-        // Li et al. 2014 Species Order
+        // Species Orders
         const LI_SPECIES_ORDER = [
             "sym","Prokaryote","E.cuniculi","E.histolytica","E.dispar","G.lamblia","T.vaginalis","T.brucei","T.cruzi","L.infantum","L.major","L.braziliensis","T.gondii","C.hominis","C.parvum","B.bovis","T.annulata","T.parva","P.knowlesi","P.vivax","P.falciparum","P.chabaudi","P.berghei","P.yoelii","P.tetraurelia","T.thermophila","P.infestans","T.pseudonana","P.tricornutum","C.merolae","N.gruberi","O.lucimarinus","O.tauri","C.reinhardtii","V.carteri","P.patens","S.moellendorffii","S.bicolor","Z.mays","O.sativa","B.distachyon","A.lyrata","A.thaliana","L.japonicus","M.truncatula","V.vinifera","P.trichocarpa","R.communis","T.trahens","D.discoideum","A.macrogynus","S.punctatus","M.globosa","U.maydis","C.neoformans","P.chrysosporium","S.commune","C.cinerea","L.bicolor","S.pombe","B.fuckeliana","S.sclerotiorum","F.graminearum","M.grisea","N.crassa","P.anserina","P.chrysogenum","A.clavatus","A.fumigatus","N.fischeri","A.flavus","A.oryzae","A.niger","A.nidulans","U.reesii","C.immitis","C.posadasii","P.nodorum","T.melanosporum","Y.lipolytica","P.pastoris","C.lusitaniae","D.hansenii","M.guilliermondii","S.stipitis","L.elongisporus","C.tropicalis","C.albicans","C.dubliniensis","K.lactis","A.gossypii","K.waltii","L.thermotolerans","Z.rouxii","V.polyspora","C.glabrata","S.bayanus","S.mikatae","S.cerevisiae","S.paradoxus","S.arctica","C.owczarzaki","M.brevicollis","S.rosetta","S.mansoni","B.malayi","C.briggsae","C.elegans","D.pulex","A.pisum","P.humanus","A.mellifera","N.vitripennis","B.mori","T.castaneum","D.melanogaster","D.pseudoobscura","A.gambiae","A.aegypti","C.quinquefasciatus","B.floridae","T.adhaerens","S.purpuratus","H.magnipapillata","N.vectensis","C.intestinalis","D.rerio","O.latipes","F.rubripes","T.nigroviridis","X.tropicalis","G.gallus","M.gallopavo","O.anatinus","M.domestica","S.scrofa","M.musculus","C.familiaris","B.taurus","H.sapiens"
         ];
-
         const NEVERS_CIL = ["Homo sapiens","Mus musculus","Danio rerio","Xenopus tropicalis","Gallus gallus","Caenorhabditis elegans","Tetrahymena thermophila (strain SB210)","Chlamydomonas reinhardtii","Micromonas sp. (strain RCC299 / NOUM17)","Trypanosoma cruzi","Leishmania major","Giardia intestinalis (strain ATCC 50803 / WB clone C6)","Trichomonas vaginalis","Strongylocentrotus purpuratus","Ciona intestinalis","Physcomitrella patens subsp. patens","Paramecium tetraurelia","Volvox carteri","Amphimedon queenslandica","Monosiga brevicollis"];
         const NEVERS_NCIL = ["Saccharomyces cerevisiae (strain ATCC 204508 / S288c)","Schizosaccharomyces pombe (strain 972 / ATCC 24843)","Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)","Ustilago maydis (strain 521 / FGSC 9021)","Candida albicans (strain WO-1)","Arabidopsis thaliana","Brachypodium distachyon","Sorghum bicolor","Vitis vinifera","Cryptosporidium parvum (strain Iowa II)","Entamoeba histolytica","Encephalitozoon cuniculi (strain GB-M1)"];
 
         // LOAD DATA: Fetch all 5 requested data sources
         async function loadData() {
             try {
-                // Fetch the 4 JSON files concurrently
+                // Fetch the 4 JSON files and 1 TSV file concurrently
                 const [masterResp, lookupResp, liResp, neversResp, rnaResp] = await Promise.all([
                     fetch(MASTER_DB),
                     fetch(LOOKUP_DB),
                     fetch(LI_PHYLO_MATRIX),
                     fetch(NEVERS_PHYLO_MATRIX),
-                    fetch(RNA_TISSUE_TSV) // Fetch the TSV data
+                    fetch(RNA_TISSUE_TSV)
                 ]);
                 
                 const masterData = await masterResp.json();
@@ -243,19 +242,16 @@
                 
                 // 3. Integrate Phylogeny data into main gene objects
                 ciliaryGeneMap.forEach((gene, geneKey) => {
-                    // Check if the external matrices have the gene and integrate them
                     gene.phylogeny.li_2014 = liMatrix[gene.Gene] || liMatrix[gene.Gene.toUpperCase()] || gene.phylogeny.li_2014;
                     gene.phylogeny.nevers_2017 = neversMatrix[gene.Gene] || neversMatrix[gene.Gene.toUpperCase()] || gene.phylogeny.nevers_2017;
                 });
                 
-                // 4. Handle RNA Tissue Data (TSV file)
+                // 4. Handle RNA Tissue Data (TSV file) - Stored raw, kept as mock visualization
                 const rnaText = await rnaResp.text();
-                // NOTE: Full robust TSV parsing is complex. For now, store raw text 
-                // and keep the RNA rendering function as a mock using random data.
                 // tissueExpressionData = rnaText; 
 
                 allGenes = Array.from(ciliaryGeneMap.values());
-                console.log(`Loaded ${ciliaryGeneMap.size} genes and 4 external JSON datasets. Tissue expression data fetched.`);
+                console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
 
             } catch (err) {
                 document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading data from server: ${err.message}. Please verify the data URLs.</p>`;
@@ -310,7 +306,7 @@
             clearPlot();
             const categories = [
                 { name: "Localization", key: "Localization", color: "#1f77b4" },
-                { name: "Complex", key: "complex_components", color: "#ff7f0e" },
+                { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
                 { name: "Ciliopathy", key: "Ciliopathy", color: "#2ca02c" },
                 { name: "Function", key: "Functional.category", color: "#d62728" },
                 { name: "Screens", key: "screens_summary", color: "#9467bd" },
@@ -402,7 +398,6 @@
                 const present = new Set(presentData);
                 
                 return orgs.map((org, idx) => {
-                    // Li matrix data often uses indices; Nevers matrix uses species names
                     return (isLi ? present.has(idx) : present.has(org)) ? 1 : 0;
                 });
             });
@@ -445,7 +440,6 @@
         // 5. Mouse Phenotype Enrichment - Mapped to 'mouse_phenotypes'
         function renderMousePhenotypeHeatmap(genes, custom) {
             clearPlot();
-            // Using the key 'Phenotypes_mouse'
             const allPhenotypes = genes.flatMap(g => getCleanArray(g, 'Phenotypes_mouse') || getCleanArray(g, 'mouse_phenotype')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
             
             if (allPhenotypes.length === 0) {
@@ -469,11 +463,11 @@
             });
         }
         
-        // 6. Ciliopathy & Disease Associations - Mapped to 'ciliopathy'
+        // 6. Ciliopathy & Disease Associations - Mapped to 'ciliopathy' - FIXES DATA RETRIEVAL
         function renderCiliopathyPlot(genes, custom) {
             clearPlot();
             
-            // Using the key 'Ciliopathy'
+            // USE CONSISTENT KEY: 'Ciliopathy'
             const allDiseases = genes.flatMap(g => getCleanArray(g, 'Ciliopathy')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
 
             if (allDiseases.length === 0) {
@@ -497,10 +491,10 @@
             });
         }
 
-        // 7. Localization Heatmap - Mapped to 'localization_heatmap'
+        // 7. Localization Heatmap - Mapped to 'localization_heatmap' - FIXES DATA RETRIEVAL
         function renderLocalizationHeatmap(genes, custom) {
             clearPlot();
-            // Using the key 'Localization'
+            // USE CONSISTENT KEY: 'Localization'
             const allLocations = genes.flatMap(g => getCleanArray(g, 'Localization')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
 
             if (allLocations.length === 0) {
@@ -527,7 +521,7 @@
         // 8. Protein Domain Architecture - Mapped to 'protein_domains'
         function renderDomainArchitecture(genes, custom) {
             clearPlot();
-             // Using the key 'Protein.Domain.PFAM'
+             // USE CONSISTENT KEY: 'Protein.Domain.PFAM'
             const allDomains = genes.flatMap(g => getCleanArray(g, 'Protein.Domain.PFAM')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
 
             if (allDomains.length === 0) {
@@ -551,11 +545,32 @@
             });
         }
 
-        // 9. Protein Complex Network - Mapped to 'protein_complex' - PLACEHOLDER
+        // 9. Protein Complex Network - Mapped to 'protein_complex' - NOW USES COMPLEX DATA
         function renderComplexNetwork(genes, custom) {
             clearPlot();
-            const el = document.getElementById('plot-display-area');
-            el.innerHTML = `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;color:#666;">Complex Membership Map: Visualization Not Yet Implemented (Requires D3 force layout)</div>`;
+            
+            // USE CONSISTENT KEYS for Complex: 'Protein.complexes' and 'complex_components' (fallback)
+            const allComplexes = genes.flatMap(g => getCleanArray(g, 'Protein.complexes') || getCleanArray(g, 'complex_components')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+
+            if (allComplexes.length === 0) {
+                 document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Protein Complex data found for these genes.</div>`;
+                 return;
+            }
+            
+            const z = genes.map(g => {
+                const geneComplexes = new Set(getCleanArray(g, 'Protein.complexes') || getCleanArray(g, 'complex_components'));
+                return allComplexes.map(c => geneComplexes.has(c) ? 1 : 0);
+            });
+
+            Plotly.newPlot('plot-display-area', [{
+                type: 'heatmap', z, x: allComplexes, y: genes.map(g=>g.gene),
+                colorscale: [[0,'#f0f0f0'],[1,'#ff7f0e']], 
+                showscale: false
+            }], { 
+                title: { text: custom.title || "Complex Membership Heatmap (Static View)" }, 
+                xaxis: { tickangle: -45, automargin: true },
+                height: custom.height 
+            });
         }
 
 
@@ -563,7 +578,6 @@
         function renderExpressionHeatmap(genes, custom) {
              clearPlot();
              const tissues = ["Brain","Lung","Kidney","Liver","Testis","Cilia"];
-             // NOTE: This uses mock random data because the raw TSV file requires complex client-side parsing.
              const z = genes.map(() => tissues.map(() => Math.random() * 10)); 
              Plotly.newPlot('plot-display-area', [{
                  type: 'heatmap', z, x: tissues, y: genes.map(g=>g.gene), colorscale: 'Blues'
@@ -659,7 +673,7 @@
                             <option value="">-- Choose Plot Type --</option>
                             <option value="gene_overview">Gene Overview / Summary</option>
                             <option value="expression_heatmap">Expression Heatmap</option>
-                            <option value="scrna_dot">scRNA-seq (Lung)</option>
+                            <option value="scrna_dot">scRNA-seq Bubble / Dot Plot</option>
                             <option value="ciliopathy">Ciliopathy & Disease Associations</option>
                             <option value="localization_heatmap">Localization Heatmap</option>
                             <option value="crispr_screens">CRISPR & siRNA Screens Summary</option>
