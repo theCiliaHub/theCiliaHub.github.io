@@ -441,12 +441,12 @@
 
     // ======== OPTIMIZED SPACING FOR LARGE DATASETS ========
     const geneCount = processed.length;
-    const xSpacing = Math.max(0.15, 0.4 - (geneCount * 0.002)); // Dynamic spacing based on gene count
-    const rowSpacing = 0.8;
+    const xSpacing = Math.max(0.1, 0.2 - (geneCount * 0.002)); // Dynamic spacing based on gene count
+    const rowSpacing = 0.4; // This controls the gap between rows
     
-    const rowTop = 2.0;
-    const rowMid = 1.0;
-    const rowBot = 0.0;
+    const rowTop = 1.0;    // Top row Y-position
+    const rowMid = 0.5;    // Middle row Y-position  
+    const rowBot = 0.0;    // Bottom row Y-position
     const rowPositions = { oe: rowTop, lof: rowMid, pct: rowBot };
 
     const phenotypeRows = [
