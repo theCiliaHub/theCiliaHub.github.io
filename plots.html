@@ -391,11 +391,14 @@
 
         // --- PLOT IMPLEMENTATIONS ---
 
-        // * UMAP PLOT (scRNA-seq Lung) - RENAMED AND GLOBALIZED
+        // * UMAP PLOT (scRNA-seq Lung) - RENAMED FOR CONFLICT RESOLUTION
         async function renderScrnaUMAPPlot(geneSymbol) { 
             const plotDivId = 'plot-display-area';
-            const umapData = window.CiliAI_UMAP || [];
-            const cellData = window.CiliAI?.cellDataCache || {};
+            
+            // CONFLICT RESOLUTION: Use renamed local variables
+            const globalUmapData = window.CiliAI_UMAP || []; // Accessing global UMAP coordinates
+            const globalCellDataCache = window.CiliAI?.cellDataCache || {}; // Accessing global expression data
+            
             const plotDiv = document.getElementById(plotDivId);
             const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
 
@@ -403,7 +406,8 @@
                 console.error('UMAP plot container not found.');
                 return;
             }
-            if (umapData.length === 0 || Object.keys(cellData).length === 0) {
+            // Use renamed local variables for the check
+            if (globalUmapData.length === 0 || Object.keys(globalCellDataCache).length === 0) {
                 plotDiv.innerHTML = `<div id="cilia-svg" style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">UMAP data is not available (Missing CiliAI_UMAP or cellDataCache).</div>`;
                 return;
             }
@@ -412,7 +416,8 @@
             const umapPlotDiv = document.getElementById('cilia-svg');
 
             // 1. Fetch Expression Data and prepare arrays
-            const geneExpressionData = cellData[gene] || {};
+            const geneExpressionData = globalCellDataCache[gene] || {};
+            
             const sampleSize = 15000;
             const sampledData = [];
             const colorArray = [];
@@ -422,9 +427,10 @@
             const sizeScaleMax = 12;      
             const expressionThreshold = 2; 
 
-            const sourceData = umapData.length > sampleSize 
-                            ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
-                            : umapData;
+            // Use renamed local variable
+            const sourceData = globalUmapData.length > sampleSize 
+                            ? globalUmapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
+                            : globalUmapData;
 
             for (const point of sourceData) {
                 const expressionValue = geneExpressionData[point.cell_type] || 0;
@@ -563,9 +569,6 @@
             const displayedNCIL = isLi ? NCIL_ORG_FULL : NEVERS_NCIL_PANEL;
             const orgs = [...displayedCIL, ...displayedNCIL];
 
-            // The full species list for Li is needed to map indices correctly
-            const fullSpeciesList = isLi ? LI_SPECIES_ORDER : [...NEVERS_CIL_PANEL, ...NEVERS_NCIL_PANEL];
-
             const z = genes.map(gene => {
                 const phy = gene.phylogeny?.[source];
                 
@@ -579,9 +582,11 @@
                 
                 return orgs.map(org => {
                     if (isLi) {
+                        // For Li: Find the index of the organism in the master LI_SPECIES_ORDER list
                         const orgIndex = LI_SPECIES_ORDER.indexOf(org);
                         return present.has(orgIndex) ? 1 : 0;
                     } else {
+                        // For Nevers: Check if the organism name is present in species_data
                         return present.has(org) ? 1 : 0;
                     }
                 });
