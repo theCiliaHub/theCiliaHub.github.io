@@ -208,54 +208,20 @@
 
         // --- PHYLOGENY PANEL DEFINITIONS ---
         const NEVERS_CIL_PANEL = [
-            "Homo sapiens",
-            "Mus musculus",
-            "Danio rerio",
-            "Xenopus tropicalis",
-            "Gallus gallus",
-            "Caenorhabditis elegans",
-            "Tetrahymena thermophila (strain SB210)",
-            "Chlamydomonas reinhardtii",
-            "Micromonas sp. (strain RCC299 / NOUM17)",
-            "Trypanosoma cruzi",
-            "Leishmania major",
-            "Giardia intestinalis (strain ATCC 50803 / WB clone C6)",
-            "Trichomonas vaginalis",
-            "Strongylocentrotus purpuratus",
-            "Ciona intestinalis",
-            "Physcomitrella patens subsp. patens",
-            "Paramecium tetraurelia",
-            "Volvox carteri",
-            "Amphimedon queenslandica",
-            "Monosiga brevicollis"
+            "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", "Caenorhabditis elegans", "Tetrahymena thermophila (strain SB210)", "Chlamydomonas reinhardtii", "Micromonas sp. (strain RCC299 / NOUM17)", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens subsp. patens", "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis"
         ];
 
         const NEVERS_NCIL_PANEL = [
-            "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
-            "Schizosaccharomyces pombe (strain 972 / ATCC 24843)",
-            "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)",
-            "Ustilago maydis (strain 521 / FGSC 9021)",
-            "Candida albicans (strain WO-1)",
-            "Arabidopsis thaliana",
-            "Brachypodium distachyon",
-            "Sorghum bicolor",
-            "Vitis vinifera",
-            "Cryptosporidium parvum (strain Iowa II)",
-            "Entamoeba histolytica",
-            "Encephalitozoon cuniculi (strain GB-M1)"
+            "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)", "Schizosaccharomyces pombe (strain 972 / ATCC 24843)", "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)", "Ustilago maydis (strain 521 / FGSC 9021)", "Candida albicans (strain WO-1)", "Arabidopsis thaliana", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica", "Encephalitozoon cuniculi (strain GB-M1)"
         ];
 
         const CIL_ORG_FULL = [
-            "H.sapiens", "M.musculus", "D.rerio", "X.tropicalis", "G.gallus",
-            "C.elegans", "T.thermophila", "C.reinhardtii", "O.tauri", 
-            "T.cruzi", "L.major", "G.lamblia", "T.vaginalis", 
-            "S.purpuratus", "C.intestinalis", "P.patens", "P.tetraurelia",
-            "V.carteri", "M.brevicollis"
+            "H.sapiens", "M.musculus", "D.rerio", "X.tropicalis", "G.gallus", "C.elegans", "T.thermophila", "C.reinhardtii", "O.tauri", 
+            "T.cruzi", "L.major", "G.lamblia", "T.vaginalis", "S.purpuratus", "C.intestinalis", "P.patens", "P.tetraurelia", "V.carteri", "M.brevicollis"
         ];
 
         const NCIL_ORG_FULL = [
-            "S.cerevisiae", "S.pombe", "C.neoformans", "U.maydis",
-            "C.albicans", "A.thaliana", "B.distachyon", "S.bicolor",
+            "S.cerevisiae", "S.pombe", "C.neoformans", "U.maydis", "C.albicans", "A.thaliana", "B.distachyon", "S.bicolor",
             "V.vinifera", "C.parvum", "E.histolytica", "E.cuniculi"
         ];
         
@@ -395,9 +361,9 @@
         async function renderScrnaUMAPPlot(geneSymbol) { 
             const plotDivId = 'plot-display-area';
             
-            // CONFLICT RESOLUTION: Use renamed local variables
-            const globalUmapData = window.CiliAI_UMAP || []; // Accessing global UMAP coordinates
-            const globalCellDataCache = window.CiliAI?.cellDataCache || {}; // Accessing global expression data
+            // CONFLICT RESOLUTION: Using unique local variables for UMAP globals
+            const globalUmapData = window.CiliAI_UMAP || []; 
+            const globalCellDataCache = window.CiliAI?.cellDataCache || {}; 
             
             const plotDiv = document.getElementById(plotDivId);
             const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
@@ -406,7 +372,7 @@
                 console.error('UMAP plot container not found.');
                 return;
             }
-            // Use renamed local variables for the check
+            // Check for missing data using the locally defined variables
             if (globalUmapData.length === 0 || Object.keys(globalCellDataCache).length === 0) {
                 plotDiv.innerHTML = `<div id="cilia-svg" style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">UMAP data is not available (Missing CiliAI_UMAP or cellDataCache).</div>`;
                 return;
@@ -427,7 +393,6 @@
             const sizeScaleMax = 12;      
             const expressionThreshold = 2; 
 
-            // Use renamed local variable
             const sourceData = globalUmapData.length > sampleSize 
                             ? globalUmapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
                             : globalUmapData;
