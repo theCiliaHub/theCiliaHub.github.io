@@ -2080,7 +2080,7 @@ async function displayFullGeneInfo(geneSymbol) {
     }
     const g = gm[geneSymbol];
 
-    // Inline CSS for fancy table styling (UNCHANGED)
+    // Inline CSS for fancy table styling
     const fancyCSS = `
         <style>
             .fancy-table {
@@ -2113,111 +2113,101 @@ async function displayFullGeneInfo(geneSymbol) {
 
     let html = `${fancyCSS}<div class="ai-result-card"><h4>Gene: ${geneSymbol}</h4>`;
     
-    // --- General Info (UNCHANGED) ---
     html += `<p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>`;
     html += `<p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>`;
     html += `<p><strong>OMIM ID:</strong> ${g.OMIM?.ID || '—'}</p>`;
     html += `<p><strong>Localization:</strong> ${g.Localization || '—'}</p>`;
     html += `<p><strong>Functional category:</strong> ${g['Functional.category'] || '—'}</p>`;
     
-    // --- Cilia Effects & Screens ---
-    html += `<h3>Cilia Effects & Screens 🔍</h3>`;
+    html += `<h3>Cilia Effects</h3>`;
     html += `<table class="fancy-table">
-        <tr><th>Metric</th><th>Value</th></tr>
-        <tr><td>Overexpression</td><td>${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</td></tr>
-        <tr><td>Loss-of-Function</td><td>${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</td></tr>
-        <tr><td>% Ciliated Cells</td><td>${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</td></tr>
-    </table>`;
+                <tr><th>Effect</th><th>Value</th></tr>
+                <tr><td>Overexpression</td><td>${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</td></tr>
+                <tr><td>Loss-of-Function</td><td>${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</td></tr>
+                <tr><td>% Ciliated Cells</td><td>${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</td></tr>
+            </table>`;
 
+    html += `<h3>Screens</h3>`;
     if (Array.isArray(g.screens) && g.screens.length > 0) {
-        html += `<p style="margin-top: 10px;">
-                    <a href="#" class="ai-action" data-action="show-screens-heatmap" data-genes="${geneSymbol}">
-                        🖼️ Show CRISPR/siRNA Screens Heatmap
-                    </a>
-                 </p>`;
-    }
-
-    // --- Expression Data ---
-    html += `<h3>Expression Data 📊</h3>`;
-    let tissueDataAvailable = g.expression?.tissue && Object.keys(g.expression.tissue).length > 0;
-    let scRNADataAvailable = g.expression?.scRNA && Object.keys(g.expression.scRNA).length > 0;
-
-    if (scRNADataAvailable) {
-        html += `<p><strong>Top scRNA Cell Type:</strong> ${Object.entries(g.expression.scRNA).sort((a,b)=>b[1]-a[1])[0].join(': ')}</p>`;
-        html += `<p style="margin-top: 10px;">
-                    <a href="#" class="ai-action" data-action="show-umap-plot" data-genes="${geneSymbol}">
-                        📈 Show scRNA-seq UMAP Plot
-                    </a>
-                 </p>`;
-    } else {
-         html += `<p>No scRNA-seq data available.</p>`;
-    }
-
-    if (tissueDataAvailable) {
-        html += `<p style="margin-top: 10px;">
-                    <a href="#" class="ai-action" data-action="show-expression-heatmap" data-genes="${geneSymbol}">
-                        🔥 Show Bulk Tissue Expression Heatmap
-                    </a>
-                 </p>`;
-    }
-
-
-    // --- Orthologs & Mouse Phenotype ---
-    html += `<h3>Orthologs & Phenotype 🧬</h3>`;
-    html += `<table class="fancy-table">
-        <tr><th>Category</th><th>Value</th></tr>
-        <tr><td>Mouse ortholog</td><td>${g.Ortholog_Mouse || '—'}</td></tr>
-        <tr><td>C. elegans ortholog</td><td>${g.Ortholog_C_elegans || '—'}</td></tr>
-        <tr><td>Zebrafish ortholog</td><td>${g.Ortholog_Zebrafish || '—'}</td></tr>
-        <tr><td>Mouse phenotype</td><td>${g.mouse_phenotype || '—'}</td></tr>
-        <tr><td>Mouse ciliopathy phenotype</td><td>${g.mouse_ciliopathy_phenotype || '—'}</td></tr>
-    </table>`;
-
-    if (g.mouse_phenotype || g.mouse_ciliopathy_phenotype) {
-         html += `<p style="margin-top: 10px;">
-                    <a href="#" class="ai-action" data-action="show-mouse-phenotype-heatmap" data-genes="${geneSymbol}">
-                        🐭 Show Mouse Phenotype Heatmap
-                    </a>
-                 </p>`;
-    }
-
-
-    // --- Phylogeny ---
-    html += `<h3>Phylogeny 🌳</h3>`;
-    if (g.phylogeny) {
         html += `<table class="fancy-table">
-            <tr><th>Source</th><th>Class</th><th>Species Count</th></tr>`;
-        for (const [pkey, pval] of Object.entries(g.phylogeny)) {
-             html += `<tr>
-                        <td>${pkey}</td>
-                        <td>${pval.class}</td>
-                        <td>${pval.species_data?.length || pval.species_indices?.length || '—'}</td>
-                      </tr>`;
+                    <tr><th>Source</th><th>Result</th></tr>`;
+        for (const s of g.screens) {
+            html += `<tr><td><strong>${s.source}</strong></td><td>${s.result}</td></tr>`;
         }
         html += `</table>`;
-
-        html += `<p style="margin-top: 10px;">
-            <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${geneSymbol}">
-                🌍 Show Conservation Plot (Heatmap)
-            </a>
-        </p>`;
     } else {
         html += `<p>None</p>`;
     }
 
-    // --- Complexes ---
-    html += `<h3>Complexes 🧩</h3>`;
+    html += `<h3>Expression Data (scRNA-seq)</h3>`;
+    if (g.expression?.scRNA) {
+        html += `<table class="fancy-table">
+                    <tr><th>Cell Type</th><th>Value</th></tr>`;
+        for (const [ct, val] of Object.entries(g.expression.scRNA)) {
+            html += `<tr><td>${ct}</td><td>${val}</td></tr>`;
+        }
+        html += `</table>`;
+    } else {
+        html += `<p>None</p>`;
+    }
+
+    html += `<h3>Expression Data (Tissue)</h3>`;
+    if (g.expression?.tissue) {
+        html += `<table class="fancy-table">
+                    <tr><th>Tissue</th><th>Value</th></tr>`;
+        for (const [t, val] of Object.entries(g.expression.tissue)) {
+            html += `<tr><td>${t}</td><td>${val}</td></tr>`;
+        }
+        html += `</table>`;
+    } else {
+        html += `<p>None</p>`;
+    }
+
+    html += `<h3>Orthologs & Mouse Phenotype</h3>`;
+    html += `<table class="fancy-table">
+                <tr><th>Category</th><th>Value</th></tr>
+                <tr><td>Mouse ortholog</td><td>${g.Ortholog_Mouse || '—'}</td></tr>
+                <tr><td>C. elegans ortholog</td><td>${g.Ortholog_C_elegans || '—'}</td></tr>
+                <tr><td>Zebrafish ortholog</td><td>${g.Ortholog_Zebrafish || '—'}</td></tr>
+                <tr><td>Mouse phenotype</td><td>${g.mouse_phenotype || '—'}</td></tr>
+                <tr><td>Mouse ciliopathy phenotype</td><td>${g.mouse_ciliopathy_phenotype || '—'}</td></tr>
+            </table>`;
+
+    html += `<h3>Phylogeny</h3>`;
+    if (g.phylogeny) {
+        html += `<table class="fancy-table">
+                    <tr><th>Group</th><th>Class</th><th>Class ID</th><th>Species Count</th></tr>`;
+        for (const [pkey, pval] of Object.entries(g.phylogeny)) {
+            html += `<tr>
+                        <td>${pkey}</td>
+                        <td>${pval.class}</td>
+                        <td>${pval.class_id}</td>
+                        <td>${pval.species_data?.length || '—'}</td>
+                     </tr>`;
+        }
+        html += `</table>`;
+    } else {
+        html += `<p>None</p>`;
+    }
+
+    html += `<h3>Complexes</h3>`;
     if (g.complex_components) {
-        html += `<p>This gene is a member of ${Object.keys(g.complex_components).length} complex(es).</p>`;
-        html += `<p style="margin-top: 10px;">
-            <a href="#" class="ai-action" data-action="show-complex-heatmap" data-genes="${geneSymbol}">
-                ⛓️ Show Complex Membership Map
-            </a>
-        </p>`;
+        html += `<table class="fancy-table">
+                    <tr><th>Complex</th><th>Members</th></tr>`;
+        for (const [cname, members] of Object.entries(g.complex_components)) {
+            html += `<tr><td>${cname}</td><td>${members.join(', ')}</td></tr>`;
+        }
+        html += `</table>`;
     } else {
         html += `<p>None</p>`;
     }
-    
+
+    html += `<p style="margin-top: 10px;">
+                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${geneSymbol}">
+                    Show Conservation Plot
+                </a>
+             </p>`;
+
     html += `</div>`;
     return html;
 }
