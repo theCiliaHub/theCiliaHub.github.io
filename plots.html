@@ -202,8 +202,8 @@
     
     // Core state variables exposed globally, matching CiliAI.js structure
     window.CiliAI = {}; 
-    window.CiliAI_UMAP = null; 
-    window.CiliAI.cellDataCache = {}; 
+    window.CiliAI_UMAP = null; // UMAP coordinates
+    window.CiliAI.cellDataCache = {}; // UMAP expression cache
     
     // --- Data Maps for Phylogeny (Kept for plot consistency) ---
     const LI_SPECIES_ORDER = [
@@ -287,7 +287,8 @@
             // Assume genes are in masterData or rawMasterData top level
             const genes = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
             
-            // UMAP Data Extraction 
+            // UMAP Data Extraction (Check properties on rawMasterData or a nested 'data' object)
+            // This replicates the mechanism used by the working ciliai.js code
             const umapContainer = rawMasterData.data || rawMasterData; 
             if (umapContainer.umap_points && umapContainer.cell_expression) {
                 window.CiliAI_UMAP = umapContainer.umap_points;
