@@ -196,12 +196,14 @@
     let ciliaryGeneMap = new Map(); 
     let liMatrix = {};
     let neversMatrix = {};
-    let rnaTissueExpressionData = {};
+    
+    // CRITICAL FIX: Ensure RNA data is globally scoped for access by plotting functions
+    window.rnaTissueExpressionData = {}; 
     
     // Core state variables exposed globally, matching CiliAI.js structure
-    window.CiliAI = {}; // Container for cached data
-    window.CiliAI_UMAP = null; // UMAP coordinates (Extracted from Master DB)
-    window.CiliAI.cellDataCache = {}; // UMAP expression cache (Extracted from Master DB)
+    window.CiliAI = {}; 
+    window.CiliAI_UMAP = null; 
+    window.CiliAI.cellDataCache = {}; 
     
     // --- Data Maps for Phylogeny (Kept for plot consistency) ---
     const LI_SPECIES_ORDER = [
@@ -268,7 +270,6 @@
 
     /**
      * @FINAL_FUNCTION: loadMasterData - Unified loading function
-     * Uses Master DB for UMAP points/cache, fulfilling the CiliAI.js comment.
      */
     async function loadMasterData() {
         try {
@@ -286,7 +287,7 @@
             // Assume genes are in masterData or rawMasterData top level
             const genes = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
             
-            // UMAP Data Extraction (Check properties on rawMasterData or a nested 'data' object)
+            // UMAP Data Extraction 
             const umapContainer = rawMasterData.data || rawMasterData; 
             if (umapContainer.umap_points && umapContainer.cell_expression) {
                 window.CiliAI_UMAP = umapContainer.umap_points;
@@ -297,8 +298,6 @@
             }
 
             // 3. Populate Gene Map and integrate Phylogeny/RNA
-            // Note: If genes is the rawMasterData and contains metadata, this loop might need careful adjustment 
-            // depending on where the *actual* gene array starts. Assuming `genes` is the array of gene objects.
             genes.forEach(g => {
                 if (g.Gene) {
                     const gene = { ...g, phylogeny: g.phylogeny || {} };
@@ -316,7 +315,9 @@
             });
             
             const rnaText = await rnaResp.text();
-            rnaTissueExpressionData = parseTsvData(rnaText);
+            
+            // CRITICAL FIX: Assign to the global variable
+            window.rnaTissueExpressionData = parseTsvData(rnaText);
 
             console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
 
@@ -808,7 +809,8 @@
     function renderExpressionHeatmap(genes, custom) {
         clearPlot();
         
-        if (Object.keys(rnaTissueExpressionData).length === 0) {
+        // Use global variable
+        if (Object.keys(window.rnaTissueExpressionData).length === 0) {
             document.getElementById('plot-display-area').innerHTML = 
                 `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
                     Tissue expression data is not available.
@@ -821,7 +823,7 @@
         // Get all tissues from the data
         const allTissues = new Set();
         geneSymbols.forEach(symbol => {
-            const exprData = rnaTissueExpressionData[symbol];
+            const exprData = window.rnaTissueExpressionData[symbol];
             if (exprData) {
                 Object.keys(exprData).forEach(tissue => allTissues.add(tissue));
             }
@@ -842,7 +844,7 @@
         
         geneSymbols.forEach(symbol => {
             const row = [];
-            const exprData = rnaTissueExpressionData[symbol] || {};
+            const exprData = window.rnaTissueExpressionData[symbol] || {};
             
             tissueArray.forEach(tissue => {
                 const nTPM = exprData[tissue] || 0;
@@ -1097,5 +1099,6 @@ KIF17</textarea>
     });
 </script>
     
+
 </body>
 </html>
