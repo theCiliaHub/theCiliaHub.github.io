@@ -192,52 +192,49 @@
 
 <script>
     // ==========================================================
-    // GLOBAL STATE (UNIFIED WITH CiliAI.js ARCHITECTURE)
+    // GLOBAL STATE & CONSTANTS
     // ==========================================================
-    let ciliaryGeneMap = new Map(); 
+    let ciliaryGeneMap = new Map();
     let liMatrix = {};
     let neversMatrix = {};
     
-    // Global state variables exposed globally, matching CiliAI.js structure
-    window.rnaTissueExpressionData = {}; 
-    window.CiliAI = {}; 
+    window.rnaTissueExpressionData = {};
+    window.CiliAI = {};
     window.CiliAI.masterData = [];
-    window.CiliAI.lookups = { geneMap: {} }; 
+    window.CiliAI.lookups = { geneMap: {} };
     window.CiliAI_UMAP = null; // UMAP coordinates
     window.CiliAI.cellDataCache = {}; // UMAP expression cache
     
-// --- Data Maps for Phylogeny (Kept for plot consistency) ---
-// --- ENSURE PHYLOGENY CONSTANTS ARE DEFINED ---
-// Add these if not already defined in your code
-const NEVERS_CIL_PANEL = [
-    "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", 
-    "Caenorhabditis elegans", "Tetrahymena thermophila", "Chlamydomonas reinhardtii", 
-    "Micromonas sp", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis", 
-    "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", 
-    "Physcomitrella patens", "Paramecium tetraurelia", "Volvox carteri", 
-    "Amphimedon queenslandica", "Monosiga brevicollis"
-];
+    // --- Data Maps for Phylogeny (Kept for plot consistency) ---
+    const NEVERS_CIL_PANEL = [
+        "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus",
+        "Caenorhabditis elegans", "Tetrahymena thermophila", "Chlamydomonas reinhardtii",
+        "Micromonas sp", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis",
+        "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis",
+        "Physcomitrella patens", "Paramecium tetraurelia", "Volvox carteri",
+        "Amphimedon queenslandica", "Monosiga brevicollis"
+    ];
 
-const NEVERS_NCIL_PANEL = [
-    "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Cryptococcus neoformans", 
-    "Ustilago maydis", "Candida albicans", "Arabidopsis thaliana", "Brachypodium distachyon", 
-    "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum", "Entamoeba histolytica", 
-    "Encephalitozoon cuniculi"
-];
+    const NEVERS_NCIL_PANEL = [
+        "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Cryptococcus neoformans",
+        "Ustilago maydis", "Candida albicans", "Arabidopsis thaliana", "Brachypodium distachyon",
+        "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum", "Entamoeba histolytica",
+        "Encephalitozoon cuniculi"
+    ];
 
-const LI_CIL_ORG = [
-    "H sapiens", "M musculus", "D rerio", "X tropicalis", "G gallus", "C elegans", 
-    "T thermophila", "C reinhardtii", "M sp RCC299", "T cruzi", "L major", 
-    "G intestinalis", "T vaginalis", "S purpuratus", "C intestinalis", "P patens", 
-    "P tetraurelia", "V carteri", "A queenslandica", "M brevicollis"
-];
+    const LI_CIL_ORG = [
+        "H sapiens", "M musculus", "D rerio", "X tropicalis", "G gallus", "C elegans",
+        "T thermophila", "C reinhardtii", "M sp RCC299", "T cruzi", "L major",
+        "G intestinalis", "T vaginalis", "S purpuratus", "C intestinalis", "P patens",
+        "P tetraurelia", "V carteri", "A queenslandica", "M brevicollis"
+    ];
 
-const LI_NCIL_ORG = [
-    "S cerevisiae", "S pombe", "C neoformans", "U maydis", "C albicans", "A thaliana", 
-    "B distachyon", "S bicolor", "V vinifera", "C parvum", "E histolytica", "E cuniculi"
-];
+    const LI_NCIL_ORG = [
+        "S cerevisiae", "S pombe", "C neoformans", "U maydis", "C albicans", "A thaliana",
+        "B distachyon", "S bicolor", "V vinifera", "C parvum", "E histolytica", "E cuniculi"
+    ];
 
-    // DATA URLS
+// DATA URLS
 const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
 const MASTER_DB = BASE_URL + 'ciliAI_master_database.json'; 
 const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json'; 
@@ -281,53 +278,44 @@ function parseTsvData(tsvText) {
 
 // --- FIXED PHYLOGENETIC DATA INTEGRATION ---
 function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
-    let liIntegrated = 0;
-    let neversIntegrated = 0;
-    
-    console.log("Integrating phylogenetic data into gene objects...");
-    
-    // Integrate Nevers 2017 data (uses gene symbols as keys)
-    if (neversMatrix && neversMatrix.genes) {
-        Object.entries(neversMatrix.genes).forEach(([geneKey, phyloData]) => {
-            if (geneKey && phyloData && phyloData.g) {
-                const geneSymbol = phyloData.g.toUpperCase();
-                const gene = geneMap.get(geneSymbol);
-                if (gene) {
-                    if (!gene.phylogeny) gene.phylogeny = {};
-                    gene.phylogeny.nevers_2017 = {
-                        species_data: phyloData.s || [],
-                        species_count: (phyloData.s || []).length,
-                        gene_name: phyloData.g
-                    };
-                    neversIntegrated++;
+        // Integrate Nevers 2017 data (uses gene symbols as keys)
+        if (neversMatrix && neversMatrix.genes) {
+            Object.values(neversMatrix.genes).forEach(phyloData => {
+                if (phyloData && phyloData.g) {
+                    const geneSymbol = phyloData.g.toUpperCase();
+                    const gene = geneMap.get(geneSymbol);
+                    if (gene) {
+                        if (!gene.phylogeny) gene.phylogeny = {};
+                        gene.phylogeny.nevers_2017 = {
+                            species_data: phyloData.s || [],
+                            species_count: (phyloData.s || []).length,
+                            gene_name: phyloData.g
+                        };
+                    }
                 }
-            }
-        });
-    }
-    
-    // Integrate Li 2014 data (uses Entrez IDs as keys, but has gene names in 'g' field)
-    if (liMatrix && liMatrix.genes) {
-        Object.values(liMatrix.genes).forEach(phyloData => {
-            if (phyloData && phyloData.g) {
-                const geneSymbol = phyloData.g.toUpperCase();
-                const gene = geneMap.get(geneSymbol);
-                if (gene) {
-                    if (!gene.phylogeny) gene.phylogeny = {};
-                    gene.phylogeny.li_2014 = {
-                        species_data: phyloData.s || [],
-                        class: phyloData.c,
-                        entrez_id: phyloData.e,
-                        gene_name: phyloData.g
-                    };
-                    liIntegrated++;
+            });
+        }
+        
+        // Integrate Li 2014 data (uses gene names in 'g' field)
+        if (liMatrix && liMatrix.genes) {
+            Object.values(liMatrix.genes).forEach(phyloData => {
+                if (phyloData && phyloData.g) {
+                    const geneSymbol = phyloData.g.toUpperCase();
+                    const gene = geneMap.get(geneSymbol);
+                    if (gene) {
+                        if (!gene.phylogeny) gene.phylogeny = {};
+                        gene.phylogeny.li_2014 = {
+                            species_data: phyloData.s || [],
+                            gene_name: phyloData.g
+                        };
+                    }
                 }
-            }
-        });
+            });
+        }
+        console.log("Phylogenetic data integration complete.");
     }
+
     
-    console.log(`Integrated phylogenetic data: ${neversIntegrated} genes from Nevers 2017, ${liIntegrated} genes from Li 2014`);
-    return { liIntegrated, neversIntegrated };
-}
 
 /**
  * @loadMasterData - Loads data and constructs the necessary global structures.
@@ -467,24 +455,7 @@ function getCleanArray(gene, key) {
     return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
 }
 
-function findGenes(input) {
-    const queries = input
-        .split(/[\s,\n;]+/)
-        .map(s => s.trim().replace(/\u200B/g, '').toUpperCase())
-        .filter(Boolean);
-        
-    const found = [];
-    const seen = new Set();
-    
-    queries.forEach(q => {
-        if (!seen.has(q) && ciliaryGeneMap.has(q)) {
-            found.push(ciliaryGeneMap.get(q));
-            seen.add(q);
-        }
-    });
-    // This ensures the found genes are the enriched objects
-    return found; 
-}
+
 
 function getCustom() {
     return {
@@ -496,14 +467,207 @@ function getCustom() {
     };
 }
 
+
+
+
+
+
+   // ==========================================================
+    // UI AND LOGIC UTILITIES
+    // ==========================================================
+
+    function log(message) { console.log(`[CiliAI] ${message}`); }
+    
     function clearPlot() {
         const el = document.getElementById('plot-display-area');
         el.innerHTML = '';
         if (window.currentPlot) Plotly.purge(el);
     }
 
+    function updateGeneSummaryTable(queries, foundGenes) {
+        const tbody = document.getElementById('ciliaplot-gene-summary-tbody');
+        if (!tbody) return;
+        const foundSet = new Set(foundGenes.map(g => (g.gene || g.Gene).toUpperCase()));
+        let html = '';
+        queries.forEach((query, index) => {
+            const status = foundSet.has(query.toUpperCase()) ? 'Found' : 'Not Found';
+            const color = status === 'Found' ? '#28a745' : '#dc3545';
+            html += `<tr><td>${index + 1}</td><td>${query}</td><td style="color:${color}; font-weight:bold;">${status}</td></tr>`;
+        });
+        tbody.innerHTML = html || '<tr><td colspan="3" style="text-align: center;">Enter genes to see summary...</td></tr>';
+    }
 
-    // --- PLOT IMPLEMENTATIONS ---
+    function getCustom() {
+        return {
+            title: document.getElementById('custom-title')?.value || 'CiliAI Analysis',
+            titleSize: parseInt(document.getElementById('title-size')?.value) || 24,
+            width: parseInt(document.getElementById('fig-width')?.value) || 1100,
+            height: parseInt(document.getElementById('fig-height')?.value) || 700,
+            source: document.getElementById('phy-source')?.value || 'nevers_2017'
+        };
+    }
+
+    function shortenOrganismName(name) {
+        if (!name) return 'Unknown';
+        const shortNames = {
+            'Homo sapiens': 'H. sap.', 'Mus musculus': 'M. mus.', 'Danio rerio': 'D. rerio',
+            'Xenopus tropicalis': 'X. trop.', 'Gallus gallus': 'G. gal.', 'Caenorhabditis elegans': 'C. el.',
+            'Tetrahymena thermophila': 'T. therm.', 'Chlamydomonas reinhardtii': 'C. rein.',
+            'Micromonas sp': 'M. sp.', 'Trypanosoma cruzi': 'T. cruzi', 'Leishmania major': 'L. maj.',
+            'Giardia intestinalis': 'G. intest.', 'Trichomonas vaginalis': 'T. vag.', 'Strongylocentrotus purpuratus': 'S. purp.',
+            'Ciona intestinalis': 'C. intest.', 'Physcomitrella patens': 'P. patens', 'Paramecium tetraurelia': 'P. tet.',
+            'Volvox carteri': 'V. carteri', 'Amphimedon queenslandica': 'A. queens.', 'Monosiga brevicollis': 'M. brev.',
+            
+            'Saccharomyces cerevisiae': 'S. cere.', 'Schizosaccharomyces pombe': 'S. pombe', 'Cryptococcus neoformans': 'C. neo.',
+            'Ustilago maydis': 'U. maydis', 'Candida albicans': 'C. alb.', 'Arabidopsis thaliana': 'A. thal.',
+            'Brachypodium distachyon': 'B. dist.', 'Sorghum bicolor': 'S. bicol.', 'Vitis vinifera': 'V. vinif.',
+            'Cryptosporidium parvum': 'C. parv.', 'Entamoeba histolytica': 'E. histo.', 'Encephalitozoon cuniculi': 'E. cun.',
+            
+            // Li formats (simplified further)
+            'H sapiens': 'H. sap.', 'M musculus': 'M. mus.', 'D rerio': 'D. rerio', 'X tropicalis': 'X. trop.',
+            'G gallus': 'G. gal.', 'C elegans': 'C. el.', 'T thermophila': 'T. therm.', 'C reinhardtii': 'C. rein.',
+            'M sp RCC299': 'M. sp.', 'T cruzi': 'T. cruzi', 'L major': 'L. maj.', 'G intestinalis': 'G. intest.',
+            'T vaginalis': 'T. vag.', 'S purpuratus': 'S. purp.', 'C intestinalis': 'C. intest.', 'P patens': 'P. patens',
+            'P tetraurelia': 'P. tet.', 'V carteri': 'V. cart.', 'A queenslandica': 'A. queens.', 'M brevicollis': 'M. brev.',
+            'S cerevisiae': 'S. cere.', 'S pombe': 'S. pombe', 'C neoformans': 'C. neo.', 'U maydis': 'U. maydis',
+            'C albicans': 'C. alb.', 'A thaliana': 'A. thal.', 'B distachyon': 'B. dist.', 'S bicolor': 'S. bicol.',
+            'V vinifera': 'V. vinif.', 'C parvum': 'C. parvum', 'E histolytica': 'E. histo.', 'E cuniculi': 'E. cun.'
+        };
+        
+        // Match against simplified map, fallback to truncation
+        return shortNames[name] || name.split(' ')[0].charAt(0) + '. ' + name.split(' ')[1].substring(0, 3) + '.';
+    }
+    
+    function getCleanArray(gene, key) {
+    let data = gene[key];
+   
+    // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
+    if (key === 'Protein.complexes') {
+         // Check 'complex_components' first, then fallback to 'Protein.complexes'
+         data = gene['complex_components'] || gene['Protein.complexes'];
+         if (typeof data === 'object' && !Array.isArray(data)) {
+             // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
+             return Object.keys(data).map(k => `${k}`);
+         }
+    }
+
+    // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
+    if (key === 'Phenotypes_mouse') {
+        // Check Phenotypes_mouse first, then fallback to mouse_phenotype
+        data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
+    }
+
+    // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
+    if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
+         // Use raw Domain_Descriptions data which is present in your object structure
+         const pfamIds = gene['PFAM_IDs'] || [];
+         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
+         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
+    }
+
+    // 4. Handle Screens Summary (Array of Objects)
+    if (key === 'screens_summary' && Array.isArray(data)) return data; 
+    
+    if (!data) return [];
+    // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)    
+    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
+    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
+        
+}
+    
+  function findGenes(input) {
+        const queries = input
+            .split(/[\s,\n;]+/)
+            .map(s => s.trim().replace(/\u200B/g, '').toUpperCase())
+            .filter(Boolean);
+            
+        const found = [];
+        const seen = new Set();
+        
+        queries.forEach(q => {
+            if (!seen.has(q) && ciliaryGeneMap.has(q)) {
+                found.push(ciliaryGeneMap.get(q));
+                seen.add(q);
+            }
+        });
+        return found;
+    }
+
+
+    // ==========================================================
+    // PLOT RENDERING FUNCTIONS (Requires all previous definitions)
+    // ==========================================================
+
+    function renderPhylogenyHeatmap(genes, custom) {
+        clearPlot();
+        const source = custom.source;
+        const isLi = source === 'li_2014';
+        
+        if (!window.liPhylogenyCache || !window.neversPhylogenyCache) {
+             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">Phylogenetic data caches are still loading or failed.</div>`;
+             return;
+        }
+        
+        const displayedCIL = isLi ? LI_CIL_ORG : NEVERS_CIL_PANEL;
+        const displayedNCIL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_PANEL;
+        const orgs = [...displayedCIL, ...displayedNCIL];
+
+        const z = [];
+        const yLabels = [];
+        
+        const masterPhylo = isLi ? window.liPhylogenyCache : window.neversPhylogenyCache;
+        const masterOrgList = isLi ? masterPhylo.summary.organisms_list : masterPhylo.organism_groups.all_organisms_list;
+        
+        const masterOrgMap = new Map(masterOrgList.map((name, index) => [name.toUpperCase().replace(/[^A-Z0-9]/g, ''), index]));
+
+        genes.forEach(gene => {
+            const geneSymbol = gene.gene;
+            const phyData = gene.phylogeny?.[source];
+            const row = [];
+            
+            if (!phyData || !Array.isArray(phyData.species_data)) {
+                 orgs.forEach(() => row.push(0)); 
+            } else {
+                const presenceIndices = new Set(phyData.species_data);
+                
+                orgs.forEach((displayOrg, index) => {
+                    const isCiliated = index < displayedCIL.length;
+                    let status = 0;
+                    
+                    const normalizedDisplayOrg = displayOrg.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    let masterIndex = masterOrgMap.get(normalizedDisplayOrg);
+
+                    if (masterIndex !== undefined && presenceIndices.has(masterIndex)) {
+                        status = isCiliated ? 2 : 1; 
+                    }
+                    row.push(status);
+                });
+            }
+            z.push(row);
+            yLabels.push(geneSymbol);
+        });
+
+        const separatorIndex = displayedCIL.length - 0.5;
+        const data = [{
+            type: 'heatmap', z, x: orgs.map(shortenOrganismName), y: yLabels,
+            colorscale: [[0, '#F0F0F0'], [0.0001, '#FFE5B5'], [1, '#FFE5B5'], [1.0001, '#698ECF'], [2, '#698ECF']],
+            showscale: false, hovertemplate: 'Gene: %{y}<br>Status: %{z}<extra></extra>', xgap: 0.5, ygap: 0.5
+        }];
+
+        const layout = {
+            title: { text: custom.title || `Phylogenetic Conservation Heatmap (${isLi ? 'Li et al. 2014' : 'Nevers et al. 2017'})`, font: { size: 16 } },
+            width: custom.width, height: custom.height,
+            xaxis: { title: 'Organisms', tickangle: -45, automargin: true, side: 'top', tickfont: { size: 9 } },
+            yaxis: { title: 'Genes', automargin: true, tickfont: { size: 11 } },
+            margin: { l: 100, r: 20, t: 120, b: 200 },
+            shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: separatorIndex, x1: separatorIndex, y0: 0, y1: 1, line: { color: 'black', width: 2 } }],
+            annotations: [
+                { text: 'CILIATED', xref: 'x', yref: 'paper', x: (displayedCIL.length - 1) / 2, y: 1.05, showarrow: false, font: { color: '#698ECF', size: 12, weight: 'bold' } },
+                { text: 'NON-CILIATED', xref: 'x', yref: 'paper', x: displayedCIL.length + (displayedNCIL.length / 2) - 0.5, y: 1.05, showarrow: false, font: { color: '#d62728', size: 12, weight: 'bold' } }
+            ]
+        };
+        Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+    }
 
     // * UMAP PLOT (scRNA-seq Lung) - Uses the CiliAI global variables
     async function renderScrnaUMAPPlot(geneSymbol) { 
@@ -890,85 +1054,6 @@ function renderPhylogenyHeatmap(genes, custom) {
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
-// --- ENHANCED ORGANISM NAME SHORTENER ---
-function shortenOrganismName(name) {
-    if (!name) return 'Unknown';
-    
-    const shortNames = {
-        // Ciliated organisms
-        'Homo sapiens': 'H. sapiens',
-        'Mus musculus': 'M. musculus', 
-        'Danio rerio': 'D. rerio',
-        'Xenopus tropicalis': 'X. tropicalis',
-        'Gallus gallus': 'G. gallus',
-        'Caenorhabditis elegans': 'C. elegans',
-        'Tetrahymena thermophila': 'T. thermophila',
-        'Chlamydomonas reinhardtii': 'C. reinhardtii',
-        'Micromonas sp': 'M. sp',
-        'Trypanosoma cruzi': 'T. cruzi',
-        'Leishmania major': 'L. major',
-        'Giardia intestinalis': 'G. intestinalis',
-        'Trichomonas vaginalis': 'T. vaginalis',
-        'Strongylocentrotus purpuratus': 'S. purpuratus',
-        'Ciona intestinalis': 'C. intestinalis',
-        'Physcomitrella patens': 'P. patens',
-        'Paramecium tetraurelia': 'P. tetraurelia',
-        'Volvox carteri': 'V. carteri',
-        'Amphimedon queenslandica': 'A. queenslandica',
-        'Monosiga brevicollis': 'M. brevicollis',
-        
-        // Non-ciliated organisms
-        'Saccharomyces cerevisiae': 'S. cerevisiae',
-        'Schizosaccharomyces pombe': 'S. pombe',
-        'Cryptococcus neoformans': 'C. neoformans',
-        'Ustilago maydis': 'U. maydis',
-        'Candida albicans': 'C. albicans',
-        'Arabidopsis thaliana': 'A. thaliana',
-        'Brachypodium distachyon': 'B. distachyon',
-        'Sorghum bicolor': 'S. bicolor',
-        'Vitis vinifera': 'V. vinifera',
-        'Cryptosporidium parvum': 'C. parvum',
-        'Entamoeba histolytica': 'E. histolytica',
-        'Encephalitozoon cuniculi': 'E. cuniculi',
-        
-        // Li format organisms
-        'H sapiens': 'H. sapiens',
-        'M musculus': 'M. musculus',
-        'D rerio': 'D. rerio',
-        'X tropicalis': 'X. tropicalis',
-        'G gallus': 'G. gallus',
-        'C elegans': 'C. elegans',
-        'T thermophila': 'T. thermophila',
-        'C reinhardtii': 'C. reinhardtii',
-        'M sp RCC299': 'M. sp',
-        'T cruzi': 'T. cruzi',
-        'L major': 'L. major',
-        'G intestinalis': 'G. intestinalis',
-        'T vaginalis': 'T. vaginalis',
-        'S purpuratus': 'S. purpuratus',
-        'C intestinalis': 'C. intestinalis',
-        'P patens': 'P. patens',
-        'P tetraurelia': 'P. tetraurelia',
-        'V carteri': 'V. carteri',
-        'A queenslandica': 'A. queenslandica',
-        'M brevicollis': 'M. brevicollis',
-        'S cerevisiae': 'S. cerevisiae',
-        'S pombe': 'S. pombe',
-        'C neoformans': 'C. neoformans',
-        'U maydis': 'U. maydis',
-        'C albicans': 'C. albicans',
-        'A thaliana': 'A. thaliana',
-        'B distachyon': 'B. distachyon',
-        'S bicolor': 'S. bicolor',
-        'V vinifera': 'V. vinifera',
-        'C parvum': 'C. parvum',
-        'E histolytica': 'E. histolytica',
-        'E cuniculi': 'E. cuniculi'
-    };
-    
-    return shortNames[name] || name.split(' ')[0] + '. ' + (name.split(' ')[1] ? name.split(' ')[1].charAt(0) : '');
-}
-
 
 // --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
 function debugPhylogenyData(genes) {
@@ -1095,42 +1180,7 @@ function debugPhylogenyData(genes) {
     
     // 8. Protein Domain Architecture Heatmap
     // --- FIXED getCleanArray FUNCTION ---
-function getCleanArray(gene, key) {
-    let data = gene[key];
-    
-    // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
-    if (key === 'Protein.complexes') {
-         // Check 'complex_components' first, then fallback to 'Protein.complexes'
-         data = gene['complex_components'] || gene['Protein.complexes'];
-         if (typeof data === 'object' && !Array.isArray(data)) {
-             // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
-             return Object.keys(data).map(k => `${k}`);
-         }
-    }
 
-    // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
-    if (key === 'Phenotypes_mouse') {
-        // Check Phenotypes_mouse first, then fallback to mouse_phenotype
-        data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
-    }
-
-    // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
-    if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-         // Use raw Domain_Descriptions data which is present in your object structure
-         const pfamIds = gene['PFAM_IDs'] || [];
-         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
-         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
-    }
-
-    // 4. Handle Screens Summary (Array of Objects)
-    if (key === 'screens_summary' && Array.isArray(data)) return data; 
-    
-    if (!data) return [];
-    
-    // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
-    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
-    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
-}
 
 // --- FIXED renderDomainArchitecture FUNCTION ---
 function renderDomainArchitecture(genes, custom) {
@@ -1332,86 +1382,7 @@ function renderDomainArchitecture(genes, custom) {
     }
 
 // MAIN GENERATOR 
-function generatePlot() {
-    const input = document.getElementById('ciliaplot-genes-input').value.trim();
-    if (!input) {
-        alert("Please enter at least one gene symbol.");
-        return;
-    }
 
-    const type = document.getElementById('analysis-dropdown').value; 
-
-    if (!type) {
-         alert("Please select a plot type.");
-         return;
-    }
-
-    const plotArea = document.getElementById('plot-display-area');
-    plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:18px;">Searching genes and generating plot...</div>';
-
-    const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
-    const genes = findGenes(input);
-    const custom = getCustom();
-
-    if (genes.length === 0) {
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;">
-                <strong>No genes found in the CiliaHub database</strong><br><br>
-                <small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small>
-            </div>`;
-        return;
-    }
-
-    console.log(`Found ${genes.length} unique gene(s): ${genes.map(g => g.gene).join(', ')}`);
-
-    // DEBUG: Check phylogenetic data for troubleshooting
-    if (type === 'phylogeny') {
-        debugPhylogenyData(genes);
-    }
-
-    const renderers = {
-        'gene_overview': renderMultiCategoryManhattan, 
-        'expression_heatmap': renderExpressionHeatmap,
-        'scrna_dot': window.renderScrnaUMAPPlot, 
-        'ciliopathy': renderCiliopathyPlot,
-        'localization_heatmap': renderLocalizationHeatmap,
-        'crispr_screens': renderScreenSummaryHeatmap,
-        'protein_domains': renderDomainArchitecture,
-        'protein_complex': renderComplexNetwork, 
-        'mouse_phenotypes': renderMousePhenotypeHeatmap,
-        'phylogeny': renderPhylogenyHeatmap 
-    };
-
-    const renderer = renderers[type];
-
-    if (!renderer) {
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">
-                Plot type "${type}" not implemented or mapped yet.
-            </div>`;
-        return;
-    }
-
-    try {
-        // Special handling for UMAP to pass the primary gene symbol
-        if (type === 'scrna_dot') {
-            const geneSymbol = genes[0].gene; // Use the first gene found
-            renderer(geneSymbol); 
-        } else {
-            renderer(genes, custom);
-        }
-    } catch (error) {
-        console.error("Plot rendering error:", error);
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;">
-                <strong>Plot failed to render</strong><br><br>
-                <small>${error.message}</small><br><br>
-                <button onclick="generatePlot()" style="padding:10px 20px; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer;">
-                    Try Again
-                </button>
-            </div>`;
-    }
-}
 
 // --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
 function debugPhylogenyData(genes) {
@@ -1466,7 +1437,6 @@ function debugPhylogenyData(genes) {
 }
 
 
-
     // Handles plot type selection via dropdown
     function handlePlotSelection(value) {
         // Show/hide phylogeny source if the selected type is phylogeny
@@ -1475,82 +1445,47 @@ function debugPhylogenyData(genes) {
         clearPlot(); 
     }
 
-    // PAGE SETUP
-    function setupPage() {
+    /function handlePlotSelection(value) {
+        document.getElementById('phy-source-group').style.display = value === 'phylogeny' ? 'block' : 'none';
+        clearPlot();
+    }
+    
+   function setupPage() {
         document.getElementById('content-area').innerHTML = `
             <div class="ciliaplot-main-layout">
                 <aside>
                     <div class="control-card">
                         <h3>Select Analysis Type</h3>
                         <select id="analysis-dropdown" onchange="handlePlotSelection(this.value)">
-                            <option value="">-- Choose Plot Type --</option>
+                            <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
                             <option value="gene_overview">Gene Overview / Summary</option>
                             <option value="expression_heatmap">Expression Heatmap</option>
-                            <option value="scrna_dot">scRNA-seq (Lung)</option> 
+                            <option value="scrna_dot">scRNA-seq (Lung)</option>
                             <option value="ciliopathy">Ciliopathy & Disease Associations</option>
                             <option value="localization_heatmap">Localization Heatmap</option>
                             <option value="crispr_screens">CRISPR & siRNA Screens Summary</option>
                             <option value="protein_domains">Protein Domain Architecture</option>
                             <option value="protein_complex">Complex Membership Map</option>
                             <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
-                            <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
                         </select>
-                        <h3>Gene Input</h3>
-                        <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">IFT88
+                        <h3 style="margin-top:20px;">Gene Input</h3>
+                        <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">ZC2HC1A
+CEP41
 BBS1
-CEP290
-ARL13B
-AHI1
 BBS2
 BBS5
+ZNF474
 IFT81
-CEP41
-WDR27
-WDR60
-WDR90
-KIF19A
-KIF17</textarea>
+BBS7</textarea>
                         <button id="generate-ciliaplot-btn">Generate Plot</button>
-
                         <div id="customization-panel">
-                            <h3>Customization</h3>
+                            <h3 style="margin-top:20px;">Customization</h3>
                             <div class="customization-grid">
-                            <div class="form-group">
-                                <label>Decrease Color</label>
-                                <input type="color" id="color-short" value="#d62728">
-                            </div>
-                            <div class="form-group">
-                                <label>Increase Color</label>
-                                <input type="color" id="color-longer" value="#2ca02c">
-                            </div>
-                            <div class="form-group">
-                                <label>No Effect Color</label>
-                                <input type="color" id="color-noeffect" value="#7f7f7f">
-                            </div>
-                            <div class="form-group">
-                                <label>Unknown Color</label>
-                                <input type="color" id="color-unknown" value="#ff7f0e">
-                            </div>
-                            <div class="form-group">
-                                <label>Axis Line Width</label>
-                                <input type="number" id="axis-linewidth" value="2" min="1" max="5">
-                            </div>
-                            <div class="form-group">
-                                <label>Text Size</label>
-                                <input type="number" id="text-size" value="14" min="10" max="24">
-                            </div>
-                            <div class="form-group full-width">
-                                <label>View Mode</label>
-                                <select id="view-mode">
-                                    <option value="plot">Interactive Plot</option>
-                                    <option value="table">Data Table</option>
-                                </select>
-                            </div>
-                                <div class="form-group"><label>Title</label><input id="custom-title" value="CiliAI Analysis"></div>
+                                <div class="form-group"><label>Title</label><input id="custom-title" value="Phylogenetic Conservation"></div>
                                 <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
                                 <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
                                 <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="700"></div>
-                                <div class="form-group" id="phy-source-group">
+                                <div class="form-group" id="phy-source-group" style="display:block;">
                                     <label>Source</label>
                                     <select id="phy-source">
                                         <option value="nevers_2017">Nevers et al. 2017</option>
@@ -1577,14 +1512,68 @@ KIF17</textarea>
         document.getElementById('download-plot-btn').onclick = () => Plotly.downloadImage('plot-display-area', {format: 'png', filename: 'CiliAI'});
         document.getElementById('analysis-dropdown').onchange = (e) => handlePlotSelection(e.target.value);
         
-        // Set initial plot type to the first option
-        const initialType = document.getElementById('analysis-dropdown').options[1].value;
+        // Initial setup
+        const initialType = document.getElementById('analysis-dropdown').options[0].value; 
         document.getElementById('analysis-dropdown').value = initialType;
         handlePlotSelection(initialType);
+        document.getElementById('phy-source-group').style.display = 'block'; 
+        generatePlot();
+    }
+    
+    function generatePlot() {
+        const input = document.getElementById('ciliaplot-genes-input').value.trim();
+        if (!input) { alert("Please enter at least one gene symbol."); return; }
+
+        const type = document.getElementById('analysis-dropdown').value;
+        if (!type) { alert("Please select a plot type."); return; }
+
+        const plotArea = document.getElementById('plot-display-area');
+        plotArea.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:18px;">Searching genes and generating plot...</div>`;
+
+        const genes = findGenes(input);
+        const custom = getCustom();
+
+        if (genes.length === 0) {
+             plotArea.innerHTML = `<div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;"><strong>No genes found in the CiliaHub database</strong></div>`;
+            return;
+        }
+
+        const renderers = {
+            'gene_overview': renderMultiCategoryManhattan,
+            'expression_heatmap': renderExpressionHeatmap,
+            'scrna_dot': renderScrnaUMAPPlot,
+            'ciliopathy': renderCiliopathyPlot,
+            'localization_heatmap': renderLocalizationHeatmap,
+            'crispr_screens': renderScreenSummaryHeatmap,
+            'protein_domains': renderDomainArchitecture,
+            'protein_complex': renderComplexNetwork,
+            'mouse_phenotypes': renderMousePhenotypeHeatmap,
+            'phylogeny': renderPhylogenyHeatmap
+        };
+
+        const renderer = renderers[type];
+
+        if (!renderer) {
+            plotArea.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">Plot type "${type}" not implemented or mapped yet.</div>`;
+            return;
+        }
+
+        try {
+            if (type === 'scrna_dot') {
+                renderer(genes[0].gene);
+            } else {
+                renderer(genes, custom);
+            }
+        } catch (error) {
+            console.error("Plot rendering error:", error);
+            plotArea.innerHTML = `<div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;"><strong>Plot failed to render</strong><br><small>${error.message}</small></div>`;
+        }
     }
 
+
+    // 6. INITIAL EXECUTION
     document.addEventListener('DOMContentLoaded', async () => {
-        await loadMasterData(); 
+        await loadMasterData();
         setupPage();
     });
 </script>
