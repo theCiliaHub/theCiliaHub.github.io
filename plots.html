@@ -1,4 +1,196 @@
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiliAI — Cilia Analysis</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #005b96;
+            --primary-light: #1976d2;
+            --accent: #4CAF50;
+            --text: #333;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { height: 100%; font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); }
+        
+        /* NAVBAR - Identical to index.html */
+        .top-navbar {
+            background: var(--primary);
+            color: white;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            font-size: 20px;
+        }
+        .brand img { height: 40px; border-radius: 8px; }
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 4px;
+        }
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .nav-links a:hover { background: rgba(255,255,255,0.15); }
+        .nav-links a.active { background: rgba(255,255,255,0.25); font-weight: 600; }
+
+        /* MAIN LAYOUT */
+        #plot-page-container { padding: 24px; min-height: calc(100vh - 64px); }
+        .ciliaplot-main-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .control-card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            margin-bottom: 16px;
+        }
+        .control-card h3 {
+            margin: 0 0 16px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+            color: var(--primary);
+            font-size: 1.3em;
+        }
+
+        /* PLOT TYPES (Kept hidden as dropdown is now primary) */
+        .plot-type-list { display: none; } 
+        
+        /* INPUT & BUTTONS */
+        #ciliaplot-genes-input {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            resize: vertical;
+            margin-bottom: 12px;
+        }
+        #generate-ciliaplot-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        #generate-ciliaplot-btn:hover { background: #43a047; }
+
+        /* CUSTOMIZATION GRID */
+        .customization-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-top: 12px;
+        }
+        .form-group label { font-weight: 600; font-size: 0.9em; margin-bottom: 4px; display: block; }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        /* ADDED STYLE FOR DROPDOWN */
+        #analysis-dropdown {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 16px; /* Space above search box */
+            background-color: #f1f5f9;
+            font-size: 1em;
+            font-weight: 500;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+
+        /* VISUALIZATION */
+        #plot-display-area {
+            width: 100%;
+            height: 80vh;
+            background: white;
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        #cilia-svg { width: 100%; height: 100%; } 
+        #plot-display-area > div { width: 100% !important; height: 100% !important; }
+
+        .download-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            justify-content: flex-end;
+        }
+        #download-plot-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        #phy-source-group { display: none; margin-top: 12px; }
+    </style>
+</head>
+<body>
+
+    <nav class="top-navbar">
+        <div class="brand">
+            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI">
+            <div>CiliAI <small style="font-size:11px; opacity:0.9;">Cilia Analysis Tool</small></div>
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="plots.html" class="active">Cilia Analysis</a></li>
+            <li><a href="about.html">About</a></li>
+        </ul>
+    </nav>
+
+    <div id="plot-page-container">
+        <div id="content-area">Loading CiliAI...</div>
+    </div>
+
+    <script>
     // ==========================================================
     // GLOBAL DATA / STATE (REPLACED ORIGINAL GLOBAL VARIABLES)
     // ==========================================================
@@ -874,3 +1066,5 @@ KIF17</textarea>
         setupPage();
     });
 </script>
+</body>
+</html>
