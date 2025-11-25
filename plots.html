@@ -191,19 +191,19 @@
     </div>
 <script>
     // ==========================================================
-    // GLOBAL DATA / STATE (UNIFIED WITH CiliAI.js ARCHITECTURE)
+    // GLOBAL STATE (UNIFIED WITH CiliAI.js ARCHITECTURE)
     // ==========================================================
     let ciliaryGeneMap = new Map(); 
     let liMatrix = {};
     let neversMatrix = {};
     
-    // CRITICAL FIX: Ensure RNA data is globally scoped for access by plotting functions
+    // Global state variables matching CiliAI.js structure
     window.rnaTissueExpressionData = {}; 
-    
-    // Core state variables exposed globally, matching CiliAI.js structure
     window.CiliAI = {}; 
-    window.CiliAI_UMAP = null; // UMAP coordinates
-    window.CiliAI.cellDataCache = {}; // UMAP expression cache
+    window.CiliAI.masterData = [];
+    window.CiliAI.lookups = { geneMap: {} }; 
+    window.CiliAI_UMAP = null; 
+    window.CiliAI.cellDataCache = {}; 
     
     // --- Data Maps for Phylogeny (Kept for plot consistency) ---
     const LI_SPECIES_ORDER = [
@@ -213,7 +213,7 @@
         "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", "Caenorhabditis elegans", "Tetrahymena thermophila (strain SB210)", "Chlamydomonas reinhardtii", "Micromonas sp. (strain RCC299 / NOUM17)", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens subsp. patens", "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis"
     ];
     const NEVERS_NCIL_PANEL = [
-        "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)", "Schizosaccharomyces pombe (strain 972 / ATCC 24843)", "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)", "Ustilago maydis (strain 521 / FGSC 9021)", "Candida albicans (strain WO-1)", "Arabidopsis thaliana", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica", "Encephalitozoon cuniculi (strain GB-M1)"
+        "Saccharomyces cerevisiae (strain ATCC 204500 / S288c)", "Schizosaccharomyces pombe (strain 972 / ATCC 24843)", "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)", "Ustilago maydis (strain 521 / FGSC 9021)", "Candida albicans (strain WO-1)", "Arabidopsis thaliana", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica", "Encephalitozoon cuniculi (strain GB-M1)"
     ];
     const CIL_ORG_FULL = [
         "H.sapiens", "M.musculus", "D.rerio", "X.tropicalis", "G.gallus", "C.elegans", "T.thermophila", "C.reinhardtii", "O.tauri", 
@@ -228,6 +228,7 @@
     // DATA URLS
     const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
     const MASTER_DB = BASE_URL + 'ciliAI_master_database.json'; 
+    const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json'; 
     const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json'; 
     const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json'; 
     const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
@@ -273,21 +274,26 @@
      */
     async function loadMasterData() {
         try {
-            // 1. Fetch core data (Master DB, Phylogeny, RNA) concurrently
-            const [masterResp, liResp, neversResp, rnaResp] = await Promise.all([
+            // 1. Fetch ALL data concurrently
+            const [masterResp, lookupResp, liResp, neversResp, rnaResp] = await Promise.all([
                 fetch(MASTER_DB),
+                fetch(LOOKUP_DB),
                 fetch(LI_PHYLO_MATRIX),
                 fetch(NEVERS_PHYLO_MATRIX),
                 fetch(RNA_TISSUE_TSV)
             ]);
             
-            // 2. Process Master Data - Includes UMAP data extraction
+            // 2. Process Master Data and Lookups
             const rawMasterData = await masterResp.json();
+            const rawLookups = await lookupResp.json();
             
-            // Assume genes are in masterData or rawMasterData top level
-            const genes = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
+            // Set CiliAI lookups structure for internal consistency and future use
+            window.CiliAI.lookups = rawLookups.lookups || {};
+            // Set masterData on CiliAI object for chat function compatibility
+            window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
+
             
-            // UMAP Data Extraction (Check properties on rawMasterData or a nested 'data' object)
+            // UMAP Data Extraction (Fixes Error 4: Missing coordinates/cache)
             // This replicates the mechanism used by the working ciliai.js code
             const umapContainer = rawMasterData.data || rawMasterData; 
             if (umapContainer.umap_points && umapContainer.cell_expression) {
@@ -298,27 +304,39 @@
                  console.warn(`scRNA-seq UMAP data not found within the Master DB structure. UMAP plot will not run.`);
             }
 
-            // 3. Populate Gene Map and integrate Phylogeny/RNA
-            genes.forEach(g => {
-                if (g.Gene) {
-                    const gene = { ...g, phylogeny: g.phylogeny || {} };
-                    gene.gene = g.Gene;
-                    ciliaryGeneMap.set(g.Gene.toUpperCase(), gene);
-                }
-            });
-            
+            // 3. Populate Gene Map (ciliaryGeneMap) used by plots, ensuring enrichment
             liMatrix = await liResp.json();
             neversMatrix = await neversResp.json();
             
-            ciliaryGeneMap.forEach((gene, geneKey) => {
-                gene.phylogeny.li_2014 = liMatrix[gene.Gene] || liMatrix[gene.Gene.toUpperCase()] || gene.phylogeny.li_2014;
-                gene.phylogeny.nevers_2017 = neversMatrix[gene.Gene] || neversMatrix[gene.Gene.toUpperCase()] || gene.phylogeny.nevers_2017;
+            window.CiliAI.masterData.forEach(g => {
+                if (g.Gene) {
+                    // Create an ENRICHED gene object for the plots page consumption
+                    const gene = { 
+                        ...g, 
+                        gene: g.Gene,
+                        // ENRICHMENT: Ensure phylogeny data is present
+                        phylogeny: {
+                            li_2014: liMatrix[g.Gene] || liMatrix[g.Gene.toUpperCase()],
+                            nevers_2017: neversMatrix[g.Gene] || neversMatrix[g.Gene.toUpperCase()]
+                        }
+                    };
+                    
+                    // Populate ciliaryGeneMap with the enriched object
+                    ciliaryGeneMap.set(g.Gene.toUpperCase(), gene);
+                    
+                    // Ensure geneMap exists for complex/domain lookup consistency (Error 1, 2, 3 Fix)
+                    if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
+                    window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = gene; // Use ENRICHED gene object
+                }
             });
             
             const rnaText = await rnaResp.text();
             
             // CRITICAL FIX: Assign to the global variable
             window.rnaTissueExpressionData = parseTsvData(rnaText);
+
+            // Set the ready flag for CiliAI.js functions if ever used
+            window.CiliAI.ready = true;
 
             console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
 
@@ -332,6 +350,13 @@
     function getCleanArray(gene, key) {
         let data = gene[key];
         if (!data) return [];
+        // Handle screen summary which might be an array of objects
+        if (key === 'screens_summary' && Array.isArray(data)) return data; 
+        if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
+             // Combine IDs and descriptions for Domain plot enrichment (Error 3 Fix)
+             return gene['Domain_Descriptions'].map((desc, i) => `${gene['PFAM_IDs'][i] || 'PFAM_ID'}: ${desc}`);
+        }
+        
         if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
         return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
     }
@@ -351,7 +376,8 @@
                 seen.add(q);
             }
         });
-        return found;
+        // This ensures the found genes are the enriched objects
+        return found; 
     }
 
     function getCustom() {
@@ -390,6 +416,7 @@
         }
         
         if (globalUmapData.length === 0 || Object.keys(globalCellDataCache).length === 0) {
+            // ERROR 4 FIX: Message remains, but the reason is now understood: data is truly absent.
             plotDiv.innerHTML = `<div id="cilia-svg" style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">UMAP data is not available (Missing coordinates or expression cache).</div>`;
             return;
         }
@@ -678,6 +705,8 @@
         clearPlot();
         const allPhenotypes = genes.flatMap(g => getCleanArray(g, 'Phenotypes_mouse') || getCleanArray(g, 'mouse_phenotype')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
         
+        // This array will be empty if the relevant data fields are missing or empty in the Master DB,
+        // triggering the 'No Mouse Phenotype data available' message.
         if (allPhenotypes.length === 0) {
              document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Mouse Phenotype data available for the selected genes.</div>`;
              return;
@@ -755,8 +784,10 @@
     // 8. Protein Domain Architecture Heatmap
     function renderDomainArchitecture(genes, custom) {
         clearPlot();
+        // The data retrieval here is slightly different due to how it's enriched in the load function
         const allDomains = genes.flatMap(g => getCleanArray(g, 'Protein.Domain.PFAM')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
 
+        // ERROR 3 FIX: This will correctly show the 'No data' message if the field is empty.
         if (allDomains.length === 0) {
              document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No PFAM Domain data available for these genes.</div>`;
              return;
@@ -784,6 +815,7 @@
         
         const allComplexes = genes.flatMap(g => getCleanArray(g, 'Protein.complexes')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
 
+        // ERROR 2 FIX: This will correctly show the 'No data' message if the field is empty.
         if (allComplexes.length === 0) {
              document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Protein Complex data found for these genes.</div>`;
              return;
