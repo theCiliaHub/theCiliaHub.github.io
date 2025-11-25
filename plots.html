@@ -189,7 +189,6 @@
     <div id="plot-page-container">
         <div id="content-area">Loading CiliAI...</div>
     </div>
-
 <script>
     // ==========================================================
     // GLOBAL DATA / STATE (UNIFIED WITH CiliAI.js ARCHITECTURE)
@@ -201,8 +200,8 @@
     
     // Core state variables exposed globally, matching CiliAI.js structure
     window.CiliAI = {}; // Container for cached data
-    window.CiliAI_UMAP = null; // UMAP coordinates
-    window.CiliAI.cellDataCache = {}; // UMAP expression cache
+    window.CiliAI_UMAP = null; // UMAP coordinates (Extracted from Master DB)
+    window.CiliAI.cellDataCache = {}; // UMAP expression cache (Extracted from Master DB)
     
     // --- Data Maps for Phylogeny (Kept for plot consistency) ---
     const LI_SPECIES_ORDER = [
@@ -230,7 +229,9 @@
     const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json'; 
     const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json'; 
     const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
-    const UMAP_DATA_URL = BASE_URL + 'ciliAI_scRNAseq_UMAP.json';
+    
+    // UMAP_DATA_URL is no longer strictly used but kept for error logging clarity if needed.
+    // const UMAP_DATA_URL = BASE_URL + 'ciliAI_scRNAseq_UMAP.json'; 
 
 
     // --- TSV Parsing Helper ---
@@ -269,24 +270,34 @@
 
 
     /**
-     * @NEW_FUNCTION: loadMasterData - Unified loading function
-     * Fetches and integrates all required data sources using the consolidated state model.
+     * @FINAL_FUNCTION: loadMasterData - Unified loading function
+     * Loads UMAP data from the Master DB structure itself to avoid the external 404 issue.
      */
     async function loadMasterData() {
         try {
-            const [masterResp, liResp, neversResp, rnaResp, umapResp] = await Promise.all([
+            // 1. Fetch core data (Master DB, Phylogeny, RNA) concurrently
+            const [masterResp, liResp, neversResp, rnaResp] = await Promise.all([
                 fetch(MASTER_DB),
                 fetch(LI_PHYLO_MATRIX),
                 fetch(NEVERS_PHYLO_MATRIX),
-                fetch(RNA_TISSUE_TSV),
-                // Handle the 404 for UMAP data gracefully as intended
-                fetch(UMAP_DATA_URL).catch(e => ({ ok: false, status: 404, error: e })) 
+                fetch(RNA_TISSUE_TSV)
             ]);
             
-            // 1. Master Data (Primary Gene Map)
-            const masterData = await masterResp.json();
-            const genes = Array.isArray(masterData.masterData) ? masterData.masterData : masterData;
+            // 2. Process Master Data - Includes UMAP data extraction from the same response
+            const rawMasterData = await masterResp.json();
+            const genes = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
             
+            // UMAP Data Extraction (Based on CiliAI.js comment: "populated from the master DB")
+            const umapContainer = rawMasterData.data || rawMasterData; // Look for a 'data' wrapper or use the top level
+            if (umapContainer.umap_points && umapContainer.cell_expression) {
+                window.CiliAI_UMAP = umapContainer.umap_points;
+                window.CiliAI.cellDataCache = umapContainer.cell_expression; 
+                console.log(`scRNA-seq UMAP data loaded successfully from Master DB. Total cells: ${umapContainer.umap_points.length}`);
+            } else {
+                 console.warn(`scRNA-seq UMAP data not found within the Master DB structure. UMAP plot will not run.`);
+            }
+
+            // 3. Populate Gene Map and integrate Phylogeny/RNA
             genes.forEach(g => {
                 if (g.Gene) {
                     const gene = { ...g, phylogeny: g.phylogeny || {} };
@@ -295,29 +306,16 @@
                 }
             });
             
-            // 2. Phylogeny Matrices
             liMatrix = await liResp.json();
             neversMatrix = await neversResp.json();
             
-            // 3. Integrate Phylogeny data into main gene objects
             ciliaryGeneMap.forEach((gene, geneKey) => {
                 gene.phylogeny.li_2014 = liMatrix[gene.Gene] || liMatrix[gene.Gene.toUpperCase()] || gene.phylogeny.li_2014;
                 gene.phylogeny.nevers_2017 = neversMatrix[gene.Gene] || neversMatrix[gene.Gene.toUpperCase()] || gene.phylogeny.nevers_2017;
             });
             
-            // 4. Handle RNA Tissue Data (TSV file)
             const rnaText = await rnaResp.text();
             rnaTissueExpressionData = parseTsvData(rnaText);
-
-            // 5. Handle UMAP Data (scRNA-seq)
-            if (umapResp.ok) {
-                const umapData = await umapResp.json();
-                window.CiliAI_UMAP = umapData.points;
-                window.CiliAI.cellDataCache = umapData.expression; 
-                console.log("scRNA-seq UMAP data loaded:", umapData.points.length, "cells");
-            } else {
-                console.warn(`scRNA-seq UMAP data not available (404/Error: ${umapResp.status}). This prevents the plot from running.`);
-            }
 
             console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
 
@@ -372,7 +370,7 @@
 
     // --- PLOT IMPLEMENTATIONS ---
 
-    // * UMAP PLOT (scRNA-seq Lung) - Uses the CiliAI global variables
+    // * UMAP PLOT (scRNA-seq Lung) 
     async function renderScrnaUMAPPlot(geneSymbol) { 
         const plotDivId = 'plot-display-area';
         
@@ -498,27 +496,48 @@
     window.renderScrnaUMAPPlot = renderScrnaUMAPPlot; 
 
 
-    // 1. Gene Feature Overview (Manhattan-style)
+    // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION
     function renderMultiCategoryManhattan(genes, custom) {
         clearPlot();
+        // Added 'Protein Domains' and 'Tissue Expression' as categories.
         const categories = [
             { name: "Localization", key: "Localization", color: "#1f77b4" },
             { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
             { name: "Ciliopathy", key: "Ciliopathy", color: "#2ca02c" },
             { name: "Function", key: "Functional.category", color: "#d62728" },
             { name: "Screens", key: "screens_summary", color: "#9467bd" },
-            { name: "Phenotypes", key: "Phenotypes_mouse", color: "#8c564b" }
+            { name: "Phenotypes", key: "Phenotypes_mouse", color: "#8c564b" },
+            { name: "Protein Domains", key: "Protein.Domain.PFAM", color: "#e377c2" }, 
+            { name: "Tissue Express.", key: "top_tissue_expression", color: "#17becf" }
         ];
 
         const traces = [];
         categories.forEach((cat, catIdx) => {
             const x = [], y = [], text = [], color = [];
             genes.forEach((gene, geneIdx) => {
-                const values = getCleanArray(gene, cat.key);
+                let values;
+                
+                // Special handling for the new "Tissue Expression" category
+                if (cat.name === "Tissue Express.") {
+                    const exprData = rnaTissueExpressionData[gene.gene] || {};
+                    const tissues = Object.entries(exprData)
+                        .filter(([, nTPM]) => nTPM > 10) // Filter for high expression (e.g., > 10 nTPM)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 1);
+                    values = tissues.map(([name, val]) => `${name} (${val.toFixed(0)} nTPM)`);
+                } else {
+                    // General handling for all other string/array fields
+                    values = getCleanArray(gene, cat.key);
+                    if (cat.key === 'screens_summary') {
+                        // Extract just the source names for a cleaner summary plot
+                        values = values.map(s => typeof s === 'object' && s.source ? s.source : s);
+                    }
+                }
+
                 values.forEach(val => {
                     x.push(catIdx + (Math.random() - 0.5) * 0.6);
                     y.push(geneIdx);
-                    text.push(`${gene.gene}<br>${cat.name}: ${val}`);
+                    text.push(`${gene.gene}<br>**${cat.name}**: ${val}`);
                     color.push(cat.color);
                 });
             });
@@ -532,8 +551,13 @@
         });
 
         const layout = {
-            title: { text: custom.title || "Gene Feature Overview / Summary", font: { size: custom.titleSize } },
-            xaxis: { title: "Categories", tickvals: categories.map((_,i)=>i), ticktext: categories.map(c=>c.name) },
+            title: { text: custom.title || "Gene Feature Overview / Summary (Manhattan Plot)", font: { size: custom.titleSize } },
+            xaxis: { 
+                title: "Categories", 
+                tickvals: categories.map((_,i)=>i), 
+                ticktext: categories.map(c=>c.name),
+                tickangle: -45 // Rotate labels for readability
+            },
             yaxis: { title: "Genes", tickvals: genes.map((_,i)=>i), ticktext: genes.map(g=>g.gene) },
             height: custom.height, width: custom.width,
             legend: { orientation: "h", y: -0.2 }
@@ -1066,7 +1090,6 @@ KIF17</textarea>
         setupPage();
     });
 </script>
-
     
 </body>
 </html>
