@@ -198,7 +198,7 @@
         let neversMatrix = {};
         let rnaTissueExpressionData = {};
         window.CiliAI_UMAP          // ← never defined
-        window.CiliAI.cellDataCache // ← never defined
+        //window.CiliAI.cellDataCache // ← never defined
 
         // DATA URLS
         const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -210,21 +210,21 @@
 
        // === FIX: Load scRNA-seq UMAP data (Lung ciliated cells) ===
         async function loadScRNAData() {
-        try {
-        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliAI_scRNAseq_UMAP.json');
-        if (!resp.ok) throw new Error('Not found');
-        const data = await resp.json();
-        
-        window.CiliAI_UMAP = data.points;                    // UMAP coordinates + cell_type
-        window.CiliAI = window.CiliAI || {};
-        window.CiliAI.cellDataCache = data.expression;       // { "FOXJ1": { "ciliated": 12.4, ... }, ... }
-        
-        console.log("scRNA-seq UMAP data loaded:", data.points.length, "cells");
-    } catch (err) {
-        console.warn("scRNA-seq UMAP data not available (this is expected if file missing)");
-        // Keep function non-blocking — UMAP will show "not available" gracefully
-    }
-} 
+        try {
+        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliAI_scRNAseq_UMAP.json');
+        if (!resp.ok) throw new Error('Not found');
+        const data = await resp.json();
+        
+        window.CiliAI_UMAP = data.points;                    // UMAP coordinates + cell_type
+        window.CiliAI = window.CiliAI || {};
+        window.CiliAI.cellDataCache = data.expression;       // { "FOXJ1": { "ciliated": 12.4, ... }, ... }
+        
+        console.log("scRNA-seq UMAP data loaded:", data.points.length, "cells");
+    } catch (err) {
+        console.warn("scRNA-seq UMAP data not available (this is expected if file missing)");
+        // Keep function non-blocking — UMAP will show "not available" gracefully
+    }
+}
         // --- PHYLOGENY PANEL DEFINITIONS ---
         const NEVERS_CIL_PANEL = [
             "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", "Caenorhabditis elegans", "Tetrahymena thermophila (strain SB210)", "Chlamydomonas reinhardtii", "Micromonas sp. (strain RCC299 / NOUM17)", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens subsp. patens", "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis"
@@ -377,126 +377,138 @@
         // --- PLOT IMPLEMENTATIONS ---
 
         // * UMAP PLOT (scRNA-seq Lung) - REMAINING NON-FUNCTIONAL DUE TO MISSING EXTERNAL DATA
-        async function renderScrnaUMAPPlot(geneSymbol) { 
-            const plotDivId = 'plot-display-area';
-            
-            // CONFLICT RESOLUTION: Using unique local variables for UMAP globals
-            const globalUmapData = window.CiliAI_UMAP || []; 
-            const globalCellDataCache = window.CiliAI?.cellDataCache || {}; 
-            
-            const plotDiv = document.getElementById(plotDivId);
-            const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
+       // * UMAP PLOT (scRNA-seq Lung) - FIXED SIZE SCALING AND FALLBACK GENE WARNING
+        async function renderScrnaUMAPPlot(geneSymbol) { 
+            const plotDivId = 'plot-display-area';
+            
+            // Using unique local variables for UMAP globals
+            const globalUmapData = window.CiliAI_UMAP || []; 
+            const globalCellDataCache = window.CiliAI?.cellDataCache || {}; 
+            
+            const plotDiv = document.getElementById(plotDivId);
+            
+            // Use FOXJ1 as fallback, but warn if no gene was provided.
+            const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
+            if (!geneSymbol) {
+                console.warn(`No gene symbol provided for UMAP. Defaulting to ${gene}.`);
+            }
 
-            if (!plotDiv) {
-                console.error('UMAP plot container not found.');
-                return;
-            }
-            // Check for missing data using the locally defined variables
-            if (globalUmapData.length === 0 || Object.keys(globalCellDataCache).length === 0) {
-                plotDiv.innerHTML = `<div id="cilia-svg" style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">UMAP data is not available (Missing CiliAI_UMAP or cellDataCache).</div>`;
-                return;
-            }
 
-            plotDiv.innerHTML = '<div id="cilia-svg" style="width: 100%; height: 100%;"></div>';
-            const umapPlotDiv = document.getElementById('cilia-svg');
+            if (!plotDiv) {
+                console.error('UMAP plot container not found.');
+                return;
+            }
+            // Check for missing data
+            if (globalUmapData.length === 0 || Object.keys(globalCellDataCache).length === 0) {
+                plotDiv.innerHTML = `<div id="cilia-svg" style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">UMAP data is not available (Missing CiliAI_UMAP or cellDataCache).</div>`;
+                return;
+            }
 
-            // 1. Fetch Expression Data and prepare arrays
-            const geneExpressionData = globalCellDataCache[gene] || {};
-            
-            const sampleSize = 15000;
-            const sampledData = [];
-            const colorArray = [];
-            const sizeArray = []; 
-            let maxExpression = 0;
-            const sizeBase = 5;      
-            const sizeScaleMax = 12;      
-            const expressionThreshold = 2; 
+            plotDiv.innerHTML = '<div id="cilia-svg" style="width: 100%; height: 100%;"></div>';
+            const umapPlotDiv = document.getElementById('cilia-svg');
 
-            const sourceData = globalUmapData.length > sampleSize 
-                            ? globalUmapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
-                            : globalUmapData;
+            // 1. Fetch Expression Data and prepare arrays
+            const geneExpressionData = globalCellDataCache[gene] || {};
+            
+            const sampleSize = 15000;
+            const sampledData = [];
+            const colorArray = [];
+            const sizeArray = []; 
+            let maxExpression = 0;
+            const sizeBase = 5;      
+            const sizeScaleMax = 12;      
+            
+            const sourceData = globalUmapData.length > sampleSize 
+                            ? globalUmapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
+                            : globalUmapData;
 
-            for (const point of sourceData) {
-                const expressionValue = geneExpressionData[point.cell_type] || 0;
-                sampledData.push(point);
-                colorArray.push(expressionValue);
-                const scaledMagnitude = Math.min(expressionValue, expressionThreshold) / expressionThreshold;
-                sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude); 
-                if (expressionValue > maxExpression) { maxExpression = expressionValue; }
-            }
-            
-            if (maxExpression === 0 && gene) {
-                console.warn(`Gene ${gene} found, but has no detectable expression.`);
-            }
-            
-            // --- Annotations (Cell Type Labels) ---
-            const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
-            const annotations = [];
-            const median = arr => {
-                const sorted = [...arr].sort((a, b) => a - b);
-                const mid = Math.floor(sorted.length / 2);
-                return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-            };
-            for (const ct of cellTypes) {
-                if (!ct) continue;
-                const pts = sampledData.filter(d => d.cell_type === ct);
-                if (pts.length === 0) continue;
-                const xs = pts.map(p => p.x);
-                const ys = pts.map(p => p.y);
-                annotations.push({
-                    x: median(xs),
-                    y: median(ys),
-                    text: ct,
-                    showarrow: false,
-                    font: { color: '#FFFFFF', size: 10, family: 'Arial, sans-serif' },
-                    bgcolor: 'rgba(0,0,0,0.45)', borderpad: 2, bordercolor: 'rgba(0,0,0,0.45)', borderwidth: 1,
-                    xref: 'x', yref: 'y'
-                });
-            }
+            for (const point of sourceData) {
+                const expressionValue = geneExpressionData[point.cell_type] || 0;
+                sampledData.push(point);
+                colorArray.push(expressionValue);
+                if (expressionValue > maxExpression) { maxExpression = expressionValue; }
+            }
 
-            const colorScaleRedGradient = [
-                [0, '#F8F8F8'], 
-                [0.0001, '#FFDAD0'], 
-                [1, '#E60000']      
-            ];
-            
-            const plotData = [{
-                x: sampledData.map(p => p.x),
-                y: sampledData.map(p => p.y),
-                text: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${colorArray[i].toFixed(3)}`),
-                mode: 'markers',
-                type: 'scattergl',
-                hoverinfo: 'text',
-                marker: {
-                    color: colorArray, 
-                    colorscale: colorScaleRedGradient, 
-                    cmin: 0,
-                    cmax: maxExpression > 0 ? maxExpression : 0.0001,
-                    colorbar: { title: `${gene} Expr. (TPM)` },
-                    size: sizeArray, 
-                    opacity: 0.8
-                }
-            }];
+            const sizeScaleMaxExpression = maxExpression > 0 ? maxExpression : 1; 
 
-            const layout = {
-                title: { 
-                    text: `UMAP: <b>${gene}</b> Expression (Size & Color Mapped)`,
-                    font: { size: 24, color: "var(--primary)" }
-                },
-                xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
-                yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
-                hovermode: 'closest',
-                margin: { t: 50, b: 50, l: 50, r: 50 },
-                plot_bgcolor: '#FFFFFF',
-                paper_bgcolor: '#F8F8F8',
-                annotations: annotations,
-                showlegend: false
-            };
+            // Iterate again to apply dynamic size scaling based on maxExpression
+            for (const expressionValue of colorArray) {
+                // Scale magnitude based on max observed expression
+                const scaledMagnitude = expressionValue / sizeScaleMaxExpression;
+                // Apply scaled size
+                sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude);
+            }
+            
+            if (maxExpression === 0) {
+                console.warn(`Gene ${gene} found, but has no detectable expression.`);
+            }
+            
+            // --- Annotations (Cell Type Labels) ---
+            const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+            const annotations = [];
+            const median = arr => {
+                const sorted = [...arr].sort((a, b) => a - b);
+                const mid = Math.floor(sorted.length / 2);
+                return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+            };
+            for (const ct of cellTypes) {
+                if (!ct) continue;
+                const pts = sampledData.filter(d => d.cell_type === ct);
+                if (pts.length === 0) continue;
+                const xs = pts.map(p => p.x);
+                const ys = pts.map(p => p.y);
+                annotations.push({
+                    x: median(xs),
+                    y: median(ys),
+                    text: ct,
+                    showarrow: false,
+                    font: { color: '#FFFFFF', size: 10, family: 'Arial, sans-serif' },
+                    bgcolor: 'rgba(0,0,0,0.45)', borderpad: 2, bordercolor: 'rgba(0,0,0,0.45)', borderwidth: 1,
+                    xref: 'x', yref: 'y'
+                });
+            }
 
-            Plotly.newPlot(umapPlotDiv, plotData, layout, { responsive: true, displayModeBar: true, scrollZoom: true });
-        }
-        window.renderScrnaUMAPPlot = renderScrnaUMAPPlot; 
+            const colorScaleRedGradient = [
+                [0, '#F8F8F8'], 
+                [0.0001, '#FFDAD0'], 
+                [1, '#E60000']      
+            ];
+            
+            const plotData = [{
+                x: sampledData.map(p => p.x),
+                y: sampledData.map(p => p.y),
+                text: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${colorArray[i].toFixed(3)}`),
+                mode: 'markers',
+                type: 'scattergl',
+                hoverinfo: 'text',
+                marker: {
+                    color: colorArray, 
+                    colorscale: colorScaleRedGradient, 
+                    cmin: 0,
+                    cmax: maxExpression > 0 ? maxExpression : 0.0001,
+                    colorbar: { title: `${gene} Expr. (TPM)` },
+                    size: sizeArray, 
+                    opacity: 0.8
+                }
+            }];
 
+            const layout = {
+                title: { 
+                    text: `UMAP: <b>${gene}</b> Expression (Size & Color Mapped)`,
+                    font: { size: 24, color: "var(--primary)" }
+                },
+                xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
+                yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
+                hovermode: 'closest',
+                margin: { t: 50, b: 50, l: 50, r: 50 },
+                plot_bgcolor: '#FFFFFF',
+                paper_bgcolor: '#F8F8F8',
+                annotations: annotations,
+                showlegend: false
+            };
+
+            Plotly.newPlot(umapPlotDiv, plotData, layout, { responsive: true, displayModeBar: true, scrollZoom: true });
+        }
 
         // 1. Gene Feature Overview (Manhattan-style)
         function renderMultiCategoryManhattan(genes, custom) {
