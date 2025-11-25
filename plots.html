@@ -190,19 +190,21 @@
         <div id="content-area">Loading CiliAI...</div>
     </div>
 
-    <script>
+<script>
     // ==========================================================
-    // GLOBAL DATA / STATE (REPLACED ORIGINAL GLOBAL VARIABLES)
+    // GLOBAL DATA / STATE (UNIFIED WITH CiliAI.js ARCHITECTURE)
     // ==========================================================
-    let ciliaryGeneMap = new Map(); // Master gene map (for finding genes)
+    let ciliaryGeneMap = new Map(); 
     let liMatrix = {};
     let neversMatrix = {};
     let rnaTissueExpressionData = {};
-    window.CiliAI_UMAP = null; // UMAP coordinates
+    
+    // Core state variables exposed globally, matching CiliAI.js structure
     window.CiliAI = {}; // Container for cached data
+    window.CiliAI_UMAP = null; // UMAP coordinates
     window.CiliAI.cellDataCache = {}; // UMAP expression cache
     
-    // --- Data Maps for Phylogeny (Used by Heatmap) ---
+    // --- Data Maps for Phylogeny (Kept for plot consistency) ---
     const LI_SPECIES_ORDER = [
         "sym","Prokaryote","E.cuniculi","E.histolytica","E.dispar","G.lamblia","T.vaginalis","T.brucei","T.cruzi","L.infantum","L.major","L.braziliensis","T.gondii","C.hominis","C.parvum","B.bovis","T.annulata","T.parva","P.knowlesi","P.vivax","P.falciparum","P.chabaudi","P.berghei","P.yoelii","P.tetraurelia","T.thermophila","P.infestans","T.pseudonana","P.tricornutum","C.merolae","N.gruberi","O.lucimarinus","O.tauri","C.reinhardtii","V.carteri","P.patens","S.moellendorffii","S.bicolor","Z.mays","O.sativa","B.distachyon","A.lyrata","A.thaliana","L.japonicus","M.truncatula","V.vinifera","P.trichocarpa","R.communis","T.trahens","D.discoideum","A.macrogynus","S.punctatus","M.globosa","U.maydis","C.neoformans","P.chrysosporium","S.commune","C.cinerea","L.bicolor","S.pombe","B.fuckeliana","S.sclerotiorum","F.graminearum","M.grisea","N.crassa","P.anserina","P.chrysogenum","A.clavatus","A.fumigatus","N.fischeri","A.flavus","A.oryzae","A.niger","A.nidulans","U.reesii","C.immitis","C.posadasii","P.nodorum","T.melanosporum","Y.lipolytica","P.pastoris","C.lusitaniae","D.hansenii","M.guilliermondii","S.stipitis","L.elongisporus","C.tropicalis","C.albicans","C.dubliniensis","K.lactis","A.gossypii","K.waltii","L.thermotolerans","Z.rouxii","V.polyspora","C.glabrata","S.bayanus","S.mikatae","S.cerevisiae","S.paradoxus","S.arctica","C.owczarzaki","M.brevicollis","S.rosetta","S.mansoni","B.malayi","C.briggsae","C.elegans","D.pulex","A.pisum","P.humanus","A.mellifera","N.vitripennis","B.mori","T.castaneum","D.melanogaster","D.pseudoobscura","A.gambiae","A.aegypti","C.quinquefasciatus","B.floridae","T.adhaerens","S.purpuratus","H.magnipapillata","N.vectensis","C.intestinalis","D.rerio","O.latipes","F.rubripes","T.nigroviridis","X.tropicalis","G.gallus","M.gallopavo","O.anatinus","M.domestica","S.scrofa","M.musculus","C.familiaris","B.taurus","H.sapiens"
     ];
@@ -225,14 +227,13 @@
     // DATA URLS
     const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
     const MASTER_DB = BASE_URL + 'ciliAI_master_database.json'; 
-    const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json'; 
     const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json'; 
     const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json'; 
     const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
     const UMAP_DATA_URL = BASE_URL + 'ciliAI_scRNAseq_UMAP.json';
 
 
-    // --- TSV Parsing Helper (Kept for RNA data parsing) ---
+    // --- TSV Parsing Helper ---
     function parseTsvData(tsvText) {
         const data = {};
         const lines = tsvText.split('\n').filter(line => line.trim() !== '');
@@ -268,17 +269,18 @@
 
 
     /**
-     * @REPLACEMENT: Consolidated Loading Function
-     * Loads ALL data required by the plots page, including the optional UMAP data.
+     * @NEW_FUNCTION: loadMasterData - Unified loading function
+     * Fetches and integrates all required data sources using the consolidated state model.
      */
-    async function loadAllData() {
+    async function loadMasterData() {
         try {
             const [masterResp, liResp, neversResp, rnaResp, umapResp] = await Promise.all([
                 fetch(MASTER_DB),
                 fetch(LI_PHYLO_MATRIX),
                 fetch(NEVERS_PHYLO_MATRIX),
                 fetch(RNA_TISSUE_TSV),
-                fetch(UMAP_DATA_URL).catch(e => ({ ok: false, status: 404, error: e })) // Catch UMAP file error gracefully
+                // Handle the 404 for UMAP data gracefully as intended
+                fetch(UMAP_DATA_URL).catch(e => ({ ok: false, status: 404, error: e })) 
             ]);
             
             // 1. Master Data (Primary Gene Map)
@@ -299,7 +301,6 @@
             
             // 3. Integrate Phylogeny data into main gene objects
             ciliaryGeneMap.forEach((gene, geneKey) => {
-                // We map the raw matrices here, the plotting functions read these global variables
                 gene.phylogeny.li_2014 = liMatrix[gene.Gene] || liMatrix[gene.Gene.toUpperCase()] || gene.phylogeny.li_2014;
                 gene.phylogeny.nevers_2017 = neversMatrix[gene.Gene] || neversMatrix[gene.Gene.toUpperCase()] || gene.phylogeny.nevers_2017;
             });
@@ -315,13 +316,13 @@
                 window.CiliAI.cellDataCache = umapData.expression; 
                 console.log("scRNA-seq UMAP data loaded:", umapData.points.length, "cells");
             } else {
-                console.warn(`scRNA-seq UMAP data not available (404/Error: ${umapResp.status})`);
+                console.warn(`scRNA-seq UMAP data not available (404/Error: ${umapResp.status}). This prevents the plot from running.`);
             }
 
             console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
 
         } catch (err) {
-            document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading data from server: ${err.message}. Please verify the data URLs.</p>`;
+            document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Please verify the data URLs.</p>`;
         }
     }
 
@@ -369,13 +370,13 @@
     }
 
 
-    // --- PLOT IMPLEMENTATIONS (UPDATED FOR NEW VARIABLE NAMES) ---
+    // --- PLOT IMPLEMENTATIONS ---
 
-    // * UMAP PLOT (scRNA-seq Lung) 
+    // * UMAP PLOT (scRNA-seq Lung) - Uses the CiliAI global variables
     async function renderScrnaUMAPPlot(geneSymbol) { 
         const plotDivId = 'plot-display-area';
         
-        // Use the globally populated variables
+        // Use the globally populated variables (Matching CiliAI.js style)
         const globalUmapData = window.CiliAI_UMAP || []; 
         const globalCellDataCache = window.CiliAI.cellDataCache || {}; 
         
@@ -500,7 +501,6 @@
     // 1. Gene Feature Overview (Manhattan-style)
     function renderMultiCategoryManhattan(genes, custom) {
         clearPlot();
-        // ... (function body remains UNCHANGED as it only uses `genes` and `getCleanArray`)
         const categories = [
             { name: "Localization", key: "Localization", color: "#1f77b4" },
             { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
@@ -542,7 +542,7 @@
     }
 
 
-    // 3. Phylogenetic Conservation Heatmap (Uses liMatrix and neversMatrix)
+    // 3. Phylogenetic Conservation Heatmap
     function renderPhylogenyHeatmap(genes, custom) {
         clearPlot();
         const source = custom.source;
@@ -866,7 +866,7 @@
     }
 
 
-    // MAIN GENERATOR
+    // MAIN GENERATOR 
     function generatePlot() {
         const input = document.getElementById('ciliaplot-genes-input').value.trim();
         if (!input) {
@@ -1062,9 +1062,11 @@ KIF17</textarea>
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        await loadAllData(); 
+        await loadMasterData(); // Now calls the unified loading function
         setupPage();
     });
 </script>
+
+    
 </body>
 </html>
