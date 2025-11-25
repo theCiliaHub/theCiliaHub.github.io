@@ -431,16 +431,17 @@ async function loadMasterData() {
 
 // --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
 function getCleanArray(gene, key) {
+    // 1. Initialize data variable using the requested key
     let data = gene[key];
     
     // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
     if (key === 'Protein.complexes') {
-         // Check 'complex_components' first, then fallback to 'Protein.complexes'
-         data = gene['complex_components'] || gene['Protein.complexes'];
-         if (typeof data === 'object' && !Array.isArray(data)) {
-             // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
-             return Object.keys(data).map(k => `${k}`);
-         }
+        // Check 'complex_components' first, then fallback to 'Protein.complexes'
+        data = gene['complex_components'] || gene['Protein.complexes'];
+        if (typeof data === 'object' && !Array.isArray(data)) {
+            // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
+            return Object.keys(data).map(k => `${k}`);
+        }
     }
 
     // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
@@ -451,22 +452,25 @@ function getCleanArray(gene, key) {
 
     // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
     if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-         // Use raw Domain_Descriptions data which is present in your object structure
-         const pfamIds = gene['PFAM_IDs'] || [];
-         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
-         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
+        // Use raw Domain_Descriptions data which is present in your object structure
+        const pfamIds = gene['PFAM_IDs'] || [];
+        const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
+        return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
     }
-
     // 4. Handle Screens Summary (Array of Objects)
     if (key === 'screens_summary' && Array.isArray(data)) return data; 
     
+    // Check if data is null/undefined before attempting to process it
     if (!data) return [];
     
     // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
     if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
+    
+    // Final default return for string fields
     return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
 }
 
+    
 function findGenes(input) {
     const queries = input
         .split(/[\s,\n;]+/)
@@ -635,77 +639,96 @@ function getCustom() {
     // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
 // --- FIXED PHYLOGENY DATA ACCESS IN OTHER PLOTS ---
 function renderMultiCategoryManhattan(genes, custom) {
-    clearPlot();
-    
-    // Add phylogeny as one of the categories if data exists
-    const categories = [
-        { name: "Localization", key: "Localization", color: "#1f77b4" },
-        { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
-        { name: "Ciliopathy", key: "Ciliopathy", color: "#2ca02c" },
-        { name: "Function", key: "Functional.category", color: "#d62728" },
-        { name: "Screens", key: "screens_summary", color: "#9467bd" },
-        { name: "Phenotypes", key: "Phenotypes_mouse", color: "#8c564b" },
-        { name: "Phylogeny", key: "phylogeny", color: "#17becf" } // NEW: Add phylogeny category
-    ];
+    clearPlot();
+    
+    // Define categories to plot
+    const categories = [
+        { name: "Localization", key: "Localization", color: "#1f77b4" },
+        { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
+        { name: "Ciliopathy", key: "Ciliopathy", color: "#2ca02c" },
+        { name: "Function", key: "Functional.category", color: "#d62728" },
+        { name: "Screens", key: "screens_summary", color: "#9467bd" }, // Key for Screens
+        { name: "Phenotypes", key: "Phenotypes_mouse", color: "#8c564b" },
+        { name: "Phylogeny", key: "phylogeny", color: "#17becf" }
+    ];
 
-    const traces = [];
-    categories.forEach((cat, catIdx) => {
-        const x = [], y = [], text = [], color = [];
-        
-        genes.forEach((gene, geneIdx) => {
-            if (cat.key === "phylogeny") {
-                // Special handling for phylogeny data
-                const neversData = gene.phylogeny?.nevers_2017;
-                const liData = gene.phylogeny?.li_2014;
-                
-                if (neversData && neversData.species_data && neversData.species_data.length > 0) {
-                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                    y.push(geneIdx);
-                    text.push(`${gene.gene}<br>Phylogeny: Nevers (${neversData.species_count} species)`);
-                    color.push(cat.color);
-                }
-                if (liData && liData.species_data && liData.species_data.length > 0) {
-                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                    y.push(geneIdx);
-                    text.push(`${gene.gene}<br>Phylogeny: Li (${liData.species_data.length} species)`);
-                    color.push(cat.color);
-                }
-            } else {
-                // Standard handling for other categories
-                const values = getCleanArray(gene, cat.key);
-                values.forEach(val => {
-                    if (val && val !== 'N/A' && val !== 'Unknown') {
-                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                        y.push(geneIdx);
-                        text.push(`${gene.gene}<br>${cat.name}: ${val}`);
-                        color.push(cat.color);
-                    }
-                });
-            }
-        });
-        
-        if (x.length > 0) {
-            traces.push({
-                x, y, text, mode: 'markers', name: cat.name,
-                marker: { size: 14, color },
-                hovertemplate: '%{text}<extra></extra>'
-            });
-        }
-    });
-        const layout = {
-            title: { text: custom.title || "Gene Feature Overview / Summary (Manhattan Plot)", font: { size: custom.titleSize } },
-            xaxis: { 
-                title: "Categories", 
-                tickvals: categories.map((_,i)=>i), 
-                ticktext: categories.map(c=>c.name),
-                tickangle: -45 // Rotate labels for readability
-            },
-            yaxis: { title: "Genes", tickvals: genes.map((_,i)=>i), ticktext: genes.map(g=>g.gene) },
-            height: custom.height, width: custom.width,
-            legend: { orientation: "h", y: -0.2 }
-        };
-        Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
-    }
+    const traces = [];
+    categories.forEach((cat, catIdx) => {
+        const x = [], y = [], text = [], color = [];
+        
+        genes.forEach((gene, geneIdx) => {
+            if (cat.key === "phylogeny") {
+                // Special handling for phylogeny data
+                const neversData = gene.phylogeny?.nevers_2017;
+                const liData = gene.phylogeny?.li_2014;
+                
+                if (neversData && neversData.species_data && neversData.species_data.length > 0) {
+                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                    y.push(geneIdx);
+                    text.push(`${gene.gene}<br>Phylogeny: Nevers (${neversData.species_count} species)`);
+                    color.push(cat.color);
+                }
+                if (liData && liData.species_data && liData.species_data.length > 0) {
+                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                    y.push(geneIdx);
+                    text.push(`${gene.gene}<br>Phylogeny: Li (${liData.species_data.length} species)`);
+                    color.push(cat.color);
+                }
+            } else if (cat.key === "screens_summary") {
+                // === FIX: Correctly plot each screen hit object ===
+                const screenData = getCleanArray(gene, cat.key);
+                
+                if (Array.isArray(screenData) && screenData.length > 0) {
+                    screenData.forEach(screenHit => {
+                        // Extract source and result for hover text
+                        const label = screenHit.source ? `${screenHit.source} (Result: ${screenHit.result || 'N/A'})` : JSON.stringify(screenHit);
+                        
+                        x.push(catIdx + (Math.random() - 0.5) * 0.6); // Scatter point horizontally
+                        y.push(geneIdx);
+                        text.push(`${gene.gene}<br>Screen Hit: ${label}`);
+                        color.push(cat.color);
+                    });
+                }
+                // =============================================================
+            } else {
+                // Standard handling for other categories
+                const values = getCleanArray(gene, cat.key);
+                values.forEach(val => {
+                    // Ensure the value is a meaningful string
+                    if (typeof val === 'string' && val.length > 0 && val !== 'N/A' && val !== 'Unknown' && !val.includes('PFAM_ID: No description')) {
+                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                        y.push(geneIdx);
+                        text.push(`${gene.gene}<br>${cat.name}: ${val}`);
+                        color.push(cat.color);
+                    }
+                });
+            }
+        });
+        
+        if (x.length > 0) {
+            traces.push({
+                x, y, text, mode: 'markers', name: cat.name,
+                marker: { size: 14, color },
+                hovertemplate: '%{text}<extra></extra>'
+            });
+        }
+    });
+    
+    // Layout definition (unchanged)
+    const layout = {
+        title: { text: custom.title || "Gene Feature Overview / Summary (Manhattan Plot)", font: { size: custom.titleSize } },
+        xaxis: { 
+            title: "Categories", 
+            tickvals: categories.map((_,i)=>i), 
+            ticktext: categories.map(c=>c.name),
+            tickangle: -45 // Rotate labels for readability
+        },
+        yaxis: { title: "Genes", tickvals: genes.map((_,i)=>i), ticktext: genes.map(g=>g.gene) },
+        height: custom.height, width: custom.width,
+        legend: { orientation: "h", y: -0.2 }
+    };
+    Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
+}
 
 // 3. Phylogenetic Conservation Heatmap
 // --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
@@ -987,28 +1010,32 @@ function debugPhylogenyData(genes) {
     console.log("=============================");
 }
 
-    // 4. CRISPR & siRNA Screens Summary Heatmap
-    function renderScreenSummaryHeatmap(genes, custom) {
-        clearPlot();
-        const screens = ["Kim2016", "Wheway2015", "Roosing2015", "Basu2023", "Breslow2018"];
+// 4. CRISPR & siRNA Screens Summary Heatmap
+function renderScreenSummaryHeatmap(genes, custom) {
+    clearPlot();
+    const screens = ["Kim2016", "Wheway2015", "Roosing2015", "Basu2023", "Breslow2018"];
+    
+    const z = genes.map(g => screens.map(s => {
+        // Use getCleanArray to retrieve the array of objects, ensuring we check for the correct key.
+        const screenArray = getCleanArray(g, 'screens_summary');
         
-        const z = genes.map(g => screens.map(s => {
-            const screen = g.screens_summary?.find(x => String(x.source).includes(s));
-            // If screens_summary is missing (undefined/null), return 0.
-            return screen ? 1 : 0; 
-        }));
+        // Find if the screen source exists in the array
+        const screen = screenArray.find(x => x.source && String(x.source).includes(s));
+        
+        // If screens_summary entry is found, return 1 (present), else 0 (absent/no data).
+        return screen ? 1 : 0; 
+    }));
 
-        Plotly.newPlot('plot-display-area', [{
-            type: 'heatmap', z, x: screens, y: genes.map(g=>g.gene),
-            colorscale: [[0,'#f0f0f0'],[1,'#2ca02c']], 
-            showscale: false
-        }], { 
-            title: { text: custom.title || "CRISPR & siRNA Screens Summary" }, 
-            xaxis: { tickangle: -45, automargin: true },
-            height: custom.height 
-        });
-    }
-
+    Plotly.newPlot('plot-display-area', [{
+        type: 'heatmap', z, x: screens, y: genes.map(g=>g.gene),
+        colorscale: [[0,'#f0f0f0'],[1,'#2ca02c']], 
+        showscale: false
+    }], { 
+        title: { text: custom.title || "CRISPR & siRNA Screens Summary" }, 
+        xaxis: { tickangle: -45, automargin: true },
+        height: custom.height 
+    });
+}
     // 5. Mouse Phenotype Enrichment Heatmap
     function renderMousePhenotypeHeatmap(genes, custom) {
         clearPlot();
@@ -1091,44 +1118,44 @@ function debugPhylogenyData(genes) {
     }
     
     // 8. Protein Domain Architecture Heatmap
-    // --- FIXED getCleanArray FUNCTION ---
+// --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
 function getCleanArray(gene, key) {
     let data = gene[key];
     
     // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
     if (key === 'Protein.complexes') {
-         // Check 'complex_components' first, then fallback to 'Protein.complexes'
-         data = gene['complex_components'] || gene['Protein.complexes'];
-         if (typeof data === 'object' && !Array.isArray(data)) {
-             // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
-             return Object.keys(data).map(k => `${k}`);
-         }
+        data = gene['complex_components'] || gene['Protein.complexes'];
+        if (typeof data === 'object' && !Array.isArray(data)) {
+            return Object.keys(data).map(k => `${k}`);
+        }
     }
 
     // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
     if (key === 'Phenotypes_mouse') {
-        // Check Phenotypes_mouse first, then fallback to mouse_phenotype
         data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
     }
 
     // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
     if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-         // Use raw Domain_Descriptions data which is present in your object structure
-         const pfamIds = gene['PFAM_IDs'] || [];
-         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
-         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
+        const pfamIds = gene['PFAM_IDs'] || [];
+        const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
+        return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
+    }
+    
+    // 4. Handle Screens Summary (Array of Objects) - FIXED WITH FALLBACK
+    if (key === 'screens_summary') {
+        // Use 'screens_summary' first, then fallback to 'screens' (as per data format)
+        data = gene['screens_summary'] || gene['screens'];
+        if (Array.isArray(data)) return data; // Returns the raw array of objects
     }
 
-    // 4. Handle Screens Summary (Array of Objects)
-    if (key === 'screens_summary' && Array.isArray(data)) return data; 
-    
     if (!data) return [];
     
     // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
     if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
     return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
 }
-
+    
 // --- FIXED renderDomainArchitecture FUNCTION ---
 function renderDomainArchitecture(genes, custom) {
     clearPlot();
