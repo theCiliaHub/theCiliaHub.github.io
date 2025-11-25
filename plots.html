@@ -255,6 +255,7 @@ const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
                 points.push({
                     x: Math.cos(i) * 10 + typeIndex * 20 + Math.random() * 5,
                     y: Math.sin(i) * 10 + typeIndex * 10 + Math.random() * 5,
+                    cell_type: type
                 });
             }
         });
@@ -273,33 +274,39 @@ const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
     window.CiliAI.cellDataCache = MOCK_SC_DATA.cell_expression;    
 
     
-// --- TSV Parsing Helper (REVERTED TO CORRECT LOGIC from file 1 for robustness) ---
+// --- TSV Parsing Helper (UNCHANGED) ---
 function parseTsvData(tsvText) {
-    const data = {};
-    const lines = tsvText.split('\n').filter(line => line.trim() !== '');
-    if (lines.length <= 1) return data;
+    const data = {};
+    const lines = tsvText.split('\n').filter(line => line.trim() !== '');
+    if (lines.length <= 1) return data;
 
-    const headers = lines[0].split('\t').map(h => h.trim());
-    const geneNameIndex = headers.indexOf('Gene name');
-    
-    if (geneNameIndex === -1) return data;
+    const headers = lines[0].split('\t').map(h => h.trim());
+    const geneNameIndex = headers.indexOf('Gene name');
+    const tissueIndex = headers.indexOf('Tissue');
+    const nTPMIndex = headers.indexOf('nTPM');
 
-    for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split('\t').map(v => v.trim());
-        const geneName = values[geneNameIndex];
-        
-        if (geneName) {
-            if (!data[geneName]) data[geneName] = {};
-            for (let j = 0; j < headers.length; j++) {
-                if (j !== geneNameIndex && headers[j] && values[j]) {
-                    data[geneName][headers[j]] = parseFloat(values[j]);
-                }
-            }
-        }
-    }
-    return data;
+    if (geneNameIndex === -1 || tissueIndex === -1 || nTPMIndex === -1) {
+        console.error("TSV headers missing: 'Gene name', 'Tissue', or 'nTPM'");
+        return data;
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split('\t').map(v => v.trim());
+        if (values.length > tissueIndex) {
+            const geneName = values[geneNameIndex];
+            let tissue = values[tissueIndex];
+            const nTPM = parseFloat(values[nTPMIndex]);
+
+            if (tissue.toLowerCase() === 'cilia') continue; 
+
+            if (geneName && !isNaN(nTPM)) {
+                if (!data[geneName]) data[geneName] = {};
+                data[geneName][tissue] = nTPM;
+            }
+        }
+    }
+    return data;
 }
-
 
 // --- FIXED PHYLOGENETIC DATA INTEGRATION ---
 function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
@@ -365,9 +372,19 @@ async function loadMasterData() {
         window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
 
         // 3. Load phylogenetic matrices
-        window.liPhylogenyCache = await liResp.json();
-        window.neversPhylogenyCache = await neversResp.json();
-       
+        const liMatrix = await liResp.json();
+        const neversMatrix = await neversResp.json();
+        
+        // UMAP Data Extraction (Check properties on rawMasterData or a nested 'data' object)
+        const umapContainer = rawMasterData.data || rawMasterData; 
+        if (umapContainer.umap_points && umapContainer.cell_expression) {
+            window.CiliAI_UMAP = umapContainer.umap_points;
+            window.CiliAI.cellDataCache = umapContainer.cell_expression; 
+            console.log(`scRNA-seq UMAP data loaded successfully from Master DB. Total cells: ${umapContainer.umap_points.length}`);
+        } else {
+             console.warn(`scRNA-seq UMAP data not found within the Master DB structure. UMAP plot will not run.`);
+        }
+
         // 4. Populate Gene Map (ciliaryGeneMap) with BASIC gene data first
         window.CiliAI.masterData.forEach(g => {
             if (g.Gene) {
@@ -388,7 +405,7 @@ async function loadMasterData() {
         });
 
         // 5. CRITICAL: INTEGRATE PHYLOGENETIC DATA PROPERLY
-        integratePhylogenyData(ciliaryGeneMap, window.liPhylogenyCache, window.neversPhylogenyCache);
+        const integrationResults = integratePhylogenyData(ciliaryGeneMap, liMatrix, neversMatrix);
         
         // 6. Load RNA tissue data
         const rnaText = await rnaResp.text();
@@ -399,8 +416,33 @@ async function loadMasterData() {
 
         console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
 
-        // The diagnostic logs are helpful but can be removed for production.
-        // ... (Diagnostic logs removed for brevity) ...
+        // DIAGNOSTICS: Check IFT88 data immediately after loading and enrichment
+        const ift88Data = ciliaryGeneMap.get('IFT88');
+        if (ift88Data) {
+            console.log("\n--- DIAGNOSTICS: IFT88 Data Check (After Integration) ---");
+            console.log("Mouse Phenotype (raw):", ift88Data['mouse_phenotype'] || 'NULL/MISSING');
+            console.log("Protein Complexes (raw):", ift88Data['Protein.complexes'] || 'NULL/MISSING');
+            console.log("PFAM IDs (raw):", ift88Data['Protein.Domain.PFAM'] || 'NULL/MISSING');
+            console.log("Screens Summary (raw):", ift88Data['screens_summary'] || 'NULL/MISSING');
+            console.log("Phylogeny Li (raw):", ift88Data.phylogeny?.li_2014 || 'NULL/MISSING');
+            console.log("Phylogeny Nevers (raw):", ift88Data.phylogeny?.nevers_2017 || 'NULL/MISSING');
+            
+            // Check if phylogenetic data exists in the matrices directly
+            console.log("--- Direct Matrix Checks ---");
+            console.log("IFT88 in Nevers matrix:", neversMatrix.genes?.IFT88 || 'NOT FOUND');
+            console.log("IFT88 in Li matrix:", Object.values(liMatrix.genes || {}).find(g => g.g === 'IFT88') || 'NOT FOUND');
+            console.log("------------------------------------\n");
+        }
+
+        // Additional diagnostics: Check a few known genes
+        const testGenes = ['BBS1', 'ARL13B', 'CEP290', 'FOXJ1'];
+        testGenes.forEach(geneName => {
+            const gene = ciliaryGeneMap.get(geneName.toUpperCase());
+            if (gene) {
+                console.log(`${geneName} - Nevers:`, gene.phylogeny?.nevers_2017 ? 'PRESENT' : 'MISSING');
+                console.log(`${geneName} - Li:`, gene.phylogeny?.li_2014 ? 'PRESENT' : 'MISSING');
+            }
+        });
 
     } catch (err) {
         document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Please verify the data URLs.</p>`;
@@ -443,29 +485,36 @@ async function loadMasterData() {
         };
     }
 
-    // Using the more comprehensive shortenOrganismName from the corrected code block for better display
-    function shortenOrganismName(name) {
-        if (!name) return 'Unknown';
-        const shortNames = {
-            'Homo sapiens': 'H. sapiens', 'Mus musculus': 'M. musculus', 'Danio rerio': 'D. rerio', 'Xenopus tropicalis': 'X. tropicalis', 'Gallus gallus': 'G. gallus',
-            'Caenorhabditis elegans': 'C. elegans', 'Tetrahymena thermophila': 'T. thermophila', 'Chlamydomonas reinhardtii': 'C. reinhardtii', 'Micromonas sp': 'M. sp',
-            'Trypanosoma cruzi': 'T. cruzi', 'Leishmania major': 'L. major', 'Giardia intestinalis': 'G. intestinalis', 'Trichomonas vaginalis': 'T. vaginalis',
-            'Strongylocentrotus purpuratus': 'S. purpuratus', 'Ciona intestinalis': 'C. intestinalis', 'Physcomitrella patens': 'P. patens', 'Paramecium tetraurelia': 'P. tetraurelia',
-            'Volvox carteri': 'V. carteri', 'Amphimedon queenslandica': 'A. queenslandica', 'Monosiga brevicollis': 'M. brevicollis',
-            'Saccharomyces cerevisiae': 'S. cerevisiae', 'Schizosaccharomyces pombe': 'S. pombe', 'Cryptococcus neoformans': 'C. neoformans',
-            'Ustilago maydis': 'U. maydis', 'Candida albicans': 'C. albicans', 'Arabidopsis thaliana': 'A. thaliana', 'Brachypodium distachyon': 'B. distachyon',
-            'Sorghum bicolor': 'S. bicolor', 'Vitis vinifera': 'V. vinifera', 'Cryptosporidium parvum': 'C. parvum', 'Entamoeba histolytica': 'E. histolytica',
-            'Encephalitozoon cuniculi': 'E. cuniculi',
-            // Li format organisms
-            'H sapiens': 'H. sapiens', 'M musculus': 'M. musculus', 'D rerio': 'D. rerio', 'X tropicalis': 'X. tropicalis', 'G gallus': 'G. gallus', 'C elegans': 'C. elegans',
-            'T thermophila': 'T. thermophila', 'C reinhardtii': 'C. reinhardtii', 'M sp RCC299': 'M. sp', 'T cruzi': 'T. cruzi', 'L major': 'L. major',
-            'G intestinalis': 'G. intestinalis', 'T vaginalis': 'T. vaginalis', 'S purpuratus': 'S. purpuratus', 'C intestinalis': 'C. intestinalis', 'P patens': 'P. patens',
-            'P tetraurelia': 'P. tetraurelia', 'V carteri': 'V. carteri', 'A queenslandica': 'A. queenslandica', 'M brevicollis': 'M. brevicollis',
-            'S cerevisiae': 'S. cerevisiae', 'S pombe': 'S. pombe', 'C neoformans': 'C. neoformans', 'U maydis': 'U. maydis', 'C albicans': 'C. albicans', 'A thaliana': 'A. thaliana',
-            'B distachyon': 'B. distachyon', 'S bicolor': 'S. bicolor', 'V vinifera': 'V. vinifera', 'C parvum': 'C. parvum', 'E histolytica': 'E. histolytica', 'E cuniculi': 'E. cuniculi'
-        };
-        return shortNames[name] || name.split(' ')[0].charAt(0) + '. ' + (name.split(' ').length > 1 ? name.split(' ')[1].charAt(0) : '');
-    }
+    function shortenOrganismName(name) {
+        if (!name) return 'Unknown';
+        const shortNames = {
+            'Homo sapiens': 'H. sap.', 'Mus musculus': 'M. mus.', 'Danio rerio': 'D. rerio',
+            'Xenopus tropicalis': 'X. trop.', 'Gallus gallus': 'G. gal.', 'Caenorhabditis elegans': 'C. el.',
+            'Tetrahymena thermophila': 'T. therm.', 'Chlamydomonas reinhardtii': 'C. rein.',
+            'Micromonas sp': 'M. sp.', 'Trypanosoma cruzi': 'T. cruzi', 'Leishmania major': 'L. maj.',
+            'Giardia intestinalis': 'G. intest.', 'Trichomonas vaginalis': 'T. vag.', 'Strongylocentrotus purpuratus': 'S. purp.',
+            'Ciona intestinalis': 'C. intest.', 'Physcomitrella patens': 'P. patens', 'Paramecium tetraurelia': 'P. tet.',
+            'Volvox carteri': 'V. carteri', 'Amphimedon queenslandica': 'A. queens.', 'Monosiga brevicollis': 'M. brev.',
+            
+            'Saccharomyces cerevisiae': 'S. cere.', 'Schizosaccharomyces pombe': 'S. pombe', 'Cryptococcus neoformans': 'C. neo.',
+            'Ustilago maydis': 'U. maydis', 'Candida albicans': 'C. alb.', 'Arabidopsis thaliana': 'A. thal.',
+            'Brachypodium distachyon': 'B. dist.', 'Sorghum bicolor': 'S. bicol.', 'Vitis vinifera': 'V. vinif.',
+            'Cryptosporidium parvum': 'C. parv.', 'Entamoeba histolytica': 'E. histo.', 'Encephalitozoon cuniculi': 'E. cun.',
+            
+            // Li formats (simplified further)
+            'H sapiens': 'H. sap.', 'M musculus': 'M. mus.', 'D rerio': 'D. rerio', 'X tropicalis': 'X. trop.',
+            'G gallus': 'G. gal.', 'C elegans': 'C. el.', 'T thermophila': 'T. therm.', 'C reinhardtii': 'C. rein.',
+            'M sp RCC299': 'M. sp.', 'T cruzi': 'T. cruzi', 'L major': 'L. maj.', 'G intestinalis': 'G. intest.',
+            'T vaginalis': 'T. vag.', 'S purpuratus': 'S. purp.', 'C intestinalis': 'C. intest.', 'P patens': 'P. patens',
+            'P tetraurelia': 'P. tet.', 'V carteri': 'V. cart.', 'A queenslandica': 'A. queens.', 'M brevicollis': 'M. brev.',
+            'S cerevisiae': 'S. cere.', 'S pombe': 'S. pombe', 'C neoformans': 'C. neo.', 'U maydis': 'U. maydis',
+            'C albicans': 'C. alb.', 'A thaliana': 'A. thal.', 'B distachyon': 'B. dist.', 'S bicolor': 'S. bicol.',
+            'V vinifera': 'V. vinif.', 'C parvum': 'C. parvum', 'E histolytica': 'E. histo.', 'E cuniculi': 'E. cun.'
+        };
+        
+        // Match against simplified map, fallback to truncation
+        return shortNames[name] || name.split(' ')[0].charAt(0) + '. ' + name.split(' ')[1].substring(0, 3) + '.';
+    }
     
     function getCleanArray(gene, key) {
     let data = gene[key];
@@ -524,7 +573,7 @@ async function loadMasterData() {
 
 
     // ==========================================================
-    // PLOT RENDERING FUNCTIONS (All functional implementations restored)
+    // PLOT RENDERING FUNCTIONS (Requires all previous definitions)
     // ==========================================================
 
 
@@ -545,6 +594,7 @@ async function loadMasterData() {
         }
         
         if (globalUmapData.length === 0 || Object.keys(globalCellDataCache).length === 0) {
+            // ERROR 4 FIX: Message remains, but the reason is now understood: data is truly absent.
             plotDiv.innerHTML = `<div id="cilia-svg" style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">UMAP data is not available (Missing coordinates or expression cache).</div>`;
             return;
         }
@@ -654,7 +704,8 @@ async function loadMasterData() {
     window.renderScrnaUMAPPlot = renderScrnaUMAPPlot; 
 
 
-// 1. Gene Feature Overview (Manhattan-style) 
+// 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
+// 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
 function renderMultiCategoryManhattan(genes, custom) {
     clearPlot();
     
@@ -677,7 +728,7 @@ function renderMultiCategoryManhattan(genes, custom) {
         genes.forEach((gene, geneIdx) => {
             
             if (cat.key === "phylogeny") {
-                // Special handling for phylogeny data 
+                // Special handling for phylogeny data (FIXED: Uses species_data length for presence check)
                 const neversData = gene.phylogeny?.nevers_2017;
                 const liData = gene.phylogeny?.li_2014;
                 
@@ -696,7 +747,7 @@ function renderMultiCategoryManhattan(genes, custom) {
                     color.push(cat.color);
                 }
             } else {
-                // Standard handling for all other categories 
+                // Standard handling for all other categories (Domains, Complexes, Phenotypes, etc.)
                 const values = getCleanArray(gene, cat.key);
                 
                 values.forEach(val => {
@@ -737,6 +788,8 @@ function renderMultiCategoryManhattan(genes, custom) {
 
 
 // 3. Phylogenetic Conservation Heatmap
+// --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
+// --- PHYLOGENY HEATMAP (Master Renderer) ---
     function renderPhylogenyHeatmap(genes, custom) {
         clearPlot();
         const source = custom.source;
@@ -770,7 +823,7 @@ function renderMultiCategoryManhattan(genes, custom) {
                      textRow.push(`Gene: ${geneSymbol}<br>Status: No Data`);
                  });
             } else {
-                const presenceIndices = new Set(phyloData.species_data);
+                const presenceIndices = new Set(phyData.species_data);
                 
                 orgs.forEach((displayOrg, index) => {
                     const isCiliated = index < displayedCIL.length;
@@ -823,6 +876,26 @@ function renderMultiCategoryManhattan(genes, custom) {
     }
 
     
+// --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
+function debugPhylogenyData(genes) {
+    console.log("=== PHYLOGENY DATA DEBUG ===");
+    genes.forEach(gene => {
+        console.log(`Gene: ${gene.gene}`);
+        console.log(`  Nevers 2017:`, gene.phylogeny?.nevers_2017 ? 
+            `${gene.phylogeny.nevers_2017.species_count} species` : 'NO DATA');
+        console.log(`  Li 2014:`, gene.phylogeny?.li_2014 ? 
+            `${gene.phylogeny.li_2014.species_data?.length} species` : 'NO DATA');
+        
+        // Check if data exists in original matrices
+        const neversDirect = window.neversPhylogenyCache?.genes?.[gene.gene.toUpperCase()];
+        const liDirect = Object.values(window.liPhylogenyCache?.genes || {}).find(g => g.g === gene.gene);
+        
+        console.log(`  In Nevers matrix:`, neversDirect ? 'YES' : 'NO');
+        console.log(`  In Li matrix:`, liDirect ? 'YES' : 'NO');
+    });
+    console.log("=============================");
+}
+
     // 4. CRISPR & siRNA Screens Summary Heatmap
     function renderScreenSummaryHeatmap(genes, custom) {
         clearPlot();
@@ -927,6 +1000,10 @@ function renderMultiCategoryManhattan(genes, custom) {
     }
     
     // 8. Protein Domain Architecture Heatmap
+    // --- FIXED getCleanArray FUNCTION ---
+
+
+// --- FIXED renderDomainArchitecture FUNCTION ---
 function renderDomainArchitecture(genes, custom) {
     clearPlot();
     
