@@ -189,6 +189,7 @@
     <div id="plot-page-container">
         <div id="content-area">Loading CiliAI...</div>
     </div>
+
 <script>
     // ==========================================================
     // GLOBAL STATE (UNIFIED WITH CiliAI.js ARCHITECTURE)
@@ -197,198 +198,303 @@
     let liMatrix = {};
     let neversMatrix = {};
     
-    // Global state variables matching CiliAI.js structure
+    // Global state variables exposed globally, matching CiliAI.js structure
     window.rnaTissueExpressionData = {}; 
     window.CiliAI = {}; 
     window.CiliAI.masterData = [];
     window.CiliAI.lookups = { geneMap: {} }; 
-    window.CiliAI_UMAP = null; 
-    window.CiliAI.cellDataCache = {}; 
+    window.CiliAI_UMAP = null; // UMAP coordinates
+    window.CiliAI.cellDataCache = {}; // UMAP expression cache
     
-    // --- Data Maps for Phylogeny (Kept for plot consistency) ---
-    const LI_SPECIES_ORDER = [
-        "sym","Prokaryote","E.cuniculi","E.histolytica","E.dispar","G.lamblia","T.vaginalis","T.brucei","T.cruzi","L.infantum","L.major","L.braziliensis","T.gondii","C.hominis","C.parvum","B.bovis","T.annulata","T.parva","P.knowlesi","P.vivax","P.falciparum","P.chabaudi","P.berghei","P.yoelii","P.tetraurelia","T.thermophila","P.infestans","T.pseudonana","P.tricornutum","C.merolae","N.gruberi","O.lucimarinus","O.tauri","C.reinhardtii","V.carteri","P.patens","S.moellendorffii","S.bicolor","Z.mays","O.sativa","B.distachyon","A.lyrata","A.thaliana","L.japonicus","M.truncatula","V.vinifera","P.trichocarpa","R.communis","T.trahens","D.discoideum","A.macrogynus","S.punctatus","M.globosa","U.maydis","C.neoformans","P.chrysosporium","S.commune","C.cinerea","L.bicolor","S.pombe","B.fuckeliana","S.sclerotiorum","F.graminearum","M.grisea","N.crassa","P.anserina","P.chrysogenum","A.clavatus","A.fumigatus","N.fischeri","A.flavus","A.oryzae","A.niger","A.nidulans","U.reesii","C.immitis","C.posadasii","P.nodorum","T.melanosporum","Y.lipolytica","P.pastoris","C.lusitaniae","D.hansenii","M.guilliermondii","S.stipitis","L.elongisporus","C.tropicalis","C.albicans","C.dubliniensis","K.lactis","A.gossypii","K.waltii","L.thermotolerans","Z.rouxii","V.polyspora","C.glabrata","S.bayanus","S.mikatae","S.cerevisiae","S.paradoxus","S.arctica","C.owczarzaki","M.brevicollis","S.rosetta","S.mansoni","B.malayi","C.briggsae","C.elegans","D.pulex","A.pisum","P.humanus","A.mellifera","N.vitripennis","B.mori","T.castaneum","D.melanogaster","D.pseudoobscura","A.gambiae","A.aegypti","C.quinquefasciatus","B.floridae","T.adhaerens","S.purpuratus","H.magnipapillata","N.vectensis","C.intestinalis","D.rerio","O.latipes","F.rubripes","T.nigroviridis","X.tropicalis","G.gallus","M.gallopavo","O.anatinus","M.domestica","S.scrofa","M.musculus","C.familiaris","B.taurus","H.sapiens"
-    ];
-    const NEVERS_CIL_PANEL = [
-        "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", "Caenorhabditis elegans", "Tetrahymena thermophila (strain SB210)", "Chlamydomonas reinhardtii", "Micromonas sp. (strain RCC299 / NOUM17)", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens subsp. patens", "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis"
-    ];
-    const NEVERS_NCIL_PANEL = [
-        "Saccharomyces cerevisiae (strain ATCC 204500 / S288c)", "Schizosaccharomyces pombe (strain 972 / ATCC 24843)", "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)", "Ustilago maydis (strain 521 / FGSC 9021)", "Candida albicans (strain WO-1)", "Arabidopsis thaliana", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica", "Encephalitozoon cuniculi (strain GB-M1)"
-    ];
-    const CIL_ORG_FULL = [
-        "H.sapiens", "M.musculus", "D.rerio", "X.tropicalis", "G.gallus", "C.elegans", "T.thermophila", "C.reinhardtii", "O.tauri", 
-        "T.cruzi", "L.major", "G.lamblia", "T.vaginalis", "S.purpuratus", "C.intestinalis", "P.patens", "P.tetraurelia", "V.carteri", "M.brevicollis"
-    ];
-    const NCIL_ORG_FULL = [
-        "S.cerevisiae", "S.pombe", "C.neoformans", "U.maydis", "C.albicans", "A.thaliana", "B.distachyon", "S.bicolor",
-        "V.vinifera", "C.parvum", "E.histolytica", "E.cuniculi"
-    ];
+// --- Data Maps for Phylogeny (Kept for plot consistency) ---
+// --- ENSURE PHYLOGENY CONSTANTS ARE DEFINED ---
+// Add these if not already defined in your code
+const NEVERS_CIL_PANEL = [
+    "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", 
+    "Caenorhabditis elegans", "Tetrahymena thermophila", "Chlamydomonas reinhardtii", 
+    "Micromonas sp", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis", 
+    "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", 
+    "Physcomitrella patens", "Paramecium tetraurelia", "Volvox carteri", 
+    "Amphimedon queenslandica", "Monosiga brevicollis"
+];
 
+const NEVERS_NCIL_PANEL = [
+    "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Cryptococcus neoformans", 
+    "Ustilago maydis", "Candida albicans", "Arabidopsis thaliana", "Brachypodium distachyon", 
+    "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum", "Entamoeba histolytica", 
+    "Encephalitozoon cuniculi"
+];
+
+const LI_CIL_ORG = [
+    "H sapiens", "M musculus", "D rerio", "X tropicalis", "G gallus", "C elegans", 
+    "T thermophila", "C reinhardtii", "M sp RCC299", "T cruzi", "L major", 
+    "G intestinalis", "T vaginalis", "S purpuratus", "C intestinalis", "P patens", 
+    "P tetraurelia", "V carteri", "A queenslandica", "M brevicollis"
+];
+
+const LI_NCIL_ORG = [
+    "S cerevisiae", "S pombe", "C neoformans", "U maydis", "C albicans", "A thaliana", 
+    "B distachyon", "S bicolor", "V vinifera", "C parvum", "E histolytica", "E cuniculi"
+];
 
     // DATA URLS
-    const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-    const MASTER_DB = BASE_URL + 'ciliAI_master_database.json'; 
-    const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json'; 
-    const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json'; 
-    const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json'; 
-    const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
+const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+const MASTER_DB = BASE_URL + 'ciliAI_master_database.json'; 
+const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json'; 
+const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json'; 
+const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json'; 
+const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
 
+// --- TSV Parsing Helper (UNCHANGED) ---
+function parseTsvData(tsvText) {
+    const data = {};
+    const lines = tsvText.split('\n').filter(line => line.trim() !== '');
+    if (lines.length <= 1) return data;
 
-    // --- TSV Parsing Helper ---
-    function parseTsvData(tsvText) {
-        const data = {};
-        const lines = tsvText.split('\n').filter(line => line.trim() !== '');
-        if (lines.length <= 1) return data;
+    const headers = lines[0].split('\t').map(h => h.trim());
+    const geneNameIndex = headers.indexOf('Gene name');
+    const tissueIndex = headers.indexOf('Tissue');
+    const nTPMIndex = headers.indexOf('nTPM');
 
-        const headers = lines[0].split('\t').map(h => h.trim());
-        const geneNameIndex = headers.indexOf('Gene name');
-        const tissueIndex = headers.indexOf('Tissue');
-        const nTPMIndex = headers.indexOf('nTPM');
-
-        if (geneNameIndex === -1 || tissueIndex === -1 || nTPMIndex === -1) {
-            console.error("TSV headers missing: 'Gene name', 'Tissue', or 'nTPM'");
-            return data;
-        }
-
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split('\t').map(v => v.trim());
-            if (values.length > tissueIndex) {
-                const geneName = values[geneNameIndex];
-                let tissue = values[tissueIndex];
-                const nTPM = parseFloat(values[nTPMIndex]);
-
-                if (tissue.toLowerCase() === 'cilia') continue; 
-
-                if (geneName && !isNaN(nTPM)) {
-                    if (!data[geneName]) data[geneName] = {};
-                    data[geneName][tissue] = nTPM;
-                }
-            }
-        }
+    if (geneNameIndex === -1 || tissueIndex === -1 || nTPMIndex === -1) {
+        console.error("TSV headers missing: 'Gene name', 'Tissue', or 'nTPM'");
         return data;
     }
 
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split('\t').map(v => v.trim());
+        if (values.length > tissueIndex) {
+            const geneName = values[geneNameIndex];
+            let tissue = values[tissueIndex];
+            const nTPM = parseFloat(values[nTPMIndex]);
 
-    /**
-     * @FINAL_FUNCTION: loadMasterData - Unified loading function
-     */
-    async function loadMasterData() {
-        try {
-            // 1. Fetch ALL data concurrently
-            const [masterResp, lookupResp, liResp, neversResp, rnaResp] = await Promise.all([
-                fetch(MASTER_DB),
-                fetch(LOOKUP_DB),
-                fetch(LI_PHYLO_MATRIX),
-                fetch(NEVERS_PHYLO_MATRIX),
-                fetch(RNA_TISSUE_TSV)
-            ]);
-            
-            // 2. Process Master Data and Lookups
-            const rawMasterData = await masterResp.json();
-            const rawLookups = await lookupResp.json();
-            
-            // Set CiliAI lookups structure for internal consistency and future use
-            window.CiliAI.lookups = rawLookups.lookups || {};
-            // Set masterData on CiliAI object for chat function compatibility
-            window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
+            if (tissue.toLowerCase() === 'cilia') continue; 
 
-            
-            // UMAP Data Extraction (Fixes Error 4: Missing coordinates/cache)
-            // This replicates the mechanism used by the working ciliai.js code
-            const umapContainer = rawMasterData.data || rawMasterData; 
-            if (umapContainer.umap_points && umapContainer.cell_expression) {
-                window.CiliAI_UMAP = umapContainer.umap_points;
-                window.CiliAI.cellDataCache = umapContainer.cell_expression; 
-                console.log(`scRNA-seq UMAP data loaded successfully from Master DB. Total cells: ${umapContainer.umap_points.length}`);
-            } else {
-                 console.warn(`scRNA-seq UMAP data not found within the Master DB structure. UMAP plot will not run.`);
+            if (geneName && !isNaN(nTPM)) {
+                if (!data[geneName]) data[geneName] = {};
+                data[geneName][tissue] = nTPM;
             }
+        }
+    }
+    return data;
+}
 
-            // 3. Populate Gene Map (ciliaryGeneMap) used by plots, ensuring enrichment
-            liMatrix = await liResp.json();
-            neversMatrix = await neversResp.json();
-            
-            window.CiliAI.masterData.forEach(g => {
-                if (g.Gene) {
-                    // Create an ENRICHED gene object for the plots page consumption
-                    const gene = { 
-                        ...g, 
-                        gene: g.Gene,
-                        // ENRICHMENT: Ensure phylogeny data is present
-                        phylogeny: {
-                            li_2014: liMatrix[g.Gene] || liMatrix[g.Gene.toUpperCase()],
-                            nevers_2017: neversMatrix[g.Gene] || neversMatrix[g.Gene.toUpperCase()]
-                        }
+// --- FIXED PHYLOGENETIC DATA INTEGRATION ---
+function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
+    let liIntegrated = 0;
+    let neversIntegrated = 0;
+    
+    console.log("Integrating phylogenetic data into gene objects...");
+    
+    // Integrate Nevers 2017 data (uses gene symbols as keys)
+    if (neversMatrix && neversMatrix.genes) {
+        Object.entries(neversMatrix.genes).forEach(([geneKey, phyloData]) => {
+            if (geneKey && phyloData && phyloData.g) {
+                const geneSymbol = phyloData.g.toUpperCase();
+                const gene = geneMap.get(geneSymbol);
+                if (gene) {
+                    if (!gene.phylogeny) gene.phylogeny = {};
+                    gene.phylogeny.nevers_2017 = {
+                        species_data: phyloData.s || [],
+                        species_count: (phyloData.s || []).length,
+                        gene_name: phyloData.g
                     };
-                    
-                    // Populate ciliaryGeneMap with the enriched object
-                    ciliaryGeneMap.set(g.Gene.toUpperCase(), gene);
-                    
-                    // Ensure geneMap exists for complex/domain lookup consistency (Error 1, 2, 3 Fix)
-                    if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
-                    window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = gene; // Use ENRICHED gene object
+                    neversIntegrated++;
                 }
-            });
-            
-            const rnaText = await rnaResp.text();
-            
-            // CRITICAL FIX: Assign to the global variable
-            window.rnaTissueExpressionData = parseTsvData(rnaText);
-
-            // Set the ready flag for CiliAI.js functions if ever used
-            window.CiliAI.ready = true;
-
-            console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
-
-        } catch (err) {
-            document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Please verify the data URLs.</p>`;
-        }
-    }
-
-
-    // --- Data retrieval utility (Kept from original plots.html) ---
-    function getCleanArray(gene, key) {
-        let data = gene[key];
-        if (!data) return [];
-        // Handle screen summary which might be an array of objects
-        if (key === 'screens_summary' && Array.isArray(data)) return data; 
-        if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-             // Combine IDs and descriptions for Domain plot enrichment (Error 3 Fix)
-             return gene['Domain_Descriptions'].map((desc, i) => `${gene['PFAM_IDs'][i] || 'PFAM_ID'}: ${desc}`);
-        }
-        
-        if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
-        return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
-    }
-
-    function findGenes(input) {
-        const queries = input
-            .split(/[\s,\n;]+/)
-            .map(s => s.trim().replace(/\u200B/g, '').toUpperCase())
-            .filter(Boolean);
-            
-        const found = [];
-        const seen = new Set();
-        
-        queries.forEach(q => {
-            if (!seen.has(q) && ciliaryGeneMap.has(q)) {
-                found.push(ciliaryGeneMap.get(q));
-                seen.add(q);
             }
         });
-        // This ensures the found genes are the enriched objects
-        return found; 
+    }
+    
+    // Integrate Li 2014 data (uses Entrez IDs as keys, but has gene names in 'g' field)
+    if (liMatrix && liMatrix.genes) {
+        Object.values(liMatrix.genes).forEach(phyloData => {
+            if (phyloData && phyloData.g) {
+                const geneSymbol = phyloData.g.toUpperCase();
+                const gene = geneMap.get(geneSymbol);
+                if (gene) {
+                    if (!gene.phylogeny) gene.phylogeny = {};
+                    gene.phylogeny.li_2014 = {
+                        species_data: phyloData.s || [],
+                        class: phyloData.c,
+                        entrez_id: phyloData.e,
+                        gene_name: phyloData.g
+                    };
+                    liIntegrated++;
+                }
+            }
+        });
+    }
+    
+    console.log(`Integrated phylogenetic data: ${neversIntegrated} genes from Nevers 2017, ${liIntegrated} genes from Li 2014`);
+    return { liIntegrated, neversIntegrated };
+}
+
+/**
+ * @loadMasterData - Loads data and constructs the necessary global structures.
+ */
+async function loadMasterData() {
+    try {
+        // 1. Fetch ALL data concurrently
+        const [masterResp, lookupResp, liResp, neversResp, rnaResp] = await Promise.all([
+            fetch(MASTER_DB),
+            fetch(LOOKUP_DB),
+            fetch(LI_PHYLO_MATRIX),
+            fetch(NEVERS_PHYLO_MATRIX),
+            fetch(RNA_TISSUE_TSV)
+        ]);
+        
+        // 2. Process Master Data and Lookups
+        const rawMasterData = await masterResp.json();
+        const rawLookups = await lookupResp.json();
+        
+        // Set CiliAI lookups structure for internal consistency and future use
+        window.CiliAI.lookups = rawLookups.lookups || {};
+        window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
+
+        // 3. Load phylogenetic matrices
+        const liMatrix = await liResp.json();
+        const neversMatrix = await neversResp.json();
+        
+        // UMAP Data Extraction (Check properties on rawMasterData or a nested 'data' object)
+        const umapContainer = rawMasterData.data || rawMasterData; 
+        if (umapContainer.umap_points && umapContainer.cell_expression) {
+            window.CiliAI_UMAP = umapContainer.umap_points;
+            window.CiliAI.cellDataCache = umapContainer.cell_expression; 
+            console.log(`scRNA-seq UMAP data loaded successfully from Master DB. Total cells: ${umapContainer.umap_points.length}`);
+        } else {
+             console.warn(`scRNA-seq UMAP data not found within the Master DB structure. UMAP plot will not run.`);
+        }
+
+        // 4. Populate Gene Map (ciliaryGeneMap) with BASIC gene data first
+        window.CiliAI.masterData.forEach(g => {
+            if (g.Gene) {
+                // Create basic gene object first
+                const gene = { 
+                    ...g, 
+                    gene: g.Gene,
+                    phylogeny: {} // Initialize empty phylogeny object
+                };
+                
+                // Populate ciliaryGeneMap with the basic object
+                ciliaryGeneMap.set(g.Gene.toUpperCase(), gene);
+                
+                // Ensure geneMap exists for complex/domain lookup consistency 
+                if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
+                window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = gene;
+            }
+        });
+
+        // 5. CRITICAL: INTEGRATE PHYLOGENETIC DATA PROPERLY
+        const integrationResults = integratePhylogenyData(ciliaryGeneMap, liMatrix, neversMatrix);
+        
+        // 6. Load RNA tissue data
+        const rnaText = await rnaResp.text();
+        window.rnaTissueExpressionData = parseTsvData(rnaText);
+
+        // Set the ready flag for CiliAI.js functions if ever used
+        window.CiliAI.ready = true;
+
+        console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
+
+        // DIAGNOSTICS: Check IFT88 data immediately after loading and enrichment
+        const ift88Data = ciliaryGeneMap.get('IFT88');
+        if (ift88Data) {
+            console.log("\n--- DIAGNOSTICS: IFT88 Data Check (After Integration) ---");
+            console.log("Mouse Phenotype (raw):", ift88Data['mouse_phenotype'] || 'NULL/MISSING');
+            console.log("Protein Complexes (raw):", ift88Data['Protein.complexes'] || 'NULL/MISSING');
+            console.log("PFAM IDs (raw):", ift88Data['Protein.Domain.PFAM'] || 'NULL/MISSING');
+            console.log("Screens Summary (raw):", ift88Data['screens_summary'] || 'NULL/MISSING');
+            console.log("Phylogeny Li (raw):", ift88Data.phylogeny?.li_2014 || 'NULL/MISSING');
+            console.log("Phylogeny Nevers (raw):", ift88Data.phylogeny?.nevers_2017 || 'NULL/MISSING');
+            
+            // Check if phylogenetic data exists in the matrices directly
+            console.log("--- Direct Matrix Checks ---");
+            console.log("IFT88 in Nevers matrix:", neversMatrix.genes?.IFT88 || 'NOT FOUND');
+            console.log("IFT88 in Li matrix:", Object.values(liMatrix.genes || {}).find(g => g.g === 'IFT88') || 'NOT FOUND');
+            console.log("------------------------------------\n");
+        }
+
+        // Additional diagnostics: Check a few known genes
+        const testGenes = ['BBS1', 'ARL13B', 'CEP290', 'FOXJ1'];
+        testGenes.forEach(geneName => {
+            const gene = ciliaryGeneMap.get(geneName.toUpperCase());
+            if (gene) {
+                console.log(`${geneName} - Nevers:`, gene.phylogeny?.nevers_2017 ? 'PRESENT' : 'MISSING');
+                console.log(`${geneName} - Li:`, gene.phylogeny?.li_2014 ? 'PRESENT' : 'MISSING');
+            }
+        });
+
+    } catch (err) {
+        document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Please verify the data URLs.</p>`;
+    }
+}
+
+// --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
+function getCleanArray(gene, key) {
+    let data = gene[key];
+    
+    // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
+    if (key === 'Protein.complexes') {
+         // Check 'complex_components' first, then fallback to 'Protein.complexes'
+         data = gene['complex_components'] || gene['Protein.complexes'];
+         if (typeof data === 'object' && !Array.isArray(data)) {
+             // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
+             return Object.keys(data).map(k => `${k}`);
+         }
     }
 
-    function getCustom() {
-        return {
-            title: document.getElementById('custom-title')?.value || 'CiliAI Analysis',
-            titleSize: parseInt(document.getElementById('title-size')?.value) || 24,
-            width: parseInt(document.getElementById('fig-width')?.value) || 1100,
-            height: parseInt(document.getElementById('fig-height')?.value) || 700,
-            source: document.getElementById('phy-source')?.value || 'nevers_2017'
-        };
+    // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
+    if (key === 'Phenotypes_mouse') {
+        // Check Phenotypes_mouse first, then fallback to mouse_phenotype
+        data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
     }
+
+    // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
+    if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
+         // Use raw Domain_Descriptions data which is present in your object structure
+         const pfamIds = gene['PFAM_IDs'] || [];
+         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
+         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
+    }
+
+    // 4. Handle Screens Summary (Array of Objects)
+    if (key === 'screens_summary' && Array.isArray(data)) return data; 
+    
+    if (!data) return [];
+    
+    // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
+    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
+    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
+}
+
+function findGenes(input) {
+    const queries = input
+        .split(/[\s,\n;]+/)
+        .map(s => s.trim().replace(/\u200B/g, '').toUpperCase())
+        .filter(Boolean);
+        
+    const found = [];
+    const seen = new Set();
+    
+    queries.forEach(q => {
+        if (!seen.has(q) && ciliaryGeneMap.has(q)) {
+            found.push(ciliaryGeneMap.get(q));
+            seen.add(q);
+        }
+    });
+    // This ensures the found genes are the enriched objects
+    return found; 
+}
+
+function getCustom() {
+    return {
+        title: document.getElementById('custom-title')?.value || 'CiliAI Analysis',
+        titleSize: parseInt(document.getElementById('title-size')?.value) || 24,
+        width: parseInt(document.getElementById('fig-width')?.value) || 1100,
+        height: parseInt(document.getElementById('fig-height')?.value) || 700,
+        source: document.getElementById('phy-source')?.value || 'nevers_2017'
+    };
+}
 
     function clearPlot() {
         const el = document.getElementById('plot-display-area');
@@ -447,7 +553,7 @@
         }
 
         const sizeScaleMaxExpression = maxExpression > 0 ? maxExpression : 1;
-        // Calculate size based on dynamic max expression
+        // Calculate size based on dynamic expression
         for (const expressionValue of colorArray) {
             const scaledMagnitude = expressionValue / sizeScaleMaxExpression; 
             sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude);
@@ -527,64 +633,65 @@
 
 
     // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
-    function renderMultiCategoryManhattan(genes, custom) {
-        clearPlot();
-        // Added 'Protein Domains' and 'Tissue Expression' as categories.
-        const categories = [
-            { name: "Localization", key: "Localization", color: "#1f77b4" },
-            { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
-            { name: "Ciliopathy", key: "Ciliopathy", color: "#2ca02c" },
-            { name: "Function", key: "Functional.category", color: "#d62728" },
-            { name: "Screens", key: "screens_summary", color: "#9467bd" },
-            { name: "Phenotypes", key: "Phenotypes_mouse", color: "#8c564b" },
-            { name: "Protein Domains", key: "Protein.Domain.PFAM", color: "#e377c2" }, 
-            { name: "Tissue Express.", key: "top_tissue_expression", color: "#17becf" }
-        ];
+// --- FIXED PHYLOGENY DATA ACCESS IN OTHER PLOTS ---
+function renderMultiCategoryManhattan(genes, custom) {
+    clearPlot();
+    
+    // Add phylogeny as one of the categories if data exists
+    const categories = [
+        { name: "Localization", key: "Localization", color: "#1f77b4" },
+        { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
+        { name: "Ciliopathy", key: "Ciliopathy", color: "#2ca02c" },
+        { name: "Function", key: "Functional.category", color: "#d62728" },
+        { name: "Screens", key: "screens_summary", color: "#9467bd" },
+        { name: "Phenotypes", key: "Phenotypes_mouse", color: "#8c564b" },
+        { name: "Phylogeny", key: "phylogeny", color: "#17becf" } // NEW: Add phylogeny category
+    ];
 
-        const traces = [];
-        categories.forEach((cat, catIdx) => {
-            const x = [], y = [], text = [], color = [];
-            genes.forEach((gene, geneIdx) => {
-                let values = [];
+    const traces = [];
+    categories.forEach((cat, catIdx) => {
+        const x = [], y = [], text = [], color = [];
+        
+        genes.forEach((gene, geneIdx) => {
+            if (cat.key === "phylogeny") {
+                // Special handling for phylogeny data
+                const neversData = gene.phylogeny?.nevers_2017;
+                const liData = gene.phylogeny?.li_2014;
                 
-                // 1. Special handling for "Tissue Expression"
-                if (cat.name === "Tissue Express.") {
-                    // Check global rnaTissueExpressionData (which holds the bulk TSV data)
-                    const exprData = window.rnaTissueExpressionData[gene.gene] || {};
-                    const tissues = Object.entries(exprData)
-                        .filter(([, nTPM]) => nTPM > 10) // Filter for high expression (e.g., > 10 nTPM)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 1);
-                    values = tissues.map(([name, val]) => `${name} (${val.toFixed(0)} nTPM)`);
-                } else {
-                    // 2. General handling for all other string/array fields
-                    values = getCleanArray(gene, cat.key);
-                    
-                    // CRITICAL FIX: Ensure screens_summary data is handled as text if it is complex objects
-                    if (cat.key === 'screens_summary' && Array.isArray(values) && values.length > 0) {
-                        // Extract just the source names/results for a cleaner summary plot
-                        values = values.map(s => typeof s === 'object' && s.source ? s.source : String(s)).slice(0, 3);
-                    }
-                }
-                
-                // Only plot points if there are values
-                values.forEach(val => {
+                if (neversData && neversData.species_data && neversData.species_data.length > 0) {
                     x.push(catIdx + (Math.random() - 0.5) * 0.6);
                     y.push(geneIdx);
-                    // Use a slightly different marker for the hover text formatting
-                    text.push(`${gene.gene}<br>**${cat.name}**: ${val}`); 
+                    text.push(`${gene.gene}<br>Phylogeny: Nevers (${neversData.species_count} species)`);
                     color.push(cat.color);
-                });
-            });
-            if (x.length > 0) {
-                traces.push({
-                    x, y, text, mode: 'markers', name: cat.name,
-                    marker: { size: 14, color },
-                    hovertemplate: '%{text}<extra></extra>'
+                }
+                if (liData && liData.species_data && liData.species_data.length > 0) {
+                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                    y.push(geneIdx);
+                    text.push(`${gene.gene}<br>Phylogeny: Li (${liData.species_data.length} species)`);
+                    color.push(cat.color);
+                }
+            } else {
+                // Standard handling for other categories
+                const values = getCleanArray(gene, cat.key);
+                values.forEach(val => {
+                    if (val && val !== 'N/A' && val !== 'Unknown') {
+                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                        y.push(geneIdx);
+                        text.push(`${gene.gene}<br>${cat.name}: ${val}`);
+                        color.push(cat.color);
+                    }
                 });
             }
         });
-
+        
+        if (x.length > 0) {
+            traces.push({
+                x, y, text, mode: 'markers', name: cat.name,
+                marker: { size: 14, color },
+                hovertemplate: '%{text}<extra></extra>'
+            });
+        }
+    });
         const layout = {
             title: { text: custom.title || "Gene Feature Overview / Summary (Manhattan Plot)", font: { size: custom.titleSize } },
             xaxis: { 
@@ -600,84 +707,288 @@
         Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
     }
 
+}
 
-    // 3. Phylogenetic Conservation Heatmap
-    function renderPhylogenyHeatmap(genes, custom) {
-        clearPlot();
-        const source = custom.source;
-        const isLi = source === 'li_2014';
+
+// 3. Phylogenetic Conservation Heatmap
+// --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
+function renderPhylogenyHeatmap(genes, custom) {
+    clearPlot();
+    const source = custom.source;
+    const isLi = source === 'li_2014';
+    // Define the ordered list of organisms to display (CIL followed by NCIL)
+    const displayedCIL = isLi ? LI_CIL_ORG : NEVERS_CIL_PANEL;
+    const displayedNCIL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_PANEL;
+    const orgs = [...displayedCIL, ...displayedNCIL];
+
+    const z = [];
+    const yLabels = [];
+    const textMatrix = [];
+    let totalPresenceCount = 0;
+    
+    // Get the appropriate master organism list
+    const masterOrgList = isLi ? 
+        (window.liPhylogenyCache?.summary?.organisms_list || []) :
+        (window.neversPhylogenyCache?.organism_groups?.all_organisms_list || []);
+    
+    const masterOrgMap = new Map(masterOrgList.map((name, index) => [name.toUpperCase(), index]));
+
+    genes.forEach(gene => {
+        const geneSymbol = gene.gene || gene.Gene;
+        const phyData = gene.phylogeny?.[source];
+        const row = [];
+        const textRow = [];
         
-        // Define the ordered list of organisms to display (CIL followed by NCIL)
-        const displayedCIL = isLi ? CIL_ORG_FULL : NEVERS_CIL_PANEL;
-        const displayedNCIL = isLi ? NCIL_ORG_FULL : NEVERS_NCIL_PANEL;
-        const orgs = [...displayedCIL, ...displayedNCIL];
-
-        const z = genes.map(gene => {
-            // Read from the integrated phylogeny object which contains the data mapped from the matrices
-            const phy = gene.phylogeny?.[source];
-            
-            if (!phy || (!phy.species_data && !phy.species_indices)) {
-                 const humanSymbol = isLi ? "H.sapiens" : "Homo sapiens";
-                 return orgs.map(org => org === humanSymbol ? 1 : 0);
-            }
-            
-            const presentData = phy.species_data || phy.species_indices;
-            const present = new Set(presentData);
-            
-            return orgs.map(org => {
-                if (isLi) {
-                    // For Li: Find the index of the organism in the master LI_SPECIES_ORDER list
-                    const orgIndex = LI_SPECIES_ORDER.indexOf(org);
-                    return present.has(orgIndex) ? 1 : 0;
-                } else {
-                    // For Nevers: Check if the organism name is present in species_data
-                    return present.has(org) ? 1 : 0;
-                }
+        if (!phyData || !phyData.species_data || !Array.isArray(phyData.species_data)) {
+            // No phylogeny data for this gene
+            orgs.forEach(org => {
+                row.push(0); // Absent
+                textRow.push(`Gene: ${geneSymbol}<br>Organism: ${org}<br>Status: No Data`);
             });
-        });
-        
-        // Add a separator line between CIL and NCIL panels
-        const separatorIndex = displayedCIL.length - 0.5;
-        
-        const data = [{
-            type: 'heatmap', z, x: orgs, y: genes.map(g=>g.gene),
-            colorscale: [[0,'#f0f0f0'],[1,'var(--primary)']], showscale: false
-        }];
-
-        const layout = {
-            title: { text: custom.title || `Phylogenetic Conservation Heatmap (Ciliated vs. Non-Ciliated)` },
-            xaxis: { 
-                tickangle: -90, 
-                side: 'top', 
-                tickfont: { size: 8 },
-                tickcolor: 'black', 
-                ticklen: 3 
-            },
-            yaxis: { automargin: true },
-            height: custom.height, 
-            width: custom.width,
-            shapes: [{
-                type: 'line',
-                xref: 'x', yref: 'paper',
-                x0: separatorIndex, y0: 0,
-                x1: separatorIndex, y1: 1,
-                line: { color: 'rgba(0, 0, 0, 0.6)', width: 2, dash: 'dash' }
-            }],
-            annotations: [
-                {
-                    xref: 'x', yref: 'paper',
-                    x: displayedCIL.length / 2 - 0.5, y: 1.05,
-                    text: 'Ciliated Organisms', showarrow: false, font: { size: 10, color: 'var(--primary)', weight: 'bold' }
-                },
-                {
-                    xref: 'x', yref: 'paper',
-                    x: displayedCIL.length + (displayedNCIL.length / 2) - 0.5, y: 1.05,
-                    text: 'Non-Ciliated Organisms', showarrow: false, font: { size: 10, color: 'darkred', weight: 'bold' }
+        } else {
+            // We have phylogeny data - map to display organisms
+            const presenceIndices = new Set(phyData.species_data);
+            
+            orgs.forEach((displayOrg, index) => {
+                const isCiliated = index < displayedCIL.length;
+                let status = 0; // Default: absent
+                
+                // Find the master index for this display organism
+                let masterIndex = -1;
+                
+                if (isLi) {
+                    // For Li data: map display names to master list indices
+                    masterIndex = masterOrgMap.get(displayOrg.toUpperCase());
+                } else {
+                    // For Nevers data: try exact match first, then partial
+                    masterIndex = masterOrgMap.get(displayOrg.toUpperCase());
+                    if (masterIndex === undefined) {
+                        // Try partial matching for Nevers organisms with strain info
+                        for (const [masterOrg, idx] of masterOrgMap.entries()) {
+                            if (masterOrg.includes(displayOrg.toUpperCase()) || 
+                                displayOrg.toUpperCase().includes(masterOrg)) {
+                                masterIndex = idx;
+                                break;
+                            }
+                        }
+                    }
                 }
-            ]
-        };
-        Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+
+                if (masterIndex !== undefined && masterIndex !== -1 && presenceIndices.has(masterIndex)) {
+                    status = isCiliated ? 2 : 1; // 2=Ciliated, 1=Non-Ciliated
+                    totalPresenceCount++;
+                    textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Present`);
+                } else {
+                    textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Absent`);
+                }
+                row.push(status);
+            });
+        }
+        
+        z.push(row);
+        yLabels.push(geneSymbol);
+        textMatrix.push(textRow);
+    });
+
+    // Check if we have any data to display
+    if (totalPresenceCount === 0) {
+        document.getElementById('plot-display-area').innerHTML = 
+            `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
+                No phylogenetic conservation data found for the selected genes in the ${isLi ? 'Li et al. 2014' : 'Nevers et al. 2017'} database.
+                <br><br>
+                <small>This could mean:
+                <ul style="text-align: left; display: inline-block;">
+                    <li>The genes are not present in the phylogenetic matrix</li>
+                    <li>There was an issue loading the phylogenetic data</li>
+                    <li>The organism mapping needs adjustment</li>
+                </ul>
+                </small>
+            </div>`;
+        return;
     }
+
+    // Add separator line between CIL and NCIL panels
+    const separatorIndex = displayedCIL.length - 0.5;
+    
+    const data = [{
+        type: 'heatmap', 
+        z: z, 
+        x: orgs.map(shortenOrganismName),
+        y: yLabels, 
+        customdata: textMatrix,
+        colorscale: [
+            [0, '#F0F0F0'],     // Absent - light gray
+            [0.0001, '#FFE5B5'], // Non-ciliated present - light orange
+            [1, '#FFE5B5'],      // Non-ciliated present  
+            [1.0001, '#698ECF'], // Ciliated present - blue
+            [2, '#698ECF']       // Ciliated present
+        ],
+        showscale: false,
+        hovertemplate: '%{customdata}<extra></extra>',
+        xgap: 0.5,
+        ygap: 0.5
+    }];
+
+    const layout = {
+        title: { 
+            text: custom.title || `Phylogenetic Conservation Heatmap (${isLi ? 'Li et al. 2014' : 'Nevers et al. 2017'})`,
+            font: { size: custom.titleFontSize || 16 }
+        },
+        width: custom.figureWidth || 1000, 
+        height: custom.figureHeight || Math.max(500, genes.length * 40 + 200),
+        xaxis: { 
+            title: 'Organisms', 
+            tickangle: -45,
+            tickfont: { size: 9 },
+            tickvals: Array.from({length: orgs.length}, (_, i) => i),
+            ticktext: orgs.map(shortenOrganismName),
+            showgrid: false, 
+            zeroline: false, 
+            side: 'top', 
+            automargin: true
+        },
+        yaxis: { 
+            title: 'Genes', 
+            automargin: true, 
+            tickfont: { size: 11 } 
+        },
+        margin: { l: 100, r: 20, t: 120, b: 200 },
+        shapes: [{
+            type: 'line', 
+            xref: 'x', 
+            yref: 'paper', 
+            x0: separatorIndex, 
+            x1: separatorIndex,
+            y0: 0, 
+            y1: 1, 
+            line: { color: 'black', width: 2 } 
+        }],
+        annotations: [
+            { 
+                text: 'CILIATED', 
+                xref: 'x', 
+                yref: 'paper', 
+                x: (displayedCIL.length - 1) / 2, 
+                y: 1.05, 
+                showarrow: false, 
+                font: { color: '#698ECF', size: 12, weight: 'bold' }, 
+                xanchor: 'center' 
+            },
+            { 
+                text: 'NON-CILIATED', 
+                xref: 'x', 
+                yref: 'paper', 
+                x: displayedCIL.length + (displayedNCIL.length / 2) - 0.5, 
+                y: 1.05,
+                showarrow: false, 
+                font: { color: '#d62728', size: 12, weight: 'bold' }, 
+                xanchor: 'center' 
+            }
+        ]
+    };
+    
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+}
+
+// --- ENHANCED ORGANISM NAME SHORTENER ---
+function shortenOrganismName(name) {
+    if (!name) return 'Unknown';
+    
+    const shortNames = {
+        // Ciliated organisms
+        'Homo sapiens': 'H. sapiens',
+        'Mus musculus': 'M. musculus', 
+        'Danio rerio': 'D. rerio',
+        'Xenopus tropicalis': 'X. tropicalis',
+        'Gallus gallus': 'G. gallus',
+        'Caenorhabditis elegans': 'C. elegans',
+        'Tetrahymena thermophila': 'T. thermophila',
+        'Chlamydomonas reinhardtii': 'C. reinhardtii',
+        'Micromonas sp': 'M. sp',
+        'Trypanosoma cruzi': 'T. cruzi',
+        'Leishmania major': 'L. major',
+        'Giardia intestinalis': 'G. intestinalis',
+        'Trichomonas vaginalis': 'T. vaginalis',
+        'Strongylocentrotus purpuratus': 'S. purpuratus',
+        'Ciona intestinalis': 'C. intestinalis',
+        'Physcomitrella patens': 'P. patens',
+        'Paramecium tetraurelia': 'P. tetraurelia',
+        'Volvox carteri': 'V. carteri',
+        'Amphimedon queenslandica': 'A. queenslandica',
+        'Monosiga brevicollis': 'M. brevicollis',
+        
+        // Non-ciliated organisms
+        'Saccharomyces cerevisiae': 'S. cerevisiae',
+        'Schizosaccharomyces pombe': 'S. pombe',
+        'Cryptococcus neoformans': 'C. neoformans',
+        'Ustilago maydis': 'U. maydis',
+        'Candida albicans': 'C. albicans',
+        'Arabidopsis thaliana': 'A. thaliana',
+        'Brachypodium distachyon': 'B. distachyon',
+        'Sorghum bicolor': 'S. bicolor',
+        'Vitis vinifera': 'V. vinifera',
+        'Cryptosporidium parvum': 'C. parvum',
+        'Entamoeba histolytica': 'E. histolytica',
+        'Encephalitozoon cuniculi': 'E. cuniculi',
+        
+        // Li format organisms
+        'H sapiens': 'H. sapiens',
+        'M musculus': 'M. musculus',
+        'D rerio': 'D. rerio',
+        'X tropicalis': 'X. tropicalis',
+        'G gallus': 'G. gallus',
+        'C elegans': 'C. elegans',
+        'T thermophila': 'T. thermophila',
+        'C reinhardtii': 'C. reinhardtii',
+        'M sp RCC299': 'M. sp',
+        'T cruzi': 'T. cruzi',
+        'L major': 'L. major',
+        'G intestinalis': 'G. intestinalis',
+        'T vaginalis': 'T. vaginalis',
+        'S purpuratus': 'S. purpuratus',
+        'C intestinalis': 'C. intestinalis',
+        'P patens': 'P. patens',
+        'P tetraurelia': 'P. tetraurelia',
+        'V carteri': 'V. carteri',
+        'A queenslandica': 'A. queenslandica',
+        'M brevicollis': 'M. brevicollis',
+        'S cerevisiae': 'S. cerevisiae',
+        'S pombe': 'S. pombe',
+        'C neoformans': 'C. neoformans',
+        'U maydis': 'U. maydis',
+        'C albicans': 'C. albicans',
+        'A thaliana': 'A. thaliana',
+        'B distachyon': 'B. distachyon',
+        'S bicolor': 'S. bicolor',
+        'V vinifera': 'V. vinifera',
+        'C parvum': 'C. parvum',
+        'E histolytica': 'E. histolytica',
+        'E cuniculi': 'E. cuniculi'
+    };
+    
+    return shortNames[name] || name.split(' ')[0] + '. ' + (name.split(' ')[1] ? name.split(' ')[1].charAt(0) : '');
+}
+
+
+// --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
+function debugPhylogenyData(genes) {
+    console.log("=== PHYLOGENY DATA DEBUG ===");
+    genes.forEach(gene => {
+        console.log(`Gene: ${gene.gene}`);
+        console.log(`  Nevers 2017:`, gene.phylogeny?.nevers_2017 ? 
+            `${gene.phylogeny.nevers_2017.species_count} species` : 'NO DATA');
+        console.log(`  Li 2014:`, gene.phylogeny?.li_2014 ? 
+            `${gene.phylogeny.li_2014.species_data?.length} species` : 'NO DATA');
+        
+        // Check if data exists in original matrices
+        const neversDirect = window.neversPhylogenyCache?.genes?.[gene.gene.toUpperCase()];
+        const liDirect = Object.values(window.liPhylogenyCache?.genes || {}).find(g => g.g === gene.gene);
+        
+        console.log(`  In Nevers matrix:`, neversDirect ? 'YES' : 'NO');
+        console.log(`  In Li matrix:`, liDirect ? 'YES' : 'NO');
+    });
+    console.log("=============================");
+}
 
     // 4. CRISPR & siRNA Screens Summary Heatmap
     function renderScreenSummaryHeatmap(genes, custom) {
@@ -686,6 +997,7 @@
         
         const z = genes.map(g => screens.map(s => {
             const screen = g.screens_summary?.find(x => String(x.source).includes(s));
+            // If screens_summary is missing (undefined/null), return 0.
             return screen ? 1 : 0; 
         }));
 
@@ -708,7 +1020,7 @@
         // This array will be empty if the relevant data fields are missing or empty in the Master DB,
         // triggering the 'No Mouse Phenotype data available' message.
         if (allPhenotypes.length === 0) {
-             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Mouse Phenotype data available for the selected genes.</div>`;
+             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">🚫 No Mouse Phenotype data available for the selected gene(s).</div>`;
              return;
         }
 
@@ -782,32 +1094,121 @@
     }
     
     // 8. Protein Domain Architecture Heatmap
-    function renderDomainArchitecture(genes, custom) {
-        clearPlot();
-        // The data retrieval here is slightly different due to how it's enriched in the load function
-        const allDomains = genes.flatMap(g => getCleanArray(g, 'Protein.Domain.PFAM')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
-
-        // ERROR 3 FIX: This will correctly show the 'No data' message if the field is empty.
-        if (allDomains.length === 0) {
-             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No PFAM Domain data available for these genes.</div>`;
-             return;
-        }
-
-        const z = genes.map(g => {
-            const geneDomains = new Set(getCleanArray(g, 'Protein.Domain.PFAM'));
-            return allDomains.map(d => geneDomains.has(d) ? 1 : 0);
-        });
-
-        Plotly.newPlot('plot-display-area', [{
-            type: 'heatmap', z, x: allDomains, y: genes.map(g=>g.gene),
-            colorscale: [[0,'#f0f0f0'],[1,'#ff7f0e']], 
-            showscale: false
-        }], { 
-            title: { text: custom.title || "Protein Domain Presence Heatmap" }, 
-            xaxis: { tickangle: -45, automargin: true },
-            height: custom.height 
-        });
+    // --- FIXED getCleanArray FUNCTION ---
+function getCleanArray(gene, key) {
+    let data = gene[key];
+    
+    // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
+    if (key === 'Protein.complexes') {
+         // Check 'complex_components' first, then fallback to 'Protein.complexes'
+         data = gene['complex_components'] || gene['Protein.complexes'];
+         if (typeof data === 'object' && !Array.isArray(data)) {
+             // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
+             return Object.keys(data).map(k => `${k}`);
+         }
     }
+
+    // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
+    if (key === 'Phenotypes_mouse') {
+        // Check Phenotypes_mouse first, then fallback to mouse_phenotype
+        data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
+    }
+
+    // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
+    if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
+         // Use raw Domain_Descriptions data which is present in your object structure
+         const pfamIds = gene['PFAM_IDs'] || [];
+         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
+         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
+    }
+
+    // 4. Handle Screens Summary (Array of Objects)
+    if (key === 'screens_summary' && Array.isArray(data)) return data; 
+    
+    if (!data) return [];
+    
+    // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
+    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
+    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
+}
+
+// --- FIXED renderDomainArchitecture FUNCTION ---
+function renderDomainArchitecture(genes, custom) {
+    clearPlot();
+    
+    // Use getCleanArray to properly extract domain data
+    const allDomains = new Set();
+    
+    genes.forEach(gene => {
+        // Try multiple possible domain data sources
+        const domains = [
+            ...getCleanArray(gene, 'Protein.Domain.PFAM'),
+            ...getCleanArray(gene, 'PFAM_IDs'),
+            ...getCleanArray(gene, 'Domain_Descriptions')
+        ].filter(domain => domain && domain !== 'N/A' && domain !== 'Unknown');
+        
+        domains.forEach(domain => allDomains.add(domain));
+    });
+    
+    const domainArray = Array.from(allDomains).slice(0, 25); // Limit to top 25 domains
+    
+    if (domainArray.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = 
+            `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
+                No PFAM domain data available for the selected genes.
+            </div>`;
+        return;
+    }
+
+    const z = [];
+    const yLabels = [];
+    
+    genes.forEach(gene => {
+        const geneDomains = new Set([
+            ...getCleanArray(gene, 'Protein.Domain.PFAM'),
+            ...getCleanArray(gene, 'PFAM_IDs'),
+            ...getCleanArray(gene, 'Domain_Descriptions')
+        ]);
+        
+        const row = domainArray.map(domain => geneDomains.has(domain) ? 1 : 0);
+        z.push(row);
+        yLabels.push(gene.gene);
+    });
+
+    const data = [{
+        type: 'heatmap', 
+        z: z, 
+        x: domainArray, 
+        y: yLabels,
+        colorscale: [[0, '#f8f8f8'], [1, '#ff7f0e']],
+        showscale: false,
+        hovertemplate: 'Gene: %{y}<br>Domain: %{x}<br>Present: %{z}<extra></extra>',
+        xgap: 1,
+        ygap: 1
+    }];
+
+    const layout = {
+        title: { 
+            text: custom.title || "Protein Domain Architecture",
+            font: { size: custom.titleFontSize || 16 }
+        },
+        xaxis: { 
+            tickangle: -45, 
+            automargin: true,
+            tickfont: { size: 10 }
+        },
+        yaxis: { 
+            automargin: true,
+            tickfont: { size: 11 }
+        },
+        height: custom.figureHeight,
+        width: custom.figureWidth,
+        margin: { t: 80, l: 120, r: 50, b: 120 }
+    };
+    
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+}
+
 
     // 9. Protein Complex Network (Heatmap View)
     function renderComplexNetwork(genes, custom) {
@@ -815,9 +1216,9 @@
         
         const allComplexes = genes.flatMap(g => getCleanArray(g, 'Protein.complexes')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
 
-        // ERROR 2 FIX: This will correctly show the 'No data' message if the field is empty.
+        // This will correctly show the 'No data' message if the field is empty.
         if (allComplexes.length === 0) {
-             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Protein Complex data found for these genes.</div>`;
+             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">🚫 No Protein Complex data found for the selected gene(s).</div>`;
              return;
         }
         
@@ -930,85 +1331,141 @@
         Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
     }
 
-
-    // MAIN GENERATOR 
-    function generatePlot() {
-        const input = document.getElementById('ciliaplot-genes-input').value.trim();
-        if (!input) {
-            alert("Please enter at least one gene symbol.");
-            return;
-        }
-
-        const type = document.getElementById('analysis-dropdown').value; 
-
-        if (!type) {
-             alert("Please select a plot type.");
-             return;
-        }
-
-        const plotArea = document.getElementById('plot-display-area');
-        plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:18px;">Searching genes and generating plot...</div>';
-
-        const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
-        const genes = findGenes(input);
-        const custom = getCustom();
-
-
-        if (genes.length === 0) {
-            plotArea.innerHTML = `
-                <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;">
-                    <strong>No genes found in the CiliaHub database</strong><br><br>
-                    <small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small>
-                </div>`;
-            return;
-        }
-
-        console.log(`Found ${genes.length} unique gene(s): ${genes.map(g => g.gene).join(', ')}`);
-
-
-        const renderers = {
-            'gene_overview': renderMultiCategoryManhattan, 
-            'expression_heatmap': renderExpressionHeatmap,
-            'scrna_dot': window.renderScrnaUMAPPlot, 
-            'ciliopathy': renderCiliopathyPlot,
-            'localization_heatmap': renderLocalizationHeatmap,
-            'crispr_screens': renderScreenSummaryHeatmap,
-            'protein_domains': renderDomainArchitecture,
-            'protein_complex': renderComplexNetwork, 
-            'mouse_phenotypes': renderMousePhenotypeHeatmap,
-            'phylogeny': renderPhylogenyHeatmap 
-        };
-
-        const renderer = renderers[type];
-
-        if (!renderer) {
-            plotArea.innerHTML = `
-                <div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">
-                    Plot type "${type}" not implemented or mapped yet.
-                </div>`;
-            return;
-        }
-
-        try {
-            // Special handling for UMAP to pass the primary gene symbol
-            if (type === 'scrna_dot') {
-                const geneSymbol = genes[0].gene; // Use the first gene found
-                renderer(geneSymbol); 
-            } else {
-                renderer(genes, custom);
-            }
-        } catch (error) {
-            console.error("Plot rendering error:", error);
-            plotArea.innerHTML = `
-                <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;">
-                    <strong>Plot failed to render</strong><br><br>
-                    <small>${error.message}</small><br><br>
-                    <button onclick="generatePlot()" style="padding:10px 20px; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer;">
-                        Try Again
-                    </button>
-                </div>`;
-        }
+// MAIN GENERATOR 
+function generatePlot() {
+    const input = document.getElementById('ciliaplot-genes-input').value.trim();
+    if (!input) {
+        alert("Please enter at least one gene symbol.");
+        return;
     }
+
+    const type = document.getElementById('analysis-dropdown').value; 
+
+    if (!type) {
+         alert("Please select a plot type.");
+         return;
+    }
+
+    const plotArea = document.getElementById('plot-display-area');
+    plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:18px;">Searching genes and generating plot...</div>';
+
+    const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
+    const genes = findGenes(input);
+    const custom = getCustom();
+
+    if (genes.length === 0) {
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;">
+                <strong>No genes found in the CiliaHub database</strong><br><br>
+                <small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small>
+            </div>`;
+        return;
+    }
+
+    console.log(`Found ${genes.length} unique gene(s): ${genes.map(g => g.gene).join(', ')}`);
+
+    // DEBUG: Check phylogenetic data for troubleshooting
+    if (type === 'phylogeny') {
+        debugPhylogenyData(genes);
+    }
+
+    const renderers = {
+        'gene_overview': renderMultiCategoryManhattan, 
+        'expression_heatmap': renderExpressionHeatmap,
+        'scrna_dot': window.renderScrnaUMAPPlot, 
+        'ciliopathy': renderCiliopathyPlot,
+        'localization_heatmap': renderLocalizationHeatmap,
+        'crispr_screens': renderScreenSummaryHeatmap,
+        'protein_domains': renderDomainArchitecture,
+        'protein_complex': renderComplexNetwork, 
+        'mouse_phenotypes': renderMousePhenotypeHeatmap,
+        'phylogeny': renderPhylogenyHeatmap 
+    };
+
+    const renderer = renderers[type];
+
+    if (!renderer) {
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">
+                Plot type "${type}" not implemented or mapped yet.
+            </div>`;
+        return;
+    }
+
+    try {
+        // Special handling for UMAP to pass the primary gene symbol
+        if (type === 'scrna_dot') {
+            const geneSymbol = genes[0].gene; // Use the first gene found
+            renderer(geneSymbol); 
+        } else {
+            renderer(genes, custom);
+        }
+    } catch (error) {
+        console.error("Plot rendering error:", error);
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;">
+                <strong>Plot failed to render</strong><br><br>
+                <small>${error.message}</small><br><br>
+                <button onclick="generatePlot()" style="padding:10px 20px; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer;">
+                    Try Again
+                </button>
+            </div>`;
+    }
+}
+
+// --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
+function debugPhylogenyData(genes) {
+    console.log("=== PHYLOGENY DATA DEBUG ===");
+    console.log("Checking phylogenetic data for genes:", genes.map(g => g.gene).join(', '));
+    
+    genes.forEach(gene => {
+        console.log(`\nGene: ${gene.gene}`);
+        
+        // Check integrated data
+        const neversData = gene.phylogeny?.nevers_2017;
+        const liData = gene.phylogeny?.li_2014;
+        
+        console.log(`  Integrated Nevers 2017:`, neversData ? 
+            `PRESENT (${neversData.species_count} species, ${neversData.species_data?.length} indices)` : 'NO DATA');
+        console.log(`  Integrated Li 2014:`, liData ? 
+            `PRESENT (${liData.species_data?.length} species)` : 'NO DATA');
+        
+        // Check direct matrix access
+        const neversDirect = window.neversPhylogenyCache?.genes?.[gene.gene.toUpperCase()];
+        const liDirect = Object.values(window.liPhylogenyCache?.genes || {}).find(g => g.g && g.g.toUpperCase() === gene.gene.toUpperCase());
+        
+        console.log(`  Direct Nevers matrix:`, neversDirect ? 
+            `PRESENT (${neversDirect.s?.length} indices)` : 'NOT FOUND');
+        console.log(`  Direct Li matrix:`, liDirect ? 
+            `PRESENT (${liDirect.s?.length} indices)` : 'NOT FOUND');
+        
+        // Sample data for verification
+        if (neversData && neversData.species_data) {
+            console.log(`  Nevers sample indices:`, neversData.species_data.slice(0, 5));
+        }
+        if (liData && liData.species_data) {
+            console.log(`  Li sample indices:`, liData.species_data.slice(0, 5));
+        }
+    });
+    
+    // Check if phylogenetic caches are loaded
+    console.log("\nPhylogeny Cache Status:");
+    console.log("Nevers cache loaded:", !!window.neversPhylogenyCache);
+    console.log("Li cache loaded:", !!window.liPhylogenyCache);
+    
+    if (window.neversPhylogenyCache) {
+        console.log("Nevers organisms count:", window.neversPhylogenyCache.organism_groups?.all_organisms_list?.length);
+        console.log("Nevers genes count:", Object.keys(window.neversPhylogenyCache.genes || {}).length);
+    }
+    if (window.liPhylogenyCache) {
+        console.log("Li organisms count:", window.liPhylogenyCache.summary?.organisms_list?.length);
+        console.log("Li genes count:", Object.keys(window.liPhylogenyCache.genes || {}).length);
+    }
+    
+    console.log("=============================");
+}
+
+
 
     // Handles plot type selection via dropdown
     function handlePlotSelection(value) {
@@ -1131,7 +1588,6 @@ KIF17</textarea>
         setupPage();
     });
 </script>
-    
 
 </body>
 </html>
