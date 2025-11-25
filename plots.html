@@ -197,6 +197,8 @@
         let liMatrix = {};
         let neversMatrix = {};
         let rnaTissueExpressionData = {};
+        window.CiliAI_UMAP          // ← never defined
+        window.CiliAI.cellDataCache // ← never defined
 
         // DATA URLS
         const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -206,6 +208,23 @@
         const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json'; 
         const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
 
+       // === FIX: Load scRNA-seq UMAP data (Lung ciliated cells) ===
+        async function loadScRNAData() {
+        try {
+        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliAI_scRNAseq_UMAP.json');
+        if (!resp.ok) throw new Error('Not found');
+        const data = await resp.json();
+        
+        window.CiliAI_UMAP = data.points;                    // UMAP coordinates + cell_type
+        window.CiliAI = window.CiliAI || {};
+        window.CiliAI.cellDataCache = data.expression;       // { "FOXJ1": { "ciliated": 12.4, ... }, ... }
+        
+        console.log("scRNA-seq UMAP data loaded:", data.points.length, "cells");
+    } catch (err) {
+        console.warn("scRNA-seq UMAP data not available (this is expected if file missing)");
+        // Keep function non-blocking — UMAP will show "not available" gracefully
+    }
+} 
         // --- PHYLOGENY PANEL DEFINITIONS ---
         const NEVERS_CIL_PANEL = [
             "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", "Caenorhabditis elegans", "Tetrahymena thermophila (strain SB210)", "Chlamydomonas reinhardtii", "Micromonas sp. (strain RCC299 / NOUM17)", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens subsp. patens", "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis"
@@ -1042,10 +1061,11 @@ KIF17</textarea>
             handlePlotSelection(initialType);
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            await loadData();
-            setupPage();
-        });
+       document.addEventListener('DOMContentLoaded', async () => {
+        await loadData();        // your existing master + phylogeny + expression
+        await loadScRNAData();   // ← ADD THIS LINE
+        setupPage();
+});
     </script>
 </body>
 </html>
