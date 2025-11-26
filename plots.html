@@ -471,8 +471,7 @@ function getCleanArray(gene, key) {
     // Final default return for string fields
     return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
 }
-
-    
+   
 function findGenes(input) {
     const queries = input
         .split(/[\s,\n;]+/)
@@ -1181,41 +1180,45 @@ function renderScreenSummaryHeatmap(genes, custom) {
     // 8. Protein Domain Architecture Heatmap
 // --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
 function getCleanArray(gene, key) {
+    // 1. Initialize data variable using the requested key
     let data = gene[key];
     
     // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
     if (key === 'Protein.complexes') {
+        // Check 'complex_components' first, then fallback to 'Protein.complexes'
         data = gene['complex_components'] || gene['Protein.complexes'];
         if (typeof data === 'object' && !Array.isArray(data)) {
+            // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
             return Object.keys(data).map(k => `${k}`);
         }
     }
 
     // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
     if (key === 'Phenotypes_mouse') {
+        // Check Phenotypes_mouse first, then fallback to mouse_phenotype
         data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
     }
 
     // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
     if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
+        // Use raw Domain_Descriptions data which is present in your object structure
         const pfamIds = gene['PFAM_IDs'] || [];
         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
     }
+    // 4. Handle Screens Summary (Array of Objects)
+    if (key === 'screens_summary' && Array.isArray(data)) return data; 
     
-    // 4. Handle Screens Summary (Array of Objects) - FIXED WITH FALLBACK
-    if (key === 'screens_summary') {
-        // Use 'screens_summary' first, then fallback to 'screens' (as per data format)
-        data = gene['screens_summary'] || gene['screens'];
-        if (Array.isArray(data)) return data; // Returns the raw array of objects
-    }
-
+    // Check if data is null/undefined before attempting to process it
     if (!data) return [];
     
     // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
     if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
+    
+    // Final default return for string fields (This is the critical line)
     return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
 }
+    
     
 // --- FIXED renderDomainArchitecture FUNCTION ---
 function renderDomainArchitecture(genes, custom) {
@@ -1417,7 +1420,6 @@ function renderDomainArchitecture(genes, custom) {
     }
 
 // MAIN GENERATOR 
-// MAIN GENERATOR 
 function generatePlot() {
     const input = document.getElementById('ciliaplot-genes-input').value.trim();
     if (!input) {
@@ -1436,21 +1438,25 @@ function generatePlot() {
     plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:18px;">Searching genes and generating plot...</div>';
 
     const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
-    let genes = findGenes(input); // Use 'let' to allow reassignment
+    
+    // IMPORTANT: findGenes now returns an object for every query (found or not)
+    let genes = findGenes(input); 
 
     const custom = getCustom();
 
     // --- Safety Check: Ensure at least one gene/default is available for UMAP/scrna_dot ---
-    if (genes.length === 0 && type === 'scrna_dot') {
-        // Force the default gene FOXJ1 for UMAP plots if user input yields nothing
-        const defaultGene = { gene: 'FOXJ1' };
+    // If no genes were found in the CiliAI core database, check if the user entered 
+    // something. If they did, use the first query as a minimal gene object for UMAP/external lookups.
+    if (genes.length === 0 && type === 'scrna_dot' && queries.length > 0) {
+        // Force the first entered query (or a default)
+        const defaultGene = { gene: queries[0] };
         genes = [defaultGene];
     }
     
     if (genes.length === 0) {
         plotArea.innerHTML = `
             <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;">
-                <strong>No genes found in the CiliaHub database</strong><br><br>
+                <strong>No valid gene symbols found in input or CiliaHub database.</strong><br><br>
                 <small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small>
             </div>`;
         return;
@@ -1494,7 +1500,8 @@ function generatePlot() {
     try {
         // Special handling for UMAP (scrna_dot) since it takes a single gene symbol, not an array
         if (type === 'scrna_dot') {
-            const geneSymbol = genes[0].gene; // Use the first (or default FOXJ1) gene found
+            // Use the gene symbol of the first object returned by findGenes
+            const geneSymbol = genes[0].gene; 
             renderer(geneSymbol); // Pass only the symbol
         } else {
             renderer(genes, custom); // Pass the array of gene objects and customization
