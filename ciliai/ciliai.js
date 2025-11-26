@@ -3126,42 +3126,39 @@ function downloadUMAPDataAsCSV(geneSymbol) {
         };
     }
 
-   /**
-     * (REPLACEMENT) Handles the "yes" follow-up for screen references.
-     * Now displays the full summary and link for each paper.
-     */
-    function handleScreenReferenceFollowup() {
-        const screenKeys = lastQueryContext.data;
-        if (!screenKeys || screenKeys.length === 0) {
-            return "Sorry, I lost track of which references you wanted. Please ask again.";
-        }
+  /**
+ * FIXED: Always returns the full CRISPR/siRNA screen reference set.
+ * Works even when lastQueryContext.data is empty.
+ */
+function handleScreenReferenceFollowup() {
 
-        const refMap = getScreenCitationMap(); // <-- Uses the new map
-        let html = `<div class="ai-result-card"><h4>Screen References</h4><ul style="list-style-type: none; padding-left: 0;">`;
+    const refMap = getScreenCitationMap();   // full reference map
+    const allKeys = Object.keys(refMap);     // always available
 
-        // Use Set to ensure unique references
-        const uniqueKeys = [...new Set(screenKeys)];
+    let html = `
+    <div class="ai-result-card">
+        <h4>CRISPR / siRNA Screen References</h4>
+        <ul style="list-style-type: none; padding-left: 0;">
+    `;
 
-        uniqueKeys.forEach(key => {
-            const ref = refMap[key];
-            if (ref) {
-                // (NEW) Build the rich HTML block
-                html += `<li style="margin-bottom: 15px;">
-                    <strong>${ref.name}</strong> (${ref.citation})
-                    <p style="margin-top: 5px; margin-bottom: 5px;">${ref.summary}</p>
-                    ${ref.link ? `<a href="${ref.link}" target="_blank" class="ai-action">View Publication</a>` : ''}
-                </li>`;
-            } else {
-                html += `<li style="margin-bottom: 10px;"><strong>${key}</strong>: No reference details found.</li>`;
-            }
-        });
+    allKeys.forEach(key => {
+        const ref = refMap[key];
+        html += `
+            <li style="margin-bottom: 15px;">
+                <strong>${ref.name}</strong> (${ref.citation})
+                <p style="margin-top: 5px; margin-bottom: 5px;">${ref.summary}</p>
+                ${ref.link ? `<a href="${ref.link}" target="_blank" class="ai-action">View Publication</a>` : ''}
+            </li>
+        `;
+    });
 
-        html += `</ul></div>`;
-        
-        // Clear the context
-        lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
-        return html;
-    }
+    html += `</ul></div>`;
+
+    // Reset context safely
+    lastQueryContext = { type: null, data: [], term: null };
+
+    return html;
+}
 
 
 // ==========================================================
