@@ -537,34 +537,37 @@ function clearPlot() {
  * Renders a UMAP visualization where points are colored and sized based on the
  * expression level of the requested gene (or FOXJ1 by default).
  */
+/**
+ * UMAP PLOT (Expression Mapping Mode)
+ * Renders a UMAP visualization where points are colored and sized based on the
+ * expression level of the requested gene (or FOXJ1 by default).
+ */
 async function renderScrnaUMAPPlot(geneSymbol) { 
-    // CRITICAL FIX: Target the inner DIV container which Plotly uses, NOT the outer wrapper.
-    const plotDivId = 'cilia-svg'; 
+    // FIX: Target the main plot container ID for consistent Plotly rendering.
+    const plotDivId = 'plot-display-area'; 
     
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
-    // Get the specific element to clear and plot to: #cilia-svg
-    const plotDiv = document.getElementById(plotDivId); 
+    const plotDiv = document.getElementById(plotDivId);
         
     // Default to FOXJ1 if no gene is provided (as requested)
     const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
 
     if (!plotDiv) {
-        console.error('UMAP plot container "cilia-svg" not found.');
+        console.error('UMAP plot container "plot-display-area" not found.');
         return;
     }
         
-    // Check if critical data is available (now relies on loaded data, no mock fallback)
+    // Check if critical data is available (data loading is still failing, so this path is likely hit)
     if (!umapData || umapData.length === 0 || !cellData || Object.keys(cellData).length === 0) {
-        // Render error message inside the inner div
-        plotDiv.innerHTML = `<div style="padding:20px; color:red; text-align:center;">
+        plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; padding:20px; color:red; text-align:center;">
             Critical error: scRNA-seq UMAP coordinates or expression data is missing or failed to load.
         </div>`;
         return;
     }
 
-    // --- Reset inner panel content ---
-    plotDiv.innerHTML = ''; // Clears only the content of #cilia-svg
+    // --- Reset panel (Clears the outer div for Plotly) ---
+    plotDiv.innerHTML = '';
     
     // 1. Prepare data arrays
     const geneExpressionData = cellData[gene] || {};
@@ -598,17 +601,16 @@ async function renderScrnaUMAPPlot(geneSymbol) {
         }
     }
         
-    // FIX 2: Gracefully handle the case where the gene is not expressed.
+    // Handle the case where the gene is not expressed.
     if (maxExpression === 0) {
         const message = `Gene <strong>${gene}</strong> not found in the expression cache or has zero expression in the loaded Lung scRNA-seq dataset.`;
-        console.warn(message);
         // Display user-friendly message in the plot area
         plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">
             🚫 ${message}
         </div>`;
         return; // CRITICAL: Stop execution here.
     }
-        
+    
     // --- Annotations & Plotly Setup ---
     const annotations = []; // Logic omitted
     const colorScaleRedGradient = [
@@ -641,7 +643,7 @@ async function renderScrnaUMAPPlot(geneSymbol) {
         showlegend: false
     };
         
-    // Use the plotDivId ('cilia-svg') for Plotly
+    // Use the plotDivId ('plot-display-area') for Plotly
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 }
 window.renderScrnaUMAPPlot = renderScrnaUMAPPlot;
