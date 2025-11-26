@@ -201,36 +201,8 @@
     window.CiliAI = { masterData: [], lookups: { geneMap: {} } };
     window.liPhylogenyCache = {};
     window.neversPhylogenyCache = {};
-    window.CiliAI.cellDataCache = {}; 
-    
-    // --- MOCK DATA FOR UMAP (CRITICAL FALLBACK) ---
-    const MOCK_SC_METADATA = { cell_types: ["Ciliated Cells", "Club Cells", "Basal Cells", "Goblet Cells", "T Cells"], datasets: ["Lung scRNA-seq"] };
-    const MOCK_SC_DATA = (() => {
-        const points = [];
-        const types = MOCK_SC_METADATA.cell_types;
-        types.forEach((type, typeIndex) => {
-            for (let i = 0; i < 200; i++) {
-                points.push({
-                    x: Math.cos(i) * 10 + typeIndex * 20 + Math.random() * 5,
-                    y: Math.sin(i) * 10 + typeIndex * 10 + Math.random() * 5,
-                    cell_type: type
-                });
-            }
-        });
-        return {
-            umap_coordinates: points,
-            cell_expression: {
-                'FOXJ1': { "Ciliated Cells": 10.5, "Club Cells": 2.1, "Basal Cells": 0.5, "Goblet Cells": 0.2, "T Cells": 0.1 },
-                'IFT88': { "Ciliated Cells": 8.0, "Club Cells": 1.5, "Basal Cells": 0.8, "Goblet Cells": 0.3, "T Cells": 0.1 },
-                'BBS1': { "Ciliated Cells": 5.0, "Club Cells": 1.0, "Basal Cells": 0.5, "Goblet Cells": 0.1, "T Cells": 0.1 },
-                'ARL13B': { "Ciliated Cells": 9.2, "Club Cells": 1.8, "Basal Cells": 0.6, "Goblet Cells": 0.2, "T Cells": 0.1 }
-            }
-        };
-    })();
-    window.CiliAI_UMAP = MOCK_SC_DATA.umap_coordinates;
-    window.CiliAI.cellDataCache = MOCK_SC_DATA.cell_expression;
-    // NOTE: window.MOCK_SC_DATA is not needed globally, but often used for debug checks.
-
+    window.CiliAI.cellDataCache = {}; // Used for scRNA-seq expression data
+    window.CiliAI_UMAP = []; // Used for scRNA-seq coordinates
 
     // DATA URLS
     const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -240,8 +212,12 @@
     const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json';
     const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv';
 
+    // NEW: Dedicated scRNA-seq Data URLs (USED IN loadMasterData)
+    const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
+    const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
+
     // ==========================================================
-    // CORE UTILITIES & DATA LOADING (FIXED)
+    // CORE UTILITIES & DATA LOADING
     // ==========================================================
 
     function log(message) { console.log(`[CiliAI] ${message}`); }
@@ -317,14 +293,14 @@ function parseTsvData(tsvText) {
     return data;
 }
 
-// --- FIXED PHYLOGENETIC DATA INTEGRATION ---
+// --- PHYLOGENETIC DATA INTEGRATION ---
 function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
     let liIntegrated = 0;
     let neversIntegrated = 0;
     
     console.log("Integrating phylogenetic data into gene objects...");
     
-    // Integrate Nevers 2017 data (uses gene symbols as keys)
+    // Integrate Nevers 2017 data
     if (neversMatrix && neversMatrix.genes) {
         Object.entries(neversMatrix.genes).forEach(([geneKey, phyloData]) => {
             if (geneKey && phyloData && phyloData.g) {
@@ -343,7 +319,7 @@ function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
         });
     }
     
-    // Integrate Li 2014 data (uses Entrez IDs as keys, but has gene names in 'g' field)
+    // Integrate Li 2014 data
     if (liMatrix && liMatrix.genes) {
         Object.values(liMatrix.genes).forEach(phyloData => {
             if (phyloData && phyloData.g) {
@@ -366,30 +342,37 @@ function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
     console.log(`Integrated phylogenetic data: ${neversIntegrated} genes from Nevers 2017, ${liIntegrated} genes from Li 2014`);
     return { liIntegrated, neversIntegrated };
 }
-
+    
 /**
  * @loadMasterData - Loads data and constructs the necessary global structures.
  */
 async function loadMasterData() {
     try {
-        // 1. Fetch ALL data concurrently
-        const [masterResp, lookupResp, liResp, neversResp, rnaResp] = await Promise.all([
+        // 1. Fetch ALL data concurrently (7 requests now: 5 existing + 2 UMAP)
+        const [
+            masterResp, lookupResp, liResp, neversResp, rnaResp,
+            umapCoordResp, cellxgeneExprResp
+        ] = await Promise.all([
             fetch(MASTER_DB),
             fetch(LOOKUP_DB),
             fetch(LI_PHYLO_MATRIX),
             fetch(NEVERS_PHYLO_MATRIX),
-            fetch(RNA_TISSUE_TSV)
+            fetch(RNA_TISSUE_TSV),
+            fetch(UMAP_COORDINATES_DB),       // NEW UMAP COORDINATES
+            fetch(CELLXGENE_EXPRESSION_DB)    // NEW EXPRESSION DATA
         ]);
         
         // 2. Process fetched JSON data
         const rawMasterData = await masterResp.json();
         const rawLookups = await lookupResp.json();
         
-        // --- FIX 1 & 2: Populate Global Phylogeny Caches IMMEDIATELY and correctly ---
-        // The original code used local 'liMatrix' and 'neversMatrix' variables only.
-        // We MUST assign the fetched data to the global 'window' variables for other functions/checks to access them.
+        // Populate Global Phylogeny Caches
         window.liPhylogenyCache = await liResp.json();
         window.neversPhylogenyCache = await neversResp.json();
+
+        // Process new scRNA-seq data files
+        const umapCoordinatesData = await umapCoordResp.json();
+        const cellxgeneExpressionData = await cellxgeneExprResp.json();
         
         // Use local references for clarity in this function scope
         const liMatrix = window.liPhylogenyCache;
@@ -399,16 +382,18 @@ async function loadMasterData() {
         window.CiliAI.lookups = rawLookups.lookups || {};
         window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
 
-        // --- FIX 3: UMAP Data Extraction/Fallback ---
-        // The console log showed the correct keys are missing in the current JSON structure.
-        const umapContainer = rawMasterData.data || rawMasterData;
-        if (umapContainer.umap_points && umapContainer.cell_expression) {
-            window.CiliAI_UMAP = umapContainer.umap_points;
-            window.CiliAI.cellDataCache = umapContainer.cell_expression;
-            console.log(`scRNA-seq UMAP data loaded successfully from Master DB. Total cells: ${umapContainer.umap_points.length}`);
+        // --- UPDATED UMAP Data Assignment (Using dedicated files) ---
+        if (umapCoordinatesData.umap_points && cellxgeneExpressionData.cell_expression) {
+            window.CiliAI_UMAP = umapCoordinatesData.umap_points;
+            window.CiliAI.cellDataCache = cellxgeneExpressionData.cell_expression;
+            
+            console.log(`scRNA-seq UMAP data loaded successfully from dedicated files. Total cells: ${umapCoordinatesData.umap_points.length}. Total expressed genes: ${Object.keys(cellxgeneExpressionData.cell_expression).length}`);
+            
         } else {
-            // This is the correct warning, as the UMAP object structure is not present in the master JSON.
-            console.warn(`scRNA-seq UMAP data not found within the Master DB structure. UMAP plot will fall back to mock data.`);
+             // Will now warn if dedicated files fail (no mock fallback)
+             console.warn(`scRNA-seq UMAP data not found in new dedicated files.`);
+             window.CiliAI_UMAP = [];
+             window.CiliAI.cellDataCache = {};
         }
 
         // 4. Populate Gene Map (ciliaryGeneMap) with BASIC gene data first
@@ -417,8 +402,7 @@ async function loadMasterData() {
                 // Create the base gene object
                 const gene = { ...g, gene: g.Gene, phylogeny: {} };
                 
-                // --- FIX 4: Store Entrez ID for matrix lookup and debug checks ---
-                // The matrix keys are Entrez IDs, so we need to save it.
+                // Store Entrez ID for matrix lookup and debug checks
                 if (g['Entrez.ID']) {
                     gene.entrezId = String(g['Entrez.ID']); 
                 }
@@ -438,17 +422,15 @@ async function loadMasterData() {
         window.rnaTissueExpressionData = parseTsvData(rnaText);
 
         window.CiliAI.ready = true;
-        console.log(`Loaded ${ciliaryGeneMap.size} genes and 5 external datasets.`);
+        console.log(`Loaded ${ciliaryGeneMap.size} genes and 7 external datasets.`);
         
-        // Note: The diagnostic checks using the matrices directly (IFT88 in Nevers/Li matrix)
-        // require the Entrez ID fix, which is now implemented in the gene object above.
-
     } catch (err) {
         console.error("Critical Data Loading Error:", err);
         document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Please verify the data URLs.</p>`;
     }
 }
 
+    
 // --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
 function getCleanArray(gene, key) {
     // 1. Initialize data variable using the requested key
@@ -501,12 +483,20 @@ function findGenes(input) {
     const seen = new Set();
     
     queries.forEach(q => {
-        if (!seen.has(q) && ciliaryGeneMap.has(q)) {
-            found.push(ciliaryGeneMap.get(q));
-            seen.add(q);
+        // Find the full gene object if it exists in the main map
+        if (ciliaryGeneMap.has(q)) {
+            if (!seen.has(q)) {
+                found.push(ciliaryGeneMap.get(q));
+                seen.add(q);
+            }
+        } else {
+            // Include minimal object for genes not in the core map (for external data sources)
+            if (!seen.has(q)) {
+                found.push({ gene: q }); 
+                seen.add(q);
+            }
         }
     });
-    // This ensures the found genes are the enriched objects
     return found; 
 }
 
@@ -516,7 +506,7 @@ function getCustom() {
         titleSize: parseInt(document.getElementById('title-size')?.value) || 24,
         width: parseInt(document.getElementById('fig-width')?.value) || 1100,
         height: parseInt(document.getElementById('fig-height')?.value) || 700,
-        source: document.getElementById('phy-source')?.value || 'nevers_2017'
+        source: document.getElementById('phy-source')?.value || 'nevers_2017' // Default to Nevers 2017
     };
 }
 
@@ -525,84 +515,74 @@ function getCustom() {
         el.innerHTML = '';
         if (window.currentPlot) Plotly.purge(el);
     }
+    
 
-
-    // --- PLOT IMPLEMENTATIONS ---
-
-    // * UMAP PLOT (scRNA-seq Lung) - Uses the CiliAI global variables
-    // ... (Your Global State and MOCK Data definitions remain unchanged) ...
-
+/ --- PLOT IMPLEMENTATIONS ---
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization where points are colored and sized based on the
  * expression level of the requested gene (or FOXJ1 by default).
  */
-/**
- * UMAP PLOT (Expression Mapping Mode)
- * Renders a UMAP visualization where points are colored and sized based on the
- * expression level of the requested gene (or FOXJ1 by default).
- */
-async function renderScrnaUMAPPlot(geneSymbol) { 
+async function renderScrnaUMAPPlot(geneSymbol) { 
     // FIX 1: Target the main plot container ID for consistent Plotly rendering.
     const plotDivId = 'plot-display-area'; 
     
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
     const plotDiv = document.getElementById(plotDivId);
-        
+        
     // Default to FOXJ1 if no gene is provided (as requested)
-    const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
+    const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
 
     if (!plotDiv) {
         console.error('UMAP plot container "plot-display-area" not found.');
         return;
     }
-        
-    // Check if critical data is available (will rely on the mock data if fetch failed)
-    if (!umapData || !cellData) {
-        plotDiv.innerHTML = `<div style="padding:20px; color:red;">Critical error: UMAP data cache or coordinates are missing.</div>`;
+        
+    // Check if critical data is available (now relies on loaded data, no mock fallback)
+    if (!umapData || umapData.length === 0 || !cellData || Object.keys(cellData).length === 0) {
+        plotDiv.innerHTML = `<div style="padding:20px; color:red; text-align:center;">
+            Critical error: scRNA-seq UMAP coordinates or expression data is missing or failed to load.
+        </div>`;
         return;
     }
 
     // --- Reset panel ---
     plotDiv.innerHTML = '';
     
-    // NOTE: Lines related to 'interactive-cilium' and SVG diagram interaction are removed 
-    // as they are outside the scope of this plot type and container setup.
-
     // 1. Prepare data arrays
     const geneExpressionData = cellData[gene] || {};
-        
+        
     const sampleSize = 15000;
     const sampledData = [];
     const colorArray = [];
     const sizeArray = [];
-        
+        
     let maxExpression = 0;
     const sizeBase = 5;
     const sizeScaleMax = 12;
     const expressionThreshold = 2; // Capping expression for dot size scaling
 
-    const sourceData = umapData.length > sampleSize 
-                           ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
-                           : umapData;
+    const sourceData = umapData.length > sampleSize 
+                            ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
+                            : umapData;
 
     for (const point of sourceData) {
         const expressionValue = geneExpressionData[point.cell_type] || 0;
-                
+                
         sampledData.push(point);
         colorArray.push(expressionValue);
-                
+                
         // Calculate dot size based on expression magnitude, capped by expressionThreshold
         const scaledMagnitude = Math.min(expressionValue, expressionThreshold) / expressionThreshold;
-        sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude); 
-                
+        sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude); 
+                
         if (expressionValue > maxExpression) {
             maxExpression = expressionValue;
         }
     }
-        
-    // FIX 2: Gracefully handle the case where the gene is not expressed (ReferenceError fix).
+        
+    // FIX 2: Gracefully handle the case where the gene is not expressed.
     if (maxExpression === 0) {
         const message = `Gene <strong>${gene}</strong> not found in the expression cache or has zero expression in the loaded Lung scRNA-seq dataset.`;
         console.warn(message);
@@ -618,7 +598,7 @@ async function renderScrnaUMAPPlot(geneSymbol) { 
     const colorScaleRedGradient = [
         [0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']
     ];
-        
+        
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
@@ -644,15 +624,12 @@ async function renderScrnaUMAPPlot(geneSymbol) { 
         annotations: annotations,
         showlegend: false
     };
-        
+        
     // Use the plotDivId ('plot-display-area') for Plotly
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
-
-    // --- Back button (UI Integration) ---
-    // Removed the back button logic for clean integration into the main plot area.
 }
 window.renderScrnaUMAPPlot = renderScrnaUMAPPlot; // Ensure it's exposed globally
-       
+    
 function debugUMAPData(genes) {
         const umapData = window.CiliAI_UMAP;
         const cellDataCache = window.CiliAI.cellDataCache;
@@ -686,7 +663,7 @@ function debugUMAPData(genes) {
         console.log("=============================");
     }
 
-
+    
 // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
 // --- FIXED PHYLOGENY DATA ACCESS IN OTHER PLOTS ---
 function renderMultiCategoryManhattan(genes, custom) {
@@ -781,6 +758,8 @@ function renderMultiCategoryManhattan(genes, custom) {
     Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
 }
 
+// 3. Phylogenetic Conservation Heatmap
+// --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
 // 3. Phylogenetic Conservation Heatmap
 // --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
 function renderPhylogenyHeatmap(genes, custom) {
@@ -888,11 +867,11 @@ function renderPhylogenyHeatmap(genes, custom) {
         y: yLabels, 
         customdata: textMatrix,
         colorscale: [
-            [0, '#F0F0F0'],     // Absent - light gray
+            [0, '#F0F0F0'],       // Absent - light gray
             [0.0001, '#FFE5B5'], // Non-ciliated present - light orange
-            [1, '#FFE5B5'],      // Non-ciliated present  
+            [1, '#FFE5B5'],       // Non-ciliated present  
             [1.0001, '#698ECF'], // Ciliated present - blue
-            [2, '#698ECF']       // Ciliated present
+            [2, '#698ECF']        // Ciliated present
         ],
         showscale: false,
         hovertemplate: '%{customdata}<extra></extra>',
@@ -913,10 +892,7 @@ function renderPhylogenyHeatmap(genes, custom) {
             tickfont: { size: 9 },
             tickvals: Array.from({length: orgs.length}, (_, i) => i),
             ticktext: orgs.map(shortenOrganismName),
-            showgrid: false, 
-            zeroline: false, 
-            side: 'top', 
-            automargin: true
+            showgrid: false, zeroline: false, side: 'top', automargin: true
         },
         yaxis: { 
             title: 'Genes', 
@@ -960,7 +936,7 @@ function renderPhylogenyHeatmap(genes, custom) {
     
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
-
+    
 // --- ENHANCED ORGANISM NAME SHORTENER ---
 function shortenOrganismName(name) {
     if (!name) return 'Unknown';
@@ -1441,6 +1417,7 @@ function renderDomainArchitecture(genes, custom) {
     }
 
 // MAIN GENERATOR 
+// MAIN GENERATOR 
 function generatePlot() {
     const input = document.getElementById('ciliaplot-genes-input').value.trim();
     if (!input) {
@@ -1534,7 +1511,10 @@ function generatePlot() {
             </div>`;
     }
 }
+
+
     
+// --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
 // --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
 function debugPhylogenyData(genes) {
     console.log("=== PHYLOGENY DATA DEBUG ===");
@@ -1587,8 +1567,6 @@ function debugPhylogenyData(genes) {
     console.log("=============================");
 }
 
-
-
     // Handles plot type selection via dropdown
     function handlePlotSelection(value) {
         // Show/hide phylogeny source if the selected type is phylogeny
@@ -1597,7 +1575,9 @@ function debugPhylogenyData(genes) {
         clearPlot(); 
     }
 
-    // PAGE SETUP
+   
+// PAGE SETUP
+// PAGE SETUP
     function setupPage() {
         document.getElementById('content-area').innerHTML = `
             <div class="ciliaplot-main-layout">
@@ -1670,13 +1650,19 @@ KIF17</textarea>
         document.getElementById('analysis-dropdown').onchange = (e) => handlePlotSelection(e.target.value);
         
         const dropdown = document.getElementById('analysis-dropdown');
-        const initialType = 'gene_overview'; // Set default plot type
+        const initialType = 'phylogeny'; // Set default plot type to phylogeny
         dropdown.value = initialType;
-        handlePlotSelection(initialType);
-        document.getElementById('phy-source-group').style.display = 'none';
+        
+        // Call handler to show source dropdown initially
+        handlePlotSelection(initialType); 
+        
+        // Ensure Nevers is selected by default for the source dropdown
+        document.getElementById('phy-source').value = 'nevers_2017';
+        
         generatePlot();
     }
 
+    
     // 7. INITIAL EXECUTION
     document.addEventListener('DOMContentLoaded', async () => {
         await loadMasterData();
