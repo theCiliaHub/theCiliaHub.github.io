@@ -346,6 +346,9 @@ function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
 /**
  * @loadMasterData - Loads data and constructs the necessary global structures.
  */
+/**
+ * @loadMasterData - Loads data and constructs the necessary global structures.
+ */
 async function loadMasterData() {
     try {
         // 1. Fetch ALL data concurrently (7 requests now: 5 existing + 2 UMAP)
@@ -371,6 +374,7 @@ async function loadMasterData() {
         window.neversPhylogenyCache = await neversResp.json();
 
         // Process new scRNA-seq data files
+        // NOTE: These files are large and processing them may cause the reported delay/failure.
         const umapCoordinatesData = await umapCoordResp.json();
         const cellxgeneExpressionData = await cellxgeneExprResp.json();
         
@@ -382,15 +386,23 @@ async function loadMasterData() {
         window.CiliAI.lookups = rawLookups.lookups || {};
         window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
 
-        // --- UPDATED UMAP Data Assignment (Using dedicated files) ---
-        if (umapCoordinatesData.umap_points && cellxgeneExpressionData.cell_expression) {
-            window.CiliAI_UMAP = umapCoordinatesData.umap_points;
-            window.CiliAI.cellDataCache = cellxgeneExpressionData.cell_expression;
+        // --- UMAP Data Assignment: CRITICAL STEP ---
+        // 1. Check if the UMAP data is an array of points (coordinates)
+        const isUmapValid = Array.isArray(umapCoordinatesData) && umapCoordinatesData.length > 0;
+        // 2. Check if the Expression data is a non-empty object (gene map)
+        const isExprValid = typeof cellxgeneExpressionData === 'object' && Object.keys(cellxgeneExpressionData).length > 0;
+
+        if (isUmapValid && isExprValid) {
+            // Success: Data is available in the expected array/object structure
+            window.CiliAI_UMAP = umapCoordinatesData;
+            window.CiliAI.cellDataCache = cellxgeneExpressionData;
             
-            console.log(`scRNA-seq UMAP data loaded successfully from dedicated files. Total cells: ${umapCoordinatesData.umap_points.length}. Total expressed genes: ${Object.keys(cellxgeneExpressionData.cell_expression).length}`);
+            const totalCells = umapCoordinatesData.length;
+            const totalGenes = Object.keys(cellxgeneExpressionData).length;
+            console.log(`scRNA-seq UMAP data loaded successfully from dedicated files. Total cells: ${totalCells}. Total expressed genes: ${totalGenes}`);
             
         } else {
-             // Will now warn if dedicated files fail (no mock fallback)
+             // Failure: Keep variables empty and log warning
              console.warn(`scRNA-seq UMAP data not found in new dedicated files.`);
              window.CiliAI_UMAP = [];
              window.CiliAI.cellDataCache = {};
