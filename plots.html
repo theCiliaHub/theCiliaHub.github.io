@@ -822,6 +822,7 @@ function renderMultiCategoryManhattan(genes, custom) {
 // 3. Phylogenetic Conservation Heatmap
 /**
  * Calculates conservation metrics for a gene based on Li/Nevers data.
+ * Fix: Uses the full list length from the cached matrix summary for the total species count (denominator).
  * @param {object} gene - The gene object containing the .phylogeny property.
  * @returns {object} Scores object with conservation percentages.
  */
@@ -833,21 +834,30 @@ function calculatePhyloScores(gene) {
         if (!phyData) return;
 
         const isLi = source === 'li_2014';
-        const CIL_PANEL = isLi ? LI_CIL_ORG : NEVERS_CIL_PANEL;
-        const NCIL_PANEL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_PANEL;
-        const totalSpecies = CIL_PANEL.length + NCIL_PANEL.length;
+        
+        // --- CRITICAL FIX: Get TOTAL study species from the cache metadata ---
+        const phyloCache = isLi ? window.liPhylogenyCache : window.neversPhylogenyCache;
+
+        // Determine the true total number of species used in the study (denominator)
+        let totalStudySpecies = 0;
+        if (isLi && phyloCache.summary?.total_organisms) {
+             totalStudySpecies = phyloCache.summary.total_organisms;
+        } else if (!isLi && phyloCache.organism_groups?.all_organisms_list) {
+             totalStudySpecies = phyloCache.organism_groups.all_organisms_list.length;
+        }
 
         const presenceCount = phyData.species_count || phyData.species_data?.length || 0;
 
-        // Simplified Score (Presence Count vs. Total Species in the study)
+        // Conservation Score is calculated against the total species in the study
         scores[source] = {
             presenceCount: presenceCount,
-            totalSpecies: totalSpecies,
-            conservationPct: totalSpecies > 0 ? (presenceCount / totalSpecies) * 100 : 0
+            totalSpecies: totalStudySpecies,
+            conservationPct: totalStudySpecies > 0 ? (presenceCount / totalStudySpecies) * 100 : 0
         };
     });
     return scores;
-}    
+}
+    
 // --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
 function renderPhylogenyHeatmap(genes, custom) {
     clearPlot();
@@ -1029,84 +1039,54 @@ function renderPhylogenyHeatmap(genes, custom) {
 }
     
 // --- ENHANCED ORGANISM NAME SHORTENER ---
+// --- ENHANCED ORGANISM NAME SHORTENER ---
 function shortenOrganismName(name) {
     if (!name) return 'Unknown';
     
+    // 1. Remove parenthetical strain information (e.g., "(strain XXXXX)")
+    let cleanName = name.replace(/\s*\([^)]+\)\s*/g, '').trim();
+
+    // 2. Check for common abbreviations (including Li et al. format)
     const shortNames = {
-        // Ciliated organisms
-        'Homo sapiens': 'H. sapiens',
-        'Mus musculus': 'M. musculus', 
-        'Danio rerio': 'D. rerio',
-        'Xenopus tropicalis': 'X. tropicalis',
-        'Gallus gallus': 'G. gallus',
-        'Caenorhabditis elegans': 'C. elegans',
-        'Tetrahymena thermophila': 'T. thermophila',
-        'Chlamydomonas reinhardtii': 'C. reinhardtii',
-        'Micromonas sp': 'M. sp',
-        'Trypanosoma cruzi': 'T. cruzi',
-        'Leishmania major': 'L. major',
-        'Giardia intestinalis': 'G. intestinalis',
-        'Trichomonas vaginalis': 'T. vaginalis',
-        'Strongylocentrotus purpuratus': 'S. purpuratus',
-        'Ciona intestinalis': 'C. intestinalis',
-        'Physcomitrella patens': 'P. patens',
-        'Paramecium tetraurelia': 'P. tetraurelia',
-        'Volvox carteri': 'V. carteri',
-        'Amphimedon queenslandica': 'A. queenslandica',
-        'Monosiga brevicollis': 'M. brevicollis',
-        
-        // Non-ciliated organisms
-        'Saccharomyces cerevisiae': 'S. cerevisiae',
-        'Schizosaccharomyces pombe': 'S. pombe',
-        'Cryptococcus neoformans': 'C. neoformans',
-        'Ustilago maydis': 'U. maydis',
-        'Candida albicans': 'C. albicans',
-        'Arabidopsis thaliana': 'A. thaliana',
-        'Brachypodium distachyon': 'B. distachyon',
-        'Sorghum bicolor': 'S. bicolor',
-        'Vitis vinifera': 'V. vinifera',
-        'Cryptosporidium parvum': 'C. parvum',
-        'Entamoeba histolytica': 'E. histolytica',
-        'Encephalitozoon cuniculi': 'E. cuniculi',
-        
-        // Li format organisms
-        'H sapiens': 'H. sapiens',
-        'M musculus': 'M. musculus',
-        'D rerio': 'D. rerio',
-        'X tropicalis': 'X. tropicalis',
-        'G gallus': 'G. gallus',
-        'C elegans': 'C. elegans',
-        'T thermophila': 'T. thermophila',
-        'C reinhardtii': 'C. reinhardtii',
-        'M sp RCC299': 'M. sp',
-        'T cruzi': 'T. cruzi',
-        'L major': 'L. major',
-        'G intestinalis': 'G. intestinalis',
-        'T vaginalis': 'T. vaginalis',
-        'S purpuratus': 'S. purpuratus',
-        'C intestinalis': 'C. intestinalis',
-        'P patens': 'P. patens',
-        'P tetraurelia': 'P. tetraurelia',
-        'V carteri': 'V. carteri',
-        'A queenslandica': 'A. queenslandica',
-        'M brevicollis': 'M. brevicollis',
-        'S cerevisiae': 'S. cerevisiae',
-        'S pombe': 'S. pombe',
-        'C neoformans': 'C. neoformans',
-        'U maydis': 'U. maydis',
-        'C albicans': 'C. albicans',
-        'A thaliana': 'A. thaliana',
-        'B distachyon': 'B. distachyon',
-        'S bicolor': 'S. bicolor',
-        'V vinifera': 'V. vinifera',
-        'C parvum': 'C. parvum',
-        'E histolytica': 'E. histolytica',
-        'E cuniculi': 'E. cuniculi'
+        'Homo sapiens': 'H. sapiens', 'Mus musculus': 'M. musculus', 'Danio rerio': 'D. rerio',
+        'Xenopus tropicalis': 'X. tropicalis', 'Gallus gallus': 'G. gallus', 
+        'Caenorhabditis elegans': 'C. elegans', 'Tetrahymena thermophila': 'T. thermophila',
+        'Chlamydomonas reinhardtii': 'C. reinhardtii', 'Micromonas sp': 'M. sp', 
+        'Trypanosoma cruzi': 'T. cruzi', 'Leishmania major': 'L. major',
+        'Giardia intestinalis': 'G. intestinalis', 'Trichomonas vaginalis': 'T. vaginalis', 
+        'Strongylocentrotus purpuratus': 'S. purpuratus', 'Ciona intestinalis': 'C. intestinalis', 
+        'Physcomitrella patens': 'P. patens', 'Paramecium tetraurelia': 'P. tetraurelia', 
+        'Volvox carteri': 'V. carteri', 'Amphimedon queenslandica': 'A. queenslandica', 
+        'Monosiga brevicollis': 'M. brevicollis', 'Saccharomyces cerevisiae': 'S. cerevisiae', 
+        'Schizosaccharomyces pombe': 'S. pombe', 'Cryptococcus neoformans': 'C. neoformans', 
+        'Ustilago maydis': 'U. maydis', 'Candida albicans': 'C. albicans', 
+        'Arabidopsis thaliana': 'A. thaliana', 'Brachypodium distachyon': 'B. distachyon', 
+        'Sorghum bicolor': 'S. bicolor', 'Vitis vinifera': 'V. vinifera', 
+        'Cryptosporidium parvum': 'C. parvum', 'Entamoeba histolytica': 'E. histolytica', 
+        'Encephalitozoon cuniculi': 'E. cuniculi', 'H sapiens': 'H. sapiens', 'M musculus': 'M. musculus',
+        'D rerio': 'D. rerio', 'X tropicalis': 'X. tropicalis', 'G gallus': 'G. gallus',
+        'C elegans': 'C. elegans', 'T thermophila': 'T. thermophila', 'C reinhardtii': 'C. reinhardtii',
+        'M sp RCC299': 'M. sp', 'T cruzi': 'T. cruzi', 'L major': 'L. major',
+        'G intestinalis': 'G. intestinalis', 'T vaginalis': 'T. vaginalis', 'S purpuratus': 'S. purpuratus',
+        'C intestinalis': 'C. intestinalis', 'P patens': 'P. patens', 'P tetraurelia': 'P. tetraurelia',
+        'V carteri': 'V. carteri', 'A queenslandica': 'A. queenslandica', 'M brevicollis': 'M. brevicollis',
+        'S cerevisiae': 'S. cerevisiae', 'S pombe': 'S. pombe', 'C neoformans': 'C. neoformans',
+        'U maydis': 'U. maydis', 'C albicans': 'C. albicans', 'A thaliana': 'A. thaliana',
+        'B distachyon': 'B. distachyon', 'S bicolor': 'S. bicolor', 'V vinifera': 'V. vinifera',
+        'C parvum': 'C. parvum', 'E histolytica': 'E. histolytica', 'E cuniculi': 'E. cuniculi'
     };
     
-    return shortNames[name] || name.split(' ')[0] + '. ' + (name.split(' ')[1] ? name.split(' ')[1].charAt(0) : '');
-}
+    // 3. Look up the cleaned name
+    if (shortNames[cleanName]) return shortNames[cleanName];
 
+    // 4. Fallback: Genus initial + species
+    const parts = cleanName.split(' ');
+    if (parts.length >= 2) {
+        return parts[0].charAt(0) + '. ' + parts[1];
+    }
+    
+    return cleanName;
+}
 
 // --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA (FIXED FOR ID KEYS) ---
 function debugPhylogenyData(genes) {
