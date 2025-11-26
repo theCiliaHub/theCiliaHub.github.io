@@ -509,45 +509,47 @@ function getCustom() {
     };
 }
 
-    function clearPlot() {
-        const el = document.getElementById('plot-display-area');
-        el.innerHTML = '';
-        if (window.currentPlot) Plotly.purge(el);
-    }
+function clearPlot() {
+    // Clears the main plot area, but typically relies on the parent function
+    // to correctly manage the inner HTML structure later.
+    const el = document.getElementById('plot-display-area');
+    el.innerHTML = '';
+    if (window.currentPlot) Plotly.purge(el);
+}
     
-
-/ --- PLOT IMPLEMENTATIONS ---
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization where points are colored and sized based on the
  * expression level of the requested gene (or FOXJ1 by default).
  */
 async function renderScrnaUMAPPlot(geneSymbol) { 
-    // FIX 1: Target the main plot container ID for consistent Plotly rendering.
-    const plotDivId = 'plot-display-area'; 
+    // CRITICAL FIX: Target the inner DIV container which Plotly uses, NOT the outer wrapper.
+    const plotDivId = 'cilia-svg'; 
     
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
-    const plotDiv = document.getElementById(plotDivId);
+    // Get the specific element to clear and plot to: #cilia-svg
+    const plotDiv = document.getElementById(plotDivId); 
         
     // Default to FOXJ1 if no gene is provided (as requested)
     const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
 
     if (!plotDiv) {
-        console.error('UMAP plot container "plot-display-area" not found.');
+        console.error('UMAP plot container "cilia-svg" not found.');
         return;
     }
         
     // Check if critical data is available (now relies on loaded data, no mock fallback)
     if (!umapData || umapData.length === 0 || !cellData || Object.keys(cellData).length === 0) {
+        // Render error message inside the inner div
         plotDiv.innerHTML = `<div style="padding:20px; color:red; text-align:center;">
             Critical error: scRNA-seq UMAP coordinates or expression data is missing or failed to load.
         </div>`;
         return;
     }
 
-    // --- Reset panel ---
-    plotDiv.innerHTML = '';
+    // --- Reset inner panel content ---
+    plotDiv.innerHTML = ''; // Clears only the content of #cilia-svg
     
     // 1. Prepare data arrays
     const geneExpressionData = cellData[gene] || {};
@@ -591,9 +593,9 @@ async function renderScrnaUMAPPlot(geneSymbol) {
         </div>`;
         return; // CRITICAL: Stop execution here.
     }
-    
+        
     // --- Annotations & Plotly Setup ---
-    const annotations = []; // Logic to calculate annotations removed for brevity
+    const annotations = []; // Logic omitted
     const colorScaleRedGradient = [
         [0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']
     ];
@@ -624,10 +626,11 @@ async function renderScrnaUMAPPlot(geneSymbol) {
         showlegend: false
     };
         
-    // Use the plotDivId ('plot-display-area') for Plotly
+    // Use the plotDivId ('cilia-svg') for Plotly
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 }
-window.renderScrnaUMAPPlot = renderScrnaUMAPPlot; // Ensure it's exposed globally
+window.renderScrnaUMAPPlot = renderScrnaUMAPPlot;
+
     
 function debugUMAPData(genes) {
         const umapData = window.CiliAI_UMAP;
@@ -1177,7 +1180,7 @@ function renderScreenSummaryHeatmap(genes, custom) {
         });
     }
     
-    // 8. Protein Domain Architecture Heatmap
+// 8. Protein Domain Architecture Heatmap
 // --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
 function getCleanArray(gene, key) {
     // 1. Initialize data variable using the requested key
@@ -1215,7 +1218,7 @@ function getCleanArray(gene, key) {
     // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
     if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
     
-    // Final default return for string fields (This is the critical line)
+    // Final default return for string fields
     return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
 }
     
