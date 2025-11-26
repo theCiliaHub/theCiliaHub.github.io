@@ -432,35 +432,38 @@ async function loadMasterData() {
 
     
 // --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
+// --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
 function getCleanArray(gene, key) {
     // 1. Initialize data variable using the requested key
     let data = gene[key];
     
-    // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
+    // 1. Handle Complex Key Mismatch
     if (key === 'Protein.complexes') {
-        // Check 'complex_components' first, then fallback to 'Protein.complexes'
         data = gene['complex_components'] || gene['Protein.complexes'];
         if (typeof data === 'object' && !Array.isArray(data)) {
-            // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
             return Object.keys(data).map(k => `${k}`);
         }
     }
 
-    // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
+    // 2. Handle Mouse Phenotype Key Mismatch
     if (key === 'Phenotypes_mouse') {
-        // Check Phenotypes_mouse first, then fallback to mouse_phenotype
         data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
     }
 
-    // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
+    // 3. Handle PFAM Domain Key Mismatch
     if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-        // Use raw Domain_Descriptions data which is present in your object structure
         const pfamIds = gene['PFAM_IDs'] || [];
         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
     }
-    // 4. Handle Screens Summary (Array of Objects)
-    if (key === 'screens_summary' && Array.isArray(data)) return data; 
+
+    // 4. RESTORED SCREEN LOGIC: Return the raw array of objects when requested.
+    // This is crucial because renderScreenSummaryHeatmap iterates over these objects.
+    if (key === 'screens_summary') {
+        data = data || gene['screens']; // Fallback if data key is wrong
+        if (Array.isArray(data)) return data; 
+        // If data is null/undefined here, we proceed to return empty list.
+    }
     
     // Check if data is null/undefined before attempting to process it
     if (!data) return [];
@@ -1186,39 +1189,39 @@ function getCleanArray(gene, key) {
     // 1. Initialize data variable using the requested key
     let data = gene[key];
     
-    // 1. Handle Complex Key Mismatch: Map 'Protein.complexes' to 'complex_components'
+    // 1. Handle Complex Key Mismatch
     if (key === 'Protein.complexes') {
-        // Check 'complex_components' first, then fallback to 'Protein.complexes'
         data = gene['complex_components'] || gene['Protein.complexes'];
         if (typeof data === 'object' && !Array.isArray(data)) {
-            // If data is an object (e.g., {"Nuclear pore complex": [...]}), return the keys
             return Object.keys(data).map(k => `${k}`);
         }
     }
 
-    // 2. Handle Mouse Phenotype Key Mismatch: Use fallback to 'mouse_phenotype'
+    // 2. Handle Mouse Phenotype Key Mismatch
     if (key === 'Phenotypes_mouse') {
-        // Check Phenotypes_mouse first, then fallback to mouse_phenotype
         data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
     }
 
-    // 3. Handle PFAM Domain Key Mismatch: Combine IDs and Descriptions (for Plotting)
+    // 3. Handle PFAM Domain Key Mismatch
     if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-        // Use raw Domain_Descriptions data which is present in your object structure
         const pfamIds = gene['PFAM_IDs'] || [];
         const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
         return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
     }
-    // 4. Handle Screens Summary (Array of Objects)
-    if (key === 'screens_summary' && Array.isArray(data)) return data; 
+
+    // 4. FIX: Handle Screens Summary (MUST return raw array of objects for heatmap plotting)
+    if (key === 'screens_summary') {
+        data = data || gene['screens']; // Fallback if data key is wrong
+        if (Array.isArray(data)) return data; 
+    }
     
     // Check if data is null/undefined before attempting to process it
     if (!data) return [];
     
-    // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
+    // 5. Split and Filter for string fields (This contains the critical regex)
     if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
     
-    // Final default return for string fields
+    // Final default return for string fields (REGEX IS SAFE HERE)
     return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
 }
     
