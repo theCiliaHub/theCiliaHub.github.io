@@ -231,11 +231,6 @@
     window.CiliAI.cellDataCache = MOCK_SC_DATA.cell_expression;
     // NOTE: window.MOCK_SC_DATA is not needed globally, but often used for debug checks.
 
-    // --- Data Maps (Defined for the plot functions) ---
-    const NEVERS_CIL_PANEL = ["Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", "Caenorhabditis elegans", "Tetrahymena thermophila", "Chlamydomonas reinhardtii", "Micromonas sp", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis", "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens", "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis"];
-    const NEVERS_NCIL_PANEL = ["Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Cryptococcus neoformans", "Ustilago maydis", "Candida albicans", "Arabidopsis thaliana", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum", "Entamoeba histolytica", "Encephalitozoon cuniculi"];
-    const LI_CIL_ORG = ["H sapiens", "M musculus", "D rerio", "X tropicalis", "G gallus", "C elegans", "T thermophila", "C reinhardtii", "M sp RCC299", "T cruzi", "L major", "G intestinalis", "T vaginalis", "S purpuratus", "C intestinalis", "P patens", "P tetraurelia", "V carteri", "A queenslandica", "M brevicollis"];
-    const LI_NCIL_ORG = ["S cerevisiae", "S pombe", "C neoformans", "U maydis", "C albicans", "A thaliana", "B distachyon", "S bicolor", "V vinifera", "C parvum", "E histolytica", "E cuniculi"];
 
     // DATA URLS
     const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -287,13 +282,6 @@ const LI_NCIL_ORG = [
     "B distachyon", "S bicolor", "V vinifera", "C parvum", "E histolytica", "E cuniculi"
 ];
 
-    // DATA URLS
-const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-const MASTER_DB = BASE_URL + 'ciliAI_master_database.json'; 
-const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json'; 
-const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json'; 
-const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json'; 
-const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv'; 
 
 // --- TSV Parsing Helper (UNCHANGED) ---
 function parseTsvData(tsvText) {
