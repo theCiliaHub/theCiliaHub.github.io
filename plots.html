@@ -230,6 +230,47 @@
 // --- Data Maps for Phylogeny (Kept for plot consistency) ---
 // --- ENSURE PHYLOGENY CONSTANTS ARE DEFINED ---
 // Add these if not already defined in your code
+// --- NEW: Species Group Definitions for Filtering ---
+// --- NEW COMPREHENSIVE SPECIES GROUP DEFINITIONS (Used for Filtering) ---
+const PHYLO_SPECIES_GROUPS = {
+    // 1. VERTEBRATES (Ciliated: Humans, Mouse, Fish, Frog, Chicken)
+    vertebrates: [
+        "Homo sapiens", "M. musculus", "Mus musculus", "Danio rerio", "D rerio", "Xenopus tropicalis", "X tropicalis", "Gallus gallus", "G gallus",
+        "Ornithorhynchus anatinus", "Myotis lucifugus", "Rattus norvegicus", "Cricetulus griseus", "Tetraodon nigroviridis", "F.rubripes", "O.latipes",
+        "Anolis carolinensis", "S.scrofa", "B.taurus", "C.familiaris", "O.anatinus", "M.domestica", "H.sapiens"
+    ],
+    // 2. INVERTEBRATES & BASAL METAZOANS (Ciliated/Ciliary-related)
+    invertebrates: [
+        "Caenorhabditis elegans", "C elegans", "C.briggsae", "Daphnia pulex", "D.pulex", "Acyrthosiphon pisum", "A.pisum", "P.humanus", "L.loa", "B.malayi",
+        "Schistosoma mansoni", "Schistosoma japonicum", "Strongylocentrotus purpuratus", "S purpuratus", "Ciona intestinalis", "C intestinalis",
+        "Branchiostoma floridae", "Oikopleura dioica", "A.queenslandica", "Monosiga brevicollis", "M brevicollis", "Capsaspora owczarzaki", "C.owczarzaki",
+        "Salpingoeca rosetta", "Hydra vulgaris", "Nematostella vectensis", "Trichoplax adhaerens"
+    ],
+    // 3. FUNGI (Non-ciliated)
+    fungi: [
+        "Saccharomyces cerevisiae", "S cerevisiae", "Schizosaccharomyces pombe", "S pombe", "Cryptococcus neoformans", "C neoformans", "Ustilago maydis", "U maydis", "Candida albicans", "C albicans",
+        "Yarrowia lipolytica", "Podospora anserina", "Emericella nidulans", "Tuber melanosporum", "Laccaria bicolor", "Puccinia graminis f. sp. tritici",
+        "Batrachochytrium dendrobatidis", "Nosema ceranae", "Enterocytozoon bieneusi", "Schizosaccharomyces japonicus", "A.gossypii", "K.lactis", "K.waltii",
+        "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus", "S.mikatae", "S.paradoxus", "S.arctica", "C.lusitaniae", "D.hansenii",
+        "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans", "C.dubliniensis"
+    ],
+    // 4. PROTOZOA & PARASITES (Mostly ciliated or flagellated)
+    protozoa: [
+        "Tetrahymena thermophila", "T thermophila", "Paramecium tetraurelia", "P tetraurelia", "Trypanosoma cruzi", "T cruzi", "Leishmania major", "L major",
+        "Giardia intestinalis", "G intestinalis", "Trichomonas vaginalis", "T vaginalis", "Cryptosporidium parvum", "C parvum", "Entamoeba histolytica", "E histolytica",
+        "Encephalitozoon cuniculi", "E cuniculi", "Trypanosoma brucei brucei", "Leishmania mexicana", "Plasmodium vivax", "P.vivax", "Plasmodium falciparum",
+        "Toxoplasma gondii", "T.gondii", "Blastocystis hominis", "Neospora caninum", "Ichthyophthirius multifiliis"
+    ],
+    // 5. PLANTS & ALGAE (Cilia in flagella/motility)
+    plants_algae: [
+        "Chlamydomonas reinhardtii", "C reinhardtii", "Volvox carteri", "V carteri", "Physcomitrella patens", "P patens", "Arabidopsis thaliana", "A thaliana",
+        "Vitis vinifera", "V vinifera", "Brachypodium distachyon", "B distachyon", "Sorghum bicolor", "S bicolor", "Micromonas sp. (strain RCC299 / NOUM17)",
+        "Ostreococcus lucimarinus", "Ostreococcus tauri", "Cyanidioschyzon merolae", "Selaginella moellendorffii", "P.trichocarpa", "R.communis", "T.trahens",
+        "D.discoideum", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri",
+        "A.flavus", "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum"
+    ]
+};
+    
 const NEVERS_CIL_PANEL = [
     "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", 
     "Caenorhabditis elegans", "Tetrahymena thermophila", "Chlamydomonas reinhardtii", 
@@ -777,72 +818,111 @@ function renderMultiCategoryManhattan(genes, custom) {
     Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
 }
 
+
 // 3. Phylogenetic Conservation Heatmap
-// --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
-// 3. Phylogenetic Conservation Heatmap
+/**
+ * Calculates conservation metrics for a gene based on Li/Nevers data.
+ * @param {object} gene - The gene object containing the .phylogeny property.
+ * @returns {object} Scores object with conservation percentages.
+ */
+function calculatePhyloScores(gene) {
+    const scores = {};
+    
+    ['nevers_2017', 'li_2014'].forEach(source => {
+        const phyData = gene.phylogeny?.[source];
+        if (!phyData) return;
+
+        const isLi = source === 'li_2014';
+        const CIL_PANEL = isLi ? LI_CIL_ORG : NEVERS_CIL_PANEL;
+        const NCIL_PANEL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_PANEL;
+        const totalSpecies = CIL_PANEL.length + NCIL_PANEL.length;
+
+        const presenceCount = phyData.species_count || phyData.species_data?.length || 0;
+
+        // Simplified Score (Presence Count vs. Total Species in the study)
+        scores[source] = {
+            presenceCount: presenceCount,
+            totalSpecies: totalSpecies,
+            conservationPct: totalSpecies > 0 ? (presenceCount / totalSpecies) * 100 : 0
+        };
+    });
+    return scores;
+}    
 // --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
 function renderPhylogenyHeatmap(genes, custom) {
     clearPlot();
-    const source = custom.source;
+    
+    // --- 1. Setup ---
+    const source = custom.source || 'nevers_2017'; 
     const isLi = source === 'li_2014';
-    // Define the ordered list of organisms to display (CIL followed by NCIL)
-    const displayedCIL = isLi ? LI_CIL_ORG : NEVERS_CIL_PANEL;
-    const displayedNCIL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_PANEL;
-    const orgs = [...displayedCIL, ...displayedNCIL];
+    
+    // Use the hardcoded panels for ciliated/non-ciliated status classification
+    const CIL_PANEL = isLi ? LI_CIL_ORG : NEVERS_CIL_PANEL;
+    const NCIL_PANEL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_PANEL;
+    const allOrgNames = [...CIL_PANEL, ...NCIL_PANEL];
 
+    const phyloCache = isLi ? window.liPhylogenyCache : window.neversPhylogenyCache;
+    const masterOrgList = isLi ? (phyloCache.summary?.organisms_list || []) : (phyloCache.organism_groups?.all_organisms_list || []);
+    const masterOrgMap = new Map(masterOrgList.map((name, index) => [name.toUpperCase(), index]));
+    
+    // --- 2. Dynamic Species Filtering (NEW) ---
+    let organismsToDisplay = [];
+    const selectedFilters = custom.speciesFilters;
+
+    if (selectedFilters && selectedFilters.length > 0 && !selectedFilters.includes('all')) {
+        const filteredOrgNamesSet = new Set();
+        selectedFilters.forEach(groupKey => {
+            const groupSpecies = PHYLO_SPECIES_GROUPS[groupKey];
+            if (groupSpecies) {
+                // Ensure we add all specific names/abbreviations listed in the group
+                groupSpecies.forEach(species => filteredOrgNamesSet.add(species));
+            }
+        });
+
+        // Filter the full list (allOrgNames) to only include those matching the user's selected groups
+        organismsToDisplay = allOrgNames.filter(name => filteredOrgNamesSet.has(name));
+    } else {
+        // Default: Display all organisms defined in the hardcoded panels
+        organismsToDisplay = allOrgNames;
+    }
+    
+    // Final check to prevent crash if filter returns empty (shouldn't happen with 'all' default, but safe)
+    if (organismsToDisplay.length === 0) {
+        organismsToDisplay = allOrgNames;
+    }
+    
+    const orgs = organismsToDisplay; // Final list of organisms for the X-axis
+
+    // --- 3. Data Processing and Scoring ---
     const z = [];
     const yLabels = [];
     const textMatrix = [];
     let totalPresenceCount = 0;
-    
-    // Get the appropriate master organism list
-    const masterOrgList = isLi ? 
-        (window.liPhylogenyCache?.summary?.organisms_list || []) :
-        (window.neversPhylogenyCache?.organism_groups?.all_organisms_list || []);
-    
-    const masterOrgMap = new Map(masterOrgList.map((name, index) => [name.toUpperCase(), index]));
 
     genes.forEach(gene => {
         const geneSymbol = gene.gene || gene.Gene;
         const phyData = gene.phylogeny?.[source];
+        const scores = calculatePhyloScores(gene)[source] || {}; // Calculate score (for Y-axis label)
+        
         const row = [];
         const textRow = [];
         
         if (!phyData || !phyData.species_data || !Array.isArray(phyData.species_data)) {
-            // No phylogeny data for this gene
             orgs.forEach(org => {
-                row.push(0); // Absent
+                row.push(0); 
                 textRow.push(`Gene: ${geneSymbol}<br>Organism: ${org}<br>Status: No Data`);
             });
         } else {
-            // We have phylogeny data - map to display organisms
             const presenceIndices = new Set(phyData.species_data);
             
             orgs.forEach((displayOrg, index) => {
-                const isCiliated = index < displayedCIL.length;
-                let status = 0; // Default: absent
-                
-                // Find the master index for this display organism
-                let masterIndex = -1;
-                
-                if (isLi) {
-                    // For Li data: map display names to master list indices
-                    masterIndex = masterOrgMap.get(displayOrg.toUpperCase());
-                } else {
-                    // For Nevers data: try exact match first, then partial
-                    masterIndex = masterOrgMap.get(displayOrg.toUpperCase());
-                    if (masterIndex === undefined) {
-                        // Try partial matching for Nevers organisms with strain info
-                        for (const [masterOrg, idx] of masterOrgMap.entries()) {
-                            if (masterOrg.includes(displayOrg.toUpperCase()) || 
-                                displayOrg.toUpperCase().includes(masterOrg)) {
-                                masterIndex = idx;
-                                break;
-                            }
-                        }
-                    }
-                }
+                // We check status based on the full panel list, not the filtered list
+                const isCiliated = CIL_PANEL.includes(displayOrg); 
+                let status = 0; 
 
+                // Look up the index in the master list using the map
+                let masterIndex = masterOrgMap.get(displayOrg.toUpperCase());
+                
                 if (masterIndex !== undefined && masterIndex !== -1 && presenceIndices.has(masterIndex)) {
                     status = isCiliated ? 2 : 1; // 2=Ciliated, 1=Non-Ciliated
                     totalPresenceCount++;
@@ -855,30 +935,20 @@ function renderPhylogenyHeatmap(genes, custom) {
         }
         
         z.push(row);
-        yLabels.push(geneSymbol);
+        
+        // Enhance Y-axis label with Conservation Score (VITAL CHANGE)
+        const scoreLabel = scores.conservationPct !== undefined ? ` (${scores.conservationPct.toFixed(1)}% Conserved)` : '';
+        yLabels.push(geneSymbol + scoreLabel);
         textMatrix.push(textRow);
     });
-
-    // Check if we have any data to display
-    if (totalPresenceCount === 0) {
-        document.getElementById('plot-display-area').innerHTML = 
-            `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
-                No phylogenetic conservation data found for the selected genes in the ${isLi ? 'Li et al. 2014' : 'Nevers et al. 2017'} database.
-                <br><br>
-                <small>This could mean:
-                <ul style="text-align: left; display: inline-block;">
-                    <li>The genes are not present in the phylogenetic matrix</li>
-                    <li>There was an issue loading the phylogenetic data</li>
-                    <li>The organism mapping needs adjustment</li>
-                </ul>
-                </small>
-            </div>`;
-        return;
-    }
-
-    // Add separator line between CIL and NCIL panels
-    const separatorIndex = displayedCIL.length - 0.5;
     
+    // --- 4. Plotly Setup ---
+    
+    // Recalculate separator index for the filtered list based on the new 'orgs' array
+    // Find the number of ciliated organisms that made it into the filtered list.
+    const filteredCilCount = orgs.filter(name => CIL_PANEL.includes(name)).length;
+    const separatorIndex = filteredCilCount > 0 ? filteredCilCount - 0.5 : -0.5;
+
     const data = [{
         type: 'heatmap', 
         z: z, 
@@ -888,9 +958,9 @@ function renderPhylogenyHeatmap(genes, custom) {
         colorscale: [
             [0, '#F0F0F0'],       // Absent - light gray
             [0.0001, '#FFE5B5'], // Non-ciliated present - light orange
-            [1, '#FFE5B5'],       // Non-ciliated present  
+            [1, '#FFE5B5'],       
             [1.0001, '#698ECF'], // Ciliated present - blue
-            [2, '#698ECF']        // Ciliated present
+            [2, '#698ECF']        
         ],
         showscale: false,
         hovertemplate: '%{customdata}<extra></extra>',
@@ -930,21 +1000,23 @@ function renderPhylogenyHeatmap(genes, custom) {
             line: { color: 'black', width: 2 } 
         }],
         annotations: [
+            // Ensure CILIATED label is positioned correctly over the filtered set
             { 
                 text: 'CILIATED', 
                 xref: 'x', 
                 yref: 'paper', 
-                x: (displayedCIL.length - 1) / 2, 
+                x: filteredCilCount > 0 ? (filteredCilCount - 1) / 2 : 0, 
                 y: 1.05, 
                 showarrow: false, 
                 font: { color: '#698ECF', size: 12, weight: 'bold' }, 
                 xanchor: 'center' 
             },
+            // Ensure NON-CILIATED label is positioned correctly over the filtered set
             { 
                 text: 'NON-CILIATED', 
                 xref: 'x', 
                 yref: 'paper', 
-                x: displayedCIL.length + (displayedNCIL.length / 2) - 0.5, 
+                x: filteredCilCount + ((orgs.length - filteredCilCount) / 2) - 0.5, 
                 y: 1.05,
                 showarrow: false, 
                 font: { color: '#d62728', size: 12, weight: 'bold' }, 
@@ -1594,38 +1666,39 @@ function debugPhylogenyData(genes) {
     console.log("=============================");
 }
 
-    // Handles plot type selection via dropdown
-    function handlePlotSelection(value) {
-        // Show/hide phylogeny source if the selected type is phylogeny
-        document.getElementById('phy-source-group').style.display = value === 'phylogeny' ? 'block' : 'none';
-        // Clear current plot when selecting a new type
-        clearPlot(); 
-    }
 
-   
+// -----------------------------------------------------------------------------
+// Update handlePlotSelection to show the new filter dropdown as well
+function handlePlotSelection(value) {
+    const isPhylogeny = value === 'phylogeny';
+    document.getElementById('phy-source-group').style.display = isPhylogeny ? 'block' : 'none';
+    document.getElementById('phy-filter-group').style.display = isPhylogeny ? 'grid' : 'none'; // Use grid to keep layout consistent
+    clearPlot(); 
+}
+
 // PAGE SETUP
-// PAGE SETUP
-    function setupPage() {
-        document.getElementById('content-area').innerHTML = `
-            <div class="ciliaplot-main-layout">
-                <aside>
-                    <div class="control-card">
-                        <h3>Select Analysis Type</h3>
-                        <select id="analysis-dropdown" onchange="handlePlotSelection(this.value)">
-                            <option value="">-- Choose Plot Type --</option>
-                            <option value="gene_overview">Gene Overview / Summary</option>
-                            <option value="expression_heatmap">Expression Heatmap</option>
-                            <option value="scrna_dot">scRNA-seq (Lung)</option>
-                            <option value="ciliopathy">Ciliopathy & Disease Associations</option>
-                            <option value="localization_heatmap">Localization Heatmap</option>
-                            <option value="crispr_screens">CRISPR & siRNA Screens Summary</option>
-                            <option value="protein_domains">Protein Domain Architecture</option>
-                            <option value="protein_complex">Complex Membership Map</option>
-                            <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
-                            <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
-                        </select>
-                        <h3 style="margin-top:20px;">Gene Input</h3>
-                        <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">IFT88
+  // PAGE SETUP
+function setupPage() {
+    document.getElementById('content-area').innerHTML = `
+        <div class="ciliaplot-main-layout">
+            <aside>
+                <div class="control-card">
+                    <h3>Select Analysis Type</h3>
+                    <select id="analysis-dropdown" onchange="handlePlotSelection(this.value)">
+                        <option value="">-- Choose Plot Type --</option>
+                        <option value="gene_overview">Gene Overview / Summary</option>
+                        <option value="expression_heatmap">Expression Heatmap</option>
+                        <option value="scrna_dot">scRNA-seq (Lung)</option>
+                        <option value="ciliopathy">Ciliopathy & Disease Associations</option>
+                        <option value="localization_heatmap">Localization Heatmap</option>
+                        <option value="crispr_screens">CRISPR & siRNA Screens Summary</option>
+                        <option value="protein_domains">Protein Domain Architecture</option>
+                        <option value="protein_complex">Complex Membership Map</option>
+                        <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
+                        <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
+                    </select>
+                    <h3 style="margin-top:20px;">Gene Input</h3>
+                    <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">IFT88
 BBS1
 CEP290
 ARL13B
@@ -1639,55 +1712,69 @@ WDR60
 WDR90
 KIF19A
 KIF17</textarea>
-                        <button id="generate-ciliaplot-btn">Generate Plot</button>
-                        <div id="customization-panel">
-                            <h3 style="margin-top:20px;">Customization</h3>
-                            <div class="customization-grid">
-                                <div class="form-group"><label>Title</label><input id="custom-title" value="Phylogenetic Conservation"></div>
-                                <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
-                                <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
-                                <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="700"></div>
-                                <div class="form-group" id="phy-source-group">
-                                    <label>Source</label>
-                                    <select id="phy-source">
-                                        <option value="nevers_2017">Nevers et al. 2017</option>
-                                        <option value="li_2014">Li et al. 2014</option>
-                                    </select>
-                                </div>
+                    <button id="generate-ciliaplot-btn">Generate Plot</button>
+                    <div id="customization-panel">
+                        <h3 style="margin-top:20px;">Customization</h3>
+                        <div class="customization-grid">
+                            <div class="form-group"><label>Title</label><input id="custom-title" value="Phylogenetic Conservation"></div>
+                            <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
+                            <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
+                            <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="700"></div>
+                            
+                            <div class="form-group" id="phy-source-group">
+                                <label>Source</label>
+                                <select id="phy-source">
+                                    <option value="nevers_2017">Nevers et al. 2017</option>
+                                    <option value="li_2014">Li et al. 2014</option>
+                                </select>
                             </div>
-                        </div>
-                    </div>
-                </aside>
 
-                <main>
-                    <div class="control-card">
-                        <div class="download-controls">
-                            <select id="download-format"><option>png</option><option>pdf</option></select>
-                            <button id="download-plot-btn">Download</button>
-                        </div>
-                        <div id="plot-display-area">
-                            <div id="cilia-svg" style="width: 100%; height: 100%;">Your plot will appear here</div>
-                        </div>
+                            <div class="form-group full-width" id="phy-filter-group" style="display: none;">
+                                <label>Filter Species Groups (Ctrl+Click to select multiple)</label>
+                                <select id="custom-species-filter" multiple size="6">
+                                    <option value="all" selected>-- Show All Species --</option>
+                                    <option value="vertebrates">Vertebrates</option>
+                                    <option value="invertebrates">Invertebrates & Basal Metazoans</option>
+                                    <option value="ciliates">Ciliates (T. thermophila, etc.)</option>
+                                    <option value="protozoa">Protozoa & Parasites</option>
+                                    <option value="plants_algae">Plants & Algae</option>
+                                    <option value="fungi">Non-Ciliary Fungi</option>
+                                </select>
+                            </div>
+                            </div>
                     </div>
-                </main>
-            </div>`;
+                </div>
+            </aside>
 
-        document.getElementById('generate-ciliaplot-btn').onclick = generatePlot;
-        document.getElementById('download-plot-btn').onclick = () => Plotly.downloadImage('plot-display-area', {format: 'png', filename: 'CiliAI_Plot'});
-        document.getElementById('analysis-dropdown').onchange = (e) => handlePlotSelection(e.target.value);
-        
-        const dropdown = document.getElementById('analysis-dropdown');
-        const initialType = 'phylogeny'; // Set default plot type to phylogeny
-        dropdown.value = initialType;
-        
-        // Call handler to show source dropdown initially
-        handlePlotSelection(initialType); 
-        
-        // Ensure Nevers is selected by default for the source dropdown
-        document.getElementById('phy-source').value = 'nevers_2017';
-        
-        generatePlot();
-    }
+            <main>
+                <div class="control-card">
+                    <div class="download-controls">
+                        <select id="download-format"><option>png</option><option>pdf</option></select>
+                        <button id="download-plot-btn">Download</button>
+                    </div>
+                    <div id="plot-display-area">
+                        <div id="cilia-svg" style="width: 100%; height: 100%;">Your plot will appear here</div>
+                    </div>
+                </div>
+            </main>
+        </div>`;
+
+    document.getElementById('generate-ciliaplot-btn').onclick = generatePlot;
+    document.getElementById('download-plot-btn').onclick = () => Plotly.downloadImage('plot-display-area', {format: 'png', filename: 'CiliAI_Plot'});
+    document.getElementById('analysis-dropdown').onchange = (e) => handlePlotSelection(e.target.value);
+    
+    const dropdown = document.getElementById('analysis-dropdown');
+    const initialType = 'phylogeny'; // Set default plot type to phylogeny
+    dropdown.value = initialType;
+    
+    // Call handler to show source AND filter dropdowns initially
+    handlePlotSelection(initialType); 
+    
+    // Ensure Nevers is selected by default for the source dropdown
+    document.getElementById('phy-source').value = 'nevers_2017';
+    
+    generatePlot();
+}
 
     
     // 7. INITIAL EXECUTION
