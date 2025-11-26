@@ -646,6 +646,53 @@ async function renderScrnaUMAPPlot(geneSymbol) {
 }
 window.renderScrnaUMAPPlot = renderScrnaUMAPPlot; // Ensure it's exposed globally
 
+/**
+ * @debugUMAPData - Provides diagnostics on the global UMAP data state.
+ * @param {Array<Object>} genes - The list of gene objects currently selected.
+ */
+function debugUMAPData(genes) {
+    const umapData = window.CiliAI_UMAP;
+    const cellDataCache = window.CiliAI.cellDataCache;
+    const geneSymbol = genes[0]?.gene || 'FOXJ1'; // Use the first gene for expression check
+
+    console.log("\n=== UMAP DATA DIAGNOSTICS ===");
+
+    // 1. Check Global Variable Population
+    if (umapData && Array.isArray(umapData)) {
+        console.log(`[Status] CiliAI_UMAP: LOADED. Coordinates available: ${umapData.length}`);
+    } else {
+        console.error("[Status] CiliAI_UMAP: FAILED TO LOAD/MOCK.");
+    }
+    
+    if (cellDataCache && Object.keys(cellDataCache).length > 0) {
+        console.log(`[Status] cellDataCache: LOADED. Genes in cache: ${Object.keys(cellDataCache).length}`);
+    } else {
+        console.error("[Status] cellDataCache: FAILED TO LOAD/MOCK.");
+    }
+
+    // 2. Check Mock Data Consistency (If mock data is correctly set up globally)
+    // NOTE: Assuming MOCK_SC_DATA is available globally for this check
+    if (window.MOCK_SC_DATA) {
+        console.log(`[Mock] Mock Data Size (Coordinates): ${window.MOCK_SC_DATA.umap_coordinates.length}`);
+        console.log(`[Mock] Mock Data Size (Cache Genes): ${Object.keys(window.MOCK_SC_DATA.cell_expression).length}`);
+    } else {
+        console.warn("[Mock] MOCK_SC_DATA object is not globally defined. Fallback verification skipped.");
+    }
+    
+    // 3. Check Expression for the Selected Gene
+    if (cellDataCache && cellDataCache[geneSymbol]) {
+        const exprData = cellDataCache[geneSymbol];
+        const nonZeroCells = Object.values(exprData).filter(v => v > 0).length;
+        console.log(`[Gene Check: ${geneSymbol}] Found in cache. Cell types with expression: ${nonZeroCells}`);
+        console.log(`[Gene Check: ${geneSymbol}] Sample expression (Ciliated Cells): ${exprData['Ciliated Cells'] || 0}`);
+    } else {
+        console.warn(`[Gene Check: ${geneSymbol}] Gene not found in the cell expression cache.`);
+    }
+
+    console.log("=============================");
+}
+
+    
     // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
 // --- FIXED PHYLOGENY DATA ACCESS IN OTHER PLOTS ---
 function renderMultiCategoryManhattan(genes, custom) {
