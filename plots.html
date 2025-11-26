@@ -1401,84 +1401,88 @@ function renderDomainArchitecture(genes, custom) {
 
 // MAIN GENERATOR 
 function generatePlot() {
-    const input = document.getElementById('ciliaplot-genes-input').value.trim();
-    if (!input) {
-        alert("Please enter at least one gene symbol.");
-        return;
+    const input = document.getElementById('ciliaplot-genes-input').value.trim();
+    if (!input) {
+        alert("Please enter at least one gene symbol.");
+        return;
+    }
+
+    const type = document.getElementById('analysis-dropdown').value; 
+
+    if (!type) {
+        alert("Please select a plot type.");
+        return;
+    }
+
+    const plotArea = document.getElementById('plot-display-area');
+    plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:18px;">Searching genes and generating plot...</div>';
+
+    const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
+    const genes = findGenes(input);
+    const custom = getCustom();
+
+    if (genes.length === 0) {
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;">
+                <strong>No genes found in the CiliaHub database</strong><br><br>
+                <small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small>
+            </div>`;
+        return;
+    }
+
+    // DEBUG: Check phylogenetic data for troubleshooting
+    if (type === 'phylogeny') {
+        debugPhylogenyData(genes);
+    }
+    
+    // --- UMAP DEBUGGING INTEGRATION ---
+    if (type === 'scrna_dot') {
+        debugUMAPData(genes); // Run UMAP check regardless of plotting success
     }
+    // --- END UMAP DEBUGGING INTEGRATION ---
 
-    const type = document.getElementById('analysis-dropdown').value; 
+    const renderers = {
+        'gene_overview': renderMultiCategoryManhattan, 
+        'expression_heatmap': renderExpressionHeatmap,
+        'scrna_dot': window.renderScrnaUMAPPlot, 
+        'ciliopathy': renderCiliopathyPlot,
+        'localization_heatmap': renderLocalizationHeatmap,
+        'crispr_screens': renderScreenSummaryHeatmap,
+        'protein_domains': renderDomainArchitecture,
+        'protein_complex': renderComplexNetwork, 
+        'mouse_phenotypes': renderMousePhenotypeHeatmap,
+        'phylogeny': renderPhylogenyHeatmap 
+    };
 
-    if (!type) {
-        alert("Please select a plot type.");
-        return;
-    }
+    const renderer = renderers[type];
 
-    const plotArea = document.getElementById('plot-display-area');
-    plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:18px;">Searching genes and generating plot...</div>';
+    if (!renderer) {
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">
+                Plot type "${type}" not implemented or mapped yet.
+            </div>`;
+        return;
+    }
 
-    const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
-    const genes = findGenes(input);
-    const custom = getCustom();
-
-    if (genes.length === 0) {
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;">
-                <strong>No genes found in the CiliaHub database</strong><br><br>
-                <small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small>
-            </div>`;
-        return;
-    }
-
-    // console.log(`Found ${genes.length} unique gene(s): ${genes.map(g => g.gene).join(', ')}`);
-
-    // DEBUG: Check phylogenetic data for troubleshooting
-    if (type === 'phylogeny') {
-        debugPhylogenyData(genes);
-    }
-
-    const renderers = {
-        'gene_overview': renderMultiCategoryManhattan, 
-        'expression_heatmap': renderExpressionHeatmap,
-        'scrna_dot': window.renderScrnaUMAPPlot, // **CORRECTLY references the renamed function**
-        'ciliopathy': renderCiliopathyPlot,
-        'localization_heatmap': renderLocalizationHeatmap,
-        'crispr_screens': renderScreenSummaryHeatmap,
-        'protein_domains': renderDomainArchitecture,
-        'protein_complex': renderComplexNetwork, 
-        'mouse_phenotypes': renderMousePhenotypeHeatmap,
-        'phylogeny': renderPhylogenyHeatmap 
-    };
-
-    const renderer = renderers[type];
-
-    if (!renderer) {
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">
-                Plot type "${type}" not implemented or mapped yet.
-            </div>`;
-        return;
-    }
-
-    try {
-        // Special handling for UMAP (scrna_dot) since it takes a single gene symbol, not an array
-        if (type === 'scrna_dot') {
-            const geneSymbol = genes[0].gene; // Use the first gene found
-            renderer(geneSymbol); // Pass only the symbol
-        } else {
-            renderer(genes, custom); // Pass the array of gene objects and customization
-        }
-    } catch (error) {
-        console.error("Plot rendering error:", error);
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;">
-                <strong>Plot failed to render</strong><br><br>
-                <small>${error.message}</small><br><br>
-                <button onclick="generatePlot()" style="padding:10px 20px; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer;">
-                    Try Again
-                </button>
-            </div>`;
-    }
+    try {
+        // Special handling for UMAP (scrna_dot) since it takes a single gene symbol, not an array
+        if (type === 'scrna_dot') {
+            const geneSymbol = genes[0].gene; // Use the first gene found
+            renderer(geneSymbol); // Pass only the symbol
+        } else {
+            renderer(genes, custom); // Pass the array of gene objects and customization
+        }
+    } catch (error) {
+        console.error("Plot rendering error:", error);
+        plotArea.innerHTML = `
+            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;">
+                <strong>Plot failed to render</strong><br><br>
+                <small>${error.message}</small><br><br>
+                <button onclick="generatePlot()" style="padding:10px 20px; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer;">
+                    Try Again
+                </button>
+            </div>`;
+    }
 }
     
 // --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
