@@ -561,10 +561,13 @@ function getCustom() {
         titleSize: parseInt(document.getElementById('title-size')?.value) || 24,
         width: parseInt(document.getElementById('fig-width')?.value) || 1100,
         height: parseInt(document.getElementById('fig-height')?.value) || 700,
-        source: document.getElementById('phy-source')?.value || 'nevers_2017' // Default to Nevers 2017
+        source: document.getElementById('phy-source')?.value || 'nevers_2017', // Default to Nevers 2017
+        // NEW: Retrieve the second gene input for UMAP
+        gene2: document.getElementById('second-gene-input')?.value.trim().toUpperCase() || null,
+        // NEW: Retrieve selected species filter groups
+        speciesFilters: Array.from(document.getElementById('custom-species-filter')?.selectedOptions || []).map(opt => opt.value)
     };
 }
-
 function clearPlot() {
     // Clears the main plot area, but typically relies on the parent function
     // to correctly manage the inner HTML structure later.
@@ -580,26 +583,39 @@ function clearPlot() {
  */
 /**
  * UMAP PLOT (Expression Mapping Mode)
- * Renders a UMAP visualization where points are colored and sized based on the
- * expression level of the requested gene (or FOXJ1 by default).
+ * Renders a UMAP visualization based on single gene expression or gene ratio.
+ * @param {string} gene1 - The primary gene symbol (always derived from main input).
+ * @param {string | null} gene2 - The secondary gene symbol (from custom input field).
+ * @param {object} custom - Customization settings.
  */
-async function renderScrnaUMAPPlot(geneSymbol) { 
-    // FIX: Target the main plot container ID for consistent Plotly rendering.
-    const plotDivId = 'plot-display-area'; 
+async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) { 
+    const plotDivId = 'plot-display-area'; // Target the main plot container ID
     
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
     const plotDiv = document.getElementById(plotDivId);
-        
-    // Default to FOXJ1 if no gene is provided (as requested)
-    const gene = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; 
+    
+    // Determine mode and genes
+    const genePrimary = gene1 ? gene1.toUpperCase() : 'FOXJ1';
+    const geneSecondary = gene2 ? gene2.toUpperCase() : null;
+    const isRatioMode = geneSecondary && geneSecondary !== genePrimary;
+    
+    let plotTitle, colorTitle;
+
+    if (isRatioMode) {
+        plotTitle = `UMAP: <strong>${genePrimary} / ${geneSecondary}</strong> Expression Ratio`;
+        colorTitle = `${genePrimary} / ${geneSecondary} Ratio`;
+    } else {
+        plotTitle = `UMAP: <strong>${genePrimary}</strong> Expression`;
+        colorTitle = `${genePrimary} Expr. (TPM)`;
+    }
 
     if (!plotDiv) {
         console.error('UMAP plot container "plot-display-area" not found.');
         return;
     }
         
-    // Check if critical data is available (data loading is still failing, so this path is likely hit)
+    // Check if critical data is available 
     if (!umapData || umapData.length === 0 || !cellData || Object.keys(cellData).length === 0) {
         plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; padding:20px; color:red; text-align:center;">
             Critical error: scRNA-seq UMAP coordinates or expression data is missing or failed to load.
@@ -607,88 +623,98 @@ async function renderScrnaUMAPPlot(geneSymbol) {
         return;
     }
 
-    // --- Reset panel (Clears the outer div for Plotly) ---
-    plotDiv.innerHTML = '';
+    plotDiv.innerHTML = ''; // Reset panel
     
-    // 1. Prepare data arrays
-    const geneExpressionData = cellData[gene] || {};
+    // Get expression data for both genes
+    const exprData1 = cellData[genePrimary] || {};
+    const exprData2 = isRatioMode ? (cellData[geneSecondary] || {}) : {};
         
-    const sampleSize = 15000;
     const sampledData = [];
     const colorArray = [];
     const sizeArray = [];
-        
-    let maxExpression = 0;
-    const sizeBase = 5;
-    const sizeScaleMax = 12;
-    const expressionThreshold = 2; // Capping expression for dot size scaling
+    
+    let maxColorValue = 0;
+    const pseudoCount = 0.01; // Avoid division by zero in ratio mode
+    const expressionThreshold = 2; 
 
-    const sourceData = umapData.length > sampleSize 
-                            ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
-                            : umapData;
+    // Use full UMAP data (assuming coordinate loading is now correct)
+    const sourceData = umapData; 
 
     for (const point of sourceData) {
-        const expressionValue = geneExpressionData[point.cell_type] || 0;
-                
+        const value1 = exprData1[point.cell_type] || 0;
+        
+        let colorValue, sizeMagnitude;
+
+        if (isRatioMode) {
+            const value2 = exprData2[point.cell_type] || 0;
+            // Calculate ratio: (G1 + pseudo) / (G2 + pseudo)
+            colorValue = (value1 + pseudoCount) / (value2 + pseudoCount); 
+            // Size based on G1 expression magnitude
+            sizeMagnitude = value1; 
+        } else {
+            colorValue = value1;
+            sizeMagnitude = value1;
+        }
+
         sampledData.push(point);
-        colorArray.push(expressionValue);
+        colorArray.push(colorValue);
                 
-        // Calculate dot size based on expression magnitude, capped by expressionThreshold
-        const scaledMagnitude = Math.min(expressionValue, expressionThreshold) / expressionThreshold;
-        sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude); 
+        // Dot size scaling based on primary magnitude
+        const scaledMagnitude = Math.min(sizeMagnitude, expressionThreshold) / expressionThreshold;
+        sizeArray.push(5 + (12 - 5) * scaledMagnitude); 
                 
-        if (expressionValue > maxExpression) {
-            maxExpression = expressionValue;
+        if (colorValue > maxColorValue) {
+            maxColorValue = colorValue;
         }
     }
         
-    // Handle the case where the gene is not expressed.
-    if (maxExpression === 0) {
-        const message = `Gene <strong>${gene}</strong> not found in the expression cache or has zero expression in the loaded Lung scRNA-seq dataset.`;
-        // Display user-friendly message in the plot area
+    // Handle case where primary gene has no data
+    if (Object.keys(exprData1).length === 0) {
         plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">
-            🚫 ${message}
+            🚫 Gene <strong>${genePrimary}</strong> not found in the expression cache.
         </div>`;
-        return; // CRITICAL: Stop execution here.
+        return; 
     }
     
-    // --- Annotations & Plotly Setup ---
-    const annotations = []; // Logic omitted
-    const colorScaleRedGradient = [
-        [0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']
-    ];
-        
+    // --- Plotly Setup ---
+    const colorScale = isRatioMode ? 'Viridis' : [[0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']];
+    const cMax = isRatioMode ? Math.min(maxColorValue, 10) : maxColorValue; // Cap ratio max at 10 for better visualization contrast
+
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
-        text: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${colorArray[i].toFixed(3)}`),
+        text: sampledData.map((p, i) => {
+            const expr1 = exprData1[p.cell_type] || 0;
+            if (isRatioMode) {
+                const expr2 = exprData2[p.cell_type] || 0;
+                return `Cell Type: ${p.cell_type}<br>${genePrimary}: ${expr1.toFixed(3)}<br>${geneSecondary}: ${expr2.toFixed(3)}<br>Ratio: ${colorArray[i].toFixed(2)}`;
+            }
+            return `Cell Type: ${p.cell_type}<br>Expression: ${expr1.toFixed(3)}`;
+        }),
         mode: 'markers',
         type: 'scattergl',
         hoverinfo: 'text',
         marker: {
             color: colorArray,
-            colorscale: colorScaleRedGradient,
-            cmin: 0,
-            cmax: maxExpression > 0 ? maxExpression : 0.0001,
-            colorbar: { title: `${gene} Expr. (TPM)` },
+            colorscale: colorScale,
+            cmin: isRatioMode ? 0.1 : 0,
+            cmax: cMax > 0 ? cMax : 0.0001,
+            colorbar: { title: colorTitle },
             size: sizeArray,
             opacity: 0.8
         }
     }];
 
     const layout = {
-        title: `UMAP: <strong>${gene}</strong> Expression (Size & Color Mapped)`,
+        title: plotTitle,
         xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
         yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
-        annotations: annotations,
         showlegend: false
     };
         
-    // Use the plotDivId ('plot-display-area') for Plotly
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 }
 window.renderScrnaUMAPPlot = renderScrnaUMAPPlot;
-
     
 function debugUMAPData(genes) {
         const umapData = window.CiliAI_UMAP;
@@ -1492,6 +1518,7 @@ function renderDomainArchitecture(genes, custom) {
     }
 
 // MAIN GENERATOR 
+// MAIN GENERATOR 
 function generatePlot() {
     const input = document.getElementById('ciliaplot-genes-input').value.trim();
     if (!input) {
@@ -1511,16 +1538,13 @@ function generatePlot() {
 
     const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
     
-    // IMPORTANT: findGenes now returns an object for every query (found or not)
+    // IMPORTANT: findGenes returns an object for every query (found or not)
     let genes = findGenes(input); 
 
     const custom = getCustom();
 
     // --- Safety Check: Ensure at least one gene/default is available for UMAP/scrna_dot ---
-    // If no genes were found in the CiliAI core database, check if the user entered 
-    // something. If they did, use the first query as a minimal gene object for UMAP/external lookups.
     if (genes.length === 0 && type === 'scrna_dot' && queries.length > 0) {
-        // Force the first entered query (or a default)
         const defaultGene = { gene: queries[0] };
         genes = [defaultGene];
     }
@@ -1542,7 +1566,7 @@ function generatePlot() {
     
     // --- UMAP DEBUGGING INTEGRATION ---
     if (type === 'scrna_dot') {
-        debugUMAPData(genes); // Run UMAP check regardless of plotting success
+        debugUMAPData(genes); 
     }
     // --- END UMAP DEBUGGING INTEGRATION ---
 
@@ -1570,11 +1594,11 @@ function generatePlot() {
     }
 
     try {
-        // Special handling for UMAP (scrna_dot) since it takes a single gene symbol, not an array
+        // CRITICAL UPDATE: Pass BOTH genes (or gene1, gene2) to the UMAP renderer
         if (type === 'scrna_dot') {
-            // Use the gene symbol of the first object returned by findGenes
-            const geneSymbol = genes[0].gene; 
-            renderer(geneSymbol); // Pass only the symbol
+            const gene1 = genes[0].gene; // Primary gene (from textarea)
+            const gene2 = custom.gene2;  // Secondary gene (from new input field)
+            renderer(gene1, gene2, custom); // Pass both genes and custom settings
         } else {
             renderer(genes, custom); // Pass the array of gene objects and customization
         }
@@ -1591,9 +1615,7 @@ function generatePlot() {
     }
 }
 
-
     
-// --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
 // --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
 function debugPhylogenyData(genes) {
     console.log("=== PHYLOGENY DATA DEBUG ===");
@@ -1657,7 +1679,6 @@ function handlePlotSelection(value) {
 }
 
 // PAGE SETUP
-  // PAGE SETUP
 function setupPage() {
     document.getElementById('content-area').innerHTML = `
         <div class="ciliaplot-main-layout">
@@ -1709,6 +1730,10 @@ KIF17</textarea>
                                 </select>
                             </div>
 
+                            <div class="form-group full-width">
+                                <label>Second Gene (For Co-expression/Ratio UMAP)</label>
+                                <input type="text" id="second-gene-input" placeholder="Optional, e.g., BBS1, FOXJ1">
+                            </div>
                             <div class="form-group full-width" id="phy-filter-group" style="display: none;">
                                 <label>Filter Species Groups (Ctrl+Click to select multiple)</label>
                                 <select id="custom-species-filter" multiple size="6">
@@ -1747,7 +1772,7 @@ KIF17</textarea>
     const initialType = 'phylogeny'; // Set default plot type to phylogeny
     dropdown.value = initialType;
     
-    // Call handler to show source AND filter dropdowns initially
+    // Call handler to show source and filter dropdowns initially
     handlePlotSelection(initialType); 
     
     // Ensure Nevers is selected by default for the source dropdown
