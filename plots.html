@@ -532,27 +532,18 @@ function getCustom() {
     // * UMAP PLOT (scRNA-seq Lung) - Uses the CiliAI global variables
     // ... (Your Global State and MOCK Data definitions remain unchanged) ...
 
-// ==========================================================
-// III. UMAP Rendering Function (renderScrnaUMAPPlot)
-// ==========================================================
-
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization where points are colored and sized based on the
  * expression level of the requested gene (or FOXJ1 by default).
- * * NOTE: Name changed from renderUMAPPlot to renderScrnaUMAPPlot
  */
-// ==========================================================
-// III. UMAP Rendering Function (renderScrnaUMAPPlot)
-// ==========================================================
-
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization where points are colored and sized based on the
  * expression level of the requested gene (or FOXJ1 by default).
  */
 async function renderScrnaUMAPPlot(geneSymbol) { 
-    // CHANGE 1: Use the master plot container ID, consistent with other renderers.
+    // FIX 1: Target the main plot container ID for consistent Plotly rendering.
     const plotDivId = 'plot-display-area'; 
     
     const umapData = window.CiliAI_UMAP;
@@ -567,49 +558,100 @@ async function renderScrnaUMAPPlot(geneSymbol) { 
         return;
     }
         
-    // Check if data is available (will rely on the mock data if fetch failed)
+    // Check if critical data is available (will rely on the mock data if fetch failed)
     if (!umapData || !cellData) {
-        // NOTE: window.addChatMessage is not defined in this snippet, using console.
-        console.warn('UMAP or scRNA-seq expression data is not available to plot.');
+        plotDiv.innerHTML = `<div style="padding:20px; color:red;">Critical error: UMAP data cache or coordinates are missing.</div>`;
         return;
     }
 
-    // --- Reset SVG panel ---
-    // Plotly.newPlot handles clearing the container, so this line can be removed 
-    // or kept if necessary for non-Plotly UI elements, but usually Plotly.newPlot suffices.
+    // --- Reset panel ---
     plotDiv.innerHTML = '';
     
-    // NOTE: The next two lines related to '.interactive-cilium' and SVG diagram 
-    // are commented out as the surrounding logic (window.generateAndInjectSVG) is not provided.
-    // const wrapper = plotDiv.closest('.interactive-cilium'); 
-    // if (wrapper) wrapper.classList.add('table-view-active'); 
+    // NOTE: Lines related to 'interactive-cilium' and SVG diagram interaction are removed 
+    // as they are outside the scope of this plot type and container setup.
 
-    // 1. Prepare data arrays (rest of function unchanged, skipping for brevity)
-    // ... data preparation logic ...
+    // 1. Prepare data arrays
+    const geneExpressionData = cellData[gene] || {};
+        
+    const sampleSize = 15000;
+    const sampledData = [];
+    const colorArray = [];
+    const sizeArray = [];
+        
+    let maxExpression = 0;
+    const sizeBase = 5;
+    const sizeScaleMax = 12;
+    const expressionThreshold = 2; // Capping expression for dot size scaling
 
-    /* ... PLOTLY DATA AND LAYOUT DEFINITIONS ... */
+    const sourceData = umapData.length > sampleSize 
+                           ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
+                           : umapData;
 
-    // CHANGE 2: The Plotly call now correctly targets the visible, main container.
+    for (const point of sourceData) {
+        const expressionValue = geneExpressionData[point.cell_type] || 0;
+                
+        sampledData.push(point);
+        colorArray.push(expressionValue);
+                
+        // Calculate dot size based on expression magnitude, capped by expressionThreshold
+        const scaledMagnitude = Math.min(expressionValue, expressionThreshold) / expressionThreshold;
+        sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude); 
+                
+        if (expressionValue > maxExpression) {
+            maxExpression = expressionValue;
+        }
+    }
+        
+    // FIX 2: Gracefully handle the case where the gene is not expressed (ReferenceError fix).
+    if (maxExpression === 0) {
+        const message = `Gene <strong>${gene}</strong> not found in the expression cache or has zero expression in the loaded Lung scRNA-seq dataset.`;
+        console.warn(message);
+        // Display user-friendly message in the plot area
+        plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">
+            🚫 ${message}
+        </div>`;
+        return; // CRITICAL: Stop execution here.
+    }
+    
+    // --- Annotations & Plotly Setup ---
+    const annotations = []; // Logic to calculate annotations removed for brevity
+    const colorScaleRedGradient = [
+        [0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']
+    ];
+        
+    const plotData = [{
+        x: sampledData.map(p => p.x),
+        y: sampledData.map(p => p.y),
+        text: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${colorArray[i].toFixed(3)}`),
+        mode: 'markers',
+        type: 'scattergl',
+        hoverinfo: 'text',
+        marker: {
+            color: colorArray,
+            colorscale: colorScaleRedGradient,
+            cmin: 0,
+            cmax: maxExpression > 0 ? maxExpression : 0.0001,
+            colorbar: { title: `${gene} Expr. (TPM)` },
+            size: sizeArray,
+            opacity: 0.8
+        }
+    }];
+
+    const layout = {
+        title: `UMAP: <strong>${gene}</strong> Expression (Size & Color Mapped)`,
+        xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
+        yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
+        annotations: annotations,
+        showlegend: false
+    };
+        
+    // Use the plotDivId ('plot-display-area') for Plotly
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 
     // --- Back button (UI Integration) ---
-    // Since the plot is now in the main container, the back button logic must be 
-    // adapted if you intend to overlay the UMAP plot. For a standard plot, this 
-    // is usually not needed or is handled by navigation.
-    // **Recommend removing the back button logic for now unless integrating with the Cilia Diagram.**
-
-    /*
-    const backButton = document.createElement('button');
-    backButton.id = 'ciliai-back-btn';
-    backButton.className = 'ciliai-button';
-    backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10;';
-    backButton.textContent = 'Back to Diagram';
-    backButton.onclick = () => window.generateAndInjectSVG();
-    plotDiv.prepend(backButton);
-    */
+    // Removed the back button logic for clean integration into the main plot area.
 }
 window.renderScrnaUMAPPlot = renderScrnaUMAPPlot; // Ensure it's exposed globally
-
        
 function debugUMAPData(genes) {
         const umapData = window.CiliAI_UMAP;
