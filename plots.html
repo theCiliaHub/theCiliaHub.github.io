@@ -844,77 +844,6 @@ const CATEGORY_COLOR_MAP = new Map();
 
 // Global index to ensure we use unique colors from the palette sequentially
 let COLOR_INDEX_COUNTER = 0;
-// --- 3. Two-Sided Legend Placement (Bottom Left / Bottom Right) ---
-
-const plotAnnotations = [];
-
-const leftCategories  = ["Localization", "Complex", "Ciliopathy", "Function"];
-const rightCategories = ["Screens", "Cilia Length", "Phenotypes", "Phylogeny"];
-
-// Vertical spacing
-const lineHeight = 0.035;
-
-// Starting Y position FAR below plot area
-let leftY  = -0.42;   // bottom-left legend
-let rightY = -0.42;   // bottom-right legend
-
-// LEFT SIDE LEGEND
-leftCategories.forEach(cat => {
-    if (!categoryLegends[cat]) return;
-
-    plotAnnotations.push({
-        xref: 'paper', yref: 'paper',
-        x: 0.02, y: leftY,
-        xanchor: 'left', yanchor: 'middle',
-        text: `<b>${cat}</b>`,
-        font: { size: 12, color: '#333' },
-        showarrow: false
-    });
-    leftY -= lineHeight * 1.2;
-
-    Object.entries(categoryLegends[cat]).forEach(([value, colorHex]) => {
-        plotAnnotations.push({
-            xref: 'paper', yref: 'paper',
-            x: 0.02, y: leftY,
-            xanchor: 'left', yanchor: 'middle',
-            text: `<span style='color:${colorHex}; font-size:16px;'>●</span> ${value}`,
-            font: { size: 10, color: '#444' },
-            showarrow: false
-        });
-        leftY -= lineHeight;
-    });
-
-    leftY -= lineHeight * 0.8; // spacing between groups
-});
-
-// RIGHT SIDE LEGEND
-rightCategories.forEach(cat => {
-    if (!categoryLegends[cat]) return;
-
-    plotAnnotations.push({
-        xref: 'paper', yref: 'paper',
-        x: 0.75, y: rightY,
-        xanchor: 'left', yanchor: 'middle',
-        text: `<b>${cat}</b>`,
-        font: { size: 12, color: '#333' },
-        showarrow: false
-    });
-    rightY -= lineHeight * 1.2;
-
-    Object.entries(categoryLegends[cat]).forEach(([value, colorHex]) => {
-        plotAnnotations.push({
-            xref: 'paper', yref: 'paper',
-            x: 0.75, y: rightY,
-            xanchor: 'left', yanchor: 'middle',
-            text: `<span style='color:${colorHex}; font-size:16px;'>●</span> ${value}`,
-            font: { size: 10, color: '#444' },
-            showarrow: false
-        });
-        rightY -= lineHeight;
-    });
-
-    rightY -= lineHeight * 0.8;
-});
 
 /**
  * Utility to get a unique color for any categorical value.
@@ -963,200 +892,220 @@ function classifyPhylo(gene) {
 function renderMultiCategoryManhattan(genes, custom) {
     clearPlot();
     
+    // Reset global categoryLegends map before starting the new plot creation
+    const categoryLegends = {};
+    COLOR_INDEX_COUNTER = 0; // Reset color index to start palette fresh for consistency
+
     // Define categories. 
     const categories = [
         { name: "Localization", key: "Localization" },
         { name: "Complex", key: "Protein.complexes" },
         { name: "Ciliopathy", key: "Ciliopathy" },
         { name: "Function", key: "Functional.category" },
-        { name: "Screens", key: "screens_summary" }, 
-        { name: "Cilia Length", key: "cilia_length_effects" }, 
+        { name: "Screens", key: "screens_summary" },
+        { name: "Cilia Length", key: "cilia_length_effects" },
         { name: "Phenotypes", key: "Phenotypes_mouse" },
         { name: "Phylogeny", key: "phylogeny" }
     ];
 
     const traces = [];
-    const categoryLegends = {};
-    
-    // Map category name to its numerical index for the X-coordinate
-    const categoryIndexMap = new Map(categories.map((cat, i) => [cat.name, i]));
 
+    // ======================================================
+    // 1. MAIN LOOP: BUILD CATEGORY POINTS AND COLLECT LEGEND DATA
+    // ======================================================
     categories.forEach((cat, catIdx) => {
-        const x = [], y = [], text = [], color = [], hoverNames = [];
-        
-        genes.forEach((gene, geneIdx) => {
-            
-            if (cat.key === "cilia_length_effects") {
-                // --- CATEGORY: Cilia Length Effects ---
-                const loF = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
-                const oe = gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
-                
-                const processEffect = (effectType, value) => {
-                    if (value && value !== 'Not Reported') {
-                        const markerKey = `${effectType} (${value})`;
-                        const markerColor = getUniqueColor('CiliaLength: ' + markerKey);
-                        
-                        x.push(catIdx + (effectType === 'LoF' ? -0.3 : 0.3) * 0.6); 
-                        y.push(geneIdx);
-                        text.push(`${gene.gene}<br>Effect: ${effectType}<br>Result: ${value}`);
-                        color.push(markerColor);
+        const x = [], y = [], text = [], colors = [];
 
-                        categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                        categoryLegends[cat.name][markerKey] = markerColor;
-                    }
+        genes.forEach((gene, geneIdx) => {
+
+            if (cat.key === "cilia_length_effects") {
+                const loF = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
+                const oe  = gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
+
+                const processEffect = (effectType, value, shift) => {
+                    if (value === "Not Reported") return;
+
+                    const key = `${effectType} (${value})`;
+                    const markerColor = getUniqueColor("CiliaLength:" + key);
+
+                    x.push(catIdx + shift * 0.6); // Shift point slightly left/right
+                    y.push(geneIdx);
+                    text.push(`${gene.gene}<br>Effect: ${effectType}<br>Result: ${value}`);
+                    colors.push(markerColor);
+
+                    categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                    categoryLegends[cat.name][key] = markerColor;
                 };
 
-                processEffect('LoF', loF);
-                processEffect('OE', oe);
-
+                processEffect("LoF", loF, -0.25);
+                processEffect("OE",  oe,  0.25);
 
             } else if (cat.key === "phylogeny") {
-                // --- CATEGORY: Phylogeny (Classification) ---
                 const classification = classifyPhylo(gene);
-                
-                if (classification !== 'No Data') {
-                    const score = calculatePhyloScores(gene)[custom.source || 'nevers_2017']?.conservationPct || 0;
-                    const sourceText = custom.source === 'li_2014' ? 'Li (2014)' : 'Nevers (2017)';
-                    
-                    const markerColor = getUniqueColor('Phylo: ' + classification);
+                if (classification === "No Data") return;
+
+                const score = calculatePhyloScores(gene)[custom.source || 'nevers_2017']?.conservationPct || 0;
+                const sourceText = custom.source === 'li_2014' ? 'Li (2014)' : 'Nevers (2017)';
+                const color = getUniqueColor("Phylo:" + classification);
+
+                x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                y.push(geneIdx);
+                text.push(`${gene.gene}<br>Conserved: ${classification}<br>(${score.toFixed(1)}% via ${sourceText})`);
+                colors.push(color);
+
+                categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                categoryLegends[cat.name][classification] = color;
+            } else if (cat.key === "screens_summary") {
+                const screenArr = getCleanArray(gene, cat.key);
+                if (!screenArr?.length) return;
+
+                screenArr.forEach(hit => {
+                    const resultKey = hit.source ? `${hit.source} - ${hit.result || "Hit"}` : "Unclassified Hit";
+                    const label = hit.source ? `${hit.source} (Result: ${hit.result || "N/A"})` : JSON.stringify(hit);
+                    const color = getUniqueColor("Screen:" + resultKey);
 
                     x.push(catIdx + (Math.random() - 0.5) * 0.6);
                     y.push(geneIdx);
-                    text.push(`${gene.gene}<br>Conserved: ${classification}<br>(${score.toFixed(1)}% via ${sourceText})`);
-                    color.push(markerColor);
-                    
+                    text.push(`${gene.gene}<br>${label}`);
+                    colors.push(color);
+
                     categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                    categoryLegends[cat.name][classification] = markerColor;
-                }
-                
-            } else if (cat.key === "screens_summary") {
-                // --- CATEGORY: Screens (Nested Objects) ---
-                const screenData = getCleanArray(gene, cat.key);
-                
-                if (Array.isArray(screenData) && screenData.length > 0) {
-                    screenData.forEach(screenHit => {
-                        const resultKey = screenHit.source ? `${screenHit.source} - ${screenHit.result || 'Hit'}` : 'Unclassified Hit';
-                        const label = screenHit.source ? `${screenHit.source} (Result: ${screenHit.result || 'N/A'})` : JSON.stringify(screenHit);
-                        const markerColor = getUniqueColor('Screen: ' + resultKey);
-
-                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                        y.push(geneIdx);
-                        text.push(`${gene.gene}<br>Screen: ${label}`);
-                        color.push(markerColor);
-
-                        categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                        categoryLegends[cat.name][resultKey] = markerColor;
-                    });
-                }
+                    categoryLegends[cat.name][resultKey] = color;
+                });
             } else {
-                // --- CATEGORIES: Localization, Complex, Ciliopathy, Function, Phenotypes (Simple Lists) ---
-                const values = getCleanArray(gene, cat.key);
-                
-                values.forEach(val => {
-                    if (typeof val === 'string' && val.length > 0 && val !== 'N/A' && val !== 'Unknown' && !val.includes('PFAM_ID: No description')) {
-                        
-                        const legendKey = cat.name + ': ' + val; 
-                        const markerColor = getUniqueColor(legendKey);
+                // SIMPLE CATEGORIES
+                const arr = getCleanArray(gene, cat.key);
+                arr.forEach(val => {
+                    if (!val || val === "N/A" || val === "Unknown" || val.includes('PFAM_ID')) return;
 
-                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                        y.push(geneIdx);
-                        text.push(`${gene.gene}<br>${cat.name}: ${val}`);
-                        color.push(markerColor);
-                        
-                        categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                        categoryLegends[cat.name][val] = markerColor;
-                    }
+                    const color = getUniqueColor(cat.name + ":" + val);
+
+                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                    y.push(geneIdx);
+                    text.push(`${gene.gene}<br>${cat.name}: ${val}`);
+                    colors.push(color);
+
+                    categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                    categoryLegends[cat.name][val] = color;
                 });
             }
         });
-        
-        // Push the trace data 
-        if (x.length > 0) {
+
+        if (x.length) {
             traces.push({
-                x, y, text, mode: 'markers', 
+                x, y, text,
+                mode: "markers",
                 name: cat.name,
-                marker: { size: 14, color: color }, 
-                hovertemplate: '%{text}<extra></extra>'
+                marker: { size: 14, color: colors },
+                hovertemplate: "%{text}<extra></extra>"
             });
         }
     });
-    
-    // --- 3. Generate Annotation Legend (Below Plot) ---
+
+    // ======================================================
+    // 2. TWO-SIDED BOTTOM LEGEND (Annotation Generation)
+    // ======================================================
     const plotAnnotations = [];
-    let currentYPosition = -0.05; 
-    const lineHeight = 0.04;
-    const boxX = 0.02;
+    const leftGroups  = ["Localization", "Complex", "Ciliopathy", "Function"];
+    const rightGroups = ["Screens", "Cilia Length", "Phenotypes", "Phylogeny"];
 
-    // Generate detailed text annotations for the legend
-    Object.entries(categoryLegends).forEach(([categoryName, colorMap]) => {
-        // Add Category Header
-        plotAnnotations.push({
-            xref: 'paper', yref: 'paper', x: boxX, y: currentYPosition,
-            xanchor: 'left', yanchor: 'middle',
-            text: `<b>${categoryName} Associations:</b>`,
-            font: { size: 12, color: '#333' },
-            showarrow: false
-        });
-        currentYPosition -= lineHeight * 1.5;
+    const lineHeight = 0.035;
+    let maxGroupsHeight = 0; // Tracks the height of the tallest column in paper units
 
-        // Add each unique value/color pair
-        Object.entries(colorMap).sort((a, b) => a[0].localeCompare(b[0])).forEach(([value, colorHex]) => {
+    const generateLegendColumn = (groups, xAnchor, startY) => {
+        let currentY = startY;
+        let columnHeight = 0;
+
+        groups.forEach(cat => {
+            if (!categoryLegends[cat]) return;
+
+            // 1. Category Header
             plotAnnotations.push({
-                xref: 'paper', yref: 'paper', x: boxX, y: currentYPosition,
-                xanchor: 'left', yanchor: 'middle',
-                text: `<span style='color:${colorHex}; font-size:16px;'>●</span> ${value}`,
-                font: { size: 10, color: '#444' },
-                showarrow: false
+                xref: "paper", yref: "paper", x: xAnchor, y: currentY,
+                text: `<b>${cat}</b>`,
+                xanchor: "left", showarrow: false, font: { size: 12 }
             });
-            currentYPosition -= lineHeight;
+            currentY -= lineHeight * 1.2;
+            columnHeight += lineHeight * 1.2;
+
+            // 2. Individual Labels
+            Object.entries(categoryLegends[cat]).sort((a, b) => a[0].localeCompare(b[0])).forEach(([label, color]) => {
+                plotAnnotations.push({
+                    xref: "paper", yref: "paper",
+                    x: xAnchor, y: currentY,
+                    text: `<span style='color:${color};font-size:16px;'>●</span> ${label}`,
+                    xanchor: "left", showarrow: false, font: { size: 10 }
+                });
+                currentY -= lineHeight;
+                columnHeight += lineHeight;
+            });
+
+            currentY -= lineHeight * 0.8;
+            columnHeight += lineHeight * 0.8;
         });
-
-        currentYPosition -= lineHeight * 0.5; // Space between categories
-    });
-
-
-    // --- 4. Plotly Layout (CRITICAL FIX FOR OVERLAP) ---
-    const layout = {
-    title: { 
-        text: custom.title || "Gene Feature Overview / Summary", 
-        font: { size: custom.titleSize || 22 }
-    },
-
-    xaxis: { 
-        title: "",
-        tickvals: categories.map((_, i) => i),
-        ticktext: categories.map(c => c.name),
-        tickangle: -45,
-        range: [-0.5, categories.length - 0.5],
-        automargin: true,
-        showgrid: false,
-        zeroline: false
-    },
-
-    yaxis: { 
-        title: "Genes",
-        tickvals: genes.map((_, i) => i),
-        ticktext: genes.map(g => g.gene),
-        automargin: true,
-        showgrid: true,
-        zeroline: false
-    },
-
-    height: custom.height || 1600,   // ← **Increase vertical space**
-    width: custom.width || 1400,
-
-    margin: { 
-        l: 180,   // ← More room for gene names
-        r: 40,
-        t: 100,
-        b: 520   // ← now has enough room for two legend columns
-    },
-
-    showlegend: false,
-    annotations: plotAnnotations
-};
+        return columnHeight;
+    };
     
-    Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
+    // Run both columns and find the max height needed
+    const leftHeight = generateLegendColumn(leftGroups, 0.02, 1.0); // Start at paper y=1.0 (top edge)
+    const rightHeight = generateLegendColumn(rightGroups, 0.75, 1.0); // Start at paper y=1.0 (top edge)
+    maxGroupsHeight = Math.max(leftHeight, rightHeight);
+
+    // ======================================================
+    // 3. PLOTLY LAYOUT
+    // ======================================================
+    
+    // We determine the bottom margin based on the tallest column height
+    // Since Plotly uses normalized coordinates (0 to 1) for annotations,
+    // we need to set the margin based on the difference between the plot area 
+    // and the top of the tallest legend column (y=1.0 in paper space).
+    const requiredBtmMargin = Math.ceil(maxGroupsHeight * custom.height) + 20; 
+
+    const layout = {
+        title: { text: custom.title || "Gene Feature Overview / Summary", font: { size: 22 } },
+
+        xaxis: {
+            title: "Categories",
+            tickvals: categories.map((_, i) => i),
+            ticktext: categories.map(c => c.name),
+            tickangle: -45,
+            range: [-0.5, categories.length - 0.5],
+            // Ensure labels are drawn in the bottom margin space reserved below:
+            ticklen: 10,
+            tickcolor: '#999',
+            
+            showgrid: false,
+            zeroline: false
+        },
+
+        yaxis: {
+            title: "Genes",
+            tickvals: genes.map((_, i) => i),
+            ticktext: genes.map(g => g.gene),
+            automargin: true,
+            showgrid: true,
+            zeroline: false
+        },
+
+        height: custom.height || 700,
+        width: custom.width || 1100,
+
+        // CRITICAL FIX 3: Set bottom margin dynamically to fit the X-axis labels AND the legend below
+        // Calculate the maximum height needed below the plot area.
+        margin: {
+            l: 120, 
+            r: 20,
+            t: 80,
+            b: requiredBtmMargin // Calculated dynamically
+        },
+
+        showlegend: false,
+        
+        // Use the generated annotations for the custom legend
+        annotations: plotAnnotations,
+    };
+
+    Plotly.newPlot("plot-display-area", traces, layout, { responsive: true });
 }
     
 
@@ -1892,7 +1841,7 @@ function renderComplexNetwork(genes, custom) {
         Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
     }
 
-// MAIN GENERATOR 
+
 // MAIN GENERATOR 
 function generatePlot() {
     const input = document.getElementById('ciliaplot-genes-input').value.trim();
