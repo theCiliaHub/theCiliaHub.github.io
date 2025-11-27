@@ -1359,83 +1359,111 @@ function getCleanArray(gene, key) {
 }
     
     
-// --- FIXED renderDomainArchitecture FUNCTION ---
+// =============================================================================
+// NEW PLOT FUNCTION: Protein Domain Dot Plot (Replaces Heatmap)
+// =============================================================================
 function renderDomainArchitecture(genes, custom) {
     clearPlot();
     
-    // Use getCleanArray to properly extract domain data
+    const plotDivId = 'plot-display-area';
+    const plotDiv = document.getElementById(plotDivId);
+
+    // --- 1. Data Preparation ---
     const allDomains = new Set();
+    const domainPoints = [];
     
-    genes.forEach(gene => {
-        // Try multiple possible domain data sources
+    genes.forEach((gene, geneIdx) => {
+        // Collect domains using the robust getCleanArray utility
         const domains = [
             ...getCleanArray(gene, 'Protein.Domain.PFAM'),
             ...getCleanArray(gene, 'PFAM_IDs'),
             ...getCleanArray(gene, 'Domain_Descriptions')
         ].filter(domain => domain && domain !== 'N/A' && domain !== 'Unknown');
         
-        domains.forEach(domain => allDomains.add(domain));
+        domains.forEach(domain => {
+            allDomains.add(domain);
+            domainPoints.push({
+                geneName: gene.gene,
+                geneIndex: geneIdx,
+                domain: domain
+            });
+        });
     });
     
-    const domainArray = Array.from(allDomains).slice(0, 25); // Limit to top 25 domains
+    // Convert Set to Array and limit the number of domains displayed for readability
+    const domainArray = Array.from(allDomains).slice(0, 30); 
     
     if (domainArray.length === 0) {
-        document.getElementById('plot-display-area').innerHTML = 
-            `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
-                No PFAM domain data available for the selected genes.
-            </div>`;
+        plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
+            No PFAM domain data available for the selected genes.
+        </div>`;
         return;
     }
 
-    const z = [];
-    const yLabels = [];
-    
-    genes.forEach(gene => {
-        const geneDomains = new Set([
-            ...getCleanArray(gene, 'Protein.Domain.PFAM'),
-            ...getCleanArray(gene, 'PFAM_IDs'),
-            ...getCleanArray(gene, 'Domain_Descriptions')
-        ]);
-        
-        const row = domainArray.map(domain => geneDomains.has(domain) ? 1 : 0);
-        z.push(row);
-        yLabels.push(gene.gene);
+    // --- 2. Create Mappings and Traces ---
+    const traces = [];
+    const uniqueDomains = new Set(domainArray); // For cleaner iteration
+
+    // Assign a unique color to each of the top domains for contrast
+    const domainColorMap = new Map();
+    const colorPalette = d3.scaleOrdinal(d3.schemeCategory10);
+    domainArray.forEach(domain => {
+        domainColorMap.set(domain, colorPalette(domain));
     });
 
-    const data = [{
-        type: 'heatmap', 
-        z: z, 
-        x: domainArray, 
-        y: yLabels,
-        colorscale: [[0, '#f8f8f8'], [1, '#ff7f0e']],
-        showscale: false,
-        hovertemplate: 'Gene: %{y}<br>Domain: %{x}<br>Present: %{z}<extra></extra>',
-        xgap: 1,
-        ygap: 1
-    }];
+    // We create one trace per unique domain for clear legend entry and coloring
+    domainArray.forEach(uniqueDomain => {
+        const pointsForDomain = domainPoints.filter(p => p.domain === uniqueDomain);
+        
+        traces.push({
+            x: pointsForDomain.map(p => p.domain),
+            y: pointsForDomain.map(p => p.geneName),
+            text: pointsForDomain.map(p => `Gene: ${p.geneName}<br>Domain: ${p.domain}`),
+            mode: 'markers',
+            type: 'scatter',
+            name: uniqueDomain,
+            hoverinfo: 'text',
+            marker: {
+                size: 12,
+                color: domainColorMap.get(uniqueDomain),
+                line: { width: 1, color: '#333' }
+            }
+        });
+    });
 
+    // --- 3. Plotly Layout ---
     const layout = {
         title: { 
-            text: custom.title || "Protein Domain Architecture",
-            font: { size: custom.titleFontSize || 16 }
+            text: custom.title || "Protein Domain Presence and Association",
+            font: { size: custom.titleFontSize || 20 }
         },
         xaxis: { 
+            title: "Protein Domain (PFAM/Description)", 
             tickangle: -45, 
             automargin: true,
             tickfont: { size: 10 }
         },
         yaxis: { 
+            title: "Genes", 
             automargin: true,
-            tickfont: { size: 11 }
+            tickfont: { size: 12, weight: 'bold' }
         },
         height: custom.figureHeight,
         width: custom.figureWidth,
-        margin: { t: 80, l: 120, r: 50, b: 120 }
+        margin: { t: 80, l: 150, r: 50, b: 150 }, // Increased bottom margin for labels
+        hovermode: 'closest',
+        showlegend: true,
+        legend: {
+            orientation: 'h',
+            y: -0.3,
+            x: 0.5,
+            xanchor: 'center',
+            traceorder: 'normal'
+        }
     };
     
-    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+    Plotly.newPlot(plotDivId, traces, layout, { responsive: true });
 }
-
 
     // 9. Protein Complex Network (Heatmap View)
     function renderComplexNetwork(genes, custom) {
