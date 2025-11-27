@@ -841,6 +841,7 @@ function getLocalizationColor(localizationValue) {
 // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION
 // Global Map to store the persistent color for each unique value across all runs
 // We place this outside the function to maintain color consistency across subsequent plots
+// Global Map to store the persistent color for each unique value across all runs
 const CATEGORY_COLOR_MAP = new Map();
 
 // Global index to ensure we use unique colors from the palette sequentially
@@ -893,7 +894,7 @@ function classifyPhylo(gene) {
 function renderMultiCategoryManhattan(genes, custom) {
     clearPlot();
     
-    // Define categories. We insert the new Cilia Length category at index 5.
+    // Define categories. 
     const categories = [
         { name: "Localization", key: "Localization" },
         { name: "Complex", key: "Protein.complexes" },
@@ -914,7 +915,7 @@ function renderMultiCategoryManhattan(genes, custom) {
         genes.forEach((gene, geneIdx) => {
             
             if (cat.key === "cilia_length_effects") {
-                // --- CATEGORY: Cilia Length Effects (NEW) ---
+                // --- CATEGORY: Cilia Length Effects ---
                 const loF = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
                 const oe = gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
                 
@@ -952,7 +953,6 @@ function renderMultiCategoryManhattan(genes, custom) {
                     text.push(`${gene.gene}<br>Conserved: ${classification}<br>(${score.toFixed(1)}% via ${sourceText})`);
                     color.push(markerColor);
                     
-                    // Add to legend map
                     categoryLegends[cat.name] = categoryLegends[cat.name] || {};
                     categoryLegends[cat.name][classification] = markerColor;
                 }
@@ -972,13 +972,12 @@ function renderMultiCategoryManhattan(genes, custom) {
                         text.push(`${gene.gene}<br>Screen: ${label}`);
                         color.push(markerColor);
 
-                        // Add to legend map
                         categoryLegends[cat.name] = categoryLegends[cat.name] || {};
                         categoryLegends[cat.name][resultKey] = markerColor;
                     });
                 }
             } else {
-                // --- CATEGORIES: Localization, Complex, Ciliopathy, Function, Phenotypes (Simple Lists) ---
+                // --- CATEGORIES: Localization, Complex, Ciliopathy, Function, Phenotypes ---
                 const values = getCleanArray(gene, cat.key);
                 
                 values.forEach(val => {
@@ -992,7 +991,6 @@ function renderMultiCategoryManhattan(genes, custom) {
                         text.push(`${gene.gene}<br>${cat.name}: ${val}`);
                         color.push(markerColor);
                         
-                        // Add to legend map
                         categoryLegends[cat.name] = categoryLegends[cat.name] || {};
                         categoryLegends[cat.name][val] = markerColor;
                     }
@@ -1000,7 +998,7 @@ function renderMultiCategoryManhattan(genes, custom) {
             }
         });
         
-        // Push the trace data (must be done outside of the individual value loops)
+        // Push the trace data 
         if (x.length > 0) {
             traces.push({
                 x, y, text, mode: 'markers', 
@@ -1013,7 +1011,7 @@ function renderMultiCategoryManhattan(genes, custom) {
     
     // --- 3. Generate Annotation Legend (Below Plot) ---
     const plotAnnotations = [];
-    let currentYPosition = -0.05; // Start position below the plot
+    let currentYPosition = -0.05; 
     const lineHeight = 0.04;
     const boxX = 0.02;
 
@@ -1045,14 +1043,20 @@ function renderMultiCategoryManhattan(genes, custom) {
     });
 
 
-    // --- 4. Plotly Layout ---
+    // --- 4. Plotly Layout (CRITICAL FIX FOR OVERLAP) ---
     const layout = {
-        title: { text: custom.title || "Gene Feature Overview / Summary (Manhattan Plot)", font: { size: custom.titleSize } },
+        title: { text: custom.title || "Gene Feature Overview / Summary", font: { size: custom.titleSize } },
         xaxis: { 
             title: "Categories", 
             tickvals: categories.map((_,i)=>i), 
             ticktext: categories.map(c=>c.name),
             tickangle: -45,
+            // CRITICAL FIX 1: Set the axis labels' position far below the plot area
+            tickmode: 'array',
+            tick0: 0,
+            dtick: 1,
+            // CRITICAL FIX 2: Ensure the tick labels are placed near the bottom margin (default anchor is middle)
+            standoff: 5, 
             showgrid: false,
             zeroline: false
         },
@@ -1063,22 +1067,23 @@ function renderMultiCategoryManhattan(genes, custom) {
             showgrid: true,
             zeroline: false
         },
-        height: custom.height, width: custom.width,
+        height: custom.height, 
+        width: custom.width,
+        
+        // CRITICAL FIX 3: Increase bottom margin to dynamically accommodate the large legend/annotations
+        margin: { 
+            l: 120, 
+            r: 20, 
+            t: 80, 
+            // Calculate bottom margin dynamically based on the vertical space needed for annotations
+            b: Math.max(200, Math.abs(currentYPosition) * custom.height * 0.8) 
+        },
         
         // Hide the default Plotly legend
         showlegend: false,
         
         // Add the custom annotations to the layout
         annotations: plotAnnotations,
-
-        // Adjust margins to make space for the custom legend
-        margin: { 
-            l: 120, 
-            r: 20, 
-            t: 80, 
-            // Calculate bottom margin dynamically based on the size of the legend
-            b: Math.max(200, Math.abs(currentYPosition) * custom.height + 50) 
-        }
     };
     
     Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
