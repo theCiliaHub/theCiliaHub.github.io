@@ -1040,29 +1040,34 @@ function renderMultiCategoryManhattan(genes, custom) {
     // PLOTLY LAYOUT
     // ---------------------------
     const layout = {
-        title: { text: custom.title || "Gene Feature Overview", font: { size: custom.titleSize || 22 } },
-        xaxis: {
-            tickvals: categories.map((_, i) => i),
-            ticktext: categories.map(c => c.name),
-            tickangle: -45,
-            range: [-0.5, categories.length - 0.5],
-            automargin: true,
-            showgrid: false
-        },
-        yaxis: {
-            title: "Genes",
-            tickvals: genes.map((_, i) => i),
-            ticktext: genes.map(g => g.gene),
-            automargin: true,
-            showgrid: true,
-            zeroline: false
-        },
-        height: Math.max(custom.height || 1600, genes.length * 20),
-        width: custom.width || 1400,
-        margin: { l: 250, r: 80, t: 120, b: 200 },
-        showlegend: false,
-        annotations: plotAnnotations
-    };
+    title: { text: custom.title || "Gene Feature Overview", font: { size: custom.titleSize || 22 } },
+    xaxis: {
+        tickvals: categories.map((_, i) => i),
+        ticktext: categories.map(c => c.name),
+        tickangle: -45,
+        range: [-0.5, categories.length - 0.5],
+        automargin: true,
+        showgrid: false
+    },
+    yaxis: {
+        title: "Genes",
+        tickvals: genes.map((_, i) => i),
+        ticktext: genes.map(g => g.gene),
+        automargin: true,
+        showgrid: true,
+        zeroline: false
+    },
+    height: Math.max(custom.height || 2000, genes.length * 25), // ↑ increased scaling factor
+    width: custom.width || 1600,  // ↑ wider for gene names and X-axis labels
+    margin: { 
+        l: 300,   // ↑ more room for long gene names
+        r: 120,   // ↑ more room for right-side legend
+        t: 120, 
+        b: 400    // ↑ increased to fit two legend columns
+    },
+    showlegend: false,
+    annotations: plotAnnotations
+};
 
     Plotly.newPlot("plot-display-area", traces, layout, { responsive: true });
 }
