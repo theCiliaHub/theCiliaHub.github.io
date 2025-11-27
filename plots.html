@@ -1387,6 +1387,9 @@ const EXTENDED_PALETTE = [
     '#cab2d6', '#6a3d9a', '#ffff99', '#b15928', '#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f'
 ];
 
+// =============================================================================
+// UPDATED PLOT FUNCTION: Protein Domain Dot Plot (Clean X-Axis & Color Fixes)
+// =============================================================================
 function renderDomainArchitecture(genes, custom) {
     clearPlot();
     
@@ -1398,7 +1401,7 @@ function renderDomainArchitecture(genes, custom) {
     const domainPoints = [];
     
     genes.forEach((gene, geneIdx) => {
-        // Explicitly use 'Domain_Descriptions' field
+        // Explicitly use 'Domain_Descriptions' field, filtering out placeholder data.
         const domains = getCleanArray(gene, 'Domain_Descriptions') 
             .filter(domain => domain && domain !== 'N/A' && domain !== 'Unknown' && !domain.includes('PFAM_ID'));
         
@@ -1412,8 +1415,8 @@ function renderDomainArchitecture(genes, custom) {
         });
     });
     
-    // Convert Set to Array and limit the number of domains displayed for readability
-    const domainArray = Array.from(allDomains).slice(0, 100); // Allow up to 100 domains
+    // Convert Set to Array and limit the number of domains displayed for visualization
+    const domainArray = Array.from(allDomains).slice(0, 100); 
     
     if (domainArray.length === 0) {
         plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
@@ -1426,10 +1429,10 @@ function renderDomainArchitecture(genes, custom) {
     const traces = [];
     const domainColorMap = new Map();
     
-    // CRITICAL FIX: Use the EXTENDED_PALETTE for unique coloring
+    // Use the EXTENDED_PALETTE for unique coloring
     const colorScale = d3.scaleOrdinal(EXTENDED_PALETTE); 
     domainArray.forEach(domain => {
-        domainColorMap.set(domain, colorScale(domain)); // Assign color based on domain name
+        domainColorMap.set(domain, colorScale(domain)); 
     });
 
     // Create one trace per unique domain for color consistency in the legend
@@ -1437,6 +1440,7 @@ function renderDomainArchitecture(genes, custom) {
         const pointsForDomain = domainPoints.filter(p => p.domain === uniqueDomain);
         
         traces.push({
+            // X-axis values are the domain names (used as categories)
             x: pointsForDomain.map(p => p.domain),
             y: pointsForDomain.map(p => p.geneName),
             text: pointsForDomain.map(p => `Gene: ${p.geneName}<br>Domain: ${p.domain}`),
@@ -1452,17 +1456,16 @@ function renderDomainArchitecture(genes, custom) {
         });
     });
 
-    // --- 3. Plotly Layout ---
+    // --- 3. Plotly Layout (with X-axis fix) ---
     const layout = {
         title: { 
-            // Corrected Title is pulled from custom.title (which should be "Protein Domain Architecture")
             text: custom.title || "Protein Domain Presence and Association",
             font: { size: custom.titleFontSize || 20 }
         },
         xaxis: { 
+            // FINAL FIX: Remove X-axis labels (ticks) to eliminate overlap
             title: "Protein Domain Description", 
-            // Keep X-axis labels hidden as requested
-            showticklabels: false, 
+            showticklabels: false, // Hides the domain names shown in the image
             showgrid: false, 
             zeroline: false,
             automargin: true 
@@ -1470,7 +1473,7 @@ function renderDomainArchitecture(genes, custom) {
         yaxis: { 
             title: "Genes", 
             automargin: true,
-            showgrid: true, // Keep horizontal gridlines for easy reading across genes
+            showgrid: true, // Keep horizontal gridlines
             tickfont: { size: 12, weight: 'bold' }
         },
         height: custom.figureHeight,
@@ -1491,6 +1494,7 @@ function renderDomainArchitecture(genes, custom) {
     Plotly.newPlot(plotDivId, traces, layout, { responsive: true });
 }
 
+    
 // 9. Protein Complex Network (Heatmap View)
 function renderComplexNetwork(genes, custom) {
         clearPlot();
