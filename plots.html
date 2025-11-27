@@ -1360,7 +1360,7 @@ function getCleanArray(gene, key) {
     
     
 // =============================================================================
-// NEW PLOT FUNCTION: Protein Domain Dot Plot (Replaces Heatmap)
+// NEW PLOT FUNCTION: Protein Domain Dot Plot (Final Fixes)
 // =============================================================================
 function renderDomainArchitecture(genes, custom) {
     clearPlot();
@@ -1373,6 +1373,7 @@ function renderDomainArchitecture(genes, custom) {
     const domainPoints = [];
     
     genes.forEach((gene, geneIdx) => {
+        // Explicitly use 'Domain_Descriptions' field
         const domains = getCleanArray(gene, 'Domain_Descriptions') 
             .filter(domain => domain && domain !== 'N/A' && domain !== 'Unknown' && !domain.includes('PFAM_ID'));
         
@@ -1390,14 +1391,13 @@ function renderDomainArchitecture(genes, custom) {
     
     if (domainArray.length === 0) {
         plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
-            No PFAM domain description data available for the selected genes.
+            No descriptive domain data available for the selected genes.
         </div>`;
         return;
     }
 
     // --- 2. Create Mappings and Traces ---
     const traces = [];
-    
     const domainColorMap = new Map();
     const colorPalette = d3.scaleOrdinal(d3.schemeCategory10);
     domainArray.forEach(domain => {
@@ -1423,30 +1423,31 @@ function renderDomainArchitecture(genes, custom) {
         });
     });
 
-    // --- 3. Plotly Layout ---
+    // --- 3. Plotly Layout (with X-axis fix) ---
     const layout = {
         title: { 
+            // FIX: Correct Plot Title
             text: custom.title || "Protein Domain Presence and Association",
             font: { size: custom.titleFontSize || 20 }
         },
         xaxis: { 
             title: "Protein Domain Description", 
-            tickangle: -45, 
-            automargin: true,
-            tickfont: { size: 10 },
-            // CRITICAL CHANGE: Remove X-axis tick labels for clarity
+            // FINAL FIX: Explicitly hide labels, ticks, and grid lines for a clean look
             showticklabels: false, 
-            // Also ensure tick marks are off if labels are off
-            ticks: '' 
+            showgrid: false, 
+            zeroline: false,
+            // Ensure space is still provided for the axis title if it's visible
+            automargin: true 
         },
         yaxis: { 
             title: "Genes", 
             automargin: true,
+            showgrid: false, // Clean up Y-axis grid lines
             tickfont: { size: 12, weight: 'bold' }
         },
         height: custom.figureHeight,
         width: custom.figureWidth,
-        margin: { t: 80, l: 150, r: 50, b: 150 }, 
+        margin: { t: 80, l: 150, r: 50, b: 150 }, // B margin can be reduced further if title is hidden
         hovermode: 'closest',
         showlegend: true,
         legend: {
