@@ -842,9 +842,9 @@ function getLocalizationColor(localizationValue) {
 // ==========================================================
 // GLOBAL COLOR & LEGEND STATE
 // ==========================================================
-const CATEGORY_COLOR_MAP = new Map();   // Persistent color mapping
-let COLOR_INDEX_COUNTER = 0;            // Sequential color assignment
-let categoryLegends = {};               // Holds category → value → color
+const CATEGORY_COLOR_MAP = new Map(); // Persistent color mapping
+let COLOR_INDEX_COUNTER = 0; // Sequential color assignment
+let categoryLegends = {}; // Holds category → value → color
 
 // ==========================================================
 // UTILITY: Get a unique color for any category/value
@@ -890,6 +890,10 @@ function renderMultiCategoryManhattan(genes, custom) {
 
     const traces = [];
 
+    // Compute spacing dynamically
+    const geneCount = genes.length;
+    const ySpacing = geneCount > 50 ? 1.5 : 1; // more spacing for large gene lists
+
     categories.forEach((cat, catIdx) => {
         const x = [], y = [], text = [], colors = [];
 
@@ -908,7 +912,7 @@ function renderMultiCategoryManhattan(genes, custom) {
                     const color = getUniqueColor("CiliaLength:" + key);
 
                     x.push(catIdx + shift);
-                    y.push(geneIdx);
+                    y.push(geneIdx * ySpacing);
                     text.push(`${gene.gene}<br>${label}: ${value}`);
                     colors.push(color);
 
@@ -929,7 +933,7 @@ function renderMultiCategoryManhattan(genes, custom) {
 
                 const color = getUniqueColor("Phylo:" + classification);
                 x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                y.push(geneIdx);
+                y.push(geneIdx * ySpacing);
                 text.push(`${gene.gene}<br>${classification}`);
                 colors.push(color);
 
@@ -938,7 +942,7 @@ function renderMultiCategoryManhattan(genes, custom) {
             }
 
             // ---------------------------
-            // SCREENS (nested objects)
+            // SCREENS
             // ---------------------------
             else if (cat.key === "screens_summary") {
                 const screenArr = getCleanArray(gene, cat.key);
@@ -950,7 +954,7 @@ function renderMultiCategoryManhattan(genes, custom) {
                     const color = getUniqueColor("Screen:" + resultKey);
 
                     x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                    y.push(geneIdx);
+                    y.push(geneIdx * ySpacing);
                     text.push(`${gene.gene}<br>${label}`);
                     colors.push(color);
 
@@ -960,7 +964,7 @@ function renderMultiCategoryManhattan(genes, custom) {
             }
 
             // ---------------------------
-            // SIMPLE CATEGORIES (Localization, Complex, etc.)
+            // SIMPLE CATEGORIES
             // ---------------------------
             else {
                 const arr = getCleanArray(gene, cat.key);
@@ -968,7 +972,7 @@ function renderMultiCategoryManhattan(genes, custom) {
                     if (!val || val === "N/A" || val === "Unknown" || val.includes('PFAM_ID: No description')) return;
                     const color = getUniqueColor(cat.name + ":" + val);
                     x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                    y.push(geneIdx);
+                    y.push(geneIdx * ySpacing);
                     text.push(`${gene.gene}<br>${cat.name}: ${val}`);
                     colors.push(color);
 
@@ -991,57 +995,41 @@ function renderMultiCategoryManhattan(genes, custom) {
     });
 
     // ======================================================
-    // TWO-SIDED BOTTOM LEGEND
+    // TWO-SIDED LEGEND
     // ======================================================
     const plotAnnotations = [];
     const leftGroups = ["Localization", "Complex", "Ciliopathy", "Function"];
     const rightGroups = ["Screens", "Cilia Length", "Phenotypes", "Phylogeny"];
-    let leftY = -0.42, rightY = -0.42;
-    const lineHeight = 0.035;
+    let leftY = -0.05, rightY = -0.05;
+    const lineHeight = 0.05;
 
-    // LEFT COLUMN
-    leftGroups.forEach(cat => {
-        if (!categoryLegends[cat]) return;
+    const addLegendColumn = (groups, startX, startY) => {
+        let yPos = startY;
+        groups.forEach(cat => {
+            if (!categoryLegends[cat]) return;
 
-        plotAnnotations.push({
-            xref: "paper", yref: "paper", x: 0.02, y: leftY,
-            text: `<b>${cat}</b>`, xanchor: "left", showarrow: false, font: { size: 12 }
-        });
-        leftY -= lineHeight * 1.2;
-
-        Object.entries(categoryLegends[cat]).forEach(([label, color]) => {
             plotAnnotations.push({
-                xref: "paper", yref: "paper", x: 0.02, y: leftY,
-                text: `<span style='color:${color};font-size:16px;'>●</span> ${label}`,
-                xanchor: "left", showarrow: false, font: { size: 10 }
+                xref: "paper", yref: "paper", x: startX, y: yPos,
+                text: `<b>${cat}</b>`, xanchor: "left", showarrow: false, font: { size: 12 }
             });
-            leftY -= lineHeight;
-        });
+            yPos -= lineHeight * 1.5;
 
-        leftY -= lineHeight * 0.8;
-    });
-
-    // RIGHT COLUMN
-    rightGroups.forEach(cat => {
-        if (!categoryLegends[cat]) return;
-
-        plotAnnotations.push({
-            xref: "paper", yref: "paper", x: 0.75, y: rightY,
-            text: `<b>${cat}</b>`, xanchor: "left", showarrow: false, font: { size: 12 }
-        });
-        rightY -= lineHeight * 1.2;
-
-        Object.entries(categoryLegends[cat]).forEach(([label, color]) => {
-            plotAnnotations.push({
-                xref: "paper", yref: "paper", x: 0.75, y: rightY,
-                text: `<span style='color:${color};font-size:16px;'>●</span> ${label}`,
-                xanchor: "left", showarrow: false, font: { size: 10 }
+            Object.entries(categoryLegends[cat]).forEach(([label, color]) => {
+                plotAnnotations.push({
+                    xref: "paper", yref: "paper", x: startX, y: yPos,
+                    text: `<span style='color:${color};font-size:16px;'>●</span> ${label}`,
+                    xanchor: "left", showarrow: false, font: { size: 10 }
+                });
+                yPos -= lineHeight;
             });
-            rightY -= lineHeight;
-        });
 
-        rightY -= lineHeight * 0.8;
-    });
+            yPos -= lineHeight;
+        });
+        return yPos;
+    };
+
+    leftY = addLegendColumn(leftGroups, 0.02, leftY);
+    rightY = addLegendColumn(rightGroups, 0.75, rightY);
 
     // ======================================================
     // PLOTLY LAYOUT
@@ -1059,18 +1047,18 @@ function renderMultiCategoryManhattan(genes, custom) {
             title: "Genes",
             tickvals: genes.map((_, i) => i),
             ticktext: genes.map(g => g.gene),
-            automargin: true
+            automargin: true,
+            tickangle: -30
         },
-        height: custom.height || 1600,
+        height: Math.max(custom.height || 1600, geneCount * ySpacing * 20),
         width: custom.width || 1400,
-        margin: { l: 180, r: 40, t: 100, b: 520 },
+        margin: { l: 250, r: 50, t: 120, b: 600 },
         showlegend: false,
         annotations: plotAnnotations
     };
 
     Plotly.newPlot("plot-display-area", traces, layout, { responsive: true });
 }
-
 
 // 3. Phylogenetic Conservation Heatmap
 /**
