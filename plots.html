@@ -1373,9 +1373,6 @@ function renderDomainArchitecture(genes, custom) {
     const domainPoints = [];
     
     genes.forEach((gene, geneIdx) => {
-        // CRITICAL CHANGE: Explicitly use 'Domain_Descriptions' field from the gene object 
-        // to ensure we get descriptive names, rather than mixing IDs and descriptions.
-        // We use getCleanArray with the specific key, assuming it returns an array of strings.
         const domains = getCleanArray(gene, 'Domain_Descriptions') 
             .filter(domain => domain && domain !== 'N/A' && domain !== 'Unknown' && !domain.includes('PFAM_ID'));
         
@@ -1389,7 +1386,6 @@ function renderDomainArchitecture(genes, custom) {
         });
     });
     
-    // Convert Set to Array and limit the number of domains displayed for readability
     const domainArray = Array.from(allDomains).slice(0, 30); 
     
     if (domainArray.length === 0) {
@@ -1402,15 +1398,12 @@ function renderDomainArchitecture(genes, custom) {
     // --- 2. Create Mappings and Traces ---
     const traces = [];
     
-    // Assign a unique color to each of the top domains for contrast
     const domainColorMap = new Map();
-    // Use a robust color palette
     const colorPalette = d3.scaleOrdinal(d3.schemeCategory10);
     domainArray.forEach(domain => {
         domainColorMap.set(domain, colorPalette(domain));
     });
 
-    // We create one trace per unique domain for a clear legend entry and color consistency
     domainArray.forEach(uniqueDomain => {
         const pointsForDomain = domainPoints.filter(p => p.domain === uniqueDomain);
         
@@ -1437,10 +1430,14 @@ function renderDomainArchitecture(genes, custom) {
             font: { size: custom.titleFontSize || 20 }
         },
         xaxis: { 
-            title: "Protein Domain Description", // Axis Title Reflecting Descriptions
+            title: "Protein Domain Description", 
             tickangle: -45, 
             automargin: true,
-            tickfont: { size: 10 }
+            tickfont: { size: 10 },
+            // CRITICAL CHANGE: Remove X-axis tick labels for clarity
+            showticklabels: false, 
+            // Also ensure tick marks are off if labels are off
+            ticks: '' 
         },
         yaxis: { 
             title: "Genes", 
@@ -1449,7 +1446,7 @@ function renderDomainArchitecture(genes, custom) {
         },
         height: custom.figureHeight,
         width: custom.figureWidth,
-        margin: { t: 80, l: 150, r: 50, b: 150 }, // Increased bottom margin for labels
+        margin: { t: 80, l: 150, r: 50, b: 150 }, 
         hovermode: 'closest',
         showlegend: true,
         legend: {
