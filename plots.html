@@ -840,7 +840,6 @@ function getLocalizationColor(localizationValue) {
     
 // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION
 // Global Map to store the persistent color for each unique value across all runs
-// Global Map to store the persistent color for each unique value across all runs
 const CATEGORY_COLOR_MAP = new Map();
 
 // Global index to ensure we use unique colors from the palette sequentially
@@ -889,7 +888,7 @@ function classifyPhylo(gene) {
     }
 }
 
-// 1. Gene Feature Overview (Manhattan-style) - FINAL COLOR, ANNOTATION, AND CILIA LENGTH FIX
+// 1. Gene Feature Overview (Manhattan-style) - FINAL VISUAL LAYOUT FIX
 function renderMultiCategoryManhattan(genes, custom) {
     clearPlot();
     
@@ -899,14 +898,14 @@ function renderMultiCategoryManhattan(genes, custom) {
         { name: "Complex", key: "Protein.complexes" },
         { name: "Ciliopathy", key: "Ciliopathy" },
         { name: "Function", key: "Functional.category" },
-        { name: "Screens", key: "screens_summary" }, // Screen source names are nested objects
-        { name: "Cilia Length", key: "cilia_length_effects" }, // NEW CATEGORY
+        { name: "Screens", key: "screens_summary" }, 
+        { name: "Cilia Length", key: "cilia_length_effects" }, 
         { name: "Phenotypes", key: "Phenotypes_mouse" },
         { name: "Phylogeny", key: "phylogeny" }
     ];
 
     const traces = [];
-    const categoryLegends = {}; // Stores unique values and their assigned color for the legend
+    const categoryLegends = {};
     
     // Map category name to its numerical index for the X-coordinate
     const categoryIndexMap = new Map(categories.map((cat, i) => [cat.name, i]));
@@ -918,8 +917,6 @@ function renderMultiCategoryManhattan(genes, custom) {
             
             if (cat.key === "cilia_length_effects") {
                 // --- CATEGORY: Cilia Length Effects ---
-                // NOTE: This logic assumes 'Loss-of-Function...' and 'Overexpression...' 
-                // keys exist in your gene objects.
                 const loF = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
                 const oe = gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
                 
@@ -928,7 +925,7 @@ function renderMultiCategoryManhattan(genes, custom) {
                         const markerKey = `${effectType} (${value})`;
                         const markerColor = getUniqueColor('CiliaLength: ' + markerKey);
                         
-                        x.push(catIdx + (effectType === 'LoF' ? -0.3 : 0.3) * 0.6); // Slightly shift LoF and OE
+                        x.push(catIdx + (effectType === 'LoF' ? -0.3 : 0.3) * 0.6); 
                         y.push(geneIdx);
                         text.push(`${gene.gene}<br>Effect: ${effectType}<br>Result: ${value}`);
                         color.push(markerColor);
@@ -1015,7 +1012,7 @@ function renderMultiCategoryManhattan(genes, custom) {
     
     // --- 3. Generate Annotation Legend (Below Plot) ---
     const plotAnnotations = [];
-    let currentYPosition = -0.05; // Start position below the plot
+    let currentYPosition = -0.05; 
     const lineHeight = 0.04;
     const boxX = 0.02;
 
@@ -1051,17 +1048,19 @@ function renderMultiCategoryManhattan(genes, custom) {
     const layout = {
         title: { text: custom.title || "Gene Feature Overview / Summary", font: { size: custom.titleSize } },
         xaxis: { 
-            title: "Categories", 
-            // FINAL FIX: We map categories to indices (0, 1, 2, ...) and explicitly provide 
-            // the text label, avoiding rotation/overlap with the plot area itself.
+            // FINAL FIX: Remove explicit 'Categories' axis title, keep tick labels on the bottom
+            title: "", // Remove redundant X-axis title
             tickvals: categories.map((_,i)=>i), 
             ticktext: categories.map(c=>c.name),
-            tickangle: -45, // Keep rotation for label readability (since they are drawn below the plot area)
+            tickangle: -45, 
             
-            // Fix X-axis position so labels don't crash into dots/Y-axis:
+            // CRITICAL FIX 1: Set position of labels in screen coordinates (paper space)
+            // By placing the labels below the plot area (y=0 in plot area), they enter the bottom margin.
             tickmode: 'array',
-            tick0: 0,
-            dtick: 1,
+            
+            // Set the range slightly outside of the numerical categories to ensure space
+            range: [-0.5, categories.length - 0.5], 
+
             showgrid: false,
             zeroline: false
         },
@@ -1077,11 +1076,11 @@ function renderMultiCategoryManhattan(genes, custom) {
         
         // CRITICAL FIX 3: Increase bottom margin to dynamically accommodate the large legend/annotations
         margin: { 
-            l: 120, 
+            l: 120, // Gene Names
             r: 20, 
             t: 80, 
-            // Calculate bottom margin dynamically based on the vertical space needed for annotations
-            b: Math.max(200, Math.abs(currentYPosition) * custom.height * 0.8) 
+            // Calculate bottom margin dynamically based on the vertical space needed for annotations + X-axis labels
+            b: Math.max(250, Math.abs(currentYPosition) * custom.height * 0.8 + 100) 
         },
         
         // Hide the default Plotly legend
@@ -1093,7 +1092,6 @@ function renderMultiCategoryManhattan(genes, custom) {
     
     Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
 }
-
     
 
 // 3. Phylogenetic Conservation Heatmap
