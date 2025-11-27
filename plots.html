@@ -1360,8 +1360,33 @@ function getCleanArray(gene, key) {
     
     
 // =============================================================================
-// NEW PLOT FUNCTION: Protein Domain Dot Plot (Final Fixes)
 // =============================================================================
+// NEW PLOT FUNCTION: Protein Domain Dot Plot (Final Title & Color Fixes)
+
+   // --- 1. Define Extended Color Palette (100 distinct colors for non-overlapping legend) ---
+const EXTENDED_PALETTE = [
+    // 1-10: Bright, Primary Colors (D3 Categorical Schemes)
+    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+    // 11-20: Light/Pastel Tones
+    '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5', '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5',
+    // 21-30: Dark/Muted Tones
+    '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173', '#6b6ecf', '#9c9ede', '#cedb9c', '#6b4c3e', '#396b79',
+    // 31-40: Tableau / Vibrant Colors
+    '#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac',
+    // 41-50: Plotly / Sequential Red-Yellow-Blue
+    '#332288', '#6699cc', '#88ccee', '#44aa99', '#117733', '#999933', '#ddcc55', '#cc6677', '#882255', '#aa4466',
+    // 51-60: High Contrast / Custom Selection
+    '#003f5c', '#58508d', '#bc5090', '#ff6361', '#ff853a', '#ffa600', '#f95d6a', '#ffc75f', '#f9f871', '#007901',
+    // 61-70: Light, Clean Hues
+    '#a2cffe', '#70a3ff', '#3e64ff', '#1f3d8f', '#ffc0cb', '#f26522', '#009440', '#00a3e0', '#8d46ff', '#e03a3e',
+    // 71-80: Deep, Saturated Colors
+    '#006400', '#008b8b', '#483d8b', '#b03060', '#ff4500', '#ffd700', '#adff2f', '#4682b4', '#d2691e', '#a0522d',
+    // 81-90: Earth Tones and Greens
+    '#005b8f', '#5e94be', '#9ecae1', '#c6dbef', '#33a02c', '#b2df8a', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00',
+    // 91-100: Secondary Bright Tones
+    '#cab2d6', '#6a3d9a', '#ffff99', '#b15928', '#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f'
+];
+
 function renderDomainArchitecture(genes, custom) {
     clearPlot();
     
@@ -1387,7 +1412,8 @@ function renderDomainArchitecture(genes, custom) {
         });
     });
     
-    const domainArray = Array.from(allDomains).slice(0, 30); 
+    // Convert Set to Array and limit the number of domains displayed for readability
+    const domainArray = Array.from(allDomains).slice(0, 100); // Allow up to 100 domains
     
     if (domainArray.length === 0) {
         plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
@@ -1399,11 +1425,14 @@ function renderDomainArchitecture(genes, custom) {
     // --- 2. Create Mappings and Traces ---
     const traces = [];
     const domainColorMap = new Map();
-    const colorPalette = d3.scaleOrdinal(d3.schemeCategory10);
+    
+    // CRITICAL FIX: Use the EXTENDED_PALETTE for unique coloring
+    const colorScale = d3.scaleOrdinal(EXTENDED_PALETTE); 
     domainArray.forEach(domain => {
-        domainColorMap.set(domain, colorPalette(domain));
+        domainColorMap.set(domain, colorScale(domain)); // Assign color based on domain name
     });
 
+    // Create one trace per unique domain for color consistency in the legend
     domainArray.forEach(uniqueDomain => {
         const pointsForDomain = domainPoints.filter(p => p.domain === uniqueDomain);
         
@@ -1423,31 +1452,30 @@ function renderDomainArchitecture(genes, custom) {
         });
     });
 
-    // --- 3. Plotly Layout (with X-axis fix) ---
+    // --- 3. Plotly Layout ---
     const layout = {
         title: { 
-            // FIX: Correct Plot Title
+            // Corrected Title is pulled from custom.title (which should be "Protein Domain Architecture")
             text: custom.title || "Protein Domain Presence and Association",
             font: { size: custom.titleFontSize || 20 }
         },
         xaxis: { 
             title: "Protein Domain Description", 
-            // FINAL FIX: Explicitly hide labels, ticks, and grid lines for a clean look
+            // Keep X-axis labels hidden as requested
             showticklabels: false, 
             showgrid: false, 
             zeroline: false,
-            // Ensure space is still provided for the axis title if it's visible
             automargin: true 
         },
         yaxis: { 
             title: "Genes", 
             automargin: true,
-            showgrid: false, // Clean up Y-axis grid lines
+            showgrid: true, // Keep horizontal gridlines for easy reading across genes
             tickfont: { size: 12, weight: 'bold' }
         },
         height: custom.figureHeight,
         width: custom.figureWidth,
-        margin: { t: 80, l: 150, r: 50, b: 150 }, // B margin can be reduced further if title is hidden
+        margin: { t: 80, l: 150, r: 50, b: 150 }, 
         hovermode: 'closest',
         showlegend: true,
         legend: {
@@ -1455,13 +1483,13 @@ function renderDomainArchitecture(genes, custom) {
             y: -0.3,
             x: 0.5,
             xanchor: 'center',
-            traceorder: 'normal'
+            traceorder: 'normal',
+            font: { size: 10 } 
         }
     };
     
     Plotly.newPlot(plotDivId, traces, layout, { responsive: true });
 }
-    
 
 // 9. Protein Complex Network (Heatmap View)
 function renderComplexNetwork(genes, custom) {
@@ -1737,14 +1765,38 @@ function debugPhylogenyData(genes) {
 
 
 // -----------------------------------------------------------------------------
-// Update handlePlotSelection to show the new filter dropdown as well
+// Handles plot type selection via dropdown
 function handlePlotSelection(value) {
     const isPhylogeny = value === 'phylogeny';
+    
+    // --- FIX 1: Show/hide phylogeny controls ---
     document.getElementById('phy-source-group').style.display = isPhylogeny ? 'block' : 'none';
-    document.getElementById('phy-filter-group').style.display = isPhylogeny ? 'grid' : 'none'; // Use grid to keep layout consistent
+    document.getElementById('phy-filter-group').style.display = isPhylogeny ? 'grid' : 'none'; 
+    
+    // --- FIX 2: Update the Custom Title input field ---
+    const customTitleInput = document.getElementById('custom-title');
+    if (customTitleInput) {
+        const defaultTitle = PLOT_TITLES[value] || 'Custom Analysis Plot';
+        customTitleInput.value = defaultTitle;
+    }
+    
     clearPlot(); 
 }
 
+// --- Map of Plot Keys to Default Titles ---
+const PLOT_TITLES = {
+    "gene_overview": "Gene Feature Overview / Summary",
+    "expression_heatmap": "Tissue Expression Profile",
+    "scrna_dot": "scRNA-seq UMAP Expression (Lung)",
+    "ciliopathy": "Ciliopathy & Disease Association Heatmap",
+    "localization_heatmap": "Localization Heatmap",
+    "crispr_screens": "CRISPR & siRNA Screens Summary",
+    "protein_domains": "Protein Domain Presence and Association",
+    "protein_complex": "Complex Membership Map",
+    "mouse_phenotypes": "Mouse Phenotype Enrichment Heatmap",
+    "phylogeny": "Phylogenetic Conservation Heatmap"
+};
+    
 // PAGE SETUP
 function setupPage() {
     document.getElementById('content-area').innerHTML = `
@@ -1784,7 +1836,7 @@ KIF17</textarea>
                     <div id="customization-panel">
                         <h3 style="margin-top:20px;">Customization</h3>
                         <div class="customization-grid">
-                            <div class="form-group"><label>Title</label><input id="custom-title" value="Phylogenetic Conservation"></div>
+                            <div class="form-group"><label>Title</label><input id="custom-title" value="Phylogenetic Conservation Heatmap"></div>
                             <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
                             <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
                             <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="700"></div>
