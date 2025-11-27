@@ -1373,12 +1373,11 @@ function renderDomainArchitecture(genes, custom) {
     const domainPoints = [];
     
     genes.forEach((gene, geneIdx) => {
-        // Collect domains using the robust getCleanArray utility
-        const domains = [
-            ...getCleanArray(gene, 'Protein.Domain.PFAM'),
-            ...getCleanArray(gene, 'PFAM_IDs'),
-            ...getCleanArray(gene, 'Domain_Descriptions')
-        ].filter(domain => domain && domain !== 'N/A' && domain !== 'Unknown');
+        // CRITICAL CHANGE: Explicitly use 'Domain_Descriptions' field from the gene object 
+        // to ensure we get descriptive names, rather than mixing IDs and descriptions.
+        // We use getCleanArray with the specific key, assuming it returns an array of strings.
+        const domains = getCleanArray(gene, 'Domain_Descriptions') 
+            .filter(domain => domain && domain !== 'N/A' && domain !== 'Unknown' && !domain.includes('PFAM_ID'));
         
         domains.forEach(domain => {
             allDomains.add(domain);
@@ -1395,23 +1394,23 @@ function renderDomainArchitecture(genes, custom) {
     
     if (domainArray.length === 0) {
         plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
-            No PFAM domain data available for the selected genes.
+            No PFAM domain description data available for the selected genes.
         </div>`;
         return;
     }
 
     // --- 2. Create Mappings and Traces ---
     const traces = [];
-    const uniqueDomains = new Set(domainArray); // For cleaner iteration
-
+    
     // Assign a unique color to each of the top domains for contrast
     const domainColorMap = new Map();
+    // Use a robust color palette
     const colorPalette = d3.scaleOrdinal(d3.schemeCategory10);
     domainArray.forEach(domain => {
         domainColorMap.set(domain, colorPalette(domain));
     });
 
-    // We create one trace per unique domain for clear legend entry and coloring
+    // We create one trace per unique domain for a clear legend entry and color consistency
     domainArray.forEach(uniqueDomain => {
         const pointsForDomain = domainPoints.filter(p => p.domain === uniqueDomain);
         
@@ -1438,7 +1437,7 @@ function renderDomainArchitecture(genes, custom) {
             font: { size: custom.titleFontSize || 20 }
         },
         xaxis: { 
-            title: "Protein Domain (PFAM/Description)", 
+            title: "Protein Domain Description", // Axis Title Reflecting Descriptions
             tickangle: -45, 
             automargin: true,
             tickfont: { size: 10 }
@@ -1464,9 +1463,10 @@ function renderDomainArchitecture(genes, custom) {
     
     Plotly.newPlot(plotDivId, traces, layout, { responsive: true });
 }
+    
 
-    // 9. Protein Complex Network (Heatmap View)
-    function renderComplexNetwork(genes, custom) {
+// 9. Protein Complex Network (Heatmap View)
+function renderComplexNetwork(genes, custom) {
         clearPlot();
         
         const allComplexes = genes.flatMap(g => getCleanArray(g, 'Protein.complexes')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
