@@ -793,98 +793,164 @@ function debugUMAPData(genes) {
     
 // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
 // --- FIXED PHYLOGENY DATA ACCESS IN OTHER PLOTS ---
-function renderMultiCategoryManhattan(genes, custom) {
-    clearPlot();
-    
-    // Define categories to plot
-    const categories = [
-        { name: "Localization", key: "Localization", color: "#1f77b4" },
-        { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
-        { name: "Ciliopathy", key: "Ciliopathy", color: "#2ca02c" },
-        { name: "Function", key: "Functional.category", color: "#d62728" },
-        { name: "Screens", key: "screens_summary", color: "#9467bd" }, // Key for Screens
-        { name: "Phenotypes", key: "Phenotypes_mouse", color: "#8c564b" },
-        { name: "Phylogeny", key: "phylogeny", color: "#17becf" }
-    ];
+/**
+ * Utility to classify a gene's conservation based on Li/Nevers data.
+ * @param {object} gene - The gene object.
+ * @returns {string} Classification ('Ciliated', 'Non-Ciliated', 'Mixed/Other').
+ */
+function classifyPhylo(gene) {
+    // We prioritize Nevers data as it's the default source.
+    const neversData = gene.phylogeny?.nevers_2017;
+    const liData = gene.phylogeny?.li_2014;
 
-    const traces = [];
-    categories.forEach((cat, catIdx) => {
-        const x = [], y = [], text = [], color = [];
-        
-        genes.forEach((gene, geneIdx) => {
-            if (cat.key === "phylogeny") {
-                // Special handling for phylogeny data
-                const neversData = gene.phylogeny?.nevers_2017;
-                const liData = gene.phylogeny?.li_2014;
-                
-                if (neversData && neversData.species_data && neversData.species_data.length > 0) {
-                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                    y.push(geneIdx);
-                    text.push(`${gene.gene}<br>Phylogeny: Nevers (${neversData.species_count} species)`);
-                    color.push(cat.color);
-                }
-                if (liData && liData.species_data && liData.species_data.length > 0) {
-                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                    y.push(geneIdx);
-                    text.push(`${gene.gene}<br>Phylogeny: Li (${liData.species_data.length} species)`);
-                    color.push(cat.color);
-                }
-            } else if (cat.key === "screens_summary") {
-                // === FIX: Correctly plot each screen hit object ===
-                const screenData = getCleanArray(gene, cat.key);
-                
-                if (Array.isArray(screenData) && screenData.length > 0) {
-                    screenData.forEach(screenHit => {
-                        // Extract source and result for hover text
-                        const label = screenHit.source ? `${screenHit.source} (Result: ${screenHit.result || 'N/A'})` : JSON.stringify(screenHit);
-                        
-                        x.push(catIdx + (Math.random() - 0.5) * 0.6); // Scatter point horizontally
-                        y.push(geneIdx);
-                        text.push(`${gene.gene}<br>Screen Hit: ${label}`);
-                        color.push(cat.color);
-                    });
-                }
-                // =============================================================
-            } else {
-                // Standard handling for other categories
-                const values = getCleanArray(gene, cat.key);
-                values.forEach(val => {
-                    // Ensure the value is a meaningful string
-                    if (typeof val === 'string' && val.length > 0 && val !== 'N/A' && val !== 'Unknown' && !val.includes('PFAM_ID: No description')) {
-                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                        y.push(geneIdx);
-                        text.push(`${gene.gene}<br>${cat.name}: ${val}`);
-                        color.push(cat.color);
-                    }
-                });
-            }
-        });
-        
-        if (x.length > 0) {
-            traces.push({
-                x, y, text, mode: 'markers', name: cat.name,
-                marker: { size: 14, color },
-                hovertemplate: '%{text}<extra></extra>'
-            });
-        }
-    });
-    
-    // Layout definition (unchanged)
-    const layout = {
-        title: { text: custom.title || "Gene Feature Overview / Summary (Manhattan Plot)", font: { size: custom.titleSize } },
-        xaxis: { 
-            title: "Categories", 
-            tickvals: categories.map((_,i)=>i), 
-            ticktext: categories.map(c=>c.name),
-            tickangle: -45 // Rotate labels for readability
-        },
-        yaxis: { title: "Genes", tickvals: genes.map((_,i)=>i), ticktext: genes.map(g=>g.gene) },
-        height: custom.height, width: custom.width,
-        legend: { orientation: "h", y: -0.2 }
-    };
-    Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
+    if (!neversData && !liData) {
+        return 'No Data';
+    }
+
+    // Using simplified presence logic for the plot: 
+    // Is the gene conserved in a majority of ciliated model organisms vs non-ciliated ones listed in the study?
+    // Since we lack normalized scores here, we'll use a simple threshold approach based on the calculated percentage score.
+    const neversScore = calculatePhyloScores(gene).nevers_2017?.conservationPct || 0;
+    const liScore = calculatePhyloScores(gene).li_2014?.conservationPct || 0;
+
+    // Classification Thresholds (These are estimates and may need tuning based on actual data)
+    if (neversScore > 30 || liScore > 35) {
+        return 'Highly Conserved (Ciliated)';
+    } else if (neversScore > 10 || liScore > 15) {
+        return 'Intermediate/Mixed';
+    } else {
+        return 'Low Conservation (Non-Ciliated)';
+    }
 }
 
+/**
+ * Utility to assign color based on whether the localization includes "Cilia".
+ * @param {string} localizationValue - The raw localization string (e.g., "Cilium, Golgi").
+ * @returns {string} Hex color code.
+ */
+function getLocalizationColor(localizationValue) {
+    const value = (localizationValue || '').toLowerCase();
+    // Prioritize Ciliary locations
+    if (value.includes('cilia') || value.includes('cilium') || value.includes('axoneme') || value.includes('basal body')) {
+        return '#005b96'; // Primary Blue for Cilia
+    } else {
+        return '#ff9f00'; // Accent Orange for Other/Non-Ciliary
+    }
+}
+    
+// 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION
+function renderMultiCategoryManhattan(genes, custom) {
+    clearPlot();
+    
+    // Define categories to plot. Note: Colors are now overwritten per data point for Localization/Phylogeny
+    const categories = [
+        { name: "Localization", key: "Localization", color: "#1f77b4" },
+        { name: "Complex", key: "Protein.complexes", color: "#ff7f0e" },
+        { name: "Ciliopathy", key: "Ciliopathy", color: "#2ca02c" },
+        { name: "Function", key: "Functional.category", color: "#d62728" },
+        { name: "Screens", key: "screens_summary", color: "#9467bd" }, // Key for Screens
+        { name: "Phenotypes", key: "Phenotypes_mouse", color: "#8c564b" },
+        { name: "Phylogeny", key: "phylogeny", color: "#17becf" }
+    ];
+
+    const traces = [];
+    categories.forEach((cat, catIdx) => {
+        const x = [], y = [], text = [], color = [];
+        
+        genes.forEach((gene, geneIdx) => {
+            
+            if (cat.key === "phylogeny") {
+                // --- FIX 1: Categorize Phylogeny ---
+                const classification = classifyPhylo(gene);
+                const colorMap = {
+                    'Highly Conserved (Ciliated)': '#005b96',
+                    'Intermediate/Mixed': '#9467bd',
+                    'Low Conservation (Non-Ciliated)': '#d62728',
+                    'No Data': '#7f7f7f'
+                };
+                
+                if (classification !== 'No Data') {
+                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                    y.push(geneIdx);
+                    
+                    const score = calculatePhyloScores(gene)[custom.source || 'nevers_2017']?.conservationPct || 0;
+                    const sourceText = custom.source === 'li_2014' ? 'Li (2014)' : 'Nevers (2017)';
+
+                    text.push(`${gene.gene}<br>Conservation: ${classification}<br>(${score.toFixed(1)}% via ${sourceText})`);
+                    color.push(colorMap[classification]);
+                }
+                
+            } else if (cat.key === "Localization") {
+                // --- FIX 2: Color Localization by Ciliary Status ---
+                const values = getCleanArray(gene, cat.key);
+                values.forEach(val => {
+                    if (val) {
+                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                        y.push(geneIdx);
+                        text.push(`${gene.gene}<br>Localization: ${val}`);
+                        color.push(getLocalizationColor(val)); // Use the utility color map
+                    }
+                });
+
+            } else if (cat.key === "screens_summary") {
+                // Correctly plot each screen hit object (Existing logic)
+                const screenData = getCleanArray(gene, cat.key);
+                
+                if (Array.isArray(screenData) && screenData.length > 0) {
+                    screenData.forEach(screenHit => {
+                        const label = screenHit.source ? `${screenHit.source} (Result: ${screenHit.result || 'N/A'})` : JSON.stringify(screenHit);
+                        
+                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                        y.push(geneIdx);
+                        text.push(`${gene.gene}<br>Screen Hit: ${label}`);
+                        color.push(cat.color);
+                    });
+                }
+            } else {
+                // Standard handling for other categories (Complex, Ciliopathy, Function, Phenotypes)
+                const values = getCleanArray(gene, cat.key);
+                values.forEach(val => {
+                    if (typeof val === 'string' && val.length > 0 && val !== 'N/A' && val !== 'Unknown' && !val.includes('PFAM_ID: No description')) {
+                        x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                        y.push(geneIdx);
+                        text.push(`${gene.gene}<br>${cat.name}: ${val}`);
+                        color.push(cat.color);
+                    }
+                });
+            }
+        });
+        
+        if (x.length > 0) {
+            traces.push({
+                x, y, text, mode: 'markers', 
+                name: cat.name, // Use category name for legend
+                marker: { size: 14, color: color }, // Use individual color array
+                hovertemplate: '%{text}<extra></extra>'
+            });
+        }
+    });
+    
+    // Layout definition
+    const layout = {
+        title: { text: custom.title || "Gene Feature Overview / Summary (Manhattan Plot)", font: { size: custom.titleSize } },
+        xaxis: { 
+            title: "Categories", 
+            tickvals: categories.map((_,i)=>i), 
+            ticktext: categories.map(c=>c.name),
+            tickangle: -45 
+        },
+        yaxis: { 
+            title: "Genes", 
+            tickvals: genes.map((_,i)=>i), 
+            ticktext: genes.map(g=>g.gene) 
+        },
+        height: custom.height, width: custom.width,
+        legend: { orientation: "h", y: -0.2 }
+    };
+    Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
+}
+
+    
 
 // 3. Phylogenetic Conservation Heatmap
 /**
