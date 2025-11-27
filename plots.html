@@ -1386,9 +1386,8 @@ const EXTENDED_PALETTE = [
     // 91-100: Secondary Bright Tones
     '#cab2d6', '#6a3d9a', '#ffff99', '#b15928', '#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f'
 ];
-
 // =============================================================================
-// UPDATED PLOT FUNCTION: Protein Domain Dot Plot (Clean X-Axis & Color Fixes)
+// UPDATED PLOT FUNCTION: Protein Domain Dot Plot (Definitive X-Axis Fix)
 // =============================================================================
 function renderDomainArchitecture(genes, custom) {
     clearPlot();
@@ -1397,26 +1396,29 @@ function renderDomainArchitecture(genes, custom) {
     const plotDiv = document.getElementById(plotDivId);
 
     // --- 1. Data Preparation ---
-    const allDomains = new Set();
+    const domainToXIndex = new Map();
+    let domainIndex = 0;
     const domainPoints = [];
     
     genes.forEach((gene, geneIdx) => {
-        // Explicitly use 'Domain_Descriptions' field, filtering out placeholder data.
         const domains = getCleanArray(gene, 'Domain_Descriptions') 
             .filter(domain => domain && domain !== 'N/A' && domain !== 'Unknown' && !domain.includes('PFAM_ID'));
         
         domains.forEach(domain => {
-            allDomains.add(domain);
+            // Assign a unique numerical index to each unique domain name for the X-axis coordinate
+            if (!domainToXIndex.has(domain)) {
+                domainToXIndex.set(domain, domainIndex++);
+            }
+            
             domainPoints.push({
                 geneName: gene.gene,
-                geneIndex: geneIdx,
-                domain: domain
+                domainIndex: domainToXIndex.get(domain), // Numerical X coordinate
+                domain: domain // Descriptive name for legend/hover
             });
         });
     });
     
-    // Convert Set to Array and limit the number of domains displayed for visualization
-    const domainArray = Array.from(allDomains).slice(0, 100); 
+    const domainArray = Array.from(domainToXIndex.keys()).slice(0, 100); 
     
     if (domainArray.length === 0) {
         plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
@@ -1429,10 +1431,9 @@ function renderDomainArchitecture(genes, custom) {
     const traces = [];
     const domainColorMap = new Map();
     
-    // Use the EXTENDED_PALETTE for unique coloring
     const colorScale = d3.scaleOrdinal(EXTENDED_PALETTE); 
     domainArray.forEach(domain => {
-        domainColorMap.set(domain, colorScale(domain)); 
+        domainColorMap.set(domain, colorScale(domain));
     });
 
     // Create one trace per unique domain for color consistency in the legend
@@ -1440,8 +1441,8 @@ function renderDomainArchitecture(genes, custom) {
         const pointsForDomain = domainPoints.filter(p => p.domain === uniqueDomain);
         
         traces.push({
-            // X-axis values are the domain names (used as categories)
-            x: pointsForDomain.map(p => p.domain),
+            // CRITICAL FIX: Use the numerical index for X, not the long domain name string.
+            x: pointsForDomain.map(p => p.domainIndex), 
             y: pointsForDomain.map(p => p.geneName),
             text: pointsForDomain.map(p => `Gene: ${p.geneName}<br>Domain: ${p.domain}`),
             mode: 'markers',
@@ -1456,16 +1457,18 @@ function renderDomainArchitecture(genes, custom) {
         });
     });
 
-    // --- 3. Plotly Layout (with X-axis fix) ---
+    // --- 3. Plotly Layout (with FINAL X-axis fix) ---
     const layout = {
         title: { 
             text: custom.title || "Protein Domain Presence and Association",
             font: { size: custom.titleFontSize || 20 }
         },
         xaxis: { 
-            // FINAL FIX: Remove X-axis labels (ticks) to eliminate overlap
-            title: "Protein Domain Description", 
-            showticklabels: false, // Hides the domain names shown in the image
+            title: "Protein Domain Description (See Legend)", 
+            // FINAL FIX: Explicitly set ticks to an empty array/no ticks and hide labels.
+            tickvals: [],
+            ticktext: [],
+            showticklabels: false,
             showgrid: false, 
             zeroline: false,
             automargin: true 
@@ -1473,7 +1476,7 @@ function renderDomainArchitecture(genes, custom) {
         yaxis: { 
             title: "Genes", 
             automargin: true,
-            showgrid: true, // Keep horizontal gridlines
+            showgrid: true, 
             tickfont: { size: 12, weight: 'bold' }
         },
         height: custom.figureHeight,
@@ -1493,7 +1496,6 @@ function renderDomainArchitecture(genes, custom) {
     
     Plotly.newPlot(plotDivId, traces, layout, { responsive: true });
 }
-
     
 // 9. Protein Complex Network (Heatmap View)
 function renderComplexNetwork(genes, custom) {
