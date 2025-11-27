@@ -1062,48 +1062,44 @@ function renderMultiCategoryManhattan(genes, custom) {
     const requiredBtmMargin = Math.ceil(maxGroupsHeight * custom.height) + 20; 
 
     const layout = {
-        title: { text: custom.title || "Gene Feature Overview / Summary", font: { size: 22 } },
+    title: { 
+        text: custom.title || "Gene Feature Overview / Summary", 
+        font: { size: custom.titleSize || 22 }
+    },
 
-        xaxis: {
-            title: "Categories",
-            tickvals: categories.map((_, i) => i),
-            ticktext: categories.map(c => c.name),
-            tickangle: -45,
-            range: [-0.5, categories.length - 0.5],
-            // Ensure labels are drawn in the bottom margin space reserved below:
-            ticklen: 10,
-            tickcolor: '#999',
-            
-            showgrid: false,
-            zeroline: false
-        },
+    xaxis: { 
+        title: "",
+        tickvals: categories.map((_, i) => i),
+        ticktext: categories.map(c => c.name),
+        tickangle: -45,
+        range: [-0.5, categories.length - 0.5],
+        automargin: true,
+        showgrid: false,
+        zeroline: false
+    },
 
-        yaxis: {
-            title: "Genes",
-            tickvals: genes.map((_, i) => i),
-            ticktext: genes.map(g => g.gene),
-            automargin: true,
-            showgrid: true,
-            zeroline: false
-        },
+    yaxis: { 
+        title: "Genes",
+        tickvals: genes.map((_, i) => i),
+        ticktext: genes.map(g => g.gene),
+        automargin: true,
+        showgrid: true,
+        zeroline: false
+    },
 
-        height: custom.height || 700,
-        width: custom.width || 1100,
+    height: custom.height || 1600,   // ← **Increase vertical space**
+    width: custom.width || 1400,
 
-        // CRITICAL FIX 3: Set bottom margin dynamically to fit the X-axis labels AND the legend below
-        // Calculate the maximum height needed below the plot area.
-        margin: {
-            l: 120, 
-            r: 20,
-            t: 80,
-            b: requiredBtmMargin // Calculated dynamically
-        },
+    margin: { 
+        l: 180,   // ← More room for gene names
+        r: 40,
+        t: 100,
+        b: 420    // ← **Enough space for rotated ticks + legend**
+    },
 
-        showlegend: false,
-        
-        // Use the generated annotations for the custom legend
-        annotations: plotAnnotations,
-    };
+    showlegend: false,
+    annotations: plotAnnotations
+};
 
     Plotly.newPlot("plot-display-area", traces, layout, { responsive: true });
 }
