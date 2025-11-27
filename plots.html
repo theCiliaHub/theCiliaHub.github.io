@@ -839,64 +839,44 @@ function getLocalizationColor(localizationValue) {
 }
     
 // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION
-// Global Map to store the persistent color for each unique value across all runs
-const CATEGORY_COLOR_MAP = new Map();
+// ==========================================================
+// GLOBAL COLOR & LEGEND STATE
+// ==========================================================
+const CATEGORY_COLOR_MAP = new Map();   // Persistent color mapping
+let COLOR_INDEX_COUNTER = 0;            // Sequential color assignment
+let categoryLegends = {};               // Holds category → value → color
 
-// Global index to ensure we use unique colors from the palette sequentially
-let COLOR_INDEX_COUNTER = 0;
-
-/**
- * Utility to get a unique color for any categorical value.
- * Uses a persistent global map and the extended palette.
- */
+// ==========================================================
+// UTILITY: Get a unique color for any category/value
+// ==========================================================
 function getUniqueColor(value) {
-    if (CATEGORY_COLOR_MAP.has(value)) {
-        return CATEGORY_COLOR_MAP.get(value);
-    }
-    
-    // Fallback if index exceeds the 100-color palette length
+    if (CATEGORY_COLOR_MAP.has(value)) return CATEGORY_COLOR_MAP.get(value);
     const color = EXTENDED_PALETTE[COLOR_INDEX_COUNTER % EXTENDED_PALETTE.length];
-    
     CATEGORY_COLOR_MAP.set(value, color);
     COLOR_INDEX_COUNTER++;
     return color;
 }
 
-/**
- * Utility to classify a gene's conservation based on Li/Nevers data.
- * @param {object} gene - The gene object.
- * @returns {string} Classification ('Ciliated', 'Non-Ciliated', 'Mixed/Other').
- */
+// ==========================================================
+// UTILITY: Classify phylogeny conservation
+// ==========================================================
 function classifyPhylo(gene) {
-    const neversData = gene.phylogeny?.nevers_2017;
-    const liData = gene.phylogeny?.li_2014;
-
-    if (!neversData && !liData) {
-        return 'No Data';
-    }
-
     const neversScore = calculatePhyloScores(gene).nevers_2017?.conservationPct || 0;
     const liScore = calculatePhyloScores(gene).li_2014?.conservationPct || 0;
 
-    // Classification Thresholds (These are estimates and may need tuning based on actual data)
-    if (neversScore > 30 || liScore > 35) {
-        return 'Highly Conserved (Ciliated)';
-    } else if (neversScore > 10 || liScore > 15) {
-        return 'Intermediate/Mixed';
-    } else {
-        return 'Low Conservation (Non-Ciliated)';
-    }
+    if (!neversScore && !liScore) return "No Data";
+    if (neversScore > 30 || liScore > 35) return "Highly Conserved (Ciliated)";
+    if (neversScore > 10 || liScore > 15) return "Intermediate/Mixed";
+    return "Low Conservation (Non-Ciliated)";
 }
 
-// 1. Gene Feature Overview (Manhattan-style) - FINAL VISUAL LAYOUT FIX
+// ==========================================================
+// MANHATTAN-STYLE MULTI-CATEGORY PLOT
+// ==========================================================
 function renderMultiCategoryManhattan(genes, custom) {
     clearPlot();
-    
-    // Reset global categoryLegends map before starting the new plot creation
-    const categoryLegends = {};
-    COLOR_INDEX_COUNTER = 0; // Reset color index to start palette fresh for consistency
+    categoryLegends = {}; // reset legends each call
 
-    // Define categories. 
     const categories = [
         { name: "Localization", key: "Localization" },
         { name: "Complex", key: "Protein.complexes" },
@@ -910,52 +890,57 @@ function renderMultiCategoryManhattan(genes, custom) {
 
     const traces = [];
 
-    // ======================================================
-    // 1. MAIN LOOP: BUILD CATEGORY POINTS AND COLLECT LEGEND DATA
-    // ======================================================
     categories.forEach((cat, catIdx) => {
         const x = [], y = [], text = [], colors = [];
 
         genes.forEach((gene, geneIdx) => {
 
+            // ---------------------------
+            // CILIA LENGTH EFFECTS
+            // ---------------------------
             if (cat.key === "cilia_length_effects") {
                 const loF = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
-                const oe  = gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
+                const oe = gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
 
-                const processEffect = (effectType, value, shift) => {
+                const pushEffect = (label, value, shift) => {
                     if (value === "Not Reported") return;
+                    const key = `${label} (${value})`;
+                    const color = getUniqueColor("CiliaLength:" + key);
 
-                    const key = `${effectType} (${value})`;
-                    const markerColor = getUniqueColor("CiliaLength:" + key);
-
-                    x.push(catIdx + shift * 0.6); // Shift point slightly left/right
+                    x.push(catIdx + shift);
                     y.push(geneIdx);
-                    text.push(`${gene.gene}<br>Effect: ${effectType}<br>Result: ${value}`);
-                    colors.push(markerColor);
+                    text.push(`${gene.gene}<br>${label}: ${value}`);
+                    colors.push(color);
 
                     categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                    categoryLegends[cat.name][key] = markerColor;
+                    categoryLegends[cat.name][key] = color;
                 };
 
-                processEffect("LoF", loF, -0.25);
-                processEffect("OE",  oe,  0.25);
+                pushEffect("LoF", loF, -0.25);
+                pushEffect("OE", oe, 0.25);
+            }
 
-            } else if (cat.key === "phylogeny") {
+            // ---------------------------
+            // PHYLOGENY
+            // ---------------------------
+            else if (cat.key === "phylogeny") {
                 const classification = classifyPhylo(gene);
                 if (classification === "No Data") return;
 
-                const score = calculatePhyloScores(gene)[custom.source || 'nevers_2017']?.conservationPct || 0;
-                const sourceText = custom.source === 'li_2014' ? 'Li (2014)' : 'Nevers (2017)';
                 const color = getUniqueColor("Phylo:" + classification);
-
                 x.push(catIdx + (Math.random() - 0.5) * 0.6);
                 y.push(geneIdx);
-                text.push(`${gene.gene}<br>Conserved: ${classification}<br>(${score.toFixed(1)}% via ${sourceText})`);
+                text.push(`${gene.gene}<br>${classification}`);
                 colors.push(color);
 
                 categoryLegends[cat.name] = categoryLegends[cat.name] || {};
                 categoryLegends[cat.name][classification] = color;
-            } else if (cat.key === "screens_summary") {
+            }
+
+            // ---------------------------
+            // SCREENS (nested objects)
+            // ---------------------------
+            else if (cat.key === "screens_summary") {
                 const screenArr = getCleanArray(gene, cat.key);
                 if (!screenArr?.length) return;
 
@@ -972,14 +957,16 @@ function renderMultiCategoryManhattan(genes, custom) {
                     categoryLegends[cat.name] = categoryLegends[cat.name] || {};
                     categoryLegends[cat.name][resultKey] = color;
                 });
-            } else {
-                // SIMPLE CATEGORIES
+            }
+
+            // ---------------------------
+            // SIMPLE CATEGORIES (Localization, Complex, etc.)
+            // ---------------------------
+            else {
                 const arr = getCleanArray(gene, cat.key);
                 arr.forEach(val => {
-                    if (!val || val === "N/A" || val === "Unknown" || val.includes('PFAM_ID')) return;
-
+                    if (!val || val === "N/A" || val === "Unknown" || val.includes('PFAM_ID: No description')) return;
                     const color = getUniqueColor(cat.name + ":" + val);
-
                     x.push(catIdx + (Math.random() - 0.5) * 0.6);
                     y.push(geneIdx);
                     text.push(`${gene.gene}<br>${cat.name}: ${val}`);
@@ -989,6 +976,7 @@ function renderMultiCategoryManhattan(genes, custom) {
                     categoryLegends[cat.name][val] = color;
                 });
             }
+
         });
 
         if (x.length) {
@@ -1003,111 +991,86 @@ function renderMultiCategoryManhattan(genes, custom) {
     });
 
     // ======================================================
-    // 2. TWO-SIDED BOTTOM LEGEND (Annotation Generation)
+    // TWO-SIDED BOTTOM LEGEND
     // ======================================================
     const plotAnnotations = [];
-    const leftGroups  = ["Localization", "Complex", "Ciliopathy", "Function"];
+    const leftGroups = ["Localization", "Complex", "Ciliopathy", "Function"];
     const rightGroups = ["Screens", "Cilia Length", "Phenotypes", "Phylogeny"];
-
+    let leftY = -0.42, rightY = -0.42;
     const lineHeight = 0.035;
-    let maxGroupsHeight = 0; // Tracks the height of the tallest column in paper units
 
-    const generateLegendColumn = (groups, xAnchor, startY) => {
-        let currentY = startY;
-        let columnHeight = 0;
+    // LEFT COLUMN
+    leftGroups.forEach(cat => {
+        if (!categoryLegends[cat]) return;
 
-        groups.forEach(cat => {
-            if (!categoryLegends[cat]) return;
-
-            // 1. Category Header
-            plotAnnotations.push({
-                xref: "paper", yref: "paper", x: xAnchor, y: currentY,
-                text: `<b>${cat}</b>`,
-                xanchor: "left", showarrow: false, font: { size: 12 }
-            });
-            currentY -= lineHeight * 1.2;
-            columnHeight += lineHeight * 1.2;
-
-            // 2. Individual Labels
-            Object.entries(categoryLegends[cat]).sort((a, b) => a[0].localeCompare(b[0])).forEach(([label, color]) => {
-                plotAnnotations.push({
-                    xref: "paper", yref: "paper",
-                    x: xAnchor, y: currentY,
-                    text: `<span style='color:${color};font-size:16px;'>●</span> ${label}`,
-                    xanchor: "left", showarrow: false, font: { size: 10 }
-                });
-                currentY -= lineHeight;
-                columnHeight += lineHeight;
-            });
-
-            currentY -= lineHeight * 0.8;
-            columnHeight += lineHeight * 0.8;
+        plotAnnotations.push({
+            xref: "paper", yref: "paper", x: 0.02, y: leftY,
+            text: `<b>${cat}</b>`, xanchor: "left", showarrow: false, font: { size: 12 }
         });
-        return columnHeight;
-    };
-    
-    // Run both columns and find the max height needed
-    const leftHeight = generateLegendColumn(leftGroups, 0.02, 1.0); // Start at paper y=1.0 (top edge)
-    const rightHeight = generateLegendColumn(rightGroups, 0.75, 1.0); // Start at paper y=1.0 (top edge)
-    maxGroupsHeight = Math.max(leftHeight, rightHeight);
+        leftY -= lineHeight * 1.2;
+
+        Object.entries(categoryLegends[cat]).forEach(([label, color]) => {
+            plotAnnotations.push({
+                xref: "paper", yref: "paper", x: 0.02, y: leftY,
+                text: `<span style='color:${color};font-size:16px;'>●</span> ${label}`,
+                xanchor: "left", showarrow: false, font: { size: 10 }
+            });
+            leftY -= lineHeight;
+        });
+
+        leftY -= lineHeight * 0.8;
+    });
+
+    // RIGHT COLUMN
+    rightGroups.forEach(cat => {
+        if (!categoryLegends[cat]) return;
+
+        plotAnnotations.push({
+            xref: "paper", yref: "paper", x: 0.75, y: rightY,
+            text: `<b>${cat}</b>`, xanchor: "left", showarrow: false, font: { size: 12 }
+        });
+        rightY -= lineHeight * 1.2;
+
+        Object.entries(categoryLegends[cat]).forEach(([label, color]) => {
+            plotAnnotations.push({
+                xref: "paper", yref: "paper", x: 0.75, y: rightY,
+                text: `<span style='color:${color};font-size:16px;'>●</span> ${label}`,
+                xanchor: "left", showarrow: false, font: { size: 10 }
+            });
+            rightY -= lineHeight;
+        });
+
+        rightY -= lineHeight * 0.8;
+    });
 
     // ======================================================
-    // 3. PLOTLY LAYOUT
+    // PLOTLY LAYOUT
     // ======================================================
-    
-    // We determine the bottom margin based on the tallest column height
-    // Since Plotly uses normalized coordinates (0 to 1) for annotations,
-    // we need to set the margin based on the difference between the plot area 
-    // and the top of the tallest legend column (y=1.0 in paper space).
-    const requiredBtmMargin = Math.ceil(maxGroupsHeight * custom.height) + 20; 
-
     const layout = {
-        title: { text: custom.title || "Gene Feature Overview / Summary", font: { size: 22 } },
-
+        title: { text: custom.title || "Gene Feature Overview", font: { size: custom.titleSize || 22 } },
         xaxis: {
-            title: "Categories",
             tickvals: categories.map((_, i) => i),
             ticktext: categories.map(c => c.name),
             tickangle: -45,
             range: [-0.5, categories.length - 0.5],
-            // Ensure labels are drawn in the bottom margin space reserved below:
-            ticklen: 10,
-            tickcolor: '#999',
-            
-            showgrid: false,
-            zeroline: false
+            automargin: true
         },
-
         yaxis: {
             title: "Genes",
             tickvals: genes.map((_, i) => i),
             ticktext: genes.map(g => g.gene),
-            automargin: true,
-            showgrid: true,
-            zeroline: false
+            automargin: true
         },
-
-        height: custom.height || 700,
-        width: custom.width || 1100,
-
-        // CRITICAL FIX 3: Set bottom margin dynamically to fit the X-axis labels AND the legend below
-        // Calculate the maximum height needed below the plot area.
-        margin: {
-            l: 120, 
-            r: 20,
-            t: 80,
-            b: requiredBtmMargin // Calculated dynamically
-        },
-
+        height: custom.height || 1600,
+        width: custom.width || 1400,
+        margin: { l: 180, r: 40, t: 100, b: 520 },
         showlegend: false,
-        
-        // Use the generated annotations for the custom legend
-        annotations: plotAnnotations,
+        annotations: plotAnnotations
     };
 
     Plotly.newPlot("plot-display-area", traces, layout, { responsive: true });
 }
-    
+
 
 // 3. Phylogenetic Conservation Heatmap
 /**
@@ -1841,7 +1804,7 @@ function renderComplexNetwork(genes, custom) {
         Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
     }
 
-
+// MAIN GENERATOR 
 // MAIN GENERATOR 
 function generatePlot() {
     const input = document.getElementById('ciliaplot-genes-input').value.trim();
