@@ -844,6 +844,77 @@ const CATEGORY_COLOR_MAP = new Map();
 
 // Global index to ensure we use unique colors from the palette sequentially
 let COLOR_INDEX_COUNTER = 0;
+// --- 3. Two-Sided Legend Placement (Bottom Left / Bottom Right) ---
+
+const plotAnnotations = [];
+
+const leftCategories  = ["Localization", "Complex", "Ciliopathy", "Function"];
+const rightCategories = ["Screens", "Cilia Length", "Phenotypes", "Phylogeny"];
+
+// Vertical spacing
+const lineHeight = 0.035;
+
+// Starting Y position FAR below plot area
+let leftY  = -0.42;   // bottom-left legend
+let rightY = -0.42;   // bottom-right legend
+
+// LEFT SIDE LEGEND
+leftCategories.forEach(cat => {
+    if (!categoryLegends[cat]) return;
+
+    plotAnnotations.push({
+        xref: 'paper', yref: 'paper',
+        x: 0.02, y: leftY,
+        xanchor: 'left', yanchor: 'middle',
+        text: `<b>${cat}</b>`,
+        font: { size: 12, color: '#333' },
+        showarrow: false
+    });
+    leftY -= lineHeight * 1.2;
+
+    Object.entries(categoryLegends[cat]).forEach(([value, colorHex]) => {
+        plotAnnotations.push({
+            xref: 'paper', yref: 'paper',
+            x: 0.02, y: leftY,
+            xanchor: 'left', yanchor: 'middle',
+            text: `<span style='color:${colorHex}; font-size:16px;'>●</span> ${value}`,
+            font: { size: 10, color: '#444' },
+            showarrow: false
+        });
+        leftY -= lineHeight;
+    });
+
+    leftY -= lineHeight * 0.8; // spacing between groups
+});
+
+// RIGHT SIDE LEGEND
+rightCategories.forEach(cat => {
+    if (!categoryLegends[cat]) return;
+
+    plotAnnotations.push({
+        xref: 'paper', yref: 'paper',
+        x: 0.75, y: rightY,
+        xanchor: 'left', yanchor: 'middle',
+        text: `<b>${cat}</b>`,
+        font: { size: 12, color: '#333' },
+        showarrow: false
+    });
+    rightY -= lineHeight * 1.2;
+
+    Object.entries(categoryLegends[cat]).forEach(([value, colorHex]) => {
+        plotAnnotations.push({
+            xref: 'paper', yref: 'paper',
+            x: 0.75, y: rightY,
+            xanchor: 'left', yanchor: 'middle',
+            text: `<span style='color:${colorHex}; font-size:16px;'>●</span> ${value}`,
+            font: { size: 10, color: '#444' },
+            showarrow: false
+        });
+        rightY -= lineHeight;
+    });
+
+    rightY -= lineHeight * 0.8;
+});
 
 /**
  * Utility to get a unique color for any categorical value.
@@ -1078,7 +1149,7 @@ function renderMultiCategoryManhattan(genes, custom) {
         l: 180,   // ← More room for gene names
         r: 40,
         t: 100,
-        b: 420    // ← **Enough space for rotated ticks + legend**
+        b: 520   // ← now has enough room for two legend columns
     },
 
     showlegend: false,
