@@ -576,11 +576,7 @@ function clearPlot() {
     if (window.currentPlot) Plotly.purge(el);
 }
     
-/**
- * UMAP PLOT (Expression Mapping Mode)
- * Renders a UMAP visualization where points are colored and sized based on the
- * expression level of the requested gene (or FOXJ1 by default).
- */
+
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization based on single gene expression or gene ratio.
@@ -588,9 +584,31 @@ function clearPlot() {
  * @param {string | null} gene2 - The secondary gene symbol (from custom input field).
  * @param {object} custom - Customization settings.
  */
+ // --- UMAP Cluster Annotation Coordinates (Estimate based on lung cell types) ---
+const UMAP_CELL_ANNOTATIONS = {
+    'ciliated cell': { x: 10, y: 0.5, label: 'Ciliated Cells' },
+    'club cell': { x: 12, y: 14, label: 'Club Cells' },
+    'goblet cell': { x: 2, y: 16, label: 'Goblet/Secretory' },
+    'basal cell': { x: 9, y: 5, label: 'Basal/Stem Cells' },
+    'pulmonary alveolar type 1 cell': { x: -5, y: -4, label: 'Alveolar Type 1' },
+    'pulmonary alveolar type 2 cell': { x: 5, y: -8, label: 'Alveolar Type 2' },
+    'lung secretory cell': { x: 6, y: -2, label: 'Lung Secretory' },
+    'neuroendocrine cell': { x: 15, y: -3, label: 'Neuroendocrine' },
+    'stem cell': { x: 8, y: 7, label: 'Stem/Progenitor' }
+};   
+// ==========================================================
+// III. UMAP Rendering Function (renderScrnaUMAPPlot)
+// ==========================================================
+
+/**
+ * UMAP PLOT (Expression Mapping Mode)
+ * Renders a UMAP visualization based on single gene expression or gene ratio, with cluster annotations.
+ * @param {string} gene1 - The primary gene symbol (always derived from main input).
+ * @param {string | null} gene2 - The secondary gene symbol (from custom input field).
+ * @param {object} custom - Customization settings.
+ */
 async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) { 
-    const plotDivId = 'plot-display-area'; // Target the main plot container ID
-    
+    const plotDivId = 'plot-display-area'; 
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
     const plotDiv = document.getElementById(plotDivId);
@@ -637,7 +655,7 @@ async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) {
     const pseudoCount = 0.01; // Avoid division by zero in ratio mode
     const expressionThreshold = 2; 
 
-    // Use full UMAP data (assuming coordinate loading is now correct)
+    // Use full UMAP data
     const sourceData = umapData; 
 
     for (const point of sourceData) {
@@ -676,9 +694,30 @@ async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) {
         return; 
     }
     
-    // --- Plotly Setup ---
+    // --- Annotations & Plotly Setup ---
     const colorScale = isRatioMode ? 'Viridis' : [[0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']];
-    const cMax = isRatioMode ? Math.min(maxColorValue, 10) : maxColorValue; // Cap ratio max at 10 for better visualization contrast
+    const cMax = isRatioMode ? Math.min(maxColorValue, 10) : maxColorValue; 
+    
+    // --- NEW: Generate UMAP Annotations ---
+    const annotations = Object.values(UMAP_CELL_ANNOTATIONS).map(ann => ({
+        x: ann.x,
+        y: ann.y,
+        xref: 'x',
+        yref: 'y',
+        text: ann.label,
+        showarrow: false,
+        font: {
+            color: '#333',
+            size: 14,
+            weight: 'bold'
+        },
+        // Draw a gray box behind the text for contrast
+        bgcolor: 'rgba(255, 255, 255, 0.7)',
+        bordercolor: '#ccc',
+        borderwidth: 1,
+        borderpad: 4
+    }));
+    // --- END NEW: Generate UMAP Annotations ---
 
     const plotData = [{
         x: sampledData.map(p => p.x),
@@ -709,12 +748,14 @@ async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) {
         title: plotTitle,
         xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
         yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
+        annotations: annotations, // Pass the new annotations here
         showlegend: false
     };
         
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 }
 window.renderScrnaUMAPPlot = renderScrnaUMAPPlot;
+
     
 function debugUMAPData(genes) {
         const umapData = window.CiliAI_UMAP;
