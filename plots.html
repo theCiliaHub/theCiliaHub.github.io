@@ -1046,49 +1046,44 @@ function renderMultiCategoryManhattan(genes, custom) {
 
     // --- 4. Plotly Layout (CRITICAL FIX FOR OVERLAP) ---
     const layout = {
-        title: { text: custom.title || "Gene Feature Overview / Summary", font: { size: custom.titleSize } },
-        xaxis: { 
-            // FINAL FIX: Remove explicit 'Categories' axis title, keep tick labels on the bottom
-            title: "", // Remove redundant X-axis title
-            tickvals: categories.map((_,i)=>i), 
-            ticktext: categories.map(c=>c.name),
-            tickangle: -45, 
-            
-            // CRITICAL FIX 1: Set position of labels in screen coordinates (paper space)
-            // By placing the labels below the plot area (y=0 in plot area), they enter the bottom margin.
-            tickmode: 'array',
-            
-            // Set the range slightly outside of the numerical categories to ensure space
-            range: [-0.5, categories.length - 0.5], 
+    title: { 
+        text: custom.title || "Gene Feature Overview / Summary", 
+        font: { size: custom.titleSize || 22 }
+    },
 
-            showgrid: false,
-            zeroline: false
-        },
-        yaxis: { 
-            title: "Genes", 
-            tickvals: genes.map((_,i)=>i), 
-            ticktext: genes.map(g=>g.gene),
-            showgrid: true,
-            zeroline: false
-        },
-        height: custom.height, 
-        width: custom.width,
-        
-        // CRITICAL FIX 3: Increase bottom margin to dynamically accommodate the large legend/annotations
-        margin: { 
-            l: 120, // Gene Names
-            r: 20, 
-            t: 80, 
-            // Calculate bottom margin dynamically based on the vertical space needed for annotations + X-axis labels
-            b: Math.max(250, Math.abs(currentYPosition) * custom.height * 0.8 + 100) 
-        },
-        
-        // Hide the default Plotly legend
-        showlegend: false,
-        
-        // Add the custom annotations to the layout
-        annotations: plotAnnotations,
-    };
+    xaxis: { 
+        title: "",
+        tickvals: categories.map((_, i) => i),
+        ticktext: categories.map(c => c.name),
+        tickangle: -45,
+        range: [-0.5, categories.length - 0.5],
+        automargin: true,
+        showgrid: false,
+        zeroline: false
+    },
+
+    yaxis: { 
+        title: "Genes",
+        tickvals: genes.map((_, i) => i),
+        ticktext: genes.map(g => g.gene),
+        automargin: true,
+        showgrid: true,
+        zeroline: false
+    },
+
+    height: custom.height || 1600,   // ← **Increase vertical space**
+    width: custom.width || 1400,
+
+    margin: { 
+        l: 180,   // ← More room for gene names
+        r: 40,
+        t: 100,
+        b: 420    // ← **Enough space for rotated ticks + legend**
+    },
+
+    showlegend: false,
+    annotations: plotAnnotations
+};
     
     Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
 }
