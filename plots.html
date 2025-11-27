@@ -876,6 +876,9 @@ function classifyPhylo(gene) {
 function renderMultiCategoryManhattan(genes, custom) {
     clearPlot();
 
+    // Reset legend state
+    const categoryLegends = {};
+
     const categories = [
         { name: "Localization", key: "Localization" },
         { name: "Complex", key: "Protein.complexes" },
@@ -888,98 +891,71 @@ function renderMultiCategoryManhattan(genes, custom) {
     ];
 
     const traces = [];
-    const categoryLegends = {};
 
-    // ---------------------------
-    // Build traces for each category
-    // ---------------------------
+    // Generate points
     categories.forEach((cat, catIdx) => {
         const x = [], y = [], text = [], colors = [];
 
         genes.forEach((gene, geneIdx) => {
-
-            // ---------------------------
-            // CILIA LENGTH EFFECTS
-            // ---------------------------
+            // --- Cilia Length
             if (cat.key === "cilia_length_effects") {
                 const loF = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
                 const oe = gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
-
-                const pushEffect = (label, value, shift) => {
-                    if (value === "Not Reported") return;
-                    const key = `${label} (${value})`;
-                    const color = getUniqueColor("CiliaLength:" + key);
-
-                    x.push(catIdx + shift);
-                    y.push(geneIdx); // Direct gene index
-                    text.push(`${gene.gene}<br>${label}: ${value}`);
-                    colors.push(color);
-
-                    categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                    categoryLegends[cat.name][key] = color;
-                };
-
-                pushEffect("LoF", loF, -0.25);
-                pushEffect("OE", oe, 0.25);
-            }
-
-            // ---------------------------
-            // PHYLOGENY
-            // ---------------------------
+                [['LoF', loF, -0.25], ['OE', oe, 0.25]].forEach(([type, val, shift]) => {
+                    if (val && val !== 'Not Reported') {
+                        const key = `${type} (${val})`;
+                        const color = getUniqueColor('CiliaLength:' + key);
+                        x.push(catIdx + shift);
+                        y.push(geneIdx);
+                        text.push(`${gene.gene}<br>${type}: ${val}`);
+                        colors.push(color);
+                        categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                        categoryLegends[cat.name][key] = color;
+                    }
+                });
+            } 
+            // --- Phylogeny
             else if (cat.key === "phylogeny") {
                 const classification = classifyPhylo(gene);
-                if (classification === "No Data") return;
-
-                const color = getUniqueColor("Phylo:" + classification);
-                x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                y.push(geneIdx);
-                text.push(`${gene.gene}<br>${classification}`);
-                colors.push(color);
-
-                categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                categoryLegends[cat.name][classification] = color;
+                if (classification !== 'No Data') {
+                    const color = getUniqueColor('Phylo:' + classification);
+                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
+                    y.push(geneIdx);
+                    text.push(`${gene.gene}<br>${classification}`);
+                    colors.push(color);
+                    categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                    categoryLegends[cat.name][classification] = color;
+                }
             }
-
-            // ---------------------------
-            // SCREENS
-            // ---------------------------
+            // --- Screens
             else if (cat.key === "screens_summary") {
-                const screenArr = getCleanArray(gene, cat.key);
-                if (!screenArr?.length) return;
-
-                screenArr.forEach(hit => {
-                    const resultKey = hit.source ? `${hit.source} - ${hit.result || "Hit"}` : "Unclassified Hit";
+                const arr = getCleanArray(gene, cat.key) || [];
+                arr.forEach(hit => {
+                    const key = hit.source ? `${hit.source} - ${hit.result || "Hit"}` : "Unclassified Hit";
                     const label = hit.source ? `${hit.source} (Result: ${hit.result || "N/A"})` : JSON.stringify(hit);
-                    const color = getUniqueColor("Screen:" + resultKey);
-
+                    const color = getUniqueColor("Screen:" + key);
                     x.push(catIdx + (Math.random() - 0.5) * 0.6);
                     y.push(geneIdx);
                     text.push(`${gene.gene}<br>${label}`);
                     colors.push(color);
-
                     categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                    categoryLegends[cat.name][resultKey] = color;
+                    categoryLegends[cat.name][key] = color;
                 });
             }
-
-            // ---------------------------
-            // SIMPLE CATEGORIES
-            // ---------------------------
+            // --- Simple categories
             else {
-                const arr = getCleanArray(gene, cat.key);
+                const arr = getCleanArray(gene, cat.key) || [];
                 arr.forEach(val => {
-                    if (!val || val === "N/A" || val === "Unknown" || val.includes('PFAM_ID: No description')) return;
-                    const color = getUniqueColor(cat.name + ":" + val);
+                    if (!val || val === "N/A" || val === "Unknown" || val.includes("PFAM_ID: No description")) return;
+                    const color = getUniqueColor(cat.name + ':' + val);
                     x.push(catIdx + (Math.random() - 0.5) * 0.6);
                     y.push(geneIdx);
                     text.push(`${gene.gene}<br>${cat.name}: ${val}`);
                     colors.push(color);
-
                     categoryLegends[cat.name] = categoryLegends[cat.name] || {};
                     categoryLegends[cat.name][val] = color;
                 });
             }
-
         });
 
         if (x.length) {
@@ -993,84 +969,59 @@ function renderMultiCategoryManhattan(genes, custom) {
         }
     });
 
-    // ---------------------------
-    // LEGEND ANNOTATIONS
-    // ---------------------------
-    const plotAnnotations = [];
-    const leftGroups = ["Localization", "Complex", "Ciliopathy", "Function"];
-    const rightGroups = ["Screens", "Cilia Length", "Phenotypes", "Phylogeny"];
-
-    const lineHeight = 0.045;
-
-    const addLegendColumn = (groups, startX, startY) => {
-        let yPos = startY;
-        groups.forEach(cat => {
-            if (!categoryLegends[cat]) return;
-
-            plotAnnotations.push({
-                xref: "paper", yref: "paper",
-                x: startX, y: yPos,
-                text: `<b>${cat}</b>`,
-                xanchor: "left",
-                showarrow: false,
-                font: { size: 12, color: "#333" }
-            });
-            yPos -= lineHeight * 1.5;
-
-            Object.entries(categoryLegends[cat]).sort().forEach(([label, color]) => {
-                plotAnnotations.push({
-                    xref: "paper", yref: "paper",
-                    x: startX, y: yPos,
-                    text: `<span style="color:${color}; font-size:16px;">●</span> ${label}`,
-                    xanchor: "left",
-                    showarrow: false,
-                    font: { size: 10 }
-                });
-                yPos -= lineHeight;
-            });
-
-            yPos -= lineHeight * 0.5;
-        });
+    // --- PLOTLY LAYOUT ---
+    const layout = {
+        title: { text: custom.title || "Gene Feature Overview", font: { size: custom.titleSize || 22 } },
+        xaxis: {
+            tickvals: categories.map((_, i) => i),
+            ticktext: categories.map(c => c.name),
+            tickangle: -45,
+            automargin: true,
+            showgrid: false
+        },
+        yaxis: {
+            title: "Genes",
+            tickvals: genes.map((_, i) => i),
+            ticktext: genes.map(g => g.gene),
+            automargin: true,
+            showgrid: true,
+            zeroline: false
+        },
+        height: Math.max(custom.height || 2000, genes.length * 25),
+        width: custom.width || 1600,
+        margin: { l: 300, r: 100, t: 120, b: 50 }, // ← bottom margin small because legend will be external
+        showlegend: false
     };
 
-    addLegendColumn(leftGroups, 0.02, 0.95);
-    addLegendColumn(rightGroups, 0.55, 0.95);
+    Plotly.newPlot('plot-display-area', traces, layout, { responsive: true });
 
-    // ---------------------------
-    // PLOTLY LAYOUT
-    // ---------------------------
-    const layout = {
-    title: { text: custom.title || "Gene Feature Overview", font: { size: custom.titleSize || 22 } },
-    xaxis: {
-        tickvals: categories.map((_, i) => i),
-        ticktext: categories.map(c => c.name),
-        tickangle: -45,
-        range: [-0.5, categories.length - 0.5],
-        automargin: true,
-        showgrid: false
-    },
-    yaxis: {
-        title: "Genes",
-        tickvals: genes.map((_, i) => i),
-        ticktext: genes.map(g => g.gene),
-        automargin: true,
-        showgrid: true,
-        zeroline: false
-    },
-    height: Math.max(custom.height || 2000, genes.length * 25), // ↑ increased scaling factor
-    width: custom.width || 1600,  // ↑ wider for gene names and X-axis labels
-    margin: { 
-        l: 300,   // ↑ more room for long gene names
-        r: 120,   // ↑ more room for right-side legend
-        t: 120, 
-        b: 400    // ↑ increased to fit two legend columns
-    },
-    showlegend: false,
-    annotations: plotAnnotations
-};
+    // --- BUILD SCROLLABLE BOTTOM LEGEND ---
+    const legendContainer = document.getElementById('legend-container');
+    legendContainer.innerHTML = ''; // clear previous
+    legendContainer.style.display = 'grid';
+    legendContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+    legendContainer.style.gap = '10px';
+    legendContainer.style.maxHeight = '300px';
+    legendContainer.style.overflowY = 'auto';
+    legendContainer.style.padding = '10px';
+    legendContainer.style.borderTop = '1px solid #ccc';
 
-    Plotly.newPlot("plot-display-area", traces, layout, { responsive: true });
+    Object.entries(categoryLegends).forEach(([catName, colorMap]) => {
+        const catDiv = document.createElement('div');
+        const header = document.createElement('div');
+        header.innerHTML = `<b>${catName}</b>`;
+        catDiv.appendChild(header);
+
+        Object.entries(colorMap).sort((a,b) => a[0].localeCompare(b[0])).forEach(([label, color]) => {
+            const item = document.createElement('div');
+            item.innerHTML = `<span style="color:${color}; font-size:16px;">●</span> ${label}`;
+            catDiv.appendChild(item);
+        });
+
+        legendContainer.appendChild(catDiv);
+    });
 }
+
 
 // 3. Phylogenetic Conservation Heatmap
 /**
