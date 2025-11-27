@@ -168,6 +168,63 @@
             border-radius: 6px;
             cursor: pointer;
         }
+        /* ========================================================== */
+/* EXTERNAL LEGEND STYLES FOR MULTI-CATEGORY MANHATTAN PLOT */
+/* ========================================================== */
+
+#legend-container {
+    background: white;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 10px;
+    padding: 15px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    border-radius: 0 0 12px 12px;
+}
+
+#legend-container .legend-category {
+    margin-bottom: 15px;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+
+#legend-container .legend-category h4 {
+    margin: 0 0 8px 0;
+    color: var(--primary);
+    font-size: 14px;
+    font-weight: 600;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+#legend-container .legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+#legend-container .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+/* Responsive adjustments for legend */
+@media (max-width: 768px) {
+    #legend-container {
+        grid-template-columns: 1fr;
+        max-height: 200px;
+    }
+}
 
         #phy-source-group { display: none; margin-top: 12px; }
     </style>
@@ -1973,42 +2030,22 @@ CEP41
 WDR27
 WDR60
 WDR90
-KIF19A
+KIF19
 KIF17</textarea>
                     <button id="generate-ciliaplot-btn">Generate Plot</button>
                     <div id="customization-panel">
                         <h3 style="margin-top:20px;">Customization</h3>
                         <div class="customization-grid">
-                            <div class="form-group"><label>Title</label><input id="custom-title" value="Phylogenetic Conservation Heatmap"></div>
+                            <div class="form-group"><label>Title</label><input id="custom-title" value="Gene Feature Overview"></div>
                             <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
-                            <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
-                            <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="700"></div>
+                            <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1600"></div>
+                            <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="2000"></div>
                             
-                            <div class="form-group" id="phy-source-group">
-                                <label>Source</label>
-                                <select id="phy-source">
-                                    <option value="nevers_2017">Nevers et al. 2017</option>
-                                    <option value="li_2014">Li et al. 2014</option>
-                                </select>
-                            </div>
-
                             <div class="form-group full-width">
                                 <label>Second Gene (For Co-expression/Ratio UMAP)</label>
                                 <input type="text" id="second-gene-input" placeholder="Optional, e.g., BBS1, FOXJ1">
                             </div>
-                            <div class="form-group full-width" id="phy-filter-group" style="display: none;">
-                                <label>Filter Species Groups (Ctrl+Click to select multiple)</label>
-                                <select id="custom-species-filter" multiple size="6">
-                                    <option value="all" selected>-- Show All Species --</option>
-                                    <option value="vertebrates">Vertebrates</option>
-                                    <option value="invertebrates">Invertebrates & Basal Metazoans</option>
-                                    <option value="ciliates">Ciliates (T. thermophila, etc.)</option>
-                                    <option value="protozoa">Protozoa & Parasites</option>
-                                    <option value="plants_algae">Plants & Algae</option>
-                                    <option value="fungi">Non-Ciliary Fungi</option>
-                                </select>
-                            </div>
-                            </div>
+                        </div>
                     </div>
                 </div>
             </aside>
@@ -2022,6 +2059,8 @@ KIF17</textarea>
                     <div id="plot-display-area">
                         <div id="cilia-svg" style="width: 100%; height: 100%;">Your plot will appear here</div>
                     </div>
+                    <!-- LEGEND CONTAINER FOR MULTI-CATEGORY PLOT -->
+                    <div id="legend-container"></div>
                 </div>
             </main>
         </div>`;
@@ -2030,15 +2069,12 @@ KIF17</textarea>
     document.getElementById('download-plot-btn').onclick = () => Plotly.downloadImage('plot-display-area', {format: 'png', filename: 'CiliAI_Plot'});
     document.getElementById('analysis-dropdown').onchange = (e) => handlePlotSelection(e.target.value);
     
+    // Set default plot type to gene overview for testing the Manhattan plot
     const dropdown = document.getElementById('analysis-dropdown');
-    const initialType = 'phylogeny'; // Set default plot type to phylogeny
-    dropdown.value = initialType;
+    dropdown.value = 'gene_overview';
     
-    // Call handler to show source and filter dropdowns initially
-    handlePlotSelection(initialType); 
-    
-    // Ensure Nevers is selected by default for the source dropdown
-    document.getElementById('phy-source').value = 'nevers_2017';
+    // Call handler to initialize the view
+    handlePlotSelection('gene_overview');
     
     generatePlot();
 }
