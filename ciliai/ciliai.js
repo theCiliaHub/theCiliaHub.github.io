@@ -463,7 +463,6 @@ function formatListResult(title, genes, description = "") {
     }
 
 function react(type) {
-    // Get the user's last question
     const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
     const lastQuestion = userMessages.length > 0 
         ? (userMessages[userMessages.length - 1].querySelector('.ciliai-message-content')?.textContent || '').trim()
@@ -472,30 +471,23 @@ function react(type) {
     const feedbackType = type === 'up' ? 'Positive' : 'Negative';
     const pageUrl = window.location.href;
 
-    // YOUR WORKING WEB APP URL (already correct!)
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzqZzPmvLM6FWYI_tdiRHUWSpjWBBUzpUHUUxFSxPWj2XmwjJP0fx_TVi7d5KtbuFPl/exec';
-
-    fetch(WEB_APP_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    // Fire-and-forget POST – this is the recommended pattern for Google Apps Script web apps
+    navigator.sendBeacon(
+        'https://script.google.com/macros/s/AKfycbzqZzPmvLM6FWYI_tdiRHUWSpjWBBUzpUHUUxFSxPWj2XmwjJP0fx_TVi7d5KtbuFPl/exec',
+        new Blob([JSON.stringify({
             type: feedbackType,
             question: lastQuestion,
             url: pageUrl
-        })
-    }).catch(() => {
-        // Silent fallback – almost never triggers because no-cors + Google is rock-solid
-    });
+        })], { type: 'application/json' })
+    );
 
-    // UI feedback
+    // Instant user feedback
     if (type === 'up') {
-        addChatMessage('Thank you! Feedback received 🙏', false);
+        addChatMessage('Thank you! Feedback received', false);
     } else {
-        addChatMessage('Sorry about that – feedback sent, I’ll improve!', false);
+        addChatMessage('Sorry about that – feedback sent!', false);
     }
 }
-
 
 function sendFeedbackEmail(feedbackType, userQuestion) {
     const subject = `CiliAI ${feedbackType === 'up' ? '👍 Positive' : '👎 Negative'} Feedback`;
