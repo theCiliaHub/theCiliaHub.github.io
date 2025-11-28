@@ -3043,11 +3043,6 @@ window.terminologyQueries = {
 };
 
 
-/**
- * CiliAI V2.0: The Main Query Router (Hybrid Semantic-RAG Model)
- * * This router is Semantic-First, prioritizing Intent Classification and Graph Reasoning 
- * (Steps 1-7) over the old V1 keyword matching (Step 8/9).
- */
 /*
  * CiliAI V2.0: The Main Query Router (Hybrid Semantic-RAG Model)
  * FINAL EXECUTABLE VERSION - Terminology check is prioritized.
@@ -3061,51 +3056,56 @@ window.terminologyQueries = {
 window.handleAIQuery = async function (query) {
     try {
         if (!query || typeof query !== "string") {
-        window.log("Empty or invalid query");
-        return "<p>Invalid query</p>";
+            window.log("Empty or invalid query");
+            return "<p>Invalid query</p>";
         }
+
         query = query.trim();
         window.log(`Routing query (V2.0 Semantic-First): ${query}`);
 
         // -----------------------------------------------------
-        // 1. GENE / ENTITY EXTRACTION
+        // 1. GENE EXTRACTION
         // -----------------------------------------------------
-        const exactGenes = window.extractMultipleGenes(query);
+        const exactGenes = window.extractMultipleGenes(query) || [];
         window.log(`[Gene Extraction] Processing: "${query}"`);
-        window.log(`[Gene Extraction] Final valid genes: ${exactGenes.join(", ")}`);
+        window.log(`[Gene Extraction] Final valid genes: ${exactGenes.join(", ") || "(none)"}`);
 
         // -----------------------------------------------------
-        // 2. SEMANTIC SEARCH (for definition / non-gene queries)
+        // 2. SEMANTIC INDEX
         // -----------------------------------------------------
         const semanticMatches = await window.searchSemanticIndex(query);
 
         // -----------------------------------------------------
-        // 3. INTENT CLASSIFICATION (raw)
+        // 3. INTENT CLASSIFICATION
         // -----------------------------------------------------
         const { intent, confidence } = window.scoreIntents(query, semanticMatches);
-        window.log(`Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ')}`);
+        window.log(
+            `Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ') || "(none)"}`
+        );
 
         // -----------------------------------------------------
-        // 4. INTENT POST-PROCESSING (FIX FOR COMPARISONS)
+        // 4. INTENT OVERRIDE FOR COMPARISONS
         // -----------------------------------------------------
         const qLower = query.toLowerCase();
 
-        // high-precision comparison phrase detection
-        const compareRegex = /\b(higher in|lower in|more expressed|less expressed|compared to|versus|vs |vs\.|differential expression|which cell type|which tissue|expressed higher|is .* expressed)\b/;
+        const compareRegex =
+            /\b(higher in|lower in|more expressed|less expressed|compared to|versus|vs |vs\.|differential expression|which cell type|which tissue|expressed higher|is .* expressed)\b/;
 
         let intentProcessed = intent;
         let confProcessed = confidence;
 
         if (compareRegex.test(qLower)) {
             intentProcessed = "compare";
-            confProcessed = Math.max(confProcessed, 0.95); // boost confidence
+            confProcessed = Math.max(confProcessed, 0.95);
             window.log(`Intent override: forced "compare" due to phrase match`);
         }
 
-        window.log(`Post-processed Intent: ${intentProcessed} (Confidence: ${confProcessed.toFixed(2)})`);
+        window.log(
+            `Post-processed Intent: ${intentProcessed} (Confidence: ${confProcessed.toFixed(2)})`
+        );
 
         // -----------------------------------------------------
-        // 5. ROUTING SWITCH (THE FIXED LOGIC)
+        // 5. ROUTING LOGIC (SAFE)
         // -----------------------------------------------------
 
         let htmlResult = "";
@@ -3114,48 +3114,55 @@ window.handleAIQuery = async function (query) {
         if (intentProcessed === "visualize" || intentProcessed === "scRNA") {
             window.log("Routing via: Intent (Visualize)");
             htmlResult = await window.routeVisualizationAction(query, exactGenes);
+            return htmlResult;
         }
 
-        // --- QUANTITATIVE (RANKING / COMPARISON) ---
-        else if (intentProcessed === "ranking" || intentProcessed === "quantitative" || intentProcessed === "compare") {
+        // --- QUANTITATIVE ---
+        if (
+            intentProcessed === "ranking" ||
+            intentProcessed === "quantitative" ||
+            intentProcessed === "compare"
+        ) {
             window.log("Routing via: Intent (Quantitative Engine)");
             htmlResult = await window.runQuantitativeEngine(query, exactGenes);
+            return htmlResult;
         }
 
-        // --- GRAPH REASONING (DISEASE–GENE–COMPLEX etc.) ---
-        else if (["relationship", "disease_query", "complex_query", "localization_query"].includes(intentProcessed)) {
+        // --- GRAPH REASONING ---
+        if (["relationship", "disease_query", "complex_query", "localization_query"]
+            .includes(intentProcessed)) {
             window.log("Routing via: Intent (Graph Reasoning / Synthesis)");
             htmlResult = await window.runGraphQuery(query, intentProcessed, exactGenes);
+            return htmlResult;
         }
 
-        // --- DEFINITION / RAG FALLBACK (TIGHTENED) ---
-        else if (
+        // --- DEFINITIONS (GENE OR CONCEPT) ---
+        if (
             intentProcessed === "definition" ||
             (confProcessed < 0.3 && !compareRegex.test(qLower) && exactGenes.length === 0)
         ) {
             window.log("Routing via: Intent (Definition / RAG Retrieval)");
 
+            // gene definition
             if (exactGenes.length > 0) {
-                // definition for a specific gene
                 htmlResult = await window.displayFullGeneInfo(exactGenes[0]);
-            } else if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
-                // concept definition
-                htmlResult = window.formatRAGAnswer(semanticMatches[0]);
-            } else {
-                htmlResult = `<p>No definition found.</p>`;
+                return htmlResult;
             }
-        }
 
-        // --- FINAL FALLBACK ---
-        else {
-            window.log("Routing via: Default fallback");
-            htmlResult = `<p>I'm not sure how to handle this query.</p>`;
+            // concept definition
+            if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
+                htmlResult = window.formatRAGAnswer(semanticMatches[0]);
+                return htmlResult;
+            }
+
+            return `<p>No definition found.</p>`;
         }
 
         // -----------------------------------------------------
-        // 6. RETURN RESULT
+        // 6. FINAL FALLBACK (SAFE)
         // -----------------------------------------------------
-        return htmlResult;
+        window.log("Routing via: Default fallback");
+        return `<p>I'm not sure how to handle this query.</p>`;
     }
 
     catch (err) {
