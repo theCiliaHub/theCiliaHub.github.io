@@ -464,7 +464,18 @@ function formatListResult(title, genes, description = "") {
 
 // Section 4A. Core Helper Functions
 
+// Replace your current react function with this:
 function react(type) {
+    // Get the user's last question from chat
+    const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
+    const lastQuestion = userMessages.length > 0 ? 
+        userMessages[userMessages.length - 1].querySelector('.ciliai-message-content').textContent : 
+        'No specific query';
+    
+    // Send email feedback
+    sendFeedbackEmail(type, lastQuestion);
+    
+    // UI response (keep your existing messages)
     if (type === 'up') {
         addChatMessage('Thanks for the feedback! 🙏', false);
     } else {
@@ -472,6 +483,22 @@ function react(type) {
     }
 }
 
+// Add this email function right after the react function
+function sendFeedbackEmail(feedbackType, userQuestion) {
+    const subject = `CiliAI ${feedbackType === 'up' ? '👍 Positive' : '👎 Negative'} Feedback`;
+    const body = `
+User Question: ${userQuestion}
+Feedback Type: ${feedbackType === 'up' ? 'Positive (👍)' : 'Negative (👎)'}
+Time: ${new Date().toLocaleString()}
+Page: ${window.location.href}
+
+--
+Sent from CiliAI Chat
+    `.trim();
+    
+    // Open user's email client with pre-filled message
+    window.open(`mailto:oktay.kaplan@agu.edu.tr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+}
 
 function addChatMessage(html, isUser = false) {
         const chatWindow = document.getElementById('messages');
