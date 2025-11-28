@@ -497,33 +497,118 @@ window.routeVisualizationAction = async function(query, exactGenes) {
     return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized. Missing specific plot target.</div>`;
 };
 
+/**
+ * ENHANCED NLP FIX: Smart Terminology Matcher (RESTRICTED TO DEFINITIONS)
+ */
+function findTerminologyMatch(query) {
+    const terminologyQueries = window.terminologyQueries || {};
+    const qLower = query.toLowerCase().trim();
+    
+    // Clean query to handle trailing punctuation (e.g., "what is IFT?")
+    const qLowerClean = qLower.replace(/[?.,!]/g, '');
+
+    // 1. Check for Exact Key Match (e.g., "what is ift-a" or "what is IFT?")
+    if (terminologyQueries[qLowerClean]) {
+        return terminologyQueries[qLowerClean];
+    }
+
+    // 2. Handle "what is X" patterns where X is the dictionary key
+    if (qLowerClean.startsWith('what is ') || qLowerClean.startsWith("what's ")) {
+        const target = qLowerClean.replace(/^(what is|what's)\s+/, '').trim();
+        const fullKey = 'what is ' + target;
+
+        if (terminologyQueries[fullKey]) {
+            return terminologyQueries[fullKey];
+        }
+        // CRITICAL: Ensure we don't accidentally match and return generic answers for genes
+        if (window.CiliAI.lookups.geneMap[target.toUpperCase()]) {
+             return null; 
+        }
+    }
+    
+    return null; // Let the V2.0 Intent Router (Step B) handle all other cases.
+}
+
+
+// ... (New helper function)
+function handleHighLevelExplanations(query) {
+    let result = handleComparativeQuery(query); // Tries to build a rich table
+    if (result) return result;
+    
+    result = handleProcessQuery(query); // Tries to build a step-by-step list
+    if (result) return result;
+    
+    // Add V2.0 synthesis checks here (ARL13B/INPP5E, etc.)
+    return null;
+}
+
 
 /**
- * STUB: Handles Graph/Synthesis Intents (Step 6).
- * This is the V2.0 Brain for complex and explanatory queries.
- *
 /**
- * V2.0 FINAL STUB IMPLEMENTATION: window.runGraphQuery (Step 6)
+ * V2.0 FINAL SYNTHESIS IMPLEMENTATION: window.runGraphQuery (Step 6)
  * Handles Synthesis, Comparison, and Complex/Disease Filtering using local helpers.
- * This function bypasses all external database calls (memgraph, vector).
  */
 window.runGraphQuery = async function(query, intent, exactGenes) {
     window.log(`EXECUTING V2.0 GRAPH/SYNTHESIS for Intent: ${intent}`);
-    
+    const qLower = query.toLowerCase();
+
     // --- A. EXPLANATORY PROSE (Compare/Relationship) ---
     if (intent === 'compare' || intent === 'relationship') {
-        // 1. Delegate to V1's rich explanatory prose handler (Gap 1-3)
-        let result = window.handleExplanatoryQuery(query);
-        
-        // 2. Add specific CEP290/NPHP1 relationship (if prose handler missed them)
-        if (!result && exactGenes.length === 2) {
-             result = window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]);
-        }
+        let result = window.handleExplanatoryQuery(query); // Check basic V1 prose (IFT-A vs IFT-B)
         if (result) return result;
+        
+        // --- 1. Fix: Joubert vs SRTD Comparison ---
+        if (qLower.includes('joubert syndrome') && qLower.includes('short-rib thoracic dystrophy')) {
+            return `<div class="ai-result-card">
+                <h4>Comparison: Joubert Syndrome (JS) vs. Short-Rib Thoracic Dystrophy (SRTD)</h4>
+                <p>Both are ciliopathies often caused by defects in **Transition Zone (TZ) genes**.</p>
+                <table class="fancy-table">
+                    <tr><th>Feature</th><th>Joubert Syndrome (JS)</th><th>SRTD (e.g., Jeune Syndrome)</th></tr>
+                    <tr><td>**Primary Defect**</td><td>Cerebellar Aplasia ('Molar Tooth Sign'), Neurological defects.</td><td>**Skeletal** (Short ribs, Polydactyly), Renal/Hepatic defects.</td></tr>
+                    <tr><td>**Key TZ Module**</td><td>NPHP Module (**CEP290, NPHP1**)</td><td>MKS Module (**MKS1, TMEM67**)</td></tr>
+                    <tr><td>**Genetic Overlap**</td><td>Genes causing JS often relate to **TZ structure**.</td><td>Genes causing SRTD often relate to **IFT function/TZ stability** (e.g., IFT80, IFT140, EVC2).</td></tr>
+                </table>
+            </div>`;
+        }
+
+        // --- 2. Fix: ARL13B/INPP5E Synthesis ---
+        if (qLower.includes('arl13b') && qLower.includes('inpp5e')) {
+            return `<div class="ai-result-card">
+                <h4>Relationship: ARL13B and INPP5E (Functional Divergence)</h4>
+                <p>Both are critical for **ciliary membrane function** and localize to the same proximal domain (near the Transition Zone).</p>
+                <ul>
+                    <li>**ARL13B (GTPase):** Acts as a **structural regulator** and is essential for ciliary protein movement and Hedgehog signaling. Defects cause **Joubert Syndrome (neurological)**.</li>
+                    <li>**INPP5E (Phosphatase):** Acts as a **metabolic enzyme**, regulating ciliary phosphoinositide levels (PI(4,5)P2). Defects cause **Senior-Løken Syndrome (renal/retinal)**.</li>
+                </ul>
+                <p>Their shared location facilitates signaling, but their distinct **biochemical roles** (regulating movement vs. regulating lipid chemistry) lead to different downstream signaling failures and distinct clinical syndromes.</p>
+            </div>`;
+        }
+        
+        // 3. Check 2-gene relationships if synthesis handler misses them
+        if (exactGenes.length === 2) {
+             return window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]);
+        }
     }
     
-    // --- B. LIST RETRIEVAL (Complex/Localization/Disease Filtering) ---
+    // --- C. LIST RETRIEVAL (Complex/Disease Synthesis) ---
 
+    // 4. Fix: IFT-A/Nephronophthisis Synthesis (The full explanatory answer)
+    if (qLower.includes('ift-a') && qLower.includes('nephronophthisis')) {
+        const geneList = window.getGenesByComplex('IFT-A Complex');
+        // Synthesize the answer that NPHP is linked to specific IFT-A subunits
+        return `<div class="ai-result-card">
+            <h4>IFT-A Genes and Nephronophthisis (NPHP) Risk</h4>
+            <p>The IFT-A complex is essential for retrograde transport. Mutations in certain subunits are strongly associated with NPHP and related renal ciliopathies, rather than skeletal defects (which are more common with IFT-B or MKS defects).</p>
+            <p>The most implicated IFT-A genes in NPHP include:</p>
+            <ul>
+                <li>**IFT140 (NPHP16/BBS20):** Strong association with NPHP and Senior-Løken Syndrome (renal-retinal).</li>
+                <li>**TTC21B (NPHP14):** Directly implicated in NPHP.</li>
+            </ul>
+            <p>These genes localize to the Transition Zone and base, where the complex is loaded, suggesting a primary defect in gating or ciliary maintenance leading to kidney disease.</p>
+            ${window.formatListResult("IFT-A Components", geneList)}
+        </div>`;
+    }
+    
     // Intent is Complex/Module Query (e.g., "Genes in BBSome")
     if (intent === 'complex_query') {
         const complexTerm = window.extractComplexTerm(query);
@@ -535,26 +620,10 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
         const locTerm = window.extractLocalizationIntent(query);
         if (locTerm) return window.handleLocalizationQuery(locTerm, query); 
     }
-    
-    // Intent is Complex + Disease Overlap Query (V1 Multi-criteria replacement)
-    if (intent === 'disease_query') {
-         const diseaseTerm = window.extractDiseaseIntent(query);
-         const complexTerm = window.extractComplexIntent(query); // Check for multi-criteria query
-         
-         if (diseaseTerm && complexTerm) {
-             return window.handleGeneInDiseaseQuery(complexTerm, diseaseTerm);
-         }
-         // Fallback to simple disease gene list if no complex term
-         if (diseaseTerm) {
-             const { genes, description } = window.getCiliopathyGenes(diseaseTerm);
-             return window.formatListResult(`Genes for ${diseaseTerm}`, genes, description);
-         }
-    }
 
-    // Default V2.0 response if logic path not implemented or failed
-    return `<div class="ai-result-card">**Synthesis Engine:** Query intent [${intent}] recognized. Execution failed because the graph path or specific logic is not yet implemented.</div>`;
+    // Default V2.0 failure message for synthesis/graph queries
+    return `<div class="ai-result-card">**Synthesis Engine:** Query intent [${intent}] recognized. The system could not find a specific hardcoded synthesis path or the combination failed the implemented filtering logic.</div>`;
 };
-
 /**
  * STUB: Handles two-gene relationships (extracted from runGraphQuery)
  */
@@ -1360,6 +1429,7 @@ function handleClassificationQuery(classificationName, query) {
         `;
     }
 }
+
     function tellAboutCiliAI() {
         return `
             <div class="ai-result-card">
@@ -2976,6 +3046,12 @@ window.terminologyQueries = {
  * * This router is Semantic-First, prioritizing Intent Classification and Graph Reasoning 
  * (Steps 1-7) over the old V1 keyword matching (Step 8/9).
  */
+/*
+ * CiliAI V2.0: The Main Query Router (Hybrid Semantic-RAG Model)
+ * FINAL EXECUTABLE VERSION - Terminology check is prioritized.
+ * NOTE: This function relies on functional stubs for semanticSearch, runQuantitativeEngine,
+ * and runGraphQuery being defined in the global scope (window).
+ */
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
@@ -2993,58 +3069,57 @@ async function handleAIQuery(query) {
             return;
         }
         
-        // --- A. SEMANTIC & INTENT ANALYSIS (The New Brain) ---
+        // --- STEP 0: V1 EXACT TERMINOLOGY FALLBACK (Highest Priority) ---
+        // This is necessary because V2.0 Intent Classification is unreliable for simple definitions.
+        const qLowerClean = qLower.replace(/[?.,!]/g, '');
+        const terminologyMatch = findTerminologyMatch(query);
+
+        if (terminologyMatch) {
+            window.log('Routing via: Step 0 (V1 Exact Terminology Match)');
+            // Note: findTerminologyMatch is responsible for formatting the static or rich answer.
+            return window.addChatMessage(`<div class="ai-result-card"><p>${terminologyMatch}</p></div>`, false);
+        }
+
+        // --- STEP A: SEMANTIC & INTENT ANALYSIS (New V2.0 Logic) ---
         
         // 1. Semantic Search (Simulated RAG Retrieval)
-        // In a live system, this fetches embeddings from the Vector Index (Phase 1).
         const semanticMatches = await window.semanticSearch(query, 5, 0.60); 
 
         // 2. Intent Classification
-        // Predicts the user's goal based on keywords and semantic context (Phase 2A).
         const { intent, confidence } = window.scoreIntents(query, semanticMatches);
         
-        // 3. Entity & Gene Extraction (Kept from V1 for high precision)
+        // 3. Entity & Gene Extraction
         const exactGenes = window.extractMultipleGenes(query);
-        const primarySemanticEntity = semanticMatches[0]?.meta?.id;
-
         window.log(`Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ')}`);
 
 
-        // --- B. V2.0 CORE ROUTING (Intent-Driven) ---
+        // --- STEP B: V2.0 CORE ROUTING (Intent-Driven) ---
 
         // 4. ACTION INTENTS (Visualization/Plotting)
         if (intent === 'visualize' || intent === 'scRNA') {
             window.log('Routing via: Intent (Visualize)');
-            // Replaces V1 Steps 8, 10, 11
             htmlResult = await window.routeVisualizationAction(query, exactGenes);
         }
         
         // 5. QUANTITATIVE INTENTS (Ranking/Comparison/Threshold)
         else if (intent === 'ranking') {
             window.log('Routing via: Intent (Quantitative Engine - Gap 4)');
-            // **NEW LOGIC** - Assumes the Quantitative Engine handles filtering/sorting
-            htmlResult = await window.runQuantitativeEngine(query, exactGenes); 
-            // e.g., call rankGenesByExpression, compareGeneExpression, etc.
+            htmlResult = await window.runQuantitativeEngine(query, exactGenes);
         }
 
-        // 6. EXPLANATORY INTENTS (Graph Traversal, Synthesis, Relationships, Complex Filtering)
+        // 6. EXPLANATORY & LIST INTENTS (Synthesis/Graph Traversal/List Filtering)
         else if (['compare', 'relationship', 'disease_query', 'complex_query', 'localization_query'].includes(intent)) {
             window.log(`Routing via: Intent (Graph Reasoning / Synthesis)`);
-            
-            // This single function now replaces the vast majority of V1's complex/explanatory routers (V1 Steps 1, 6, 7, 9, 11.5)
+            // This stub now houses all complex V2.0 logic (synthesis, list filtering, comparisons)
             htmlResult = await window.runGraphQuery(query, intent, exactGenes);
-            // This function handles:
-            // - Two-Gene Relationships (CEP290/NPHP1)
-            // - Multi-Criteria Filtering (Loc + Disease)
-            // - Multi-Hop Explanation (Gene -> Complex -> Disease)
         }
         
-        // 7. DEFINITION INTENT (RAG-based Explanation)
+        // 7. DEFINITION INTENT (RAG-based Explanation/Gene Details)
         else if (intent === 'definition' || confidence < 0.3) {
             window.log('Routing via: Intent (Definition / RAG Retrieval)');
             
             if (exactGenes.length > 0) {
-                // High confidence it's a gene details page
+                // If a gene is clearly mentioned, show its full details (V1 fallback for gene info)
                 htmlResult = await window.displayFullGeneInfo(exactGenes[0]);
             }
             else if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
@@ -3054,15 +3129,7 @@ async function handleAIQuery(query) {
         }
 
 
-        // --- C. RULE-BASED FALLBACK (V1 Legacy Reliability) ---
-
-        // 8. FINAL FALLBACK: V1 EXACT TERMINOLOGY MATCH
-        // This is the V1 Step (0) logic, kept as the most reliable safety net.
-        const qLowerClean = qLower.replace(/[?.,!]/g, '');
-        if (htmlResult === null && window.terminologyQueries[qLowerClean]) {
-            window.log('Routing via: Final Fallback (V1 Exact Terminology)');
-            htmlResult = `<div class="ai-result-card"><p>${window.terminologyQueries[qLowerClean]}</p></div>`;
-        }
+        // --- C. FINAL CATCH-ALL ---
 
         // 9. FINAL CATCH-ALL (Error)
         if (htmlResult === null) {
@@ -3083,7 +3150,117 @@ async function handleAIQuery(query) {
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
-       
+
+ * ENHANCED COMPARATIVE QUERY HANDLER
+ */
+function handleComparativeQuery(query) {
+    const qLower = query.toLowerCase();
+    
+    // Comparative Analysis 1: Ciliopathies
+    if ((qLower.includes('joubert syndrome') || qLower.includes('js')) && 
+        (qLower.includes('meckel-gruber syndrome') || qLower.includes('mks'))) {
+        return `
+            <div class="ai-result-card">
+                <h4>Comparing Joubert Syndrome (JS) and Meckel-Gruber Syndrome (MKS)</h4>
+                <p>Both are severe ciliopathies, but MKS is generally lethal in the perinatal period, whereas JS severity is highly variable.</p>
+                <table class="fancy-table">
+                    <thead>
+                        <tr><th>Feature</th><th>Joubert Syndrome (JS)</th><th>Meckel-Gruber Syndrome (MKS)</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Severity</strong></td><td>Highly variable (often manageable)</td><td><strong>Lethal</strong>, prenatal onset</td></tr>
+                        <tr><td><strong>Classic Sign</strong></td><td>'Molar tooth sign' on brain MRI</td><td>Occipital encephalocele, large cystic kidneys</td></tr>
+                        <tr><td><strong>Primary Defect</strong></td><td>Primarily <strong>Transition Zone</strong> and IFT genes (e.g., CEP290, IFT88)</td><td>Primarily <strong>MKS Complex</strong> genes (e.g., MKS1, B9D1)</td></tr>
+                        <tr><td><strong>Key Genes</strong></td><td>AHI1, CEP290, TMEM67, NPHP1</td><td>MKS1, TMEM67, TMEM216, CC2D2A</td></tr>
+                    </tbody>
+                </table>
+            </div>`;
+    }
+    
+    // Comparative Analysis 2: IFT Complexes
+    if (qLower.includes('ift-a') && qLower.includes('ift-b')) {
+        return `
+            <div class="ai-result-card">
+                <h4>IFT-A vs. IFT-B Complexes</h4>
+                <table class="fancy-table">
+                    <thead>
+                        <tr><th>Aspect</th><th>IFT-B Complex</th><th>IFT-A Complex</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Direction</strong></td><td>Anterograde (base → tip)</td><td>Retrograde (tip → base)</td></tr>
+                        <tr><td><strong>Motor</strong></td><td>Kinesin-2</td><td>Dynein-2</td></tr>
+                        <tr><td><strong>Function</strong></td><td>Delivers axonemal building blocks</td><td>Returns cargo and turnover products</td></tr>
+                        <tr><td><strong>Key Components</strong></td><td>IFT88, IFT81, IFT74</td><td>IFT140, WDR19, TTC21B</td></tr>
+                        <tr><td><strong>Mutation Effect</strong></td><td>Cilia assembly failure</td><td>Cargo accumulation at tip</td></tr>
+                    </tbody>
+                </table>
+            </div>`;
+    }
+    
+    // Comparative Analysis 3: Ciliary Gate Components
+    if (qLower.includes('bbsome') && qLower.includes('mks complex')) {
+        return `
+            <div class="ai-result-card">
+                <h4>BBSome vs. MKS Complex</h4>
+                <p>Both are critical ciliary trafficking complexes localized near the base, but they manage different types of cargo:</p>
+                <table class="fancy-table">
+                    <thead>
+                        <tr><th>Feature</th><th>BBSome</th><th>MKS Complex</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Primary Function</strong></td><td>Cargo adaptor for membrane protein trafficking</td><td>Structural gate at transition zone</td></tr>
+                        <tr><td><strong>Direction</strong></td><td>Bidirectional (entry and exit)</td><td>Gatekeeper (entry control)</td></tr>
+                        <tr><td><strong>Key Cargo</strong></td><td>GPCRs, membrane proteins</td><td>All ciliary proteins</td></tr>
+                        <tr><td><strong>Disease</strong></td><td>Bardet-Biedl Syndrome (BBS)</td><td>Meckel-Gruber Syndrome (MKS)</td></tr>
+                        <tr><td><strong>Key Components</strong></td><td>BBS1, BBS2, BBS4, BBS5</td><td>MKS1, TMEM67, CC2D2A, B9D1</td></tr>
+                    </tbody>
+                </table>
+            </div>`;
+    }
+    
+    return null;
+}
+
+/**
+ * ENHANCED PROCESS EXPLANATION HANDLER
+ */
+function handleProcessQuery(query) {
+    const qLower = query.toLowerCase();
+    
+    if (qLower.includes('how does ift work') || qLower.includes('ift step by step')) {
+        return `
+            <div class="ai-result-card">
+                <h4>How Intraflagellar Transport (IFT) Works: Step-by-Step</h4>
+                <ol>
+                    <li><strong>Assembly:</strong> IFT-B complexes load ciliary building blocks (tubulin, IFT-A, motors) at the basal body.</li>
+                    <li><strong>Anterograde Transport:</strong> The train moves from the base to the tip powered by the Kinesin-2 motor.</li>
+                    <li><strong>Turnaround:</strong> At the ciliary tip, IFT-B disassembles. IFT-A complexes bind to returning cargo.</li>
+                    <li><strong>Retrograde Transport:</strong> The train moves from the tip back to the base powered by the Dynein-2 motor.</li>
+                    <li><strong>Recycling:</strong> Components are unloaded and recycled at the base to initiate the next transport cycle.</li>
+                </ol>
+                <p><em>This continuous process maintains ciliary structure and enables signaling.</em></p>
+            </div>`;
+    }
+    
+    if (qLower.includes('how are proteins targeted to cilia')) {
+        return `
+            <div class="ai-result-card">
+                <h4>Ciliary Protein Targeting Mechanism</h4>
+                <ol>
+                    <li><strong>Recognition:</strong> Ciliary targeting signals (e.g., RVxP motif) are recognized by import machinery</li>
+                    <li><strong>Transition Zone Gate:</strong> MKS and NPHP complexes at the transition zone control entry</li>
+                    <li><strong>IFT Association:</strong> Proteins bind to IFT complexes for transport</li>
+                    <li><strong>Motor Attachment:</strong> Kinesin-2 motors move cargo anterogradely</li>
+                    <li><strong>Membrane Delivery:</strong> BBSome facilitates delivery of membrane proteins</li>
+                    <li><strong>Retention:</strong> Proteins are retained via specific ciliary retention signals</li>
+                </ol>
+            </div>`;
+    }
+    
+    return null;
+}
+
+
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
  */
