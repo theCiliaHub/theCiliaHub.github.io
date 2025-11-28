@@ -19,16 +19,19 @@ if (typeof window.updateStatus !== "function") {
         console.log(`STATUS[${state}]: ${msg}`);
     };
 }
-// Allow commands like: "plot default umap", "show umap", "default tsne"
-if (query.toLowerCase().includes("default umap")) {
-    window.log("[Visualization] Default UMAP requested");
-    return window.drawDefaultUMAP();  // <— This must exist
+if (typeof window.drawDefaultUMAP !== "function") {
+    window.drawDefaultUMAP = function () {
+        window.log("drawDefaultUMAP() placeholder called");
+        return "<p>Default UMAP plot placeholder.</p>"; // ✅ return inside function
+    };
 }
 
-if (query.toLowerCase().includes("default tsne")) {
-    window.log("[Visualization] Default t-SNE requested");
-    return window.drawDefaultTSNE();  // <— This must exist
+// Safe usage inside handleAIQuery
+if (query.toLowerCase().includes("default umap")) {
+    window.log("[Visualization] Default UMAP requested");
+    htmlResult = window.drawDefaultUMAP(); // ✅ inside function
 }
+
 
 // If no genes AND not default plot → avoid crash
 if (!exactGenes || exactGenes.length === 0) {
