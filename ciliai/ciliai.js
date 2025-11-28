@@ -19,6 +19,23 @@ if (typeof window.updateStatus !== "function") {
         console.log(`STATUS[${state}]: ${msg}`);
     };
 }
+// Allow commands like: "plot default umap", "show umap", "default tsne"
+if (query.toLowerCase().includes("default umap")) {
+    window.log("[Visualization] Default UMAP requested");
+    return window.drawDefaultUMAP();  // <— This must exist
+}
+
+if (query.toLowerCase().includes("default tsne")) {
+    window.log("[Visualization] Default t-SNE requested");
+    return window.drawDefaultTSNE();  // <— This must exist
+}
+
+// If no genes AND not default plot → avoid crash
+if (!exactGenes || exactGenes.length === 0) {
+    window.log("[Visualization] No genes detected → gene-free plot?");
+    // you may choose your default behavior:
+    return window.drawDefaultUMAP();
+}
 
 if (typeof window.renderUMAPPlot !== "function") {
     window.renderUMAPPlot = function () {
@@ -498,24 +515,69 @@ window.runQuantitativeEngine = async function(query, exactGenes) {
     
     return `<div class="ai-result-card">**Quantitative Engine:** Intent [ranking] recognized, but the specific comparison logic failed.</div>`;
 };
+
 /**
- * STUB: Handles Visualization Intents (Step 4).
- * Centralizes UMAP/Phylogeny routing.
+ * Handles Visualization Intents (Step 4).
+ * Centralizes UMAP / t-SNE / Phylogeny routing.
  */
 window.routeVisualizationAction = async function(query, exactGenes) {
     const qLower = query.toLowerCase();
-    const gene = exactGenes[0] || 'FOXJ1';
-    
+    const hasGenes = exactGenes && exactGenes.length > 0;
+    const gene = hasGenes ? exactGenes[0] : 'FOXJ1'; // default marker if no gene
+
+    // -------------------------------
+    // 1. Default / gene-free UMAP
+    // -------------------------------
+    if (!hasGenes || qLower.includes('default umap')) {
+        if (window.drawDefaultUMAP) {
+            window.drawDefaultUMAP();
+            return `<div class="ai-result-card">📊 Default UMAP plot requested. Displaying now.</div>`;
+        } else {
+            return `<div class="ai-result-card">📊 Default UMAP plot requested. Function not implemented.</div>`;
+        }
+    }
+
+    // -------------------------------
+    // 2. Default / gene-free t-SNE
+    // -------------------------------
+    if (qLower.includes('default tsne')) {
+        if (window.drawDefaultTSNE) {
+            window.drawDefaultTSNE();
+            return `<div class="ai-result-card">📊 Default t-SNE plot requested. Displaying now.</div>`;
+        } else {
+            return `<div class="ai-result-card">📊 Default t-SNE plot requested. Function not implemented.</div>`;
+        }
+    }
+
+    // -------------------------------
+    // 3. Gene-colored UMAP / scRNA
+    // -------------------------------
     if (qLower.includes('umap') || qLower.includes('scrna')) {
-        window.renderUMAPPlot(gene); // Call V1 visualizer
-        return `<div class="ai-result-card">📊 UMAP plot for **${gene}** requested. Displaying visualization now.</div>`;
+        if (window.renderUMAPPlot) {
+            window.renderUMAPPlot(gene); // V1 visualizer
+            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. Displaying now.</div>`;
+        } else {
+            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. renderUMAPPlot() not implemented.</div>`;
+        }
     }
+
+    // -------------------------------
+    // 4. Phylogeny / Heatmap
+    // -------------------------------
     if (qLower.includes('phylogen') || qLower.includes('heatmap')) {
-        // Use V1 phylogeny router to manage lazy loading/plotting
-        return window.routePhylogenyAnalysis(query); 
+        if (window.routePhylogenyAnalysis) {
+            return window.routePhylogenyAnalysis(query);
+        } else {
+            return `<div class="ai-result-card">📊 Phylogeny / heatmap requested. routePhylogenyAnalysis() not implemented.</div>`;
+        }
     }
-    return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized. Missing specific plot target.</div>`;
+
+    // -------------------------------
+    // 5. Fallback visualization
+    // -------------------------------
+    return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized, but no specific plot matched the query.</div>`;
 };
+
 
 /**
  * ENHANCED NLP FIX: Smart Terminology Matcher (RESTRICTED TO DEFINITIONS)
@@ -3053,123 +3115,144 @@ window.terminologyQueries = {
 // FULL UPDATED handleAIQuery()  (DROP-IN SAFE REPLACEMENT)
 // ============================================================
 
+// ==========================
+// CiliAI v2.0 Safe Query Handler
+// ==========================
 window.handleAIQuery = async function (query) {
     try {
+        // -----------------------------
+        // 0. VALIDATE QUERY
+        // -----------------------------
         if (!query || typeof query !== "string") {
             window.log("Empty or invalid query");
             return "<p>Invalid query</p>";
         }
-
         query = query.trim();
         window.log(`Routing query (V2.0 Semantic-First): ${query}`);
 
-        // -----------------------------------------------------
-        // 1. GENE EXTRACTION
-        // -----------------------------------------------------
-        const exactGenes = window.extractMultipleGenes(query) || [];
+        // -----------------------------
+        // 1. GENE / ENTITY EXTRACTION
+        // -----------------------------
+        const exactGenes = window.extractMultipleGenes
+            ? window.extractMultipleGenes(query)
+            : [];
         window.log(`[Gene Extraction] Processing: "${query}"`);
         window.log(`[Gene Extraction] Final valid genes: ${exactGenes.join(", ") || "(none)"}`);
 
-        // -----------------------------------------------------
-        // 2. SEMANTIC INDEX
-        // -----------------------------------------------------
-        const semanticMatches = await window.searchSemanticIndex(query);
+        // -----------------------------
+        // 2. DEFAULT PLOT HANDLING (gene-free visualization)
+        // -----------------------------
+        const queryLower = query.toLowerCase();
+        if (queryLower.includes("default umap")) {
+            window.log("[Visualization] Default UMAP requested");
+            return window.drawDefaultUMAP ? window.drawDefaultUMAP() : "<p>UMAP plot not implemented</p>";
+        }
+        if (queryLower.includes("default tsne")) {
+            window.log("[Visualization] Default t-SNE requested");
+            return window.drawDefaultTSNE ? window.drawDefaultTSNE() : "<p>t-SNE plot not implemented</p>";
+        }
 
-        // -----------------------------------------------------
-        // 3. INTENT CLASSIFICATION
-        // -----------------------------------------------------
-        const { intent, confidence } = window.scoreIntents(query, semanticMatches);
-        window.log(
-            `Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ') || "(none)"}`
-        );
+        // -----------------------------
+        // 3. SEMANTIC SEARCH (definitions / concepts)
+        // -----------------------------
+        const semanticMatches = window.searchSemanticIndex
+            ? await window.searchSemanticIndex(query)
+            : [];
 
-        // -----------------------------------------------------
-        // 4. INTENT OVERRIDE FOR COMPARISONS
-        // -----------------------------------------------------
-        const qLower = query.toLowerCase();
+        // -----------------------------
+        // 4. INTENT CLASSIFICATION
+        // -----------------------------
+        let { intent, confidence } = window.scoreIntents
+            ? window.scoreIntents(query, semanticMatches)
+            : { intent: "definition", confidence: 0 };
 
-        const compareRegex =
-            /\b(higher in|lower in|more expressed|less expressed|compared to|versus|vs |vs\.|differential expression|which cell type|which tissue|expressed higher|is .* expressed)\b/;
+        window.log(`Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ')}`);
 
-        let intentProcessed = intent;
-        let confProcessed = confidence;
+        // -----------------------------
+        // 5. INTENT POST-PROCESSING (comparison phrases)
+        // -----------------------------
+        const compareRegex = /\b(higher in|lower in|more expressed|less expressed|compared to|versus|vs |vs\.|differential expression|which cell type|which tissue|expressed higher|is .* expressed)\b/;
 
-        if (compareRegex.test(qLower)) {
-            intentProcessed = "compare";
-            confProcessed = Math.max(confProcessed, 0.95);
+        if (compareRegex.test(queryLower)) {
+            intent = "compare";
+            confidence = Math.max(confidence, 0.95); // boost confidence for quantitative
             window.log(`Intent override: forced "compare" due to phrase match`);
         }
+        window.log(`Post-processed Intent: ${intent} (Confidence: ${confidence.toFixed(2)})`);
 
-        window.log(
-            `Post-processed Intent: ${intentProcessed} (Confidence: ${confProcessed.toFixed(2)})`
-        );
-
-        // -----------------------------------------------------
-        // 5. ROUTING LOGIC (SAFE)
-        // -----------------------------------------------------
-
+        // -----------------------------
+        // 6. ROUTING LOGIC
+        // -----------------------------
         let htmlResult = "";
 
-        // --- VISUALIZATION ---
-        if (intentProcessed === "visualize" || intentProcessed === "scRNA") {
+        // --- VISUALIZATION / SC-RNA ---
+        if ((intent === "visualize" || intent === "scRNA") && exactGenes.length > 0) {
             window.log("Routing via: Intent (Visualize)");
-            htmlResult = await window.routeVisualizationAction(query, exactGenes);
-            return htmlResult;
+            htmlResult = window.routeVisualizationAction
+                ? await window.routeVisualizationAction(query, exactGenes)
+                : "<p>Visualization not implemented.</p>";
         }
 
-        // --- QUANTITATIVE ---
-        if (
-            intentProcessed === "ranking" ||
-            intentProcessed === "quantitative" ||
-            intentProcessed === "compare"
-        ) {
+        // --- QUANTITATIVE / COMPARISON ---
+        else if (intent === "ranking" || intent === "quantitative" || intent === "compare") {
             window.log("Routing via: Intent (Quantitative Engine)");
-            htmlResult = await window.runQuantitativeEngine(query, exactGenes);
-            return htmlResult;
+            htmlResult = window.runQuantitativeEngine
+                ? await window.runQuantitativeEngine(query, exactGenes)
+                : "<p>Quantitative comparison engine not implemented.</p>";
         }
 
         // --- GRAPH REASONING ---
-        if (["relationship", "disease_query", "complex_query", "localization_query"]
-            .includes(intentProcessed)) {
+        else if (["relationship", "disease_query", "complex_query", "localization_query"].includes(intent)) {
             window.log("Routing via: Intent (Graph Reasoning / Synthesis)");
-            htmlResult = await window.runGraphQuery(query, intentProcessed, exactGenes);
-            return htmlResult;
+            htmlResult = window.runGraphQuery
+                ? await window.runGraphQuery(query, intent, exactGenes)
+                : "<p>Graph reasoning not implemented.</p>";
         }
 
-        // --- DEFINITIONS (GENE OR CONCEPT) ---
-        if (
-            intentProcessed === "definition" ||
-            (confProcessed < 0.3 && !compareRegex.test(qLower) && exactGenes.length === 0)
-        ) {
+        // --- DEFINITION / RAG FALLBACK ---
+        else if (intent === "definition" || (confidence < 0.3 && !compareRegex.test(queryLower) && exactGenes.length === 0)) {
             window.log("Routing via: Intent (Definition / RAG Retrieval)");
-
-            // gene definition
             if (exactGenes.length > 0) {
-                htmlResult = await window.displayFullGeneInfo(exactGenes[0]);
-                return htmlResult;
+                htmlResult = window.displayFullGeneInfo
+                    ? await window.displayFullGeneInfo(exactGenes[0])
+                    : `<p>Full gene info for ${exactGenes[0]} not available.</p>`;
+            } else if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
+                htmlResult = window.formatRAGAnswer
+                    ? window.formatRAGAnswer(semanticMatches[0])
+                    : `<p>Semantic match found, but RAG formatting not implemented.</p>`;
+            } else {
+                htmlResult = `<p>No definition found.</p>`;
             }
-
-            // concept definition
-            if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
-                htmlResult = window.formatRAGAnswer(semanticMatches[0]);
-                return htmlResult;
-            }
-
-            return `<p>No definition found.</p>`;
         }
 
-        // -----------------------------------------------------
-        // 6. FINAL FALLBACK (SAFE)
-        // -----------------------------------------------------
-        window.log("Routing via: Default fallback");
-        return `<p>I'm not sure how to handle this query.</p>`;
-    }
+        // --- FALLBACK ---
+        else {
+            window.log("Routing via: Default fallback");
+            htmlResult = `<p>I'm not sure how to handle this query.</p>`;
+        }
 
-    catch (err) {
+        // -----------------------------
+        // 7. RETURN
+        // -----------------------------
+        return htmlResult;
+    } catch (err) {
         window.log("ERROR in handleAIQuery:", err);
         return `<p>Error: ${err.message}</p>`;
     }
 };
+
+// ==========================
+// SAFE FALLBACKS
+// ==========================
+if (typeof window.log !== "function") window.log = msg => console.log(`CiliAI LOG: ${msg}`);
+if (typeof window.drawDefaultUMAP !== "function") window.drawDefaultUMAP = () => "<p>Default UMAP plot placeholder.</p>";
+if (typeof window.drawDefaultTSNE !== "function") window.drawDefaultTSNE = () => "<p>Default t-SNE plot placeholder.</p>";
+if (typeof window.routeVisualizationAction !== "function") window.routeVisualizationAction = async () => "<p>Visualization route not implemented.</p>";
+if (typeof window.runQuantitativeEngine !== "function") window.runQuantitativeEngine = async () => "<p>Quantitative engine not implemented.</p>";
+if (typeof window.runGraphQuery !== "function") window.runGraphQuery = async () => "<p>Graph query engine not implemented.</p>";
+if (typeof window.displayFullGeneInfo !== "function") window.displayFullGeneInfo = async gene => `<p>Full info for ${gene} not available.</p>`;
+if (typeof window.formatRAGAnswer !== "function") window.formatRAGAnswer = semanticMatch => `<p>RAG output placeholder for ${semanticMatch.term}</p>`;
+
 
 
 function handleComparativeQuery(query) {
