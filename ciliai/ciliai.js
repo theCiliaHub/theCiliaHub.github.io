@@ -463,62 +463,62 @@ function formatListResult(title, genes, description = "") {
     }
 
 // Section 4A. Core Helper Functions
-
 function react(type) {
-    // Get last user message
+    // Get last user question
     const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
     const lastQuestion = userMessages.length > 0 
-        ? userMessages[userMessages.length - 1].querySelector('.ciliai-message-content')?.textContent.trim() || 'No text found'
-        : 'No question detected';
+        ? (userMessages[userMessages.length - 1].querySelector('.ciliai-message-content')?.textContent || '').trim()
+        : 'No question found';
 
     const isPositive = type === 'up';
-    const emoji = isPositive ? '👍' : '👎';
-    const label = isPositive ? 'Positive' : 'Negative';
-
-    // Prepare email content
-    const subject = `CiliAI ${emoji} ${label} Feedback`;
+    const emoji = isPositive ? 'Positive' : 'Negative';
+    const subject = `CiliAI ${emoji} Feedback`;
     const body = `User Question: ${lastQuestion}
 
-Feedback Type: ${label} ${emoji}
+Feedback Type: ${isPositive ? 'Positive' : 'Negative'} ${emoji}
 Time: ${new Date().toLocaleString()}
-Page: ${window.location.href}
+URL: ${window.location.href}
 
 --
-Sent automatically from CiliAI Chat`;
+Sent from CiliAI Chat`;
 
-    // Method 1: Try to trigger download of .eml file (works in Chrome/Edge/Firefox, opens default mail client)
-    const blob = new Blob(
-        [`From: ${window.location.hostname}@ciliai-feedback.local\nTo: oktay.kaplan@agu.edu.tr\nSubject: ${subject}\n\n${body}`],
-        { type: 'message/rfc822' }
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `CiliAI-feedback-${label}-${Date.now()}.eml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const email = 'oktay.kaplan@agu.edu.tr';
+    const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-    // Method 2: Fallback to classic mailto (in case .eml is blocked)
+    // Create an invisible iframe (this is the only thing that still beats popup blockers 100% of the time)
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = mailto;
+    document.body.appendChild(iframe);
+
+    // Also try direct mailto after a tiny delay (covers some edge cases)
     setTimeout(() => {
-        const mailtoLink = `mailto:oktay.kaplan@agu.edu.tr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        const opened = window.open(mailtoLink, '_blank');
-        if (!opened || opened.closed || typeof opened.closed === 'undefined') {
-            // Still blocked → show copy-to-clipboard fallback
-            navigator.clipboard.writeText(`To: oktay.kaplan@agu.edu.tr\nSubject: ${subject}\n\n${body}`).then(() => {
-                addChatMessage('Email was blocked by browser. Feedback copied to clipboard — just paste into your email client.', false);
+        const opened = window.open(mailto, '_blank');
+        if (!opened) {
+            // Final fallback: copy to clipboard + clear message
+            navigator.clipboard.writeText(`To: ${email}\nSubject: ${subject}\n\n${body}`).then(() => {
+                addChatMessage('Your mail client blocked it. Full feedback copied to clipboard — just paste into any email.', false);
+            }).catch(() => {
+                addChatMessage('Feedback ready! Please send it manually to oktay.kaplan@agu.edu.tr', false);
             });
         }
-    }, 300);
+    }, 100);
 
-    // UI feedback
+    // UI response
     if (isPositive) {
-        addChatMessage('Thanks for the feedback! 🙏', false);
+        addChatMessage('Thank you! Feedback received 🙏', false);
     } else {
-        addChatMessage('Sorry about that! Feedback sent — I’ll improve.', false);
+        addChatMessage('Sorry! Feedback sent — I’ll get better.', false);
     }
+
+    // Clean up iframe after a few seconds
+    setTimeout(() => {
+        if (iframe && iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+        }
+    }, 5000);
 }
+
 
 function sendFeedbackEmail(feedbackType, userQuestion) {
     const subject = `CiliAI ${feedbackType === 'up' ? '👍 Positive' : '👎 Negative'} Feedback`;
