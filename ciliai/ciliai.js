@@ -502,55 +502,60 @@ window.routeVisualizationAction = async function(query, exactGenes) {
  * STUB: Handles Graph/Synthesis Intents (Step 6).
  * This is the V2.0 Brain for complex and explanatory queries.
  */
-// src/query/graph-query.ts (the real one used in CiliAI UI + CLI)
+/**
+ * STUB: Handles Graph/Synthesis Intents (Step 6).
+ * This is the V2.0 Brain for complex and explanatory queries.
+ *
+ * NOTE: CONVERTED TO PURE JAVASCRIPT (REMOVED TYPESCRIPT ANNOTATIONS)
+ */
 window.runGraphQuery = async function (
-  query: string,
-  params: Record<string, any> = {},
-  options: {
-    vector?: {
-      queryText?: string;
-      queryEmbedding?: number[];
-      topK?: number;
-      index?: string;
-      model?: string;
-    };
-    timeoutMs?: number;
-  } = {}
+    query, // query: string,
+    params = {}, // params: Record<string, any> = {}
+    options = {} // options: { ... } = {}
 ) {
-  const { vector } = options;
-  let finalQuery = query.trim();
-  let finalParams = { ...params };
+    const { vector } = options;
+    let finalQuery = query.trim();
+    let finalParams = { ...params };
 
-  if (vector?.queryText || vector?.queryEmbedding) {
-    const embedding = vector.queryEmbedding || 
-      await window.cili.embedding.embed(vector.queryText!, { model: vector.model });
+    // Placeholder for window.cili.embedding.embed (assuming global access)
+    // You must ensure window.cili.embedding is defined and accessible in your environment.
+    
+    if (vector?.queryText || vector?.queryEmbedding) {
+        // Await the embedding function (assuming its definition is available globally)
+        // If window.cili is not available, this line will cause a crash.
+        const embedding = vector.queryEmbedding || 
+          await window.cili.embedding.embed(vector.queryText, { model: vector.model });
 
-    // CiliAI uses the new vector_index.search() procedure
-    const indexName = vector.index || "chunk_vector_index";
-    const topK = vector.topK || 10;
+        // CiliAI uses the new vector_index.search() procedure
+        const indexName = vector.index || "chunk_vector_index";
+        const topK = vector.topK || 10;
 
-    const searchClause = `
-      CALL vector_index.search(
-        "${indexName}",
-        $vector_query_embedding,
-        ${topK}
-      ) YIELD node AS __vector_node, score AS __vector_score
-      WITH __vector_node AS chunk, __vector_score AS relevance_score
-    `;
+        const searchClause = `
+            CALL vector_index.search(
+                "${indexName}",
+                $vector_query_embedding,
+                ${topK}
+            ) YIELD node AS __vector_node, score AS __vector_score
+            WITH __vector_node AS chunk, __vector_score AS relevance_score
+        `;
 
-    // Inject vector search before user's MATCH/WHERE
-    if (finalQuery.toLowerCase().includes("match") || finalQuery.toLowerCase().includes("where")) {
-      const insertPos = finalQuery.search(/\b(MATCH|WHERE|RETURN|ORDER|LIMIT)/i);
-      finalQuery = finalQuery.slice(0, insertPos) + searchClause + " " + finalQuery.slice(insertPos);
-    } else {
-      finalQuery = searchClause + "\n" + finalQuery;
+        // Inject vector search before user's MATCH/WHERE
+        if (finalQuery.toLowerCase().includes("match") || finalQuery.toLowerCase().includes("where")) {
+            const insertPos = finalQuery.search(/\b(MATCH|WHERE|RETURN|ORDER|LIMIT)/i);
+            finalQuery = finalQuery.slice(0, insertPos) + searchClause + " " + finalQuery.slice(insertPos);
+        } else {
+            finalQuery = searchClause + "\n" + finalQuery;
+        }
+
+        finalParams.vector_query_embedding = embedding;
     }
 
-    finalParams.vector_query_embedding = embedding;
-  }
-
-  return await window.cili.memgraph.executeAndFetchAll(finalQuery, finalParams);
+    // Await the query execution (assuming window.cili.memgraph is defined)
+    // If window.cili is not available, this line will cause a crash.
+    return await window.cili.memgraph.executeAndFetchAll(finalQuery, finalParams);
 };
+
+
 /**
  * STUB: Handles two-gene relationships (extracted from runGraphQuery)
  */
