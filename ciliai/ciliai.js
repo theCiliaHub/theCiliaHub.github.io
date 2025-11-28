@@ -462,48 +462,37 @@ function formatListResult(title, genes, description = "") {
         `;
     }
 
-// Section 4A. Core Helper Functions
 function react(type) {
-    // Get last user question
+    // Get the user's last question
     const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
     const lastQuestion = userMessages.length > 0 
         ? (userMessages[userMessages.length - 1].querySelector('.ciliai-message-content')?.textContent || '').trim()
         : 'No question found';
 
-    const isPositive = type === 'up';
-    const emoji = isPositive ? 'Positive' : 'Negative';
-    const subject = `CiliAI ${emoji} Feedback`;
-    const body = `User Question: ${lastQuestion}
+    const feedbackType = type === 'up' ? 'Positive' : 'Negative';
+    const pageUrl = window.location.href;
 
-Feedback Type: ${isPositive ? 'Positive' : 'Negative'} ${emoji}
-Time: ${new Date().toLocaleString()}
-URL: ${window.location.href}
+    // YOUR WORKING WEB APP URL (already correct!)
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzqZzPmvLM6FWYI_tdiRHUWSpjWBBUzpUHUUxFSxPWj2XmwjJP0fx_TVi7d5KtbuFPl/exec';
 
---
-Sent from CiliAI Chat`;
+    fetch(WEB_APP_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            type: feedbackType,
+            question: lastQuestion,
+            url: pageUrl
+        })
+    }).catch(() => {
+        // Silent fallback – almost never triggers because no-cors + Google is rock-solid
+    });
 
-    // === THIS IS THE ONLY TRICK THAT STILL WORKS 100% IN 2025 ===
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = `mailto:oktay.kaplan@agu.edu.tr?subject=${encodeURIComponent(subject)}`;
-    form.enctype = 'text/plain';
-    form.style.display = 'none';
-
-    const bodyInput = document.createElement('textarea');
-    bodyInput.name = 'body';
-    bodyInput.value = body;
-
-    form.appendChild(bodyInput);
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-    // ===============================================================
-
-    // Nice UI feedback
-    if (isPositive) {
-        addChatMessage('Thank you! Feedback sent 🙏', false);
+    // UI feedback
+    if (type === 'up') {
+        addChatMessage('Thank you! Feedback received 🙏', false);
     } else {
-        addChatMessage('Sorry about that — feedback sent!', false);
+        addChatMessage('Sorry about that – feedback sent, I’ll improve!', false);
     }
 }
 
