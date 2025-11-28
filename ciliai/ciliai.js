@@ -501,60 +501,59 @@ window.routeVisualizationAction = async function(query, exactGenes) {
 /**
  * STUB: Handles Graph/Synthesis Intents (Step 6).
  * This is the V2.0 Brain for complex and explanatory queries.
- */
-/**
- * STUB: Handles Graph/Synthesis Intents (Step 6).
- * This is the V2.0 Brain for complex and explanatory queries.
  *
- * NOTE: CONVERTED TO PURE JAVASCRIPT (REMOVED TYPESCRIPT ANNOTATIONS)
+/**
+ * V2.0 FINAL STUB IMPLEMENTATION: window.runGraphQuery (Step 6)
+ * Handles Synthesis, Comparison, and Complex/Disease Filtering using local helpers.
+ * This function bypasses all external database calls (memgraph, vector).
  */
-window.runGraphQuery = async function (
-    query, // query: string,
-    params = {}, // params: Record<string, any> = {}
-    options = {} // options: { ... } = {}
-) {
-    const { vector } = options;
-    let finalQuery = query.trim();
-    let finalParams = { ...params };
-
-    // Placeholder for window.cili.embedding.embed (assuming global access)
-    // You must ensure window.cili.embedding is defined and accessible in your environment.
+window.runGraphQuery = async function(query, intent, exactGenes) {
+    window.log(`EXECUTING V2.0 GRAPH/SYNTHESIS for Intent: ${intent}`);
     
-    if (vector?.queryText || vector?.queryEmbedding) {
-        // Await the embedding function (assuming its definition is available globally)
-        // If window.cili is not available, this line will cause a crash.
-        const embedding = vector.queryEmbedding || 
-          await window.cili.embedding.embed(vector.queryText, { model: vector.model });
-
-        // CiliAI uses the new vector_index.search() procedure
-        const indexName = vector.index || "chunk_vector_index";
-        const topK = vector.topK || 10;
-
-        const searchClause = `
-            CALL vector_index.search(
-                "${indexName}",
-                $vector_query_embedding,
-                ${topK}
-            ) YIELD node AS __vector_node, score AS __vector_score
-            WITH __vector_node AS chunk, __vector_score AS relevance_score
-        `;
-
-        // Inject vector search before user's MATCH/WHERE
-        if (finalQuery.toLowerCase().includes("match") || finalQuery.toLowerCase().includes("where")) {
-            const insertPos = finalQuery.search(/\b(MATCH|WHERE|RETURN|ORDER|LIMIT)/i);
-            finalQuery = finalQuery.slice(0, insertPos) + searchClause + " " + finalQuery.slice(insertPos);
-        } else {
-            finalQuery = searchClause + "\n" + finalQuery;
+    // --- A. EXPLANATORY PROSE (Compare/Relationship) ---
+    if (intent === 'compare' || intent === 'relationship') {
+        // 1. Delegate to V1's rich explanatory prose handler (Gap 1-3)
+        let result = window.handleExplanatoryQuery(query);
+        
+        // 2. Add specific CEP290/NPHP1 relationship (if prose handler missed them)
+        if (!result && exactGenes.length === 2) {
+             result = window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]);
         }
+        if (result) return result;
+    }
+    
+    // --- B. LIST RETRIEVAL (Complex/Localization/Disease Filtering) ---
 
-        finalParams.vector_query_embedding = embedding;
+    // Intent is Complex/Module Query (e.g., "Genes in BBSome")
+    if (intent === 'complex_query') {
+        const complexTerm = window.extractComplexTerm(query);
+        if (complexTerm) return window.getComplexGenesAndFormat(complexTerm);
+    }
+    
+    // Intent is Localization Query (e.g., "Genes in transition zone")
+    if (intent === 'localization_query') {
+        const locTerm = window.extractLocalizationIntent(query);
+        if (locTerm) return window.handleLocalizationQuery(locTerm, query); 
+    }
+    
+    // Intent is Complex + Disease Overlap Query (V1 Multi-criteria replacement)
+    if (intent === 'disease_query') {
+         const diseaseTerm = window.extractDiseaseIntent(query);
+         const complexTerm = window.extractComplexIntent(query); // Check for multi-criteria query
+         
+         if (diseaseTerm && complexTerm) {
+             return window.handleGeneInDiseaseQuery(complexTerm, diseaseTerm);
+         }
+         // Fallback to simple disease gene list if no complex term
+         if (diseaseTerm) {
+             const { genes, description } = window.getCiliopathyGenes(diseaseTerm);
+             return window.formatListResult(`Genes for ${diseaseTerm}`, genes, description);
+         }
     }
 
-    // Await the query execution (assuming window.cili.memgraph is defined)
-    // If window.cili is not available, this line will cause a crash.
-    return await window.cili.memgraph.executeAndFetchAll(finalQuery, finalParams);
+    // Default V2.0 response if logic path not implemented or failed
+    return `<div class="ai-result-card">**Synthesis Engine:** Query intent [${intent}] recognized. Execution failed because the graph path or specific logic is not yet implemented.</div>`;
 };
-
 
 /**
  * STUB: Handles two-gene relationships (extracted from runGraphQuery)
@@ -1305,15 +1304,26 @@ function getComplexGenesAndFormat(complexTerm) {
         }));
         return formatListResult(`Complexes containing ${geneSymbol}`, complexList);
     }
-// --- FIX: handleClassificationQuery (Genes in Classification) ---
+/**
+ * V2.0 UPDATED: handleClassificationQuery (Genes in Classification)
+ * Handles queries asking for the gene list belonging to a general ciliopathy classification 
+ * (e.g., "Genes in Primary Ciliopathies") or the diseases within it.
+ * * @param {string} classificationName - The broad classification name (e.g., "Primary Ciliopathies").
+ * @param {string} query - The original user query.
+ * @returns {string} HTML list or explanatory message.
+ */
 function handleClassificationQuery(classificationName, query) {
     const qLower = query.toLowerCase();
+    
+    // Find the cased name, e.g., "Primary Ciliopathies"
     const casedClassificationName = Object.keys(getDiseaseClassificationMap()).find(key => normalizeTerm(key) === normalizeTerm(classificationName));
     if (!casedClassificationName) {
         return `Sorry, I don't recognize the classification "${classificationName}".`;
     }
+    
     const normKey = normalizeTerm(casedClassificationName);
     
+    // Case 1: User asks for the list of genes associated with the classification
     if (qLower.includes('gene') || qLower.includes('genes') || qLower.includes('gene list')) {
         const geneList = window.CiliAI.lookups.byClassification[normKey] || [];
         const count = geneList.length;
@@ -1323,18 +1333,21 @@ function handleClassificationQuery(classificationName, query) {
         }
         
         const geneMap = window.CiliAI.lookups.geneMap;
+        // Map gene symbols to objects containing classification data for display
         const geneListObjects = geneList.map(gene => ({
             gene: gene,
             classification: geneMap[gene]?.ciliopathy_classification || 'No classification listed'
         })).sort((a, b) => a.gene.localeCompare(b.gene)); 
 
         // V2.0 FIX: Directly call formatListResult and return the HTML.
+        // This eliminates the 'lastQueryContext' and follow-up prompt.
         return window.formatListResult(
             `Genes for ${casedClassificationName} (${count})`, 
             geneListObjects
         );
+    
     } else {
-        // User just wants to list the diseases in the classification (V1 logic is acceptable here)
+        // Case 2: User asks for the diseases within the classification (e.g., "What is Primary Ciliopathies?")
         const diseaseMap = getDiseaseClassificationMap();
         const diseaseList = diseaseMap[casedClassificationName] || [];
         const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
@@ -1347,7 +1360,6 @@ function handleClassificationQuery(classificationName, query) {
         `;
     }
 }
-
     function tellAboutCiliAI() {
         return `
             <div class="ai-result-card">
