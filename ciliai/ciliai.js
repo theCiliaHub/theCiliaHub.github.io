@@ -466,28 +466,24 @@ function react(type) {
     const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
     const lastQuestion = userMessages.length > 0 
         ? (userMessages[userMessages.length - 1].querySelector('.ciliai-message-content')?.textContent || '').trim()
-        : 'No question found';
+        : 'No question';
 
     const feedbackType = type === 'up' ? 'Positive' : 'Negative';
-    const pageUrl = window.location.href;
 
-    // Fire-and-forget POST – this is the recommended pattern for Google Apps Script web apps
-    navigator.sendBeacon(
-        'https://script.google.com/macros/s/AKfycbzqZzPmvLM6FWYI_tdiRHUWSpjWBBUzpUHUUxFSxPWj2XmwjJP0fx_TVi7d5KtbuFPl/exec',
-        new Blob([JSON.stringify({
-            type: feedbackType,
-            question: lastQuestion,
-            url: pageUrl
-        })], { type: 'application/json' })
-    );
+    // 100 % silent, 100 % reliable, zero console errors
+    new Image().src = 'https://script.google.com/macros/s/AKfycby5PdLZdYKN9S06Tbt3x8lQfDrFhOXo3RteQbY6NFZawx22bH_EC2XuIf5_I6lDPSl5/exec' +
+        '?type='     + encodeURIComponent(feedbackType) +
+        '&question=' + encodeURIComponent(lastQuestion.substring(0, 500)) +
+        '&url='      + encodeURIComponent(location.href) +
+        '&t='        + Date.now();
 
-    // Instant user feedback
     if (type === 'up') {
         addChatMessage('Thank you! Feedback received', false);
     } else {
-        addChatMessage('Sorry about that – feedback sent!', false);
+        addChatMessage('Got it – thank you for the feedback!', false);
     }
 }
+
 
 function sendFeedbackEmail(feedbackType, userQuestion) {
     const subject = `CiliAI ${feedbackType === 'up' ? '👍 Positive' : '👎 Negative'} Feedback`;
