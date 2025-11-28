@@ -3000,9 +3000,7 @@ window.terminologyQueries = {
     "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
 };
 
- */ (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
- */ MODIFIED: Implement new single-gene response logic.
- */
+
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
