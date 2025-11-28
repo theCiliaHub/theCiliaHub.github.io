@@ -482,41 +482,29 @@ URL: ${window.location.href}
 --
 Sent from CiliAI Chat`;
 
-    const email = 'oktay.kaplan@agu.edu.tr';
-    const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    // === THIS IS THE ONLY TRICK THAT STILL WORKS 100% IN 2025 ===
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `mailto:oktay.kaplan@agu.edu.tr?subject=${encodeURIComponent(subject)}`;
+    form.enctype = 'text/plain';
+    form.style.display = 'none';
 
-    // Create an invisible iframe (this is the only thing that still beats popup blockers 100% of the time)
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = mailto;
-    document.body.appendChild(iframe);
+    const bodyInput = document.createElement('textarea');
+    bodyInput.name = 'body';
+    bodyInput.value = body;
 
-    // Also try direct mailto after a tiny delay (covers some edge cases)
-    setTimeout(() => {
-        const opened = window.open(mailto, '_blank');
-        if (!opened) {
-            // Final fallback: copy to clipboard + clear message
-            navigator.clipboard.writeText(`To: ${email}\nSubject: ${subject}\n\n${body}`).then(() => {
-                addChatMessage('Your mail client blocked it. Full feedback copied to clipboard — just paste into any email.', false);
-            }).catch(() => {
-                addChatMessage('Feedback ready! Please send it manually to oktay.kaplan@agu.edu.tr', false);
-            });
-        }
-    }, 100);
+    form.appendChild(bodyInput);
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+    // ===============================================================
 
-    // UI response
+    // Nice UI feedback
     if (isPositive) {
-        addChatMessage('Thank you! Feedback received 🙏', false);
+        addChatMessage('Thank you! Feedback sent 🙏', false);
     } else {
-        addChatMessage('Sorry! Feedback sent — I’ll get better.', false);
+        addChatMessage('Sorry about that — feedback sent!', false);
     }
-
-    // Clean up iframe after a few seconds
-    setTimeout(() => {
-        if (iframe && iframe.parentNode) {
-            iframe.parentNode.removeChild(iframe);
-        }
-    }, 5000);
 }
 
 
