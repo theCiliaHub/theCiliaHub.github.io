@@ -2664,8 +2664,12 @@ function getCiliopathyGenes(term) {
 // 4B. COMPLEX QUERY ENGINE (L2/L3) - NEW
 // ==========================================================
 
+// ==========================================================
+// NEW: V2.0 Component Definitions (Browser-Safe Stubs)
+// ==========================================================
+
 /**
- * (NEW) Extracts localization keywords from a query.
+ * (CLEANED) Extracts localization keywords from a query.
  * @param {string} qLower - The lowercase query string.
  * @returns {string|null} The found localization term, or null.
  */
@@ -2689,86 +2693,38 @@ function extractLocalizationIntent(qLower) {
 }
 
 /**
- * CiliAI V2.0: Generates raw text records for the Vector Index.
- * * @param {object} masterDBData - Content of ciliAI_master_database.json / geneMap
- * @param {object} terminologyData - Content of window.terminologyQueries
- * @returns {Array<object>} Array of index records (pre-embedding).
+ * STUB: Generates Vector Index Records.
+ * This is a simplified placeholder that only generates the necessary *structure* * for the V2.0 system to simulate its data foundation (Phase 1).
  */
-// src/vector-index/sync.ts
-export async function generateVectorIndexRecords(
-  this: CiliGraphRAG,
-  options: {
-    label?: string;
-    textProperty?: string;
-    embeddingProperty?: string;
-    indexName?: string;
-    model?: string;
-    batchSize?: number;
-    forceRecreate?: boolean;
-  } = {}
-) {
-  const {
-    label = "Chunk",
-    textProperty = "text",
-    embeddingProperty = "embedding",
-    indexName = "chunk_vector_index",
-    model = "text-embedding-3-large",
-    batchSize = 500,
-    forceRecreate = false,
-  } = options;
+async function generateVectorIndexRecords(masterDBData, terminologyData) {
+    window.log("STUB: Generating Vector Index Records (Simulated)");
+    const records = [];
+    
+    // Simulate indexing a few key concepts from masterDBData
+    const geneMap = masterDBData.lookups.geneMap || {};
+    
+    // 1. Terminology
+    for (const [key, definition] of Object.entries(terminologyData || {})) {
+        records.push({
+            id: `TERM_${key.toUpperCase().slice(0, 15)}`,
+            text: definition.substring(0, 50) + "...",
+            meta: { type: 'definition' }
+        });
+    }
 
-  const client = this.memgraph;
-  const embedder = this.embeddingProvider;
-
-  // 1. Drop & recreate vector index (new CiliAI v2.8 syntax)
-  if (forceRecreate) {
-    await client.execute(`DROP VECTOR INDEX IF EXISTS ${indexName}`);
-  }
-
-  await client.execute(`
-    CREATE VECTOR INDEX IF NOT EXISTS ${indexName}
-    ON NODE :${label}(${embeddingProperty})
-    WITH { dimension: 1536, similarity_metric: 'cosine' }
-  `);
-
-  // 2. Stream all nodes missing embeddings
-  const result = await client.executeAndFetchAll(`
-    MATCH (n:${label})
-    WHERE n.${embeddingProperty} IS NULL AND n.${textProperty} IS NOT NULL
-    RETURN id(n) AS elementId, n.${textProperty} AS text
-    ORDER BY elementId
-  `);
-
-  const total = result.length;
-  if (total === 0) {
-    console.log("Vector index already up-to-date.");
-    return;
-  }
-
-  console.log(`Embedding ${total} nodes using ${model}...`);
-
-  for (let i = 0; i < total; i += batchSize) {
-    const batch = result.slice(i, i + batchSize);
-    const texts = batch.map(r => r.text);
-
-    const embeddings = await embedder.embedBatch(texts, { model });
-
-    const payload = batch.map((row, idx) => ({
-      elementId: row.elementId,
-      embedding: embeddings[idx],
-    }));
-
-    await client.execute(`
-      UNWIND $batch AS row
-      MATCH (n) WHERE elementId(n) = row.elementId
-      SET n.${embeddingProperty} = row.embedding
-    `, { batch: payload });
-
-    console.log(`Progress: ${Math.min(i + batchSize, total)}/${total}`);
-  }
-
-  console.log(`${indexName} fully synchronized!`);
+    // 2. Sample Gene Description
+    if (geneMap['IFT88']) {
+        records.push({
+            id: 'IFT88_DESC',
+            text: geneMap['IFT88']['Gene.Description'].substring(0, 50) + "...",
+            meta: { type: 'gene_description', gene_symbol: 'IFT88' }
+        });
+    }
+    
+    window.log(`STUB: Generated ${records.length} sample index records.`);
+    return records;
 }
+
 
 // intentClassifier.js (Simplified V2.0 Logic)
 const INTENTS = ['definition', 'visualize', 'ranking', 'compare', 'localization_query', 'disease_query', 'complex_query', 'relationship'];
