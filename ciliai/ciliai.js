@@ -464,26 +464,62 @@ function formatListResult(title, genes, description = "") {
 
 // Section 4A. Core Helper Functions
 
-// Replace your current react function with this:
 function react(type) {
-    // Get the user's last question from chat
+    // Get last user message
     const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
-    const lastQuestion = userMessages.length > 0 ? 
-        userMessages[userMessages.length - 1].querySelector('.ciliai-message-content').textContent : 
-        'No specific query';
-    
-    // Send email feedback
-    sendFeedbackEmail(type, lastQuestion);
-    
-    // UI response (keep your existing messages)
-    if (type === 'up') {
+    const lastQuestion = userMessages.length > 0 
+        ? userMessages[userMessages.length - 1].querySelector('.ciliai-message-content')?.textContent.trim() || 'No text found'
+        : 'No question detected';
+
+    const isPositive = type === 'up';
+    const emoji = isPositive ? '👍' : '👎';
+    const label = isPositive ? 'Positive' : 'Negative';
+
+    // Prepare email content
+    const subject = `CiliAI ${emoji} ${label} Feedback`;
+    const body = `User Question: ${lastQuestion}
+
+Feedback Type: ${label} ${emoji}
+Time: ${new Date().toLocaleString()}
+Page: ${window.location.href}
+
+--
+Sent automatically from CiliAI Chat`;
+
+    // Method 1: Try to trigger download of .eml file (works in Chrome/Edge/Firefox, opens default mail client)
+    const blob = new Blob(
+        [`From: ${window.location.hostname}@ciliai-feedback.local\nTo: oktay.kaplan@agu.edu.tr\nSubject: ${subject}\n\n${body}`],
+        { type: 'message/rfc822' }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CiliAI-feedback-${label}-${Date.now()}.eml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // Method 2: Fallback to classic mailto (in case .eml is blocked)
+    setTimeout(() => {
+        const mailtoLink = `mailto:oktay.kaplan@agu.edu.tr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        const opened = window.open(mailtoLink, '_blank');
+        if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+            // Still blocked → show copy-to-clipboard fallback
+            navigator.clipboard.writeText(`To: oktay.kaplan@agu.edu.tr\nSubject: ${subject}\n\n${body}`).then(() => {
+                addChatMessage('Email was blocked by browser. Feedback copied to clipboard — just paste into your email client.', false);
+            });
+        }
+    }, 300);
+
+    // UI feedback
+    if (isPositive) {
         addChatMessage('Thanks for the feedback! 🙏', false);
     } else {
-        addChatMessage('Sorry about that. What specifically would help?', false);
+        addChatMessage('Sorry about that! Feedback sent — I’ll improve.', false);
     }
 }
 
-// Add this email function right after the react function
 function sendFeedbackEmail(feedbackType, userQuestion) {
     const subject = `CiliAI ${feedbackType === 'up' ? '👍 Positive' : '👎 Negative'} Feedback`;
     const body = `
