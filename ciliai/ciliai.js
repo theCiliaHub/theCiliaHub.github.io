@@ -3054,104 +3054,110 @@ window.terminologyQueries = {
  * NOTE: This function relies on functional stubs for semanticSearch, runQuantitativeEngine,
  * and runGraphQuery being defined in the global scope (window).
  */
-async function handleAIQuery(query) {
-    const chatWindow = document.getElementById('messages');
-    if (!chatWindow) return;
+// ============================================================
+// FULL UPDATED handleAIQuery()  (DROP-IN SAFE REPLACEMENT)
+// ============================================================
 
-    if (!query) return;
-    const qLower = query.toLowerCase().trim();
-    let htmlResult = null;
-    let match;
-
-    window.log(`Routing query (V2.0 Semantic-First): ${query}`);
-
+window.handleAIQuery = async function (query) {
     try {
-        if (!window.CiliAI.ready) {
-            window.addChatMessage("Data is still loading, please wait...", false);
-            return;
-        }
-        
-        // --- STEP 0: V1 EXACT TERMINOLOGY FALLBACK (Highest Priority) ---
-        // This is necessary because V2.0 Intent Classification is unreliable for simple definitions.
-        const qLowerClean = qLower.replace(/[?.,!]/g, '');
-        const terminologyMatch = findTerminologyMatch(query);
+        window.log(`Routing query (V2.0 Semantic-First): ${query}`);
 
-        if (terminologyMatch) {
-            window.log('Routing via: Step 0 (V1 Exact Terminology Match)');
-            // Note: findTerminologyMatch is responsible for formatting the static or rich answer.
-            return window.addChatMessage(`<div class="ai-result-card"><p>${terminologyMatch}</p></div>`, false);
-        }
-
-        // --- STEP A: SEMANTIC & INTENT ANALYSIS (New V2.0 Logic) ---
-        
-        // 1. Semantic Search (Simulated RAG Retrieval)
-        const semanticMatches = await window.semanticSearch(query, 5, 0.60); 
-
-        // 2. Intent Classification
-        const { intent, confidence } = window.scoreIntents(query, semanticMatches);
-        
-        // 3. Entity & Gene Extraction
+        // -----------------------------------------------------
+        // 1. GENE / ENTITY EXTRACTION
+        // -----------------------------------------------------
         const exactGenes = window.extractMultipleGenes(query);
+        window.log(`[Gene Extraction] Processing: "${query}"`);
+        window.log(`[Gene Extraction] Final valid genes: ${exactGenes.join(", ")}`);
+
+        // -----------------------------------------------------
+        // 2. SEMANTIC SEARCH (for definition / non-gene queries)
+        // -----------------------------------------------------
+        const semanticMatches = await window.searchSemanticIndex(query);
+
+        // -----------------------------------------------------
+        // 3. INTENT CLASSIFICATION (raw)
+        // -----------------------------------------------------
+        const { intent, confidence } = window.scoreIntents(query, semanticMatches);
         window.log(`Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ')}`);
 
+        // -----------------------------------------------------
+        // 4. INTENT POST-PROCESSING (FIX FOR COMPARISONS)
+        // -----------------------------------------------------
+        const qLower = query.toLowerCase();
 
-        // --- STEP B: V2.0 CORE ROUTING (Intent-Driven) ---
+        // high-precision comparison phrase detection
+        const compareRegex = /\b(higher in|lower in|more expressed|less expressed|compared to|versus|vs |vs\.|differential expression|which cell type|which tissue|expressed higher|is .* expressed)\b/;
 
-        // 4. ACTION INTENTS (Visualization/Plotting)
-        if (intent === 'visualize' || intent === 'scRNA') {
-            window.log('Routing via: Intent (Visualize)');
+        let intentProcessed = intent;
+        let confProcessed = confidence;
+
+        if (compareRegex.test(qLower)) {
+            intentProcessed = "compare";
+            confProcessed = Math.max(confProcessed, 0.95); // boost confidence
+            window.log(`Intent override: forced "compare" due to phrase match`);
+        }
+
+        window.log(`Post-processed Intent: ${intentProcessed} (Confidence: ${confProcessed.toFixed(2)})`);
+
+        // -----------------------------------------------------
+        // 5. ROUTING SWITCH (THE FIXED LOGIC)
+        // -----------------------------------------------------
+
+        let htmlResult = "";
+
+        // --- VISUALIZATION ---
+        if (intentProcessed === "visualize" || intentProcessed === "scRNA") {
+            window.log("Routing via: Intent (Visualize)");
             htmlResult = await window.routeVisualizationAction(query, exactGenes);
         }
-        
-        // 5. QUANTITATIVE INTENTS (Ranking/Comparison/Threshold)
-        else if (intent === 'ranking') {
-            window.log('Routing via: Intent (Quantitative Engine - Gap 4)');
+
+        // --- QUANTITATIVE (RANKING / COMPARISON) ---
+        else if (intentProcessed === "ranking" || intentProcessed === "quantitative" || intentProcessed === "compare") {
+            window.log("Routing via: Intent (Quantitative Engine)");
             htmlResult = await window.runQuantitativeEngine(query, exactGenes);
         }
 
-        // 6. EXPLANATORY & LIST INTENTS (Synthesis/Graph Traversal/List Filtering)
-        else if (['compare', 'relationship', 'disease_query', 'complex_query', 'localization_query'].includes(intent)) {
-            window.log(`Routing via: Intent (Graph Reasoning / Synthesis)`);
-            // This stub now houses all complex V2.0 logic (synthesis, list filtering, comparisons)
-            htmlResult = await window.runGraphQuery(query, intent, exactGenes);
+        // --- GRAPH REASONING (DISEASE–GENE–COMPLEX etc.) ---
+        else if (["relationship", "disease_query", "complex_query", "localization_query"].includes(intentProcessed)) {
+            window.log("Routing via: Intent (Graph Reasoning / Synthesis)");
+            htmlResult = await window.runGraphQuery(query, intentProcessed, exactGenes);
         }
-        
-        // 7. DEFINITION INTENT (RAG-based Explanation/Gene Details)
-        else if (intent === 'definition' || confidence < 0.3) {
-            window.log('Routing via: Intent (Definition / RAG Retrieval)');
-            
+
+        // --- DEFINITION / RAG FALLBACK (TIGHTENED) ---
+        else if (
+            intentProcessed === "definition" ||
+            (confProcessed < 0.3 && !compareRegex.test(qLower) && exactGenes.length === 0)
+        ) {
+            window.log("Routing via: Intent (Definition / RAG Retrieval)");
+
             if (exactGenes.length > 0) {
-                // If a gene is clearly mentioned, show its full details (V1 fallback for gene info)
+                // definition for a specific gene
                 htmlResult = await window.displayFullGeneInfo(exactGenes[0]);
-            }
-            else if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
-                // RAG: Use the top semantic match as the core answer/definition
+            } else if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
+                // concept definition
                 htmlResult = window.formatRAGAnswer(semanticMatches[0]);
+            } else {
+                htmlResult = `<p>No definition found.</p>`;
             }
         }
 
-
-        // --- C. FINAL CATCH-ALL ---
-
-        // 9. FINAL CATCH-ALL (Error)
-        if (htmlResult === null) {
-            window.log(`Routing via: Final Fallback (Error)`);
-            const fallbackText = exactGenes.length > 0 
-                                ? `I found gene **${exactGenes[0]}**, but couldn't process the intent (${intent}).`
-                                : `I didn't understand the query. The best semantic match was "${semanticMatches[0]?.text || 'none'}".`;
-            htmlResult = `Sorry, I couldn't process your request. ${fallbackText}`;
+        // --- FINAL FALLBACK ---
+        else {
+            window.log("Routing via: Default fallback");
+            htmlResult = `<p>I'm not sure how to handle this query.</p>`;
         }
 
-        // Send the final result to chat
-        if (htmlResult) {
-            window.addChatMessage(htmlResult, false);
-        }
-
-    } catch (e) {
-        console.error("Error in handleAIQuery:", e);
-        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+        // -----------------------------------------------------
+        // 6. RETURN RESULT
+        // -----------------------------------------------------
+        return htmlResult;
     }
-}
+
+    catch (err) {
+        window.log("ERROR in handleAIQuery:", err);
+        return `<p>Error: ${err.message}</p>`;
+    }
+};
 
 
 function handleComparativeQuery(query) {
