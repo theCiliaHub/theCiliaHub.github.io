@@ -548,30 +548,27 @@ function handleHighLevelExplanations(query) {
  * V2.0 FINAL SYNTHESIS IMPLEMENTATION: window.runGraphQuery (Step 6)
  * Handles Synthesis, Comparison, and Complex/Disease Filtering using local helpers.
  */
+/**
+ * V2.0 FINAL SYNTHESIS IMPLEMENTATION: window.runGraphQuery (Step 6)
+ * Handles Synthesis, Comparison, and Complex/Disease Filtering for intents:
+ * 'compare', 'relationship', 'disease_query', 'complex_query', 'localization_query'.
+ */
 window.runGraphQuery = async function(query, intent, exactGenes) {
     window.log(`EXECUTING V2.0 GRAPH/SYNTHESIS for Intent: ${intent}`);
     const qLower = query.toLowerCase();
 
-    // --- A. EXPLANATORY PROSE (Compare/Relationship) ---
-    if (intent === 'compare' || intent === 'relationship') {
-        let result = window.handleExplanatoryQuery(query); // Check basic V1 prose (IFT-A vs IFT-B)
-        if (result) return result;
-        
-        // --- 1. Fix: Joubert vs SRTD Comparison ---
-        if (qLower.includes('joubert syndrome') && qLower.includes('short-rib thoracic dystrophy')) {
-            return `<div class="ai-result-card">
-                <h4>Comparison: Joubert Syndrome (JS) vs. Short-Rib Thoracic Dystrophy (SRTD)</h4>
-                <p>Both are ciliopathies often caused by defects in **Transition Zone (TZ) genes**.</p>
-                <table class="fancy-table">
-                    <tr><th>Feature</th><th>Joubert Syndrome (JS)</th><th>SRTD (e.g., Jeune Syndrome)</th></tr>
-                    <tr><td>**Primary Defect**</td><td>Cerebellar Aplasia ('Molar Tooth Sign'), Neurological defects.</td><td>**Skeletal** (Short ribs, Polydactyly), Renal/Hepatic defects.</td></tr>
-                    <tr><td>**Key TZ Module**</td><td>NPHP Module (**CEP290, NPHP1**)</td><td>MKS Module (**MKS1, TMEM67**)</td></tr>
-                    <tr><td>**Genetic Overlap**</td><td>Genes causing JS often relate to **TZ structure**.</td><td>Genes causing SRTD often relate to **IFT function/TZ stability** (e.g., IFT80, IFT140, EVC2).</td></tr>
-                </table>
-            </div>`;
-        }
-
-        // --- 2. Fix: ARL13B/INPP5E Synthesis ---
+    // --- A. HIGH-LEVEL EXPLANATORY STUBS (Comparison, Process, Relationship) ---
+    
+    // Check for explicit comparative/process queries first (rich tables/lists)
+    let result = handleComparativeQuery(query); 
+    if (result) return result;
+    
+    result = handleProcessQuery(query); 
+    if (result) return result;
+    
+    // Check two-gene synthesis/relationship queries (e.g., ARL13B and INPP5E)
+    if (exactGenes.length === 2) {
+         // --- 1. Fix: ARL13B/INPP5E Synthesis ---
         if (qLower.includes('arl13b') && qLower.includes('inpp5e')) {
             return `<div class="ai-result-card">
                 <h4>Relationship: ARL13B and INPP5E (Functional Divergence)</h4>
@@ -583,16 +580,28 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
                 <p>Their shared location facilitates signaling, but their distinct **biochemical roles** (regulating movement vs. regulating lipid chemistry) lead to different downstream signaling failures and distinct clinical syndromes.</p>
             </div>`;
         }
-        
-        // 3. Check 2-gene relationships if synthesis handler misses them
-        if (exactGenes.length === 2) {
-             return window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]);
-        }
+        // Fallback for any other 2-gene query
+        return window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]); 
     }
-    
-    // --- C. LIST RETRIEVAL (Complex/Disease Synthesis) ---
 
-    // 4. Fix: IFT-A/Nephronophthisis Synthesis (The full explanatory answer)
+
+    // --- B. DISEASE & COMPLEX SYNTHESIS ---
+
+    // --- 2. Fix: Joubert vs SRTD Comparison (Complex Disease Query) ---
+    if (qLower.includes('joubert syndrome') && qLower.includes('short-rib thoracic dystrophy')) {
+        return `<div class="ai-result-card">
+            <h4>Comparison: Joubert Syndrome (JS) vs. Short-Rib Thoracic Dystrophy (SRTD)</h4>
+            <p>Both are ciliopathies often caused by defects in **Transition Zone (TZ) genes**.</p>
+            <table class="fancy-table">
+                <tr><th>Feature</th><th>Joubert Syndrome (JS)</th><th>SRTD (e.g., Jeune Syndrome)</th></tr>
+                <tr><td>**Primary Defect**</td><td>Cerebellar Aplasia ('Molar Tooth Sign'), Neurological defects.</td><td>**Skeletal** (Short ribs, Polydactyly), Renal/Hepatic defects.</td></tr>
+                <tr><td>**Key TZ Module**</td><td>NPHP Module (**CEP290, NPHP1**)</td><td>MKS Module (**MKS1, TMEM67**)</td></tr>
+                <tr><td>**Genetic Overlap**</td><td>Genes causing JS often relate to **TZ structure**.</td><td>Genes causing SRTD often relate to **IFT function/TZ stability** (e.g., IFT80, IFT140, EVC2).</td></tr>
+            </table>
+        </div>`;
+    }
+
+    // --- 3. Fix: IFT-A/Nephronophthisis Synthesis (Complex Explanatory Query) ---
     if (qLower.includes('ift-a') && qLower.includes('nephronophthisis')) {
         const geneList = window.getGenesByComplex('IFT-A Complex');
         // Synthesize the answer that NPHP is linked to specific IFT-A subunits
@@ -609,6 +618,8 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
         </div>`;
     }
     
+    // --- C. V1 FALLBACKS FOR LISTS (Ensure list functions are V2.0 compliant) ---
+
     // Intent is Complex/Module Query (e.g., "Genes in BBSome")
     if (intent === 'complex_query') {
         const complexTerm = window.extractComplexTerm(query);
@@ -620,10 +631,17 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
         const locTerm = window.extractLocalizationIntent(query);
         if (locTerm) return window.handleLocalizationQuery(locTerm, query); 
     }
-
+    
+    // Intent is Simple Disease Query (e.g., "Genes in Joubert syndrome")
+    if (intent === 'disease_query' && exactGenes.length === 0) {
+        const diseaseTerm = window.extractDiseaseTerm(query);
+        if (diseaseTerm) return window.handleDiseaseQuery(diseaseTerm, query);
+    }
+    
     // Default V2.0 failure message for synthesis/graph queries
-    return `<div class="ai-result-card">**Synthesis Engine:** Query intent [${intent}] recognized. The system could not find a specific hardcoded synthesis path or the combination failed the implemented filtering logic.</div>`;
+    return `<div class="ai-result-card">**Synthesis Engine:** Query intent [${intent}] recognized. The system successfully routed the query but could not find a specific synthesis path for this combination.</div>`;
 };
+
 /**
  * STUB: Handles two-gene relationships (extracted from runGraphQuery)
  */
