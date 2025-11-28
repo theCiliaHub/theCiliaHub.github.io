@@ -94,7 +94,13 @@ let lastQueryContext = { type: null, data: [], term: null };
 window.liPhylogenyCache = null;
 window.neversPhylogenyCache = null;
 window.CiliAI_UMAP = null; // This will be populated from the master DB
+// --- CRITICAL FIX: ALIASING OLD/INCORRECT V1 FUNCTION NAMES ---
+// This resolves the fatal "window.extractDiseaseTerm is not a function" error in runGraphQuery.
+window.extractDiseaseTerm = window.extractDiseaseIntent;
 
+// --- CRITICAL FIX: Alias for complex term extractor ---
+window.extractComplexTerm = window.extractComplexIntent; 
+// ---
    
     // --- Data Maps (These are now just for the AI brain) ---
 
@@ -542,14 +548,8 @@ function handleHighLevelExplanations(query) {
     return null;
 }
 
-
 /**
-/**
- * V2.0 FINAL SYNTHESIS IMPLEMENTATION: window.runGraphQuery (Step 6)
- * Handles Synthesis, Comparison, and Complex/Disease Filtering using local helpers.
- */
-/**
- * V2.0 FINAL SYNTHESIS IMPLEMENTATION: window.runGraphQuery (Step 6)
+ * V2.0 FINAL STUB IMPLEMENTATION: window.runGraphQuery (Step 6)
  * Handles Synthesis, Comparison, and Complex/Disease Filtering for intents:
  * 'compare', 'relationship', 'disease_query', 'complex_query', 'localization_query'.
  */
@@ -559,87 +559,57 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
 
     // --- A. HIGH-LEVEL EXPLANATORY STUBS (Comparison, Process, Relationship) ---
     
-    // Check for explicit comparative/process queries first (rich tables/lists)
+    // 1. Check V2.0 Enhanced Explanations (Compare/Process)
     let result = handleComparativeQuery(query); 
     if (result) return result;
     
     result = handleProcessQuery(query); 
     if (result) return result;
     
-    // Check two-gene synthesis/relationship queries (e.g., ARL13B and INPP5E)
+    // 2. Check 2-gene synthesis/relationship queries (e.g., ARL13B and INPP5E)
     if (exactGenes.length === 2) {
-         // --- 1. Fix: ARL13B/INPP5E Synthesis ---
-        if (qLower.includes('arl13b') && qLower.includes('inpp5e')) {
-            return `<div class="ai-result-card">
-                <h4>Relationship: ARL13B and INPP5E (Functional Divergence)</h4>
-                <p>Both are critical for **ciliary membrane function** and localize to the same proximal domain (near the Transition Zone).</p>
-                <ul>
-                    <li>**ARL13B (GTPase):** Acts as a **structural regulator** and is essential for ciliary protein movement and Hedgehog signaling. Defects cause **Joubert Syndrome (neurological)**.</li>
-                    <li>**INPP5E (Phosphatase):** Acts as a **metabolic enzyme**, regulating ciliary phosphoinositide levels (PI(4,5)P2). Defects cause **Senior-Løken Syndrome (renal/retinal)**.</li>
-                </ul>
-                <p>Their shared location facilitates signaling, but their distinct **biochemical roles** (regulating movement vs. regulating lipid chemistry) lead to different downstream signaling failures and distinct clinical syndromes.</p>
-            </div>`;
-        }
-        // Fallback for any other 2-gene query
+        // We use the simpler alias here since the full synthesis logic is complex.
         return window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]); 
     }
 
+    // --- B. LIST RETRIEVAL AND SYNTHESIS (Resolves E2, E3) ---
 
-    // --- B. DISEASE & COMPLEX SYNTHESIS ---
-
-    // --- 2. Fix: Joubert vs SRTD Comparison (Complex Disease Query) ---
-    if (qLower.includes('joubert syndrome') && qLower.includes('short-rib thoracic dystrophy')) {
-        return `<div class="ai-result-card">
-            <h4>Comparison: Joubert Syndrome (JS) vs. Short-Rib Thoracic Dystrophy (SRTD)</h4>
-            <p>Both are ciliopathies often caused by defects in **Transition Zone (TZ) genes**.</p>
-            <table class="fancy-table">
-                <tr><th>Feature</th><th>Joubert Syndrome (JS)</th><th>SRTD (e.g., Jeune Syndrome)</th></tr>
-                <tr><td>**Primary Defect**</td><td>Cerebellar Aplasia ('Molar Tooth Sign'), Neurological defects.</td><td>**Skeletal** (Short ribs, Polydactyly), Renal/Hepatic defects.</td></tr>
-                <tr><td>**Key TZ Module**</td><td>NPHP Module (**CEP290, NPHP1**)</td><td>MKS Module (**MKS1, TMEM67**)</td></tr>
-                <tr><td>**Genetic Overlap**</td><td>Genes causing JS often relate to **TZ structure**.</td><td>Genes causing SRTD often relate to **IFT function/TZ stability** (e.g., IFT80, IFT140, EVC2).</td></tr>
-            </table>
-        </div>`;
-    }
-
-    // --- 3. Fix: IFT-A/Nephronophthisis Synthesis (Complex Explanatory Query) ---
-    if (qLower.includes('ift-a') && qLower.includes('nephronophthisis')) {
-        const geneList = window.getGenesByComplex('IFT-A Complex');
-        // Synthesize the answer that NPHP is linked to specific IFT-A subunits
-        return `<div class="ai-result-card">
-            <h4>IFT-A Genes and Nephronophthisis (NPHP) Risk</h4>
-            <p>The IFT-A complex is essential for retrograde transport. Mutations in certain subunits are strongly associated with NPHP and related renal ciliopathies, rather than skeletal defects (which are more common with IFT-B or MKS defects).</p>
-            <p>The most implicated IFT-A genes in NPHP include:</p>
-            <ul>
-                <li>**IFT140 (NPHP16/BBS20):** Strong association with NPHP and Senior-Løken Syndrome (renal-retinal).</li>
-                <li>**TTC21B (NPHP14):** Directly implicated in NPHP.</li>
-            </ul>
-            <p>These genes localize to the Transition Zone and base, where the complex is loaded, suggesting a primary defect in gating or ciliary maintenance leading to kidney disease.</p>
-            ${window.formatListResult("IFT-A Components", geneList)}
-        </div>`;
-    }
-    
-    // --- C. V1 FALLBACKS FOR LISTS (Ensure list functions are V2.0 compliant) ---
-
-    // Intent is Complex/Module Query (e.g., "Genes in BBSome")
+    // 3. Simple Complex/Module Query (e.g., "Genes in BBSome")
     if (intent === 'complex_query') {
-        const complexTerm = window.extractComplexTerm(query);
-        if (complexTerm) return window.getComplexGenesAndFormat(complexTerm);
+        const complexTerm = window.extractComplexIntent(query);
+        const gene = exactGenes[0]; 
+        
+        if (complexTerm) {
+             // Case: What genes are in the BBSome?
+             return window.getComplexGenesAndFormat(complexTerm);
+        } else if (gene) {
+             // Case: What complexes is KIF3A a member of?
+             return window.handleGeneInComplexQuery(gene);
+        }
     }
     
-    // Intent is Localization Query (e.g., "Genes in transition zone")
+    // 4. Simple Localization Query (e.g., "List genes in the transition zone")
     if (intent === 'localization_query') {
         const locTerm = window.extractLocalizationIntent(query);
-        if (locTerm) return window.handleLocalizationQuery(locTerm, query); 
+        if (locTerm) {
+            // Use V1 helper to get list and format it.
+            return window.handleLocalizationQuery(locTerm, query); 
+        }
     }
     
-    // Intent is Simple Disease Query (e.g., "Genes in Joubert syndrome")
+    // 5. Simple Disease Query (e.g., "Genes associated with Primary Ciliary Dyskinesia")
     if (intent === 'disease_query' && exactGenes.length === 0) {
-        const diseaseTerm = window.extractDiseaseTerm(query);
-        if (diseaseTerm) return window.handleDiseaseQuery(diseaseTerm, query);
+        const diseaseTerm = window.extractDiseaseIntent(query);
+        
+        if (diseaseTerm) {
+            const { genes, description } = window.getCiliopathyGenes(diseaseTerm);
+            // V2.0 FIX: Directly output the list.
+            return window.formatListResult(`Genes for ${diseaseTerm}`, genes, description);
+        }
     }
     
     // Default V2.0 failure message for synthesis/graph queries
-    return `<div class="ai-result-card">**Synthesis Engine:** Query intent [${intent}] recognized. The system successfully routed the query but could not find a specific synthesis path for this combination.</div>`;
+    return `<div class="ai-result-card">**Synthesis Engine:** Query intent [${intent}] recognized. The specific synthesis path failed. Try simplifying the list request.</div>`;
 };
 
 /**
