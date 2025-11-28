@@ -2757,6 +2757,127 @@ function extractPhenotypeIntent(qLower) {
         return `I found ${filteredGenes.length} gene(s) matching your criteria: <strong>${resultTitle}</strong>. Do you want to view the list?`;
    }
 
+
+/**
+ * @param {string} query
+ * @returns {string | null} HTML result for an explanatory query, or null.
+ */
+function handleExplanatoryQuery(query) {
+    const qLower = query.toLowerCase().trim();
+
+    // --- GAP 1: Comparative Questions ---
+    if (qLower.includes('compare') || qLower.includes('difference between') || (qLower.includes('how do') && qLower.includes('differ'))) {
+        window.log('Routing via: Enhanced NLP (Comparative Analysis)');
+
+        // Comparative Analysis 1: Ciliopathies
+        if ((qLower.includes('joubert syndrome') || qLower.includes('js')) && (qLower.includes('meckel-gruber syndrome') || qLower.includes('mks'))) {
+            return `
+                <div class="ai-result-card">
+                    <h4>Comparing Joubert Syndrome (JS) and Meckel-Gruber Syndrome (MKS)</h4>
+                    <p>Both are severe ciliopathies, but MKS is generally lethal in the perinatal period, whereas JS severity is highly variable.</p>
+                    <table>
+                        <thead>
+                            <tr><th>Feature</th><th>Joubert Syndrome (JS)</th><th>Meckel-Gruber Syndrome (MKS)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Severity</strong></td><td>Highly variable (often manageable)</td><td>**Lethal**, prenatal onset</td></tr>
+                            <tr><td><strong>Classic Sign</strong></td><td>'Molar tooth sign' on brain MRI</td><td>Occipital encephalocele, large cystic kidneys</td></tr>
+                            <tr><td><strong>Primary Defect</strong></td><td>Primarily **Transition Zone** and IFT genes (e.g., *CEP290*, *IFT88*)</td><td>Primarily **MKS Complex** genes (e.g., *MKS1*, *B9D1*)</td></tr>
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+        
+        // Comparative Analysis 2: IFT Complexes
+        if (qLower.includes('ift-a') && qLower.includes('ift-b')) {
+            const iftA = window.terminologyQueries["what is ift-a"];
+            const iftB = window.terminologyQueries["what is ift-b"];
+            return `<div class="ai-result-card">
+                <h4>IFT-A vs. IFT-B Complexes (Intraflagellar Transport)</h4>
+                <p><strong>IFT-B (Anterograde)</strong>: ${iftB.replace(/IFT-B is /, '')} It transports cargo **to the tip** (base $\\to$ tip) using the **Kinesin-2** motor. Essential for initial cilium assembly (ciliogenesis). </p>
+                <hr>
+                <p><strong>IFT-A (Retrograde)</strong>: ${iftA.replace(/IFT-A \(.+\) is /, '')} It transports cargo **back to the base** (tip $\\to$ base) using the **Dynein-2** motor. Essential for recycling and ciliary maintenance.</p>
+            </div>`;
+        }
+
+        // Comparative Analysis 3: Ciliary Gate Components
+        if (qLower.includes('bbsome') && qLower.includes('mks complex')) {
+            return `<div class="ai-result-card">
+                <h4>BBSome vs. MKS Complex</h4>
+                <p>Both are critical ciliary trafficking complexes localized near the base, but they manage different types of cargo:</p>
+                <ul>
+                    <li>**MKS Complex:** Forms the core **Transition Zone (TZ) gate structure**; controls access of proteins *into* the cilium's membrane. Defects cause structural gate failure (MKS).</li>
+                    <li>**BBSome:** A **cargo adaptor complex** that ferries transmembrane proteins (like GPCRs) *out* of the cilium for degradation or recycling. Defects cause trafficking defects (BBS).</li>
+                </ul>
+            </div>`;
+        }
+    }
+
+
+    // --- GAP 2: Process & Mechanism Questions (How/Why) ---
+    if (qLower.startsWith('how does ift work') || qLower.includes('ift step by step')) {
+        window.log('Routing via: Enhanced NLP (IFT Mechanism)');
+        return `
+            <div class="ai-result-card">
+                <h4>How Intraflagellar Transport (IFT) Works: Step-by-Step</h4>
+                <ol>
+                    <li>**Assembly:** IFT-B complexes (e.g., IFT88, IFT81) load ciliary building blocks (tubulin, IFT-A, motors) at the **basal body**.</li>
+                    <li>**Anterograde Transport:** The train moves **from the base to the tip** powered by the **Kinesin-2** motor (anterograde = forward).</li>
+                    <li>**Turnaround:** At the ciliary tip, IFT-B disassembles. IFT-A complexes (e.g., IFT140) bind to the returning cargo.</li>
+                    <li>**Retrograde Transport:** The train moves **from the tip back to the base** powered by the **Dynein-2** motor (retrograde = backward).</li>
+                    <li>**Recycling:** Components are unloaded and recycled at the base to initiate the next transport cycle.</li>
+                </ol>
+            </div>`;
+    }
+    
+    if (qLower.includes('why do transition zone defects cause joubert syndrome')) {
+        window.log('Routing via: Enhanced NLP (Mechanism: TZ/JS)');
+        return `
+            <div class="ai-result-card">
+                <h4>Transition Zone (TZ) Defects and Joubert Syndrome (JS)</h4>
+                <p>The **Transition Zone** is the molecular **gate** at the ciliary base. JS-associated genes (like *CEP290*, *NPHP1*, *MKS1*) encode components that form this gate. </p>
+                <p>Defects cause **gate failure**, resulting in:</p>
+                <ul>
+                    <li>**Loss of Enrichment:** Key ciliary signaling components (like some GPCRs) fail to enter the cilium, disrupting vital pathways.</li>
+                    <li>**Corrupted Membrane:** Non-ciliary membrane proteins are allowed to diffuse into the cilium, corrupting the organelle's specialized environment.</li>
+                </ul>
+                <p>This failure in ciliary signaling is the root cause of the pleiotropic JS phenotypes, particularly the cerebellar malformation.</p>
+            </div>`;
+    }
+    
+    // --- GAP 3: Relationship & Pathway Questions ---
+    if (qLower.includes('how do ift88 and ift140 work together') || qLower.includes('relationship between ift88 and ift140')) {
+        window.log('Routing via: Enhanced NLP (Relationship: IFT Proteins)');
+        return `<div class="ai-result-card">
+            <h4>Relationship between IFT88 and IFT140</h4>
+            <p><strong>IFT88</strong> is a core component of the **IFT-B** complex (anterograde transport). <strong>IFT140</strong> is a core component of the **IFT-A** complex (retrograde transport).</p>
+            <p>They don't directly interact to form one complex, but they are intrinsically linked by their opposing roles in the **IFT Cycle**:</p>
+            <ul>
+                <li>IFT88 drives the cargo **to the tip** (anterograde).</li>
+                <li>IFT140 is essential for returning components **from the tip to the base** (retrograde).</li>
+            </ul>
+            <p>The proper function of IFT88 is dependent on IFT140 recycling the machinery, and vice-versa, to maintain the steady state of the cilium.</p>
+        </div>`;
+    }
+
+    if (qLower.includes('hedgehog signaling pathway in cilia')) {
+        window.log('Routing via: Enhanced NLP (Pathway: Hedgehog)');
+        return `
+            <div class="ai-result-card">
+                <h4>Hedgehog (Hh) Signaling in the Primary Cilium</h4>
+                <p>${window.terminologyQueries["what is hedgehog signaling"]}</p>
+                <p>The cilium acts as the **central signaling hub**:</p>
+                <ul>
+                    <li>**OFF State (No Ligand):** The receptor **PTCH1** is present in the ciliary membrane, and the key transducer **SMOOTHENED (SMO)** is sequestered in vesicles at the ciliary base. The transcription factor **GLI** is processed into a repressor form.</li>
+                    <li>**ON State (Ligand Binding):** PTCH1 exits the cilium, allowing SMO to translocate into the ciliary axoneme. This movement prevents GLI processing, leading to the accumulation of the active GLI form that translocates to the nucleus to induce gene expression.</li>
+                </ul>
+                
+            </div>`;
+    }
+
+    return null; // No explanatory match found
+}
+
 /**
  * Global object containing predefined answers for common Cilia/IFT/Ciliopathy terminology.
  * This is accessed directly by handleAIQuery for fast, static responses.
@@ -2799,6 +2920,10 @@ window.terminologyQueries = {
  * (REPLACEMENT) The Main "Level 1" Query Router
  * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
  */
+/**
+ * (REPLACEMENT) The Main "Level 1" Query Router
+ * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
+ */
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
@@ -2818,7 +2943,7 @@ async function handleAIQuery(query) {
         let htmlResult = null;
         let match;
 
-        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
+        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY (Highest Priority for Exact Explanatory Match)
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
         const terminologyQueries = window.terminologyQueries || {};
         
@@ -2829,9 +2954,16 @@ async function handleAIQuery(query) {
         }
         
         if (terminologyQueries[qLower]) {
-            window.log('Routing via: Intent (Terminology)');
+            window.log('Routing via: Intent (Terminology - Exact Match)');
             window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
-            return;
+            // Link the term 'cilium' to its definition here.
+            if (qLower.includes('cilium')) {
+                window.addChatMessage(`
+
+[Image of a primary cilium structure]
+`, false);
+            }
+            return; // EXIT immediately for exact terminology matches
         }
 
         // --- High Priority Plot Buttons (Immediate Actions) ---
@@ -2847,35 +2979,17 @@ async function handleAIQuery(query) {
         }
         
         // =( 1 )= INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES (Highest Priority for Filtering)
-        const intentChecker = window.flexibleIntentParser(query);
-
-        if (htmlResult === null && intentChecker) {
-             const intents = {
-                disease: window.extractDiseaseIntent(qLower),
-                expression: window.extractExpressionIntent(qLower),
-                complex: window.extractComplexIntent(qLower)
-            };
-
-            // Case 1A: Complex AND Disease (e.g., BBSome genes causing Joubert Syndrome)
-            if (intents.complex && intents.disease) {
-                window.log('Routing via: Intent (Complex + Disease)');
-                htmlResult = window.handleGeneInDiseaseQuery(intents.complex, intents.disease);
-            }
-            // Case 1B: Disease AND Expression/Tissue (e.g., Joubert Syndrome genes expressed in kidney)
-            else if (intents.disease && intents.expression) {
-                window.log('Routing via: Intent (Disease + Expression)');
-                htmlResult = window.handleTissueSpecificDiseaseQuery(intents.disease, intents.expression);
-            }
-            // Case 1C: Simple Complex Query (e.g., "Genes in BBSome") - Fall back to L1 handler
-            else if (intents.complex) {
-                window.log('Routing via: Intent (Simple Complex List)');
-                htmlResult = window.handleSimpleComplexQuery(intents.complex, query);
+        // Check for complex filtering queries first
+        if (htmlResult === null) {
+            htmlResult = window.handleComplexQuery(query); // Check the complex multi-criteria router
+            if (htmlResult) {
+                window.log('Routing via: Intent (L2/L3 Complex Filter)');
             }
         }
         
         // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
-                         !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
+        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
+                             !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
         if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && window.lastQueryContext.type === null) {
             window.log('Routing via: Intent (Ignored standalone "yes")');
@@ -2986,6 +3100,13 @@ async function handleAIQuery(query) {
             </div>`;
         }
 
+        // ** NEW STEP **
+        // =( 11.5 )= INTENT: EXPLANATORY (COMPARATIVE/MECHANISM/RELATIONSHIP)
+        else if (htmlResult === null && typeof window.handleExplanatoryQuery === 'function') {
+            window.log('Routing via: Enhanced NLP Pre-Router (Gaps 1-3)');
+            htmlResult = window.handleExplanatoryQuery(query); 
+        }
+
 
         // =( 12 )= INTENT: SIMPLE KEYWORD LISTS (Catch-all for simple Localization/Disease/Domain lookups)
         else if (htmlResult === null) {
@@ -3068,7 +3189,6 @@ async function handleAIQuery(query) {
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
-
        
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
