@@ -3151,8 +3151,7 @@ async function handleAIQuery(query) {
     }
 }
 
- * ENHANCED COMPARATIVE QUERY HANDLER
- */
+
 function handleComparativeQuery(query) {
     const qLower = query.toLowerCase();
     
