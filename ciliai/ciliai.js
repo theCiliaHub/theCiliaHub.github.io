@@ -3060,6 +3060,11 @@ window.terminologyQueries = {
 
 window.handleAIQuery = async function (query) {
     try {
+        if (!query || typeof query !== "string") {
+        window.log("Empty or invalid query");
+        return "<p>Invalid query</p>";
+        }
+        query = query.trim();
         window.log(`Routing query (V2.0 Semantic-First): ${query}`);
 
         // -----------------------------------------------------
