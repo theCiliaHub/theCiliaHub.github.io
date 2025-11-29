@@ -573,7 +573,9 @@ window.semanticSearch = async function(query, topK=5, minScore=0.60) {
  * Predicts the most likely intent based on keyword overlap.
  * This function should be defined here or sourced before handleAIQuery.
  */
-function scoreIntents(query, semanticMatches = []) {
+const INTENTS = ['definition', 'visualize', 'ranking', 'compare', 'localization_query', 'disease_query', 'complex_query', 'relationship', 'scRNA'];
+
+window.scoreIntents = function(query, semanticMatches = []) {
     const q = query.toLowerCase().trim();
     const scores = INTENTS.reduce((acc, i) => { acc[i] = 0; return acc; }, {});
     // Curated list of high-value trigger phrases (TRAINING) - defined outside if possible, but copied here for safety.
@@ -583,15 +585,16 @@ function scoreIntents(query, semanticMatches = []) {
         relationship: ['relationship between', 'how do', 'work together', 'connect to'],
         definition: ['what is', 'explain', 'define', 'tell me about'],
         visualize: ['show me', 'plot', 'umap', 'heatmap', 'display'],
+        scRNA: ['scrna', 'single cell rna'],
         localization_query: ['localized to', 'where is', 'cellular location'],
         disease_query: ['associated with', 'causes', 'mutated in', 'joubert', 'bbs', 'nphp'],
         complex_query: ['genes in', 'members of', 'subunits', 'complex', 'bbsome', 'ift-a', 'mks']
     };
-    const INTENTS = Object.keys(TRAINING);
+    
 
     // 1. Exact Phrase/Keyword Match Scoring (High Weight)
     for (const intent of INTENTS) {
-        for (const phrase of TRAINING[intent]) {
+        for (const phrase of TRAINING[intent] || []) {
             if (q.includes(phrase)) scores[intent] += 5;
         }
     }
@@ -683,12 +686,14 @@ window.handleAIQuery = async function (query) {
         } 
         else if (['complex_query', 'disease_query', 'localization_query'].includes(intent)) {
             window.log(`Routing via: LOCAL Engine (Graph Retrieval: ${intent})`);
+            // FIX: The runGraphQuery function handles complex entities based on the query.
             htmlResult = await window.runGraphQuery(query, intent, exactGenes);
             isLocalIntent = true;
         }
+        
         // 3. DELEGATE TO GEMINI BACKEND for all other complex NL queries (Synthesis, Complex/Mechanism, Unknown)
         
-        // NOTE: If local intent failed (htmlResult === null), we must fall back to Gemini.
+        // NOTE: If the local intent processing yields no result (htmlResult === null), we must fall back to Gemini.
         if (!isLocalIntent || htmlResult === null) {
             window.log('Routing via: GEMINI BACKEND (Synthesis, Mechanism, and Fallback NL)');
             
@@ -719,276 +724,776 @@ window.handleAIQuery = async function (query) {
     }
 }
 
+
+// --- Example Usage (How you would call this function from an event listener) ---
+
+/*
+document.getElementById('query-button').addEventListener('click', async () => {
+    const inputElement = document.getElementById('user-input');
+    const outputElement = document.getElementById('ai-response-area');
+    const query = inputElement.value.trim();
+
+    if (query) {
+        // Show loading state
+        outputElement.innerHTML = 'Thinking... <img src="spinner.gif" alt="Loading">'; 
+
+        // Call the new backend function
+        const result = await getCiliAIAssistance(query);
+
+        // Display the result
+        outputElement.innerHTML = result; 
+    }
+});
+
+
+*/
 /**
- * Handles Visualization Intents (Step 4).
- * Centralizes UMAP / t-SNE / Phylogeny routing.
+ * (REPLACEMENT) Robust Gene Extractor
+ * This version uses a manual map for common genes and an expanded stopword list
+ * to correctly parse complex queries and avoid "THE" bugs.
  */
-window.routeVisualizationAction = async function(query, exactGenes) {
+function extractMultipleGenes(query) {
+    if (!query || typeof query !== 'string') return [];
+    
+    window.log(`[Gene Extraction] Processing: "${query}"`);
     const qLower = query.toLowerCase();
-    const hasGenes = exactGenes && exactGenes.length > 0;
-    // Default marker is FOXJ1 if no gene is specified
-    const singleGene = hasGenes ? exactGenes[0] : 'FOXJ1'; 
 
-    // -------------------------------
-    // 1. Default / gene-free UMAP
-    // -------------------------------
-    if ((!hasGenes && qLower.includes('umap')) || qLower.includes('default umap')) {
-        if (window.drawDefaultUMAP) {
-            window.drawDefaultUMAP();
-            return `<div class="ai-result-card">📊 Default UMAP plot (cell type clusters) requested. Displaying now.</div>`;
-        } else {
-            return `<div class="ai-result-card">📊 Default UMAP plot requested. Function not implemented.</div>`;
+    // Manual map for high-priority or problematic gene names
+    const manualMap = {
+        'kif3a': 'KIF3A',
+        'ift88': 'IFT88',
+        'bbs1': 'BBS1',
+        'arl13b': 'ARL13B',
+        'cep290': 'CEP290',
+        'tmem67': 'TMEM67',
+        'ofd1': 'OFD1',
+        'ift52': 'IFT52',
+        'pkd1': 'PKD1',
+        'evc2': 'EVC2'
+    };
+
+    let foundGenes = new Set();
+    
+    // Check manual map first
+    for (const [key, gene] of Object.entries(manualMap)) {
+        if (qLower.includes(key)) {
+            window.log(`[Gene Extraction] Found via manual map: ${gene}`);
+            foundGenes.add(gene);
         }
     }
 
-    // -------------------------------
-    // 2. Default / gene-free t-SNE
-    // -------------------------------
-    if (qLower.includes('default tsne')) {
-        if (window.drawDefaultTSNE) {
-            window.drawDefaultTSNE();
-            return `<div class="ai-result-card">📊 Default t-SNE plot requested. Displaying now.</div>`;
-        } else {
-            return `<div class="ai-result-card">📊 Default t-SNE plot requested. Function not implemented.</div>`;
-        }
-    }
+    // Use regex for other gene-like patterns
+    const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
+    let matches = query.match(geneRegex) || [];
+    
+    // Enhanced stop words list to prevent "THE" bug
+    const stopWords = new Set([
+        "THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES",
+        "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN", "LOSS", "FUNCTION",
+        "EFFECT", "WITH", "THAT", "THIS", "ABOUT", "TELL", "ME", "SHORT", "LONG",
+        "LONGER", "CILIA", "CILIARY", "PROTEINS", "WHICH", "FIND", "CAUSES", "CAUSE",
+        "KNOCKED", "DOWN", "WHEN", "NO", "KNOWN", "CORUM", "LINKED", "ASSOCIATED"
+    ]);
+    
+    const geneMap = window.CiliAI.lookups.geneMap;
+    if (!geneMap) return [];
 
-    // -------------------------------
-    // 3. SINGLE GENE UMAP / scRNA (Expression Mapping)
-    // -------------------------------
-    if (hasGenes && (qLower.includes('umap') || qLower.includes('scrna')) && !qLower.includes('average')) {
-        if (window.renderUMAPPlot) {
-            window.renderUMAPPlot(singleGene); // V1 visualizer
-            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${singleGene}** (Expression Mapping) requested. Displaying now.</div>`;
-        } else {
-            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${singleGene}** requested. renderUMAPPlot() not implemented.</div>`;
+    for (const match of matches) {
+        const upperMatch = match.toUpperCase();
+        if (!stopWords.has(upperMatch) && geneMap[upperMatch]) {
+            window.log(`[Gene Extraction] Found via regex: ${upperMatch}`);
+            foundGenes.add(upperMatch);
         }
     }
     
-    // -------------------------------
-    // 4. QUANTITATIVE / SET UMAP (e.g., Average BBSome Gene Expression)
-    // -------------------------------
-    if (qLower.includes('umap') && qLower.includes('average') && hasGenes) {
-        // NOTE: This assumes a function to calculate and render the average set score exists.
-        if (window.renderAverageGeneSetUMAP) {
-            window.renderAverageGeneSetUMAP(exactGenes); 
-            return `<div class="ai-result-card">📊 UMAP plot of average expression for **${exactGenes.join(', ')}** requested. Displaying now.</div>`;
-        } else {
-            return `<div class="ai-result-card">📊 UMAP Gene Set Plot requested. renderAverageGeneSetUMAP() not implemented.</div>`;
-        }
+    const finalGenes = Array.from(foundGenes);
+    window.log(`[Gene Extraction] Final valid genes:`, finalGenes);
+    return finalGenes;
+}
+/**
+ * STUB: Simulates Semantic Search (Step 1).
+ * Always returns a low-confidence dummy match unless the query is specific.
+ */
+window.semanticSearch = async function(query, topK=5, minScore=0.60) {
+    const qLower = query.toLowerCase();
+    
+    if (qLower.includes('bbsome') || qLower.includes('ift88')) {
+        return [{ 
+            id: 'IFT88_DESC', 
+            text: 'IFT88 is a core component of the IFT-B complex.', 
+            score: 0.95,
+            meta: { type: 'definition', gene_symbol: qLower.includes('ift88') ? 'IFT88' : 'BBSome' }
+        }];
     }
-    // -------------------------------
-    // 5. Phylogeny / Heatmap
-    // -------------------------------
-    if (qLower.includes('phylogen') || qLower.includes('heatmap')) {
-        if (window.routePhylogenyAnalysis) {
-            return window.routePhylogenyAnalysis(query);
-        } else {
-            return `<div class="ai-result-card">📊 Phylogeny / heatmap requested. routePhylogenyAnalysis() not implemented.</div>`;
-        }
-    }
-    // -------------------------------
-    // 6. Fallback visualization
-    // -------------------------------
-    return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized, but no specific plot matched the query.</div>`;
-};
-
-// ===================================================================
-// CILI AI V2.0 — THE CLEVER ENGINE (Passes All 200 Test Questions)
-// ===================================================================
-
-// Cache for computed profiles
-window.geneProfileCache = {};
-
-// ===================================================================
-// 1. MASTER INTENT PARSER — Understands Any Question
-// ===================================================================
-window.parseUserIntent = function(question) {
-    const q = question.toLowerCase().trim();
-
-    // ——— TERMINOLOGY & CONCEPTS (Part A1) ———
-    const terminology = {
-        "9+0.*9\\+2": "9+0 vs 9+2 axoneme",
-        "basal body": "Basal Body",
-        "intraflagellar transport|ift": "Intraflagellar Transport (IFT)",
-        "ciliopathy": "ciliopathy",
-        "transition zone": "Transition Zone",
-        "bbsome": "BBSome",
-        "mks.*module|nphp.*module": "Transition Zone modules",
-        "dynein arms?" : "dynein arms",
-        "primary ciliary dyskinesia|pcd": "Primary Ciliary Dyskinesia (PCD)",
-        "rvxp motif": "RVxP motif",
-        "adpkd|autosomal dominant polycystic": "ADPKD",
-        "ciliogenesis": "ciliogenesis",
-        "ntpm": "nTPM unit",
-        "nodal cilia": "nodal cilia",
-        "radial spokes?": "radial spokes",
-        "motile cilio": "motile ciliopathies"
-    };
-    for (const [pattern, concept] of Object.entries(terminology)) {
-        if (new RegExp(pattern).test(q)) {
-            return { intent: "terminology", concept };
-        }
-    }
-
-    // ——— SINGLE GENE LOOKUP ———
-    const geneMatch = q.match(/(tell|what|describe|info|about|detail).{0,20}([A-Z0-9]{3,})/i);
-    if (geneMatch) {
-        const gene = geneMatch[2].toUpperCase();
-        if (window.geneData?.[gene]) {
-            return { intent: "gene_details", gene };
-        }
-    }
-
-    // ——— LIST RETRIEVAL (Complex, Disease, Localization) ———
-    if (q.includes("genes in") || q.includes("genes.*complex") || q.includes("genes.*module")) {
-        const complex = extractComplexIntent(q);
-        if (complex) return { intent: "complex_query", complex };
-    }
-    if (q.includes("genes.*disease") || q.includes("associated with")) {
-        const disease = extractDiseaseIntent(q);
-        if (disease) return { intent: "disease_query", disease };
-    }
-    if (q.includes("localiz|basal body|transition zone|ciliary tip")) {
-        return { intent: "localization_query", localization: "basal body" };
-    }
-
-    // ——— QUANTITATIVE COMPARISON / RANKING ———
-    if (q.includes("higher") || q.includes("lower") || q.includes("more.*than") || q.includes("compare.*expression")) {
-        return { intent: "quantitative_compare", question };
-    }
-    if (q.includes("top [0-9]+") || q.includes("rank") || q.includes("highest") || q.includes("most specific")) {
-        return { intent: "quantitative_rank", question };
-    }
-
-    // ——— COMPLEX SYNTHESIS & MECHANISM ———
-    if (q.includes("compare.*joubert") || q.includes("joubert.*srtd") || q.includes("vs")) {
-        return { intent: "compare_diseases", diseases: ["Joubert syndrome", "Short-rib thoracic dystrophy"] };
-    }
-    if (q.includes("mechanism") || q.includes("why") || q.includes("explain")) {
-        return { intent: "mechanism_synthesis", question };
-    }
-
-    return { intent: "unknown", question };
+    return [{ id: 'NONE', text: 'no semantic match found', score: 0.1 }];
 };
 
 // ===================================================================
 // 2. TERMINOLOGY RAG — Answers All 20 Core Concept Questions
 // ===================================================================
 window.answerTerminology = function(concept) {
-    const answers = {
-        "9+0 vs 9+2 axoneme": `**9+0** = Primary (non-motile) cilia → sensory, signaling (e.g. Hedgehog)\n**9+2** = Motile cilia → have dynein arms, cause movement (respiratory, fallopian)`,
-        "Basal Body": "The basal body is a modified centriole that anchors the cilium and serves as the organizing center for axonemal microtubules.",
-        "Intraflagellar Transport (IFT)": "Bidirectional transport system inside cilia:\n• IFT-B (anterograde, kinesin-2): tip-ward\n• IFT-A (retrograde, dynein-2): base-ward\nEssential for cilia assembly and maintenance.",
-        "ciliopathy": "Group of >40 genetic disorders caused by defects in ciliary structure or function. Includes polycystic kidney disease, Bardet-Biedl, Joubert, etc.",
-        "Transition Zone": "Compartment at ciliary base acting as diffusion barrier. Contains MKS and NPHP modules. Mutations → ciliopathies.",
-        "BBSome": "Octameric complex (BBS1,2,4,5,7,8,9,18) that coats vesicles and mediates protein trafficking to cilia. Required for ciliary gating and Hedgehog signaling.",
-        "dynein arms": "Motor protein complexes on outer doublet microtubules. Outer dynein arms → force generation. Inner → waveform regulation. Absent in PCD.",
-        "RVxP motif": "C-terminal motif in many ciliary proteins recognized by ARL13B/ARL3 for ciliary targeting.",
-        "nTPM unit": "normalized Transcripts Per Million — expression unit used in Human Protein Atlas (tissue and scRNA).",
-        "motile ciliopathies": "Primary Ciliary Dyskinesia (PCD), Reduced Generation of Multiple Motile Cilia (RGMC)."
-    };
-    return answers[concept] || "No definition available yet.";
+  const answers = {
+    "9+0 vs 9+2 axoneme": `**9+0** = Primary (non-motile) cilia → sensory, signaling (e.g. Hedgehog)\n**9+2** = Motile cilia → have dynein arms, cause movement (respiratory, fallopian)`,
+    "Basal Body": "The basal body is a modified centriole that anchors the cilium and serves as the organizing center for axonemal microtubules.",
+    "Intraflagellar Transport (IFT)": "Bidirectional transport system inside cilia:\n• IFT-B (anterograde, kinesin-2): tip-ward\n• IFT-A (retrograde, dynein-2): base-ward\nEssential for cilia assembly and maintenance.",
+    "ciliopathy": "Group of >40 genetic disorders caused by defects in ciliary structure or function. Includes polycystic kidney disease, Bardet-Biedl, Joubert, etc.",
+    "Transition Zone": "Compartment at ciliary base acting as diffusion barrier. Contains MKS and NPHP modules. Mutations → ciliopathies.",
+    "BBSome": "Octameric complex (BBS1,2,4,5,7,8,9,18) that coats vesicles and mediates protein trafficking to cilia. Required for ciliary gating and Hedgehog signaling.",
+    "dynein arms": "Motor protein complexes on outer doublet microtubules. Outer dynein arms → force generation. Inner → waveform regulation. Absent in PCD.",
+    "RVxP motif": "C-terminal motif in many ciliary proteins recognized by ARL13B/ARL3 for ciliary targeting.",
+    "nTPM unit": "normalized Transcripts Per Million — expression unit used in Human Protein Atlas (tissue and scRNA).",
+    "motile ciliopathies": "Primary Ciliary Dyskinesia (PCD), Reduced Generation of Multiple Motile Cilia (RGMC)."
+  };
+  return answers[concept] || "No definition available yet.";
 };
 
 // ===================================================================
 // 3. MASTER COMPUTE GENE PROFILE — Source of All Cleverness
 // ===================================================================
 window.computeGeneProfile = function(gene) {
-    if (window.geneProfileCache[gene]) return window.geneProfileCache[gene];
-    const d = window.geneData[gene];
-    if (!d) return null;
+  if (window.geneProfileCache[gene]) return window.geneProfileCache[gene];
+  const d = window.geneData[gene];
+  if (!d) return null;
 
-    // 1. Specificity Score (mean nTPM in 9 ciliated cell types)
-    const ciliated = ['motile', 'primary', 'rod', 'cone', 'olfactory', 'kinocilium', 'stereocilium', 'node', 'fallopian'];
-    let sum = 0, n = 0;
-    ciliated.forEach(t => { if (d.scRNA?.[t] !== undefined) { sum += d.scRNA[t]; n++; } });
-    const specificity = n > 0 ? sum / n : 0;
+  // 1. Specificity Score (mean nTPM in 9 ciliated cell types)
+  const ciliated = ['motile', 'primary', 'rod', 'cone', 'olfactory', 'kinocilium', 'stereocilium', 'node', 'fallopian'];
+  let sum = 0, n = 0;
+  ciliated.forEach(t => { if (d.scRNA?.[t] !== undefined) { sum += d.scRNA[t]; n++; } });
+  const specificity = n > 0 ? sum / n : 0;
 
-    // 2. Validation Score (0–4 screens)
-    const screens = ['CRISPR_cilia', 'Proteomics_cilia', 'Comparative_genomics', 'Literature_curated'];
-    const validation = screens.filter(s => d[s]).length;
+  // 2. Validation Score (0–4 screens)
+  const screens = ['CRISPR_cilia', 'Proteomics_cilia', 'Comparative_genomics', 'Literature_curated'];
+  const validation = screens.filter(s => d[s]).length;
 
-    // 3. Tissue Enrichment (max nTPM)
-    const tissueEnrich = Math.max(...Object.values(d.rna_tissue_consensus || {}), 0);
+  // 3. Tissue Enrichment (max nTPM)
+  const tissueEnrich = Math.max(...Object.values(d.rna_tissue_consensus || {}), 0);
 
-    // 4. Conservation (0–100)
-    const conservation = d.phylogenetic_conservation || 0;
+  // 4. Conservation (0–100)
+  const conservation = d.phylogenetic_conservation || 0;
 
-    // 5. Combined Score
-    const combined = 0.4*specificity + 0.25*validation + 0.2*(tissueEnrich/50) + 0.15*conservation;
+  // 5. Combined Score
+  const combined = 0.4*specificity + 0.25*validation + 0.2*(tissueEnrich/50) + 0.15*conservation;
 
-    const profile = {
-        specificityScore: +specificity.toFixed(2),
-        validationScore: validation,
-        tissueEnrichment: +tissueEnrich.toFixed(1),
-        conservationScore: +conservation.toFixed(1),
-        combinedScore: +combined.toFixed(3)
-    };
+  const profile = {
+    specificityScore: +specificity.toFixed(2),
+    validationScore: validation,
+    tissueEnrichment: +tissueEnrich.toFixed(1),
+    conservationScore: +conservation.toFixed(1),
+    combinedScore: +combined.toFixed(3)
+  };
 
-    window.geneProfileCache[gene] = profile;
-    return profile;
+  window.geneProfileCache[gene] = profile;
+  return profile;
 };
 
 // ===================================================================
 // 4. UNIVERSAL QUANTITATIVE ENGINE — Handles All Ranking/Comparison
 // ===================================================================
 window.runQuantitativeEngine = function(query) {
-    const q = query.toLowerCase();
+  const q = query.toLowerCase();
 
-    let candidates = Object.keys(window.geneData);
+  let candidates = Object.keys(window.geneData);
 
-    // Apply filters
-    if (q.includes("transition zone")) candidates = candidates.filter(g => window.geneData[g].localization?.includes("transition zone"));
-    if (q.includes("ift-a")) candidates = candidates.filter(g => window.geneData[g].complexes?.includes("IFT-A"));
-    if (q.includes("bbs")) candidates = candidates.filter(g => window.geneData[g].associatedDiseases?.includes("Bardet-Biedl"));
+  // Apply filters
+  if (q.includes("transition zone")) candidates = candidates.filter(g => window.geneData[g].localization?.includes("transition zone"));
+  if (q.includes("ift-a")) candidates = candidates.filter(g => window.geneData[g].complexes?.includes("IFT-A"));
+  if (q.includes("bbs")) candidates = candidates.filter(g => window.geneData[g].associatedDiseases?.includes("Bardet-Biedl"));
 
-    // Sort by metric
-    let metric = "combinedScore";
-    if (q.includes("specific")) metric = "specificityScore";
-    if (q.includes("validation")) metric = "validationScore";
-    if (q.includes("conserv")) metric = "conservationScore";
+  // Sort by metric
+  let metric = "combinedScore";
+  if (q.includes("specific")) metric = "specificityScore";
+  if (q.includes("validation")) metric = "validationScore";
+  if (q.includes("conserv")) metric = "conservationScore";
 
-    const scored = candidates.map(g => ({ gene: g, profile: computeGeneProfile(g) })).filter(x => x.profile);
-    scored.sort((a,b) => b.profile[metric] - a.profile[metric]);
+  const scored = candidates.map(g => ({ gene: g, profile: computeGeneProfile(g) })).filter(x => x.profile);
+  scored.sort((a,b) => b.profile[metric] - a.profile[metric]);
 
-    const top10 = scored.slice(0, 10);
+  const top10 = scored.slice(0, 10);
 
-    let md = `| Rank | Gene | Specificity | Validation | Tissue | Consv | Combined |\n|----|------|-------------|------------|--------|-------|----------|\n`;
-    top10.forEach((x,i) => {
-        const p = x.profile;
-        md += `| ${i+1} | **${x.gene}** | ${p.specificityScore} | ${p.validationScore}/4 | ${p.tissueEnrichment} | ${p.conservationScore} | ${p.combinedScore} |\n`;
-    });
-    return md;
+  let md = `| Rank | Gene | Specificity | Validation | Tissue | Consv | Combined |\n|----|------|-------------|------------|--------|-------|----------|\n`;
+  top10.forEach((x,i) => {
+    const p = x.profile;
+    md += `| ${i+1} | **${x.gene}** | ${p.specificityScore} | ${p.validationScore}/4 | ${p.tissueEnrichment} | ${p.conservationScore} | ${p.combinedScore} |\n`;
+  });
+  return md;
 };
 
 // ===================================================================
 // 5. SMART GRAPH QUERY — Multi-Hop Synthesis & Narratives
 // ===================================================================
-window.runGraphQuery = function(intent, entities) {
-    if (intent === "complex_query") return getGenesByComplexAndFormat(entities.complex);
-    if (intent === "disease_query") return getGenesByDiseaseAndFormat(entities.disease);
+window.runGraphQuery = function(query, intent, exactGenes) {
+  // Assuming query carries the full intent/entity information when called from handleAIQuery
+  const q = query.toLowerCase();
+  
+  if (intent === "complex_query") {
+      const complexTerm = extractComplexTerm(q);
+      if (complexTerm) return getComplexGenesAndFormat(complexTerm);
+  }
+  
+  if (intent === "disease_query") {
+      const disease = extractDiseaseIntent(q);
+      if (disease) return getGenesByDiseaseAndFormat(disease); // Assuming getGenesByDiseaseAndFormat exists
+  }
 
-    if (intent === "compare_diseases") {
-        return `### Joubert Syndrome vs Short-Rib Thoracic Dysplasia (SRTD)
+  // Handle localization queries
+  if (intent === "localization_query") {
+      const localization = extractLocalizationIntent(q);
+      if (localization) return handleLocalizationQuery(localization, query);
+  }
 
-| Feature             | Joubert Syndrome      | SRTD (Jeune, Mainzer-Saldino) |
-|---------------------|-----------------------|-------------------------------|
-| Core TZ module      | MKS module            | MKS module                    |
-| Brain malformation  | Molar tooth sign      | Rare                          |
-| Skeletal            | Occasional polydactyly| Severe (narrow thorax, short ribs)|
-| Renal               | Cystic dysplasia      | Severe nephronophthisis       |
-| Key genes           | TMEM67, AHI1, CEP290  | IFT80, IFT140, WDR19, DYNC2H1 |
-| Overlap             | CEP290, TMEM67        | Some shared genes             |`;
+  // Handle hardcoded comparisons or mechanism synthesis if they were missed by V1 routing
+  if (q.includes("compare.*joubert") || q.includes("joubert.*srtd") || q.includes("vs")) {
+    return `### Joubert Syndrome vs Short-Rib Thoracic Dysplasia (SRTD)
+
+| Feature             | Joubert Syndrome          | SRTD (Jeune, Mainzer-Saldino) |
+|---------------------|---------------------------|-------------------------------|
+| Core TZ module      | MKS module                | MKS module                    |
+| Brain malformation  | Molar tooth sign          | Rare                          |
+| Skeletal            | Occasional polydactyly    | Severe (narrow thorax, short ribs) |
+| Renal               | Cystic dysplasia          | Severe nephronophthisis        |
+| Key genes           | TMEM67, AHI1, CEP290      | IFT80, IFT140, WDR19, DYNC2H1 |
+| Overlap             | CEP290, TMEM67            | Some shared genes             |`;
+  }
+
+  if (q.includes("mechanism") || q.includes("why") || q.includes("explain")) {
+    // Attempt to match hardcoded mechanisms before passing to Gemini
+    if (q.includes("ift-a")) {
+      return `### IFT-A Complex Mechanism\nMutations cause **retrograde transport failure** → accumulation of IFT-B and BBSome inside cilium → short/bulbous cilia → severe skeletal + renal phenotypes (Jeune, SRTD, CED).`;
+    }
+  }
+
+  return null; // Let the caller (handleAIQuery) decide to pass to Gemini
+};
+// ... (rest of the functions defined in the original file) ...
+
+
+// ===================================================================
+// 6. MAIN DISPATCHER — The Brain of CiliAI V2.0
+// ===================================================================
+// NOTE: This function is preserved from the last successful file state but unused 
+// because handleAIQuery is the main entry point now.
+window.handleUserQuestion = function(question) {
+  const parsed = parseUserIntent(question);
+
+  switch (parsed.intent) {
+    case "terminology":
+      return answerTerminology(parsed.concept);
+
+    case "gene_details":
+      return displayFullGeneInfo(parsed.gene);  // now includes V2.0 profile
+
+    case "complex_query":
+    case "disease_query":
+    case "localization_query":
+      return window.runGraphQuery(parsed.intent, parsed);
+
+    case "quantitative_compare":
+    case "quantitative_rank":
+      return runQuantitativeEngine(question);
+
+    case "compare_diseases":
+    case "mechanism_synthesis":
+      return runGraphQuery(parsed.intent, parsed);
+
+    default:
+      return "I don't understand this question yet. But I'm learning!";
+  }
+};
+
+// ===================================================================
+// UPGRADE YOUR MAIN ENTRY POINT
+// ===================================================================
+const OLD_HANDLE = window.onUserMessage || function() {};
+window.onUserMessage = function(msg) {
+  const answer = window.handleUserQuestion(msg);
+  OLD_HANDLE(msg); // keep existing UI
+  return answer;
+};
+
+
+/**
+ * ENHANCED NLP FIX: Smart Terminology Matcher (RESTRICTED TO DEFINITIONS)
+ */
+function findTerminologyMatch(query) {
+    const terminologyQueries = window.terminologyQueries || {};
+    const qLower = query.toLowerCase().trim();
+    
+    // Clean query to handle trailing punctuation (e.g., "what is IFT?")
+    const qLowerClean = qLower.replace(/[?.,!]/g, '');
+
+    // 1. Check for Exact Key Match (e.g., "what is ift-a" or "what is IFT?")
+    if (terminologyQueries[qLowerClean]) {
+        return terminologyQueries[qLowerClean];
     }
 
-    if (intent === "mechanism_synthesis") {
-        if (entities.complex === "IFT-A") {
-            return `### IFT-A Complex Mechanism\nMutations cause **retrograde transport failure** → accumulation of IFT-B and BBSome inside cilium → short/bulbous cilia → severe skeletal + renal phenotypes (Jeune, SRTD, CED).`;
+    // 2. Handle "what is X" patterns where X is the dictionary key
+    if (qLowerClean.startsWith('what is ') || qLowerClean.startsWith("what's ")) {
+        const target = qLowerClean.replace(/^(what is|what's)\s+/, '').trim();
+        const fullKey = 'what is ' + target;
+
+        if (terminologyQueries[fullKey]) {
+            return terminologyQueries[fullKey];
+        }
+        // CRITICAL: Ensure we don't accidentally match and return generic answers for genes
+        if (window.CiliAI.lookups.geneMap[target.toUpperCase()]) {
+             return null;  
         }
     }
+    
+    return null; // Let the V2.0 Intent Router (Step B) handle all other cases.
+}
 
-    return "Not implemented yet.";
+
+// ... (New helper function)
+function handleHighLevelExplanations(query) {
+    let result = handleComparativeQuery(query); // Tries to build a rich table
+    if (result) return result;
+    
+    result = handleProcessQuery(query); // Tries to build a step-by-step list
+    if (result) return result;
+    
+    // Add V2.0 synthesis checks here (ARL13B/INPP5E, etc.)
+    return null;
+}
+
+
+// -----------------------------
+// Master Gene Profile (scaffold)
+// -----------------------------
+window.buildMasterGeneProfile = function (gene) {
+    // Defensive: ensure gene exists in DB
+    const record = (window.CiliAI && window.CiliAI.masterData)
+        ? window.CiliAI.masterData.find(r => r.gene === gene || r.Gene === gene)
+        : null;
+
+    // Basic computed metrics (placeholders — replace with real computations)
+    const conservationScore = record && record.conservation ? record.conservation : Math.random();
+    const specificityScore = record && record.specificity ? record.specificity : Math.random();
+    const expression = (record && record.expression) ? record.expression : {};
+
+    return {
+        gene,
+        record,
+        conservationScore,
+        specificityScore,
+        combinedScore: conservationScore * specificityScore,
+        expression // object keyed by celltype/tissue with numeric expression values
+    };
+};
+
+// -----------------------------
+// handleComparativeQuery
+// builds a simple numeric comparison using expression data from master DB
+// -----------------------------
+window.handleComparativeQuery = function (gene, Aterm, Bterm) {
+    try {
+        const geneRecord = (window.CiliAI.masterData || []).find(r => (r.Gene || r.gene || "").toUpperCase() === (gene || "").toUpperCase());
+        const expr = (geneRecord && geneRecord.expression) || {};
+        // normalization of terms
+        const norm = t => (t || "").toLowerCase().trim();
+        const A = norm(Aterm);
+        const B = norm(Bterm);
+        const valA = expr[A] !== undefined ? expr[A] : null;
+        const valB = expr[B] !== undefined ? expr[B] : null;
+
+        // If both numeric values exist, compare
+        if (valA !== null && valB !== null) {
+            const higher = valA === valB ? "equal" : (valA > valB ? Aterm : Bterm);
+            let html = `<div class="ai-result-card"><b>Comparison — ${gene}</b>
+                <table>
+                    <tr><th>Cell/Tissue</th><th>Mean expression</th></tr>
+                    <tr><td>${Aterm}</td><td>${valA}</td></tr>
+                    <tr><td>${Bterm}</td><td>${valB}</td></tr>
+                </table>
+                <p>Result: <b>${higher === "equal" ? "Both equal" : higher}</b></p>
+            </div>`;
+            return html;
+        }
+
+        // If expression values are missing, attempt statistical or proxy via grouped summaries
+        // Placeholder: if missing, show best-effort explanation and suggest using exact dataset names
+        return `<div class="ai-result-card"><b>Comparison — ${gene}</b>
+            <p>Could not find numeric expression for <b>${Aterm}</b> or <b>${Bterm}</b> in the master DB. Try synonyms or check dataset names (e.g., "ciliated cells", "basal cells").</p>
+        </div>`;
+    } catch (err) {
+        window.log("ERROR in handleComparativeQuery: " + err);
+        return `<div class="ai-error-card">Comparison error: ${err.message}</div>`;
+    }
+};
+
+// -----------------------------
+// runGraphQuery
+// Handles: list retrieval, disease/complex simulated multi-hop synthesis
+// -----------------------------
+window.runGraphQuery = async function (query, intent, entities = []) {
+    try {
+        const q = (query || "").toLowerCase();
+
+        // 1) List retrieval patterns: "genes in X", "members of Y complex", "BBSome genes"
+        const listMatch = q.match(/(genes|members|components)\s+(in|of)?\s*(?:the\s)?(.+)/i);
+        if (listMatch) {
+            const term = listMatch[3].trim();
+            // If complex -> use getComplexGenesAndFormat or getGenesByComplex
+            if (term.toLowerCase().includes("complex") || term.toLowerCase().includes("bbsome") || term.toLowerCase().includes("ift")) {
+                const genes = window.getGenesByComplex ? window.getGenesByComplex(term) : [];
+                return window.handleListQuery("complex", term, genes);
+            }
+            // fallback: try disease or simple list
+            const genesByDisease = window.getGenesByDisease ? window.getGenesByDisease(term) : [];
+            if (genesByDisease && genesByDisease.length) {
+                return window.handleListQuery("disease", term, genesByDisease);
+            }
+            return `<div class="ai-result-card">No list found for <b>${term}</b>.</div>`;
+        }
+
+        // 2) Disease–disease comparison or multi-hop: "Compare Joubert syndrome and short-rib thoracic dystrophy"
+        const compareDiseases = q.match(/compare\s+(.+?)\s+(and|vs|versus)\s+(.+)/i);
+        if (compareDiseases) {
+            const A = compareDiseases[1].trim();
+            const B = compareDiseases[3].trim();
+            // Simulate multi-hop: disease -> gene -> complex -> disease
+            // We'll synthesize shared genes and complexes with best-effort lookups
+            const genesA = window.getGenesByDisease ? window.getGenesByDisease(A) : [];
+            const genesB = window.getGenesByDisease ? window.getGenesByDisease(B) : [];
+            // shared genes
+            const shared = genesA.filter(x => genesB.includes(x));
+            
+            // Shared gene logic is now handled in the main comparison routine (not just shared species)
+            if (genesA.length > 0 && genesB.length > 0) {
+                 return handleComparativeQuery(A, B, genesA, genesB); // Re-use simplified comparison stub
+            }
+
+            let html = `<div class="ai-result-card"><b>Comparison: ${A} vs ${B}</b>`;
+            html += `<p>Genes for ${A}: ${genesA.length} — for ${B}: ${genesB.length} — shared: ${shared.length}</p>`;
+            if (shared.length) {
+                html += `<p>Shared genes: ${shared.slice(0,20).join(", ")}</p>`;
+            } else {
+                html += `<p>No directly shared genes found in your database snapshot. Attempting complex-level synthesis...</p>`;
+                // attempt complexes via masterData
+                const complexesA = (genesA || []).flatMap(g => (window.getComplexesForGene ? window.getComplexesForGene(g) : []) || []);
+                const complexesB = (genesB || []).flatMap(g => (window.getComplexesForGene ? window.getComplexesForGene(g) : []) || []);
+                const sharedC = complexesA.filter(c => complexesB.includes(c));
+                html += `<p>Shared complexes: ${[...new Set(sharedC)].slice(0,20).join(", ") || "(none)"} </p>`;
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        // 3) Fallback: if entities contain a single complex or disease, return its members
+        if (entities && entities.length === 1) {
+            const term = entities[0];
+            // prefer complex, then disease
+            const byComplex = window.getGenesByComplex ? window.getGenesByComplex(term) : [];
+            if (byComplex && byComplex.length) return window.handleListQuery("complex", term, byComplex);
+            const byDisease = window.getGenesByDisease ? window.getGenesByDisease(term) : [];
+            if (byDisease && byDisease.length) return window.handleListQuery("disease", term, byDisease);
+        }
+
+        return null; // If no local graph query matches, pass to Gemini
+    } catch (err) {
+        window.log("ERROR in runGraphQuery: " + err);
+        // Returning null will ensure the query is routed to the Gemini backend as a final attempt
+        return null; 
+    }
+};
+
+// ===================================================================
+// 4. UNIVERSAL QUANTITATIVE ENGINE — Handles All Ranking/Comparison
+// ===================================================================
+// NOTE: This function is required by handleAIQuery and must be defined globally
+window.runQuantitativeEngine = function(query, exactGenes) {
+  const q = query.toLowerCase();
+
+  let candidates = Object.keys(window.geneData || {});
+
+  // Apply filters
+  if (q.includes("transition zone")) candidates = candidates.filter(g => window.geneData[g].localization?.includes("transition zone"));
+  if (q.includes("ift-a")) candidates = candidates.filter(g => window.geneData[g].complexes?.includes("IFT-A"));
+  if (q.includes("bbs")) candidates = candidates.filter(g => window.geneData[g].associatedDiseases?.includes("Bardet-Biedl"));
+
+  // Sort by metric
+  let metric = "combinedScore";
+  if (q.includes("specific")) metric = "specificityScore";
+  if (q.includes("validation")) metric = "validationScore";
+  if (q.includes("conserv")) metric = "conservationScore";
+
+  const scored = candidates.map(g => ({ gene: g, profile: window.computeGeneProfile(g) })).filter(x => x.profile);
+  scored.sort((a,b) => b.profile[metric] - a.profile[metric]);
+
+  const top10 = scored.slice(0, 10);
+
+  let md = `| Rank | Gene | Specificity | Validation | Tissue | Consv | Combined |\n|----|------|-------------|------------|--------|-------|----------|\n`;
+  top10.forEach((x,i) => {
+    const p = x.profile;
+    md += `| ${i+1} | **${x.gene}** | ${p.specificityScore} | ${p.validationScore}/4 | ${p.tissueEnrichment} | ${p.conservationScore} | ${p.combinedScore} |\n`;
+  });
+  
+  // Return null if no data, forcing fallback to Gemini for NL explanation
+  return md.length > 100 ? md : null;
+};
+
+
+/**
+ * STUB: Simple implementation for getGenesByDiseaseAndFormat 
+ * to prevent crashes when runGraphQuery calls it.
+ */
+function getGenesByDiseaseAndFormat(disease) {
+    const normDisease = normalizeDiseaseKey(disease);
+    const genes = window.CiliAI.lookups.byCiliopathy?.[normDisease] || [];
+    const count = genes.length;
+    
+    if (count === 0) {
+        return null;
+    }
+    
+    const geneListObjects = genes.map(g => ({ gene: g, description: 'Ciliopathy gene' }));
+    return window.formatListResult(`Genes associated with ${disease} (${count})`, geneListObjects);
+}
+
+// ===================================================================
+// 6. MAIN DISPATCHER — The Brain of CiliAI V2.0
+// ===================================================================
+// NOTE: This function is preserved from the last successful file state but unused 
+// because handleAIQuery is the main entry point now.
+window.handleUserQuestion = function(question) {
+  const parsed = parseUserIntent(question);
+
+  switch (parsed.intent) {
+    case "terminology":
+      return answerTerminology(parsed.concept);
+
+    case "gene_details":
+      return displayFullGeneInfo(parsed.gene);  // now includes V2.0 profile
+
+    case "complex_query":
+    case "disease_query":
+    case "localization_query":
+      return window.runGraphQuery(parsed.intent, parsed);
+
+    case "quantitative_compare":
+    case "quantitative_rank":
+      return runQuantitativeEngine(question);
+
+    case "compare_diseases":
+    case "mechanism_synthesis":
+      return runGraphQuery(parsed.intent, parsed);
+
+    default:
+      return "I don't understand this question yet. But I'm learning!";
+  }
+};
+
+// ===================================================================
+// UPGRADE YOUR MAIN ENTRY POINT
+// ===================================================================
+const OLD_HANDLE = window.onUserMessage || function() {};
+window.onUserMessage = function(msg) {
+  const answer = window.handleUserQuestion(msg);
+  OLD_HANDLE(msg); // keep existing UI
+  return answer;
+};
+
+
+/**
+ * ENHANCED NLP FIX: Smart Terminology Matcher (RESTRICTED TO DEFINITIONS)
+ */
+function findTerminologyMatch(query) {
+    const terminologyQueries = window.terminologyQueries || {};
+    const qLower = query.toLowerCase().trim();
+    
+    // Clean query to handle trailing punctuation (e.g., "what is IFT?")
+    const qLowerClean = qLower.replace(/[?.,!]/g, '');
+
+    // 1. Check for Exact Key Match (e.g., "what is ift-a" or "what is IFT?")
+    if (terminologyQueries[qLowerClean]) {
+        return terminologyQueries[qLowerClean];
+    }
+
+    // 2. Handle "what is X" patterns where X is the dictionary key
+    if (qLowerClean.startsWith('what is ') || qLowerClean.startsWith("what's ")) {
+        const target = qLowerClean.replace(/^(what is|what's)\s+/, '').trim();
+        const fullKey = 'what is ' + target;
+
+        if (terminologyQueries[fullKey]) {
+            return terminologyQueries[fullKey];
+        }
+        // CRITICAL: Ensure we don't accidentally match and return generic answers for genes
+        if (window.CiliAI.lookups.geneMap[target.toUpperCase()]) {
+             return null;  
+        }
+    }
+    
+    return null; // Let the V2.0 Intent Router (Step B) handle all other cases.
+}
+
+
+// ... (New helper function)
+function handleHighLevelExplanations(query) {
+    let result = handleComparativeQuery(query); // Tries to build a rich table
+    if (result) return result;
+    
+    result = handleProcessQuery(query); // Tries to build a step-by-step list
+    if (result) return result;
+    
+    // Add V2.0 synthesis checks here (ARL13B/INPP5E, etc.)
+    return null;
+}
+
+
+// -----------------------------
+// Master Gene Profile (scaffold)
+// -----------------------------
+window.buildMasterGeneProfile = function (gene) {
+    // Defensive: ensure gene exists in DB
+    const record = (window.CiliAI && window.CiliAI.masterData)
+        ? window.CiliAI.masterData.find(r => r.gene === gene || r.Gene === gene)
+        : null;
+
+    // Basic computed metrics (placeholders — replace with real computations)
+    const conservationScore = record && record.conservation ? record.conservation : Math.random();
+    const specificityScore = record && record.specificity ? record.specificity : Math.random();
+    const expression = (record && record.expression) ? record.expression : {};
+
+    return {
+        gene,
+        record,
+        conservationScore,
+        specificityScore,
+        combinedScore: conservationScore * specificityScore,
+        expression // object keyed by celltype/tissue with numeric expression values
+    };
+};
+
+// -----------------------------
+// handleComparativeQuery
+// builds a simple numeric comparison using expression data from master DB
+// -----------------------------
+window.handleComparativeQuery = function (gene, Aterm, Bterm) {
+    try {
+        const geneRecord = (window.CiliAI.masterData || []).find(r => (r.Gene || r.gene || "").toUpperCase() === (gene || "").toUpperCase());
+        const expr = (geneRecord && geneRecord.expression) || {};
+        // normalization of terms
+        const norm = t => (t || "").toLowerCase().trim();
+        const A = norm(Aterm);
+        const B = norm(Bterm);
+        const valA = expr[A] !== undefined ? expr[A] : null;
+        const valB = expr[B] !== undefined ? expr[B] : null;
+
+        // If both numeric values exist, compare
+        if (valA !== null && valB !== null) {
+            const higher = valA === valB ? "equal" : (valA > valB ? Aterm : Bterm);
+            let html = `<div class="ai-result-card"><b>Comparison — ${gene}</b>
+                <table>
+                    <tr><th>Cell/Tissue</th><th>Mean expression</th></tr>
+                    <tr><td>${Aterm}</td><td>${valA}</td></tr>
+                    <tr><td>${Bterm}</td><td>${valB}</td></tr>
+                </table>
+                <p>Result: <b>${higher === "equal" ? "Both equal" : higher}</b></p>
+            </div>`;
+            return html;
+        }
+
+        // If expression values are missing, attempt statistical or proxy via grouped summaries
+        // Placeholder: if missing, show best-effort explanation and suggest using exact dataset names
+        return `<div class="ai-result-card"><b>Comparison — ${gene}</b>
+            <p>Could not find numeric expression for <b>${Aterm}</b> or <b>${Bterm}</b> in the master DB. Try synonyms or check dataset names (e.g., "ciliated cells", "basal cells").</p>
+        </div>`;
+    } catch (err) {
+        window.log("ERROR in handleComparativeQuery: " + err);
+        return `<div class="ai-error-card">Comparison error: ${err.message}</div>`;
+    }
+};
+
+
+// -----------------------------
+// handleComparativeQuery (Disease Comparison)
+// -----------------------------
+window.handleComparativeQueryDisease = function (diseaseA, diseaseB, genesA, genesB) {
+    try {
+        // Find shared genes
+        const genesASymbols = genesA.map(g => g.gene);
+        const genesBSymbols = genesB.map(g => g.gene);
+        const shared = genesASymbols.filter(g => genesBSymbols.includes(g));
+
+        let html = `<div class="ai-result-card"><b>Comparison: ${diseaseA} vs ${diseaseB}</b>`;
+        html += `<p>Genes for ${diseaseA}: ${genesASymbols.length} — for ${diseaseB}: ${genesBSymbols.length} — shared: ${shared.length}</p>`;
+        
+        if (shared.length > 0) {
+            html += `<p>Shared genes: ${shared.slice(0, 20).join(", ")}</p>`;
+        } else {
+            html += `<p>No directly shared genes found in the database snapshot.</p>`;
+        }
+        
+        // Add more synthetic comparison logic here if needed (e.g., shared complexes)
+
+        html += `</div>`;
+        return html;
+    } catch (err) {
+        window.log("ERROR in handleComparativeQueryDisease: " + err);
+        return `<div class="ai-error-card">Disease comparison error: ${err.message}</div>`;
+    }
+};
+
+
+// -----------------------------
+// runGraphQuery
+// Handles: list retrieval, disease/complex simulated multi-hop synthesis
+// -----------------------------
+window.runGraphQuery = async function (query, intent, exactGenes) {
+    try {
+        const q = (query || "").toLowerCase();
+
+        // --- 1) List retrieval patterns: "genes in X", "members of Y complex", "BBSome genes" ---
+        const listMatch = q.match(/(genes|members|components)\s+(in|of)?\s*(?:the\s)?(.+)/i);
+        if (listMatch) {
+            const term = listMatch[3].trim();
+            
+            // Complex Lookup
+            if (term.toLowerCase().includes("complex") || term.toLowerCase().includes("bbsome") || term.toLowerCase().includes("ift")) {
+                const genes = window.getGenesByComplex ? window.getGenesByComplex(term) : [];
+                return window.handleListQuery("complex", term, genes);
+            }
+            
+            // Disease Lookup
+            const genesByDisease = window.getGenesByDisease ? window.getGenesByDisease(term) : [];
+            if (genesByDisease && genesByDisease.length) {
+                return window.handleListQuery("disease", term, genesByDisease);
+            }
+            return `<div class="ai-result-card">No list found for <b>${term}</b>.</div>`;
+        }
+
+        // --- 2) Disease–disease comparison or multi-hop: "Compare Joubert syndrome and short-rib thoracic dystrophy" ---
+        const compareDiseases = q.match(/compare\s+(.+?)\s+(and|vs|versus)\s+(.+)/i);
+        if (compareDiseases) {
+            const A = compareDiseases[1].trim();
+            const B = compareDiseases[3].trim();
+            
+            const genesA = window.getGenesByDisease ? window.getGenesByDisease(A) : [];
+            const genesB = window.getGenesByDisease ? window.getGenesByDisease(B) : [];
+            
+            if (genesA.length > 0 && genesB.length > 0) {
+                 return handleComparativeQueryDisease(A, B, genesA, genesB);
+            }
+        }
+        
+        // --- 3) Localization Query ---
+        if (intent === "localization_query") {
+            const localization = extractLocalizationIntent(q);
+            if (localization) return handleLocalizationQuery(localization, query);
+        }
+        
+        // --- 4) Gene Details (handled by handleAIQuery, but added here for completeness if needed) ---
+        if (intent === 'gene_details' && exactGenes.length > 0) {
+             return await window.displayFullGeneInfo(exactGenes[0]);
+        }
+
+
+        return null; // If no local graph query matches, pass to Gemini
+    } catch (err) {
+        window.log("ERROR in runGraphQuery: " + err);
+        // Returning null will ensure the query is routed to the Gemini backend as a final attempt
+        return null; 
+    }
 };
 
 // ===================================================================
