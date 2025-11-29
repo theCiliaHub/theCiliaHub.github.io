@@ -551,6 +551,73 @@ function extractMultipleGenes(query) {
 
 
 /**
+ * STUB: Simulates Semantic Search (Step 1).
+ * Always returns a low-confidence dummy match unless the query is specific.
+ */
+window.semanticSearch = async function(query, topK=5, minScore=0.60) {
+    const qLower = query.toLowerCase();
+    
+    // Placeholder logic for semantic matching
+    if (qLower.includes('bbsome') || qLower.includes('ift88')) {
+        return [{ 
+            id: 'IFT88_DESC', 
+            text: 'IFT88 is a core component of the IFT-B complex.', 
+            score: 0.95,
+            meta: { type: 'definition', gene_symbol: qLower.includes('ift88') ? 'IFT88' : 'BBSome' }
+        }];
+    }
+    return [{ id: 'NONE', text: 'no semantic match found', score: 0.1 }];
+};
+
+/**
+ * Predicts the most likely intent based on keyword overlap.
+ * This function should be defined here or sourced before handleAIQuery.
+ */
+function scoreIntents(query, semanticMatches = []) {
+    const q = query.toLowerCase().trim();
+    const scores = INTENTS.reduce((acc, i) => { acc[i] = 0; return acc; }, {});
+    // Curated list of high-value trigger phrases (TRAINING) - defined outside if possible, but copied here for safety.
+    const TRAINING = {
+        ranking: ['which five', 'highest expression', 'lowest expression', 'rank by', 'more than', 'less than', 'expressed higher in', 'compare expression in'],
+        compare: ['compare', 'versus', 'vs', 'difference between', 'how do', 'differ from'],
+        relationship: ['relationship between', 'how do', 'work together', 'connect to'],
+        definition: ['what is', 'explain', 'define', 'tell me about'],
+        visualize: ['show me', 'plot', 'umap', 'heatmap', 'display'],
+        localization_query: ['localized to', 'where is', 'cellular location'],
+        disease_query: ['associated with', 'causes', 'mutated in', 'joubert', 'bbs', 'nphp'],
+        complex_query: ['genes in', 'members of', 'subunits', 'complex', 'bbsome', 'ift-a', 'mks']
+    };
+    const INTENTS = Object.keys(TRAINING);
+
+    // 1. Exact Phrase/Keyword Match Scoring (High Weight)
+    for (const intent of INTENTS) {
+        for (const phrase of TRAINING[intent]) {
+            if (q.includes(phrase)) scores[intent] += 5;
+        }
+    }
+
+    // 2. Prioritize specific disease/complex tokens if present (medium weight)
+    if (q.includes('joubert') || q.includes('bbs') || q.includes('nphp')) {
+        scores.disease_query += 2;
+    }
+    if (q.includes('ift-b') || q.includes('bbsome') || q.includes('mks')) {
+        scores.complex_query += 2;
+    }
+    
+    // 3. Select the best intent (highest score)
+    const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+    const maxScore = best ? best[1] : 0;
+    
+    if (maxScore > 0) {
+        const tiedIntents = Object.entries(scores).filter(([i, s]) => s === maxScore);
+        return { intent: best[0], confidence: maxScore, tiedIntents: tiedIntents.map(t => t[0]) };
+    }
+
+    return { intent: 'definition', confidence: 0, tiedIntents: ['definition'] }; // Default fallback
+}
+
+
+/**
  * CiliAI V2.0: The Main Query Router (Hybrid Semantic-RAG Model)
  * FINAL EXECUTABLE VERSION - Prioritizes Quantitative/Comparison Logic.
  * * INTEGRATION FIX: Delegates all complex NL queries (synthesis, definition, complex list)
@@ -578,14 +645,16 @@ window.handleAIQuery = async function (query) {
 
         if (terminologyMatch) {
             window.log('Routing via: Step 0 (V1 Exact Terminology Match)');
-            return window.addChatMessage(`<div class="ai-result-card"><p>${terminologyMatch}</p></div>`, false);
+            // Fix: ensure the message is added to chat and execution stops
+            window.addChatMessage(`<div class="ai-result-card"><p>${terminologyMatch}</p></div>`, false);
+            return;
         }
 
         // --- STEP A: SEMANTIC & INTENT ANALYSIS ---
         
+        // window.semanticSearch is now defined, should not crash
         const semanticMatches = await window.semanticSearch(query, 5, 0.60); 
         const { intent, confidence } = window.scoreIntents(query, semanticMatches);
-        // FIX: extractMultipleGenes logic is now correctly updated above.
         const exactGenes = window.extractMultipleGenes(query); 
 
         window.log(`Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ')}`);
@@ -619,10 +688,7 @@ window.handleAIQuery = async function (query) {
         }
         // 3. DELEGATE TO GEMINI BACKEND for all other complex NL queries (Synthesis, Complex/Mechanism, Unknown)
         
-        // NOTE: The previous failure (500 error) likely occurred because the backend wasn't
-        // expecting some of the local queries. We now ensure only complex synthesis or
-        // unknown queries hit the Gemini endpoint.
-        
+        // NOTE: If local intent failed (htmlResult === null), we must fall back to Gemini.
         if (!isLocalIntent || htmlResult === null) {
             window.log('Routing via: GEMINI BACKEND (Synthesis, Mechanism, and Fallback NL)');
             
