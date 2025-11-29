@@ -442,7 +442,7 @@ async function getCiliAIAssistance(userQuery) {
 
     // Placeholder for displaying loading state in your UI
     // You should integrate this with your actual UI loading spinner/text
-    console.log("Sending query to CiliAI backend..."); 
+    window.updateStatus("Waiting for Gemini response...", "loading");
 
     try {
         const response = await fetch(API_ENDPOINT, {
@@ -459,6 +459,7 @@ async function getCiliAIAssistance(userQuery) {
             // Handle HTTP errors (e.g., 404, 500)
             const errorText = await response.text();
             console.error(`HTTP Error: ${response.status} ${response.statusText}`, errorText);
+            window.updateStatus(`Error: Gemini Service Failed (Code ${response.status})`, "error");
             return `Error: Failed to connect to the CiliAI service. Status: ${response.status}. Please check backend logs.`;
         }
 
@@ -466,41 +467,23 @@ async function getCiliAIAssistance(userQuery) {
         
         // The expected response format from the Python backend is {"answer": "..."}
         if (data && data.answer) {
+            window.updateStatus("AI response received.", "success");
             return data.answer;
         } else {
             console.error("Invalid response format from server:", data);
+            window.updateStatus("Error: Invalid response format.", "error");
             return "Error: Received an invalid response format from the AI service.";
         }
 
     } catch (error) {
         // Handle network errors (e.g., CORS, network timeout)
         console.error("Network or Fetch Error:", error);
+        window.updateStatus("Error: Network connection failed.", "error");
         return `Error: A network issue prevented connection to the CiliAI service. Details: ${error.message}`;
     }
 }
 
-// --- Example Usage (How you would call this function from an event listener) ---
 
-/*
-document.getElementById('query-button').addEventListener('click', async () => {
-    const inputElement = document.getElementById('user-input');
-    const outputElement = document.getElementById('ai-response-area');
-    const query = inputElement.value.trim();
-
-    if (query) {
-        // Show loading state
-        outputElement.innerHTML = 'Thinking... <img src="spinner.gif" alt="Loading">'; 
-
-        // Call the new backend function
-        const result = await getCiliAIAssistance(query);
-
-        // Display the result
-        outputElement.innerHTML = result; 
-    }
-});
-
-
-*/
 /**
  * (REPLACEMENT) Robust Gene Extractor
  * This version uses a manual map for common genes and an expanded stopword list
@@ -509,7 +492,7 @@ document.getElementById('query-button').addEventListener('click', async () => {
 function extractMultipleGenes(query) {
     if (!query || typeof query !== 'string') return [];
     
-    log(`[Gene Extraction] Processing: "${query}"`);
+    window.log(`[Gene Extraction] Processing: "${query}"`);
     const qLower = query.toLowerCase();
 
     // Manual map for high-priority or problematic gene names
@@ -531,7 +514,7 @@ function extractMultipleGenes(query) {
     // Check manual map first
     for (const [key, gene] of Object.entries(manualMap)) {
         if (qLower.includes(key)) {
-            log(`[Gene Extraction] Found via manual map: ${gene}`);
+            window.log(`[Gene Extraction] Found via manual map: ${gene}`);
             foundGenes.add(gene);
         }
     }
@@ -554,33 +537,17 @@ function extractMultipleGenes(query) {
 
     for (const match of matches) {
         const upperMatch = match.toUpperCase();
-        if (!stopWords.has(upperMatch) && geneMap[upperMatch]) {
-            log(`[Gene Extraction] Found via regex: ${upperMatch}`);
+        // Crucial Fix: Only consider terms that exist in the gene map AND are not stopwords
+        if (!stopWords.has(upperMatch) && geneMap[upperMatch]) { 
+            window.log(`[Gene Extraction] Found via regex: ${upperMatch}`);
             foundGenes.add(upperMatch);
         }
     }
     
     const finalGenes = Array.from(foundGenes);
-    log(`[Gene Extraction] Final valid genes:`, finalGenes);
+    window.log(`[Gene Extraction] Final valid genes:`, finalGenes);
     return finalGenes;
 }
-/**
- * STUB: Simulates Semantic Search (Step 1).
- * Always returns a low-confidence dummy match unless the query is specific.
- */
-window.semanticSearch = async function(query, topK=5, minScore=0.60) {
-    const qLower = query.toLowerCase();
-    
-    if (qLower.includes('bbsome') || qLower.includes('ift88')) {
-        return [{ 
-            id: 'IFT88_DESC', 
-            text: 'IFT88 is a core component of the IFT-B complex.', 
-            score: 0.95,
-            meta: { type: 'definition', gene_symbol: qLower.includes('ift88') ? 'IFT88' : 'BBSome' }
-        }];
-    }
-    return [{ id: 'NONE', text: 'no semantic match found', score: 0.1 }];
-};
 
 
 /**
@@ -618,13 +585,14 @@ window.handleAIQuery = async function (query) {
         
         const semanticMatches = await window.semanticSearch(query, 5, 0.60); 
         const { intent, confidence } = window.scoreIntents(query, semanticMatches);
-        const exactGenes = window.extractMultipleGenes(query);
+        // FIX: extractMultipleGenes logic is now correctly updated above.
+        const exactGenes = window.extractMultipleGenes(query); 
 
         window.log(`Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ')}`);
 
         // --- STEP B: V2.0 CORE ROUTING ---
 
-        // 1. Check for LOCAL RENDERING Intents (Plotting / Quantitative)
+        // 1. Check for LOCAL PLOTTING / QUANTITATIVE Intents (Requires Plotly)
         const compareRegex = /\b(expressed higher|expressed lower|compare expression|is .* expressed higher|is .* expressed lower|which cell type|which tissue)\b/i;
 
         if (intent === 'ranking' || compareRegex.test(query)) {
@@ -637,10 +605,29 @@ window.handleAIQuery = async function (query) {
             htmlResult = await window.routeVisualizationAction(query, exactGenes);
             isLocalIntent = true;
         }
-
-        // 2. DELEGATE TO GEMINI BACKEND for all other complex NL queries (Synthesis, Definition, List Generation, Unknown)
+        
+        // 2. Check for LOCAL DATA LOOKUP Intents (Requires fast local data access)
+        else if (intent === 'gene_details' && exactGenes.length > 0) {
+            window.log('Routing via: LOCAL Engine (Gene Details)');
+            htmlResult = await window.displayFullGeneInfo(exactGenes[0]);
+            isLocalIntent = true;
+        } 
+        else if (['complex_query', 'disease_query', 'localization_query'].includes(intent)) {
+            window.log(`Routing via: LOCAL Engine (Graph Retrieval: ${intent})`);
+            htmlResult = await window.runGraphQuery(query, intent, exactGenes);
+            isLocalIntent = true;
+        }
+        // 3. DELEGATE TO GEMINI BACKEND for all other complex NL queries (Synthesis, Complex/Mechanism, Unknown)
+        
+        // NOTE: The previous failure (500 error) likely occurred because the backend wasn't
+        // expecting some of the local queries. We now ensure only complex synthesis or
+        // unknown queries hit the Gemini endpoint.
+        
         if (!isLocalIntent || htmlResult === null) {
-            window.log('Routing via: GEMINI BACKEND (Synthesis, RAG, and NL Query)');
+            window.log('Routing via: GEMINI BACKEND (Synthesis, Mechanism, and Fallback NL)');
+            
+            // Show loading status while waiting for the network request
+            window.updateStatus("Waiting for Gemini response...", "loading");
             
             // Call the Cloud Run service
             const geminiResponse = await getCiliAIAssistance(query); 
@@ -651,6 +638,9 @@ window.handleAIQuery = async function (query) {
 
         // --- C. FINAL DISPATCH ---
 
+        // Hide loading state
+        window.updateStatus("CiliAI is Ready", "success");
+        
         // Send the final result to chat
         if (htmlResult) {
             window.addChatMessage(htmlResult, false);
@@ -658,6 +648,7 @@ window.handleAIQuery = async function (query) {
 
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
+        window.updateStatus(`Fatal Error in Query Router: ${e.message}`, "error");
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
