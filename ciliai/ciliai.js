@@ -264,19 +264,8 @@ window.extractComplexTerm = window.extractComplexIntent;
         return [value];
     }
 
-    // ==========================================================
-// ==========================================================
-// 2. DATA LOADING & PROCESSING
-// ==========================================================
- 
-/* ==============================================================
- * CiliAI – Unified Explorer (v6.0 - CELL WHISPERER INSPIRED DESIGN)
- * ==============================================================
- * Features: Three-column layout (Nav | Vis | Chat), Blue Branding, Organized Menus.
- * ============================================================== */
-/**
- * Executes a query against the CiliAI Gemini Backend Service deployed on Google Cloud Run.
-// ==========================================================
+
+
 // 3. GEMINI COMMUNICATION LAYER
 // ==========================================================
 
