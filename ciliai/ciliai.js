@@ -5,52 +5,41 @@
  * ============================================================== */
 
 // ==========================================================
-// 0. GLOBAL DATA URL CONSTANT (GCS)
+// 0. GLOBAL CONFIGURATION & STATE
 // ==========================================================
-// ALL data files are now served from the public GCS bucket 'ciliai'
 const GCS_BASE_URL = 'https://storage.googleapis.com/ciliai/';
+const API_ENDPOINT = "https://cili-ai-gemini-backend-687107394688.us-central1.run.app/ask-ciliai";
 
-// CRITICAL FIX: Ensure all functions used early are defined.
+// Global State and Cache
+window.CiliAI = { data: { umap: [] }, masterData: [], ready: false, lookups: {} };
+let lastQueryContext = { type: null, data: [], term: null };
+window.liPhylogenyCache = null;
+window.neversPhylogenyCache = null;
+window.CiliAI_UMAP = null;
+
+
+// ==========================================================
+// 1. CORE UTILITIES (Must be defined globally only once)
+// ==========================================================
 
 if (typeof window.updateStatus !== "function") {
-    window.updateStatus = function (msg, state) {
-        console.log(`STATUS[${state}]: ${msg}`);
-    };
+    window.updateStatus = (msg, state) => { console.log(`STATUS[${state}]: ${msg}`); };
 }
-
 if (typeof window.log !== "function") {
-    window.log = function (msg) {
-        console.log(`CiliAI LOG: ${msg}`);
-    };
+    window.log = (msg) => { console.log(`CiliAI LOG: ${msg}`); };
 }
-
 if (typeof window.addChatMessage !== "function") {
-    window.addChatMessage = function (msg, isUser) {
-        console.log(`CHAT[${isUser ? "USER" : "AI"}]: ${msg}`);
-    };
-}
-
-if (typeof window.react !== "function") {
-    window.react = function (type) {
-        window.addChatMessage(`Feedback received: ${type}`, false);
-    };
-}
-
-if (typeof window.clearChat !== "function") {
-    window.clearChat = function () {
-        window.log("clearChat() fallback executed.");
-    };
-}
-
-if (typeof window.handleUserSend !== "function") {
-    window.handleUserSend = function () {
-        window.log("handleUserSend() fallback executed.");
-    };
-}
-
-if (typeof window.handleGeneSearch !== "function") {
-    window.handleGeneSearch = function () {
-        window.log("handleGeneSearch() fallback executed.");
+    window.addChatMessage = (html, isUser = false) => { 
+        const chatWindow = document.getElementById('messages');
+        if (chatWindow) {
+             const msg = document.createElement('div');
+             msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+             msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
+             chatWindow.appendChild(msg);
+             chatWindow.scrollTop = chatWindow.scrollHeight;
+        } else {
+             console.log(`CHAT[${isUser ? "USER" : "AI"}]: ${html}`);
+        }
     };
 }
 
@@ -287,61 +276,43 @@ window.extractComplexTerm = window.extractComplexIntent;
  * ============================================================== */
 /**
  * Executes a query against the CiliAI Gemini Backend Service deployed on Google Cloud Run.
- *
- * This function handles packaging the user query, sending it to the secure Cloud Run endpoint,
- * and processing the result or any errors.
- *
- * @param {string} userQuery The text question submitted by the user.
- * @returns {Promise<string>} A promise that resolves with the AI's answer text.
- */
+// ==========================================================
+// 3. GEMINI COMMUNICATION LAYER
+// ==========================================================
+
 async function getCiliAIAssistance(userQuery) {
-    // ----------------------------------------------------------------------------------
-    // NOTE: This is your live, production backend URL deployed on Google Cloud Run.
-    // ----------------------------------------------------------------------------------
-    const API_ENDPOINT = "https://cili-ai-gemini-backend-687107394688.us-central1.run.app/ask-ciliai";
-
-    const requestBody = {
-        query: userQuery
-    };
-
-    // Placeholder for displaying loading state in your UI
-    // You should integrate this with your actual UI loading spinner/text
-    console.log("Sending query to CiliAI backend...");
+    window.updateStatus("Waiting for Gemini response...", "loading");
+    const requestBody = { query: userQuery };
 
     try {
         const response = await fetch(API_ENDPOINT, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // Since the Cloud Run service allows unauthenticated access (--allow-unauthenticated),
-                // we don't need a client-side API key or authentication token here.
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
-            // Handle HTTP errors (e.g., 404, 500)
             const errorText = await response.text();
-            console.error(`HTTP Error: ${response.status} ${response.statusText}`, errorText);
-            return `Error: Failed to connect to the CiliAI service. Status: ${response.status}. Please check backend logs.`;
+            window.updateStatus(`Error: Gemini Service Failed (Code ${response.status})`, "error");
+            return `Error: Failed to fetch synthesis. Status: ${response.status}. Details: ${errorText.substring(0, 100)}...`;
         }
 
         const data = await response.json();
-       
-        // The expected response format from the Python backend is {"answer": "..."}
+        
         if (data && data.answer) {
+            window.updateStatus("AI response received.", "success");
             return data.answer;
         } else {
-            console.error("Invalid response format from server:", data);
-            return "Error: Received an invalid response format from the AI service.";
+            window.updateStatus("Error: Invalid response format.", "error");
+            return "Error: Received an empty or invalid synthesis response.";
         }
 
     } catch (error) {
-        // Handle network errors (e.g., CORS, network timeout)
-        console.error("Network or Fetch Error:", error);
+        window.updateStatus("Error: Network connection failed.", "error");
         return `Error: A network issue prevented connection to the CiliAI service. Details: ${error.message}`;
     }
 }
+
 
 /**
  * Loads the external data files required only by the Cilia Analysis Page plots.
@@ -536,117 +507,18 @@ function extractMultipleGenes(query) {
  * STUB: Simulates Semantic Search (Step 1).
  * Always returns a low-confidence dummy match unless the query is specific.
  */
-window.semanticSearch = async function(query, topK=5, minScore=0.60) {
+window.semanticSearch = async (query) => { return [{ id: 'NONE', text: 'no match', score: 0.1 }]; };
+window.scoreIntents = (query) => { 
     const qLower = query.toLowerCase();
-   
-    if (qLower.includes('bbsome') || qLower.includes('ift88')) {
-        return [{
-            id: 'IFT88_DESC',
-            text: 'IFT88 is a core component of the IFT-B complex.',
-            score: 0.95,
-            meta: { type: 'definition', gene_symbol: qLower.includes('ift88') ? 'IFT88' : 'BBSome' }
-        }];
-    }
-    return [{ id: 'NONE', text: 'no semantic match found', score: 0.1 }];
+    if (qLower.includes('umap') || qLower.includes('plot')) return { intent: 'visualize', confidence: 10 };
+    if (qLower.includes('rank') || qLower.includes('conserved')) return { intent: 'ranking', confidence: 10 };
+    if (qLower.includes('explain') || qLower.includes('describe') || qLower.includes('why')) return { intent: 'synthesis', confidence: 10 };
+    if (qLower.includes('gene') || qLower.includes('complex') || qLower.includes('disease')) return { intent: 'complex_query', confidence: 5 };
+    return { intent: 'definition', confidence: 5 };
 };
 
 
  /**
- * CiliAI V2.0: The Main Query Router (Hybrid Semantic-RAG Model)
- * FINAL EXECUTABLE VERSION - Prioritizes Quantitative/Comparison Logic.
- */
-window.handleAIQuery = async function (query) {
-    const chatWindow = document.getElementById('messages');
-    if (!chatWindow) return;
-
-    if (!query) return;
-    const qLower = query.toLowerCase().trim();
-    let htmlResult = null;
-    let match;
-
-    window.log(`Routing query (V2.0 Semantic-First): ${query}`);
-
-    try {
-        if (!window.CiliAI.ready) {
-            window.addChatMessage("Data is still loading, please wait...", false);
-            return;
-        }
-       
-        // --- STEP 0: V1 EXACT TERMINOLOGY FALLBACK (Highest Priority) ---
-        const qLowerClean = qLower.replace(/[?.,!]/g, '');
-        const terminologyMatch = findTerminologyMatch(query);
-
-        if (terminologyMatch) {
-            window.log('Routing via: Step 0 (V1 Exact Terminology Match)');
-            return window.addChatMessage(`<div class="ai-result-card"><p>${terminologyMatch}</p></div>`, false);
-        }
-
-        // --- STEP A: SEMANTIC & INTENT ANALYSIS ---
-       
-        const semanticMatches = await window.semanticSearch(query, 5, 0.60);
-        const { intent, confidence } = window.scoreIntents(query, semanticMatches);
-        const exactGenes = window.extractMultipleGenes(query);
-
-        window.log(`Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ')}`);
-
-        // --- STEP B: V2.0 CORE ROUTING (Intent-Driven) ---
-
-        // CRITICAL FIX: Quantitative phrase overriding (Resolves IFT88 comparison failure)
-        const compareRegex = /\b(expressed higher|expressed lower|compare expression|is .* expressed higher|is .* expressed lower|which cell type|which tissue)\b/i;
-
-        if (intent === 'ranking' || compareRegex.test(query)) {
-            window.log('Routing via: Intent (Quantitative Engine - Forced)');
-            htmlResult = await window.runQuantitativeEngine(query, exactGenes);
-        }
-       
-        // 4. ACTION INTENTS (Visualization/Plotting)
-        else if (intent === 'visualize' || intent === 'scRNA') {
-            window.log('Routing via: Intent (Visualize)');
-            htmlResult = await window.routeVisualizationAction(query, exactGenes);
-        }
-       
-        // 6. EXPLANATORY & LIST INTENTS (Synthesis/Graph Traversal/List Filtering)
-        else if (['compare', 'relationship', 'disease_query', 'complex_query', 'localization_query'].includes(intent)) {
-            window.log(`Routing via: Intent (Graph Reasoning / Synthesis)`);
-            htmlResult = await window.runGraphQuery(query, intent, exactGenes);
-        }
-       
-        // 7. DEFINITION INTENT (RAG-based Explanation/Gene Details)
-        else if (intent === 'definition' || confidence < 0.3) {
-            window.log('Routing via: Intent (Definition / RAG Retrieval)');
-           
-            if (exactGenes.length > 0) {
-                htmlResult = await window.displayFullGeneInfo(exactGenes[0]);
-            }
-            else if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
-                htmlResult = window.formatRAGAnswer(semanticMatches[0]);
-            }
-        }
-
-
-        // --- C. FINAL CATCH-ALL ---
-
-        // 9. FINAL CATCH-ALL (Error)
-        if (htmlResult === null) {
-            window.log(`Routing via: Final Fallback (Error)`);
-            const fallbackText = exactGenes.length > 0
-                                ? `I found gene **${exactGenes[0]}**, but couldn't process the intent (${intent}).`
-                                : `I didn't understand the query. The best semantic match was "${semanticMatches[0]?.text || 'none'}".`;
-            htmlResult = `Sorry, I couldn't process your request. ${fallbackText}`;
-        }
-
-        // Send the final result to chat
-        if (htmlResult) {
-            window.addChatMessage(htmlResult, false);
-        }
-
-    } catch (e) {
-        console.error("Error in handleAIQuery:", e);
-        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
-    }
-}
-
-/**
  * Handles Visualization Intents (Step 4).
  * Centralizes UMAP / t-SNE / Phylogeny routing.
  */
@@ -857,97 +729,195 @@ window.computeGeneProfile = function(gene) {
   return profile;
 };
 
+
+// ==========================================================
+// 2. STUBS & DATA LOOKUP HANDLERS
+// ==========================================================
+
+// Dummy stubs for local functionality to prevent crashes
+window.findTerminologyMatch = (query) => { 
+    const qLower = query.toLowerCase().replace(/[?.,!]/g, '');
+    if (qLower === 'tell me about cilia') {
+        return "Cilia detect environmental cues or move fluids, depending on type. Defects cause human genetic disorders called ciliopathies. (Hildebrandt & Benzing 2011)";
+    }
+    return null; 
+};
+
+window.getGenesByDisease = (term) => { return []; };
+window.getComplexesForGene = (gene) => { return []; };
+window.routeVisualizationAction = async (query, genes) => { return null; };
+window.displayFullGeneInfo = async (gene) => { return `Detailed info for ${gene} not implemented yet.`; };
+
+// V2.0 Gene Extractor (Defined once)
+window.extractMultipleGenes = function(query) {
+    if (!query || typeof query !== 'string') return [];
+    const qLower = query.toLowerCase();
+    const manualMap = { 'kif3a': 'KIF3A', 'ift88': 'IFT88', 'bbs1': 'BBS1', 'cep290': 'CEP290' };
+    let foundGenes = new Set();
+    for (const [key, gene] of Object.entries(manualMap)) { if (qLower.includes(key)) foundGenes.add(gene); }
+    const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
+    let matches = query.match(geneRegex) || [];
+    const stopWords = new Set(["THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES", "PLOT", "COMPARE"]);
+    const geneMap = window.CiliAI.lookups.geneMap;
+    if (!geneMap) return Array.from(foundGenes);
+
+    for (const match of matches) {
+        const upperMatch = match.toUpperCase();
+        if (!stopWords.has(upperMatch) && geneMap[upperMatch]) { foundGenes.add(upperMatch); }
+    }
+    return Array.from(foundGenes);
+};
+
+
 // ===================================================================
 // 4. UNIVERSAL QUANTITATIVE ENGINE — Handles All Ranking/Comparison
 // ===================================================================
-window.runQuantitativeEngine = function(query) {
-  const q = query.toLowerCase();
-
-  let candidates = Object.keys(window.geneData);
-
-  // Apply filters
-  if (q.includes("transition zone")) candidates = candidates.filter(g => window.geneData[g].localization?.includes("transition zone"));
-  if (q.includes("ift-a")) candidates = candidates.filter(g => window.geneData[g].complexes?.includes("IFT-A"));
-  if (q.includes("bbs")) candidates = candidates.filter(g => window.geneData[g].associatedDiseases?.includes("Bardet-Biedl"));
-
-  // Sort by metric
-  let metric = "combinedScore";
-  if (q.includes("specific")) metric = "specificityScore";
-  if (q.includes("validation")) metric = "validationScore";
-  if (q.includes("conserv")) metric = "conservationScore";
-
-  const scored = candidates.map(g => ({ gene: g, profile: computeGeneProfile(g) })).filter(x => x.profile);
-  scored.sort((a,b) => b.profile[metric] - a.profile[metric]);
-
-  const top10 = scored.slice(0, 10);
-
-  let md = `| Rank | Gene | Specificity | Validation | Tissue | Consv | Combined |\n|----|------|-------------|------------|--------|-------|----------|\n`;
-  top10.forEach((x,i) => {
-    const p = x.profile;
-    md += `| ${i+1} | **${x.gene}** | ${p.specificityScore} | ${p.validationScore}/4 | ${p.tissueEnrichment} | ${p.conservationScore} | ${p.combinedScore} |\n`;
-  });
-  return md;
+window.runQuantitativeEngine = async (query, genes) => {
+    window.log("Quantitative intent detected. Routing to Gemini for synthesis/ranking.");
+    return null; 
 };
+
 
 // ===================================================================
 // 5. SMART GRAPH QUERY — Multi-Hop Synthesis & Narratives
 // ===================================================================
-window.runGraphQuery = function(intent, entities) {
-  if (intent === "complex_query") return getGenesByComplexAndFormat(entities.complex);
-  if (intent === "disease_query") return getGenesByDiseaseAndFormat(entities.disease);
-
-  if (intent === "compare_diseases") {
-    return `### Joubert Syndrome vs Short-Rib Thoracic Dysplasia (SRTD)
-
-| Feature | Joubert Syndrome | SRTD (Jeune, Mainzer-Saldino) |
-|----------------------------|---------------------------|-------------------------------|
-| Core TZ module | MKS module | MKS module |
-| Brain malformation | Molar tooth sign | Rare |
-| Skeletal | Occasional polydactyly | Severe (narrow thorax, short ribs) |
-| Renal | Cystic dysplasia | Severe nephronophthisis |
-| Key genes | TMEM67, AHI1, CEP290 | IFT80, IFT140, WDR19, DYNC2H1 |
-| Overlap | CEP290, TMEM67 | Some shared genes |`;
-  }
-
-  if (intent === "mechanism_synthesis") {
-    if (entities.complex === "IFT-A") {
-      return `### IFT-A Complex Mechanism\nMutations cause **retrograde transport failure** → accumulation of IFT-B and BBSome inside cilium → short/bulbous cilia → severe skeletal + renal phenotypes (Jeune, SRTD, CED).`;
+// Simplified Graph Query: Only handles simple local lookups, sends complex requests to Gemini.
+window.runGraphQuery = async function (query, intent, genes) {
+    // If the query is a simple list lookup, try local data (stubbed for now)
+    if (intent === 'complex_query' || intent === 'disease_query' || intent === 'localization_query') {
+        window.log("Attempting local graph lookup. If list is empty, it routes to Gemini.");
+        // A full implementation would go here and return HTML. Since stubs return [], we force NULL result.
+        return null;
     }
-  }
-
-  return "Not implemented yet.";
+    // All other graph/complex synthesis queries go to Gemini.
+    return null;
 };
 
-// ===================================================================
-// 6. MAIN DISPATCHER — The Brain of CiliAI V2.0
-// ===================================================================
+
+
+// ==========================================================
+// 4. MAIN ROUTER FUNCTION
+// ==========================================================
+
+window.handleAIQuery = async function (query) {
+    if (!query || !document.getElementById('messages')) return;
+
+    let htmlResult = null;
+    let isLocalIntent = false;
+
+    try {
+        if (!window.CiliAI.ready) {
+            window.addChatMessage("Data is still loading, please wait...", false);
+            return;
+        }
+        
+        // Step 0: Check for V1 static terminologies (highest priority)
+        const terminologyMatch = window.findTerminologyMatch(query);
+        if (terminologyMatch) {
+            window.addChatMessage(`<div class="ai-result-card"><p>${terminologyMatch}</p></div>`, false);
+            return;
+        }
+
+        // Step A: Intent Analysis
+        const semanticMatches = await window.semanticSearch(query); 
+        const { intent } = window.scoreIntents(query, semanticMatches);
+        const exactGenes = window.extractMultipleGenes(query); 
+
+        // Step B: LOCAL EXECUTION (Plotting, Ranking, Direct Data Lookup)
+        
+        // 1. Visualization (must be local)
+        if (intent === 'visualize') {
+            htmlResult = await window.routeVisualizationAction(query, exactGenes);
+            isLocalIntent = true;
+        } 
+        
+        // 2. Direct Gene Details (if local data handler is fully functional, otherwise falls through)
+        else if (intent === 'gene_details' && exactGenes.length > 0) {
+            htmlResult = await window.displayFullGeneInfo(exactGenes[0]);
+            isLocalIntent = true;
+        } 
+        
+        // 3. Graph/Quantitative/Complex Queries (run these locally, but expect null if complex)
+        else if (['ranking', 'complex_query', 'disease_query', 'localization_query', 'synthesis'].includes(intent)) {
+            // Attempt local execution first. If local code fails or returns null, it falls to Gemini.
+            htmlResult = await window.runQuantitativeEngine(query, exactGenes) || await window.runGraphQuery(query, intent, exactGenes);
+            isLocalIntent = true; 
+        }
+
+        
+        // Step C: FALLBACK TO GEMINI BACKEND
+        
+        // Route to Gemini if:
+        // 1. It wasn't a local intent OR 
+        // 2. The local intent execution failed (htmlResult is null) OR 
+        // 3. The intent was 'synthesis' or 'definition' (which should be handled by Gemini anyway)
+        if (htmlResult === null || intent === 'synthesis' || intent === 'definition') {
+            window.log('Routing via: GEMINI BACKEND (Synthesis/Fallback)');
+            
+            const geminiResponse = await getCiliAIAssistance(query); 
+            htmlResult = `<div class="ai-result-card">🧠 **AI Synthesis:** ${geminiResponse}</div>`;
+        }
+
+        // Step D: FINAL DISPATCH
+        if (htmlResult) {
+            window.addChatMessage(htmlResult, false);
+        }
+
+    } catch (e) {
+        console.error("Error in handleAIQuery:", e);
+        window.updateStatus(`Fatal Error in Query Router: ${e.message}`, "error");
+        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+    }
+};
+
+/**
+ * MISSING: Primary V1 Logic Dispatcher. Should be defined here.
+ * @param {string} question 
+ */
 window.handleUserQuestion = function(question) {
-  const parsed = parseUserIntent(question);
-
-  switch (parsed.intent) {
-    case "terminology":
-      return answerTerminology(parsed.concept);
-
-    case "gene_details":
-      return displayFullGeneInfo(parsed.gene); // now includes V2.0 profile
-
-    case "complex_query":
-    case "disease_query":
-    case "localization_query":
-      return window.runGraphQuery(parsed.intent, parsed);
-
-    case "quantitative_compare":
-    case "quantitative_rank":
-      return runQuantitativeEngine(question);
-
-    case "compare_diseases":
-    case "mechanism_synthesis":
-      return runGraphQuery(parsed.intent, parsed);
-
-    default:
-      return "I don't understand this question yet. But I'm learning!";
-  }
+    // We use the V2 router handleAIQuery as the core logic engine now
+    window.log("handleUserQuestion delegated to handleAIQuery.");
+    return window.handleAIQuery(question);
 };
+
+/**
+ * MISSING: V1 Intent Parser. Simplified logic for V1 compatibility.
+ * @param {string} question 
+ */
+window.parseUserIntent = function(question) {
+    const q = question.toLowerCase().trim();
+    // Simplified parsing to prevent V1 logic crashes while delegating to V2
+    if (q.includes("tell me about")) return { intent: "gene_details", gene: "CEP290" };
+    return { intent: "unknown", question };
+};
+
+/**
+ * MISSING: List formatter. Generates standardized HTML list output.
+ */
+window.handleListQuery = (type, term, genes) => {
+    if (genes && genes.length > 0) {
+        let listHtml = genes.map(g => `<li>${g.gene} - ${g.description}</li>`).join('');
+        return `<div class="ai-result-card">Found ${genes.length} ${type} genes for ${term}.<ul>${listHtml}</ul></div>`;
+    }
+    return null;
+};
+
+/**
+ * MISSING: Disease lookup wrapper.
+ */
+window.getGenesByDiseaseAndFormat = (disease) => {
+    const genes = ["CEP290", "IFT140"]; // Stub data
+    return window.handleListQuery("disease", disease, genes.map(g => ({gene: g, description: "Ciliopathy gene"})));
+};
+
+/**
+ * MISSING: Gene in Complex lookup wrapper.
+ */
+window.handleGeneInComplexQuery = (gene) => {
+    const complexes = ["IFT Complex", "Transition Zone"]; // Stub data
+    return window.handleListQuery("complex", gene, complexes.map(c => ({gene: c, description: "Component"})));
+};
+
 
 // ===================================================================
 // UPGRADE YOUR MAIN ENTRY POINT
@@ -3497,7 +3467,7 @@ window.terminologyQueries = {
  // ==========================
 // SAFE FALLBACKS
 // ==========================
-if (typeof window.log !== "function") window.log = msg => console.log(`CiliAI LOG: ${msg}`);
+
 if (typeof window.drawDefaultUMAP !== "function") window.drawDefaultUMAP = () => "<p>Default UMAP plot placeholder.</p>";
 if (typeof window.drawDefaultTSNE !== "function") window.drawDefaultTSNE = () => "<p>Default t-SNE plot placeholder.</p>";
 if (typeof window.routeVisualizationAction !== "function") window.routeVisualizationAction = async () => "<p>Visualization route not implemented.</p>";
@@ -3841,7 +3811,25 @@ window.generateAndInjectSVG = function() {
 // ==========================================================
 // GLOBAL EXPOSURE (REQUIRED FOR index.html)
 // ==========================================================
-// These manually expose the functions defined above to the global 'window' scope.
+
+// Expose V1 functions for compatibility with existing buttons
+window.searchGene = function (name) {
+    const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
+    if (query) {
+        window.addChatMessage(query, true);
+        window.handleAIQuery(query);
+    }
+};
+
+window.showDefaultUMAP = function () {
+    window.addChatMessage('plot default umap', true);
+    window.handleAIQuery('plot default umap');
+};
+window.showDefaultPhylogeny = function () {
+    window.addChatMessage('plot default phylogeny', true);
+    window.handleAIQuery('plot default phylogeny');
+};
+
 
 window.log = log;
 window.react = react;
