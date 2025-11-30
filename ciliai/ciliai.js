@@ -101,16 +101,6 @@ window.getGenesByComplex = function (complexTerm) {
 let ciliaryGeneMap = new Map();
 let screenDatabase = {};
 
-let lastQueryContext = {
-    type: null,
-    data: [],
-    term: null
-};
-
-window.liPhylogenyCache = null;
-window.neversPhylogenyCache = null;
-window.CiliAI_UMAP = null;
-
 // ==========================================================
 // V1 → V2 ALIAS FIXES FOR GRAPH ENGINE
 // ==========================================================
