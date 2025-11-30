@@ -281,7 +281,7 @@ window.extractMultipleGenes = function(query) {
     if (!query || typeof query !== 'string') return [];
     const qLower = query.toLowerCase();
 
-    // 1. Hardcoded list of essential genes (Faster than full lookup for common queries)
+    // 1. Hardcoded list of essential genes for FAST local routing
     const knownGenes = {
         'ift88': 'IFT88', 'cep290': 'CEP290', 'bbs1': 'BBS1', 'arl13b': 'ARL13B',
         'kif3a': 'KIF3A', 'dyhc2': 'DYNC2H1', 'pkd1': 'PKD1', 'nphp1': 'NPHP1'
@@ -296,11 +296,10 @@ window.extractMultipleGenes = function(query) {
     }
 
     // 2. Generic Regex Matching (Captures capitalized words >= 3 chars, handles dashes/periods)
-    // This provides a good fallback for non-hardcoded genes.
     const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/g;
     let matches = query.match(geneRegex) || [];
     
-    // 3. Simple Stop Words List (Stops common false positives like 'THE', 'AND', 'FOR')
+    // 3. Simple Stop Words List
     const stopWords = new Set(["THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "PLOT", "COMPARE", "GENE", "CELL", "HOW"]);
 
     for (const match of matches) {
@@ -309,16 +308,8 @@ window.extractMultipleGenes = function(query) {
             foundGenes.add(upperMatch); 
         }
     }
-
-    // Note: This version assumes that if a gene is not in the small list, 
-    // it will be confirmed by the backend's exhaustive KNOWN_GENE_SYMBOLS.
-    const finalGenes = Array.from(foundGenes);
     
-    if (finalGenes.length > 0) {
-        console.log(`[JS Router] Genes detected: ${finalGenes.join(', ')}`);
-    }
-    
-    return finalGenes;
+    return Array.from(foundGenes);
 };
 
 
@@ -723,11 +714,9 @@ window.buildMasterGeneProfile = function (gene) {
  * returns null, forcing the main handleAIQuery router to use the Gemini backend
  * for deep synthesis and cross-validation (Layers 2-5).
  */
+// Replacement for local calculation logic in window.handleComparativeQuery
 window.handleComparativeQuery = async function (gene, Aterm, Bterm) {
-    // Log the action for debugging/monitoring
-    window.log(`[Router] Comparative Query detected for ${gene} between ${Aterm} and ${Bterm}. Delegating to Gemini Synthesis Engine.`);
-    
-    // Returning null ensures the request falls through to the Gemini backend call
+    // This immediately returns null, forcing the main handleAIQuery router to use Gemini.
     return null;
 };
 
