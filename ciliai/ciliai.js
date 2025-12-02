@@ -1716,12 +1716,18 @@ function handleClassificationQuery(classificationName, query) {
     }
     
 
+
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization where points are colored and sized based on the
  * expression level of the requested gene (or FOXJ1 by default).
  */
 async function renderUMAPPlot(geneSymbol) { 
+    // --- 💡 CRITICAL FIX: Ensure Data is Loaded/Awaited ---
+    // These functions must be defined externally to fetch and populate the global caches.
+    await fetchUmapData(); 
+    await fetchCellData(); 
+    // ----------------------------------------------------
     const plotDivId = 'cilia-svg';
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
@@ -1734,11 +1740,13 @@ async function renderUMAPPlot(geneSymbol) {
         console.error('UMAP plot container "cilia-svg" not found.');
         return;
     }
+    
+    // Check if data is *now* available after the await calls
     if (!umapData || !cellData) {
-        window.addChatMessage('UMAP or scRNA-seq expression data is not available to plot.', false);
-        return;
+        window.addChatMessage('UMAP coordinates or scRNA-seq expression data failed to load.', false);
+        return; 
     }
-
+        
     // --- Reset SVG panel ---
     plotDiv.innerHTML = '';
     const wrapper = plotDiv.closest('.interactive-cilium');
