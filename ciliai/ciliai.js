@@ -304,10 +304,13 @@ async function loadAnalysisData() {
 
 // NEW/REVISED HELPER FUNCTIONS (Must be defined globally in your script)
 
-const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
-const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
+// Data URLs (already defined in your context)
+// const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
+// const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
 
+/**
+ * Ensures UMAP coordinate data is loaded into window.CiliAI_UMAP.
+ */
 /**
  * Ensures UMAP coordinate data is loaded into window.CiliAI_UMAP.
  */
@@ -332,9 +335,9 @@ async function ensureUmapCoordinatesLoaded() {
 
 /**
  * Ensures cell expression data is loaded into window.CiliAI.cellDataCache.
- * NOTE: This function must populate a variable named cellDataCache.
  */
 async function ensureCellExpressionLoaded() {
+    // Note: The correct cache key is window.CiliAI.cellDataCache
     if (window.CiliAI.cellDataCache && Object.keys(window.CiliAI.cellDataCache).length > 0) return true;
     try {
         window.log("Fetching Cell Expression data...");
@@ -1774,10 +1777,10 @@ async function renderUMAPPlot(geneSymbol) {
     
     // --- 💡 CRITICAL FIX: Await UMAP and Cell Data loading ---
     // Ensure the required data is loaded into global caches before proceeding.
-    await Promise.all([
-        ensureUmapCoordinatesLoaded(),
-        ensureCellExpressionLoaded()
-    ]);
+        await Promise.all([
+    ensureUmapCoordinatesLoaded(),
+    ensureCellExpressionLoaded()
+]);
     // ----------------------------------------------------
 
     const plotDivId = 'cilia-svg';
