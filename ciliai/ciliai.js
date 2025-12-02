@@ -3138,72 +3138,103 @@ window.terminologyQueries = {
  * FINAL EXECUTABLE VERSION - Terminology check is prioritized.
  * NOTE: This function relies on functional stubs for semanticSearch, runQuantitativeEngine,
  * and runGraphQuery being defined in the global scope (window).
- */
+ 
 // ============================================================
-// FULL UPDATED handleAIQuery()  (DROP-IN SAFE REPLACEMENT)
+// CiliAI V5.1 - Main Query Router (Hybrid Frontend Execution)
 // ============================================================
-
-// ==========================
-// CiliAI v2.0 Safe Query Handler
-// ==========================
-// ------------------------------------------------------------
-// CiliAI V3 — FINAL handleAIQuery()
-// Backend does NO data loading. All data provided by frontend.
-// ------------------------------------------------------------
 async function handleAIQuery(question) {
-  try {
-    // 1. Ensure context is already loaded in ciliai.js
-    if (!window.CILIAI_DB) {
-      throw new Error("CILIAI_DB not loaded.");
+    window.updateStatus("Processing query locally...", "loading");
+
+    // 1. Check for immediate static/explanatory matches (fastest route)
+    let localResult = findTerminologyMatch(question);
+    if (localResult) {
+        window.updateStatus("Local terminology match found.", "success");
+        return `<div class="ai-result-card">🧠 **Terminology Match:** ${localResult}</div>`;
     }
 
-    // 2. Detect gene symbols mentioned in the question
-    const detectedGenes = extractGenes(question, window.CILIAI_DB);
+    // 2. Check for high-level local structural queries (Comparison, Process)
+    localResult = handleExplanatoryQuery(question);
+    if (localResult) {
+        window.updateStatus("Local explanatory synthesis executed.", "success");
+        return localResult;
+    }
+    
+    // --- Determine Intent and Entities ---
+    
+    // Fallback: Use simple keyword scoring if direct match fails
+    const intentAnalysis = scoreIntents(question);
+    const intent = intentAnalysis.intent;
+    
+    // Detect gene symbols using the most robust method
+    const exactGenes = extractMultipleGenes(question);
+    const hasGenes = exactGenes.length > 0;
 
-    // 3. Build minimal context (only detected genes)
+    window.log(`[Intent] Detected: ${intent}`);
+    window.log(`[Genes] Detected: ${exactGenes.join(', ')}`);
+
+    // --- 3. Execute Local/Structural Intent Handlers ---
+
+    // Visualization: UMAP, Phylogeny, Heatmaps (High Priority)
+    if (intent === 'visualize' || question.toLowerCase().includes('plot')) {
+        window.updateStatus("Routing to Visualization Engine...", "loading");
+        return window.routeVisualizationAction(question, exactGenes);
+    }
+
+    // Graph/Synthesis Queries: Complex lists, Disease lists, Relationships
+    if (['complex_query', 'disease_query', 'localization_query', 'compare', 'relationship'].includes(intent) || intentAnalysis.confidence >= 5) {
+        window.updateStatus("Routing to Local Graph/Synthesis Engine...", "loading");
+        
+        // This runs the local functions like getComplexGenesAndFormat(), handleLocalizationQuery(), etc.
+        localResult = await window.runGraphQuery(question, intent, exactGenes);
+        if (localResult && !localResult.includes('Synthesis path failed')) {
+            window.updateStatus("Local Graph/Synthesis complete.", "success");
+            return localResult;
+        }
+    }
+    
+    // Data List Queries not covered by Graph/Synthesis (e.g., Domains)
+    const entityMatch = flexibleIntentParser(question);
+    if (entityMatch) {
+        window.updateStatus(`Executing specific local handler for ${entityMatch.type}...`, "loading");
+        return entityMatch.handler(entityMatch.entity, question);
+    }
+    
+    // --- 4. Gene-specific Information Request (Full Details) ---
+
+    // If the intent is a definition OR we only have a single gene detected
+    if (hasGenes && (intent === 'definition' || intentAnalysis.confidence < 2)) {
+        window.updateStatus(`Fetching full data for ${exactGenes[0]}...`, "loading");
+        return await displayFullGeneInfo(exactGenes[0]);
+    }
+
+
+    // --- 5. FALLBACK TO GEMINI SYNTHESIS ENGINE ---
+    
+    // Build context using locally loaded data for the backend
     const context = {};
-    for (const gene of detectedGenes) {
-      if (window.CILIAI_DB[gene]) {
-        context[gene] = window.CILIAI_DB[gene];
-      }
+    const geneMap = window.CiliAI.lookups?.geneMap || {};
+    let contextSize = 0;
+
+    for (const gene of exactGenes) {
+        if (geneMap[gene]) {
+            // Send the full data record for synthesis
+            context[gene] = geneMap[gene];
+            contextSize++;
+        }
     }
 
-    // 4. Call backend
-    const response = await fetch(BACKEND_URL + "/ask-ciliai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        context: JSON.stringify(context),
-        detected_genes: detectedGenes
-      })
-    });
+    window.updateStatus(`Querying Gemini (Context: ${contextSize} genes)...`, "loading");
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error("Backend error: " + err);
+    // Call the external backend API
+    try {
+        const result = await getCiliAIAssistance(question, context, exactGenes);
+        window.updateStatus("AI synthesis received.", "success");
+        return result; // result is already formatted HTML/Markdown from app.py
+    } catch (error) {
+        window.updateStatus("AI Query failed.", "error");
+        return `<div class="ai-result-card">**Gemini Error:** Failed to communicate with the backend. Details: ${error.message}</div>`;
     }
-
-    const data = await response.json();
-
-    return {
-      answer: data.answer || "No answer returned.",
-      detected_genes: data.detected_genes,
-      model: data.model,
-      gene_count: data.context_size_genes
-    };
-
-  } catch (err) {
-    console.error("CiliAI error:", err);
-    return {
-      answer: "An error occurred: " + err.message,
-      detected_genes: [],
-      model: "unknown",
-      gene_count: 0
-    };
-  }
 }
-
 
 // ==========================
 // SAFE FALLBACKS
