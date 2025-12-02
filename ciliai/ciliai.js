@@ -274,14 +274,6 @@ window.extractComplexTerm = window.extractComplexIntent; 
  * Features: Three-column layout (Nav | Vis | Chat), Blue Branding, Organized Menus.
  * ============================================================== */
 
-// ==========================================================
-// 1. SAFE FALLBACKS & GLOBAL STATE (Keep as is)
-// ... (The entire SAFE FALLBACKS block remains unchanged from previous step) ...
-// ... (The entire GLOBAL STATE block remains unchanged from previous step) ...
-// ... (The entire Data Maps and Constants block remains unchanged from previous step) ...
-// ... (The entire CILIBRAIN and Plotting Logic sections remain defined locally) ...
-
-    
 /**
  * Loads the external data files required only by the Cilia Analysis Page plots.
  */
@@ -307,6 +299,57 @@ async function loadAnalysisData() {
 
     } catch (error) {
         window.log(`Failed to load a required analysis data file: ${error.message}`, 'error');
+    }
+}
+
+// NEW/REVISED HELPER FUNCTIONS (Must be defined globally in your script)
+
+const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
+const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
+
+/**
+ * Ensures UMAP coordinate data is loaded into window.CiliAI_UMAP.
+ */
+async function ensureUmapCoordinatesLoaded() {
+    if (window.CiliAI_UMAP && window.CiliAI_UMAP.length > 0) return true;
+    try {
+        window.log("Fetching UMAP coordinates...");
+        const resp = await fetch(UMAP_COORDINATES_DB);
+        const data = await resp.json();
+        
+        if (Array.isArray(data) && data.length > 0) {
+            window.CiliAI_UMAP = data;
+            return true;
+        }
+        window.log("UMAP coordinates data is empty or invalid.", "warning");
+        return false;
+    } catch (e) {
+        window.log(`Failed to fetch UMAP coordinates: ${e.message}`, "error");
+        return false;
+    }
+}
+
+/**
+ * Ensures cell expression data is loaded into window.CiliAI.cellDataCache.
+ * NOTE: This function must populate a variable named cellDataCache.
+ */
+async function ensureCellExpressionLoaded() {
+    if (window.CiliAI.cellDataCache && Object.keys(window.CiliAI.cellDataCache).length > 0) return true;
+    try {
+        window.log("Fetching Cell Expression data...");
+        const resp = await fetch(CELLXGENE_EXPRESSION_DB);
+        const data = await resp.json();
+        
+        if (typeof data === 'object' && Object.keys(data).length > 0) {
+            window.CiliAI.cellDataCache = data;
+            return true;
+        }
+        window.log("Cell Expression data is empty or invalid.", "warning");
+        return false;
+    } catch (e) {
+        window.log(`Failed to fetch Cell Expression data: ${e.message}`, "error");
+        return false;
     }
 }
 
@@ -1722,13 +1765,23 @@ function handleClassificationQuery(classificationName, query) {
  * Renders a UMAP visualization where points are colored and sized based on the
  * expression level of the requested gene (or FOXJ1 by default).
  */
+/**
+ * UMAP PLOT (Expression Mapping Mode)
+ * Renders a UMAP visualization where points are colored and sized based on the
+ * expression level of the requested gene (or FOXJ1 by default).
+ */
 async function renderUMAPPlot(geneSymbol) { 
-    // --- 💡 CRITICAL FIX: Ensure Data is Loaded/Awaited ---
-    // These functions must be defined externally to fetch and populate the global caches.
-    await fetchUmapData(); 
-    await fetchCellData(); 
+    
+    // --- 💡 CRITICAL FIX: Await UMAP and Cell Data loading ---
+    // Ensure the required data is loaded into global caches before proceeding.
+    await Promise.all([
+        ensureUmapCoordinatesLoaded(),
+        ensureCellExpressionLoaded()
+    ]);
     // ----------------------------------------------------
+
     const plotDivId = 'cilia-svg';
+    // The variables are now populated (or still null if fetch failed)
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
     const plotDiv = document.getElementById(plotDivId);
@@ -1741,16 +1794,17 @@ async function renderUMAPPlot(geneSymbol) {
         return;
     }
     
-    // Check if data is *now* available after the await calls
-    if (!umapData || !cellData) {
-        window.addChatMessage('UMAP coordinates or scRNA-seq expression data failed to load.', false);
+    // Check if data is NOW available after the async fetch
+    if (!umapData || umapData.length === 0 || !cellData || Object.keys(cellData).length === 0) {
+        window.addChatMessage('UMAP coordinates or scRNA-seq expression data failed to load. Cannot render plot.', false);
+        window.generateAndInjectSVG(); // Restore the diagram to prevent an empty visualization panel
         return; 
     }
-        
-    // --- Reset SVG panel ---
+
+    // --- Reset SVG panel: Clear previous diagrams/plots ---
     plotDiv.innerHTML = '';
     const wrapper = plotDiv.closest('.interactive-cilium');
-    if (wrapper) wrapper.classList.add('table-view-active');
+    if (wrapper) wrapper.classList.add('table-view-active'); // Use full space for the plot
 
     // 1. Fetch Expression Data and prepare arrays
     const geneExpressionData = cellData[gene] || {};
@@ -1765,9 +1819,9 @@ async function renderUMAPPlot(geneSymbol) {
     const sizeScaleMax = 12;     // Maximum dot size
     const expressionThreshold = 2; // Expression cap for dot size scaling
 
-    const sourceData = umapData.length > sampleSize 
-                       ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
-                       : umapData;
+    const sourceData = umapData.length > sampleSize
+                        ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize)
+                        : umapData;
 
     for (const point of sourceData) {
         // Look up expression value for this cell's type for the target gene
@@ -1789,7 +1843,7 @@ async function renderUMAPPlot(geneSymbol) {
         window.addChatMessage(`Gene <strong>${gene}</strong> found, but has no detectable expression in the loaded Lung scRNA-seq dataset.`, false);
     }
     
-    // --- Annotations (Cell Type Labels) remain unchanged ---
+    // --- Annotations (Cell Type Labels) ---
     const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
     const annotations = [];
     const median = arr => {
@@ -1817,9 +1871,9 @@ async function renderUMAPPlot(geneSymbol) {
 
     // 3. Define Plotly Trace with Color Mapping (Red Gradient)
     const colorScaleRedGradient = [
-        [0, '#F8F8F8'], // Light Gray/Off-White (0 expression)
-        [0.0001, '#FFDAD0'], // Peach/Very Light Red (Start of expression, matches requested light red base)
-        [1, '#E60000']       // Vibrant Red (Max expression color)
+        [0, '#F8F8F8'], 
+        [0.0001, '#FFDAD0'], 
+        [1, '#E60000']       
     ];
     
     const plotData = [{
@@ -1856,8 +1910,8 @@ async function renderUMAPPlot(geneSymbol) {
     };
 
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
-
-    // --- Back button ---
+    
+    // Add Back button (Crucial for UI functionality)
     const backButton = document.createElement('button');
     backButton.id = 'ciliai-back-btn';
     backButton.className = 'ciliai-button';
@@ -1866,6 +1920,8 @@ async function renderUMAPPlot(geneSymbol) {
     backButton.onclick = () => window.generateAndInjectSVG();
     plotDiv.prepend(backButton);
 }
+
+
     
     /**
      * Helper function to lazy-load phylogeny data only when needed
