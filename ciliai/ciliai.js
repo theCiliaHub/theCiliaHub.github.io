@@ -86,8 +86,10 @@ if (typeof window.handleGeneSearch !== "function") {
     };
 }
 
-    
- // ==========================================================
+// --- CRITICAL CONFIGURATION ---
+const BACKEND_URL = 'https://cili-ai-gemini-backend-687107394688.us-central1.run.app';
+
+// ==========================================================
 // GLOBAL STATE
 // ==========================================================
     window.CiliAI = {
@@ -1383,17 +1385,14 @@ function handleLocalizationQuery(term, query) {
 // ----------------------------------------------------------
 // FAST GENE EXTRACTION (for visualization + Gemini context)
 // ----------------------------------------------------------
-
 window.extractMultipleGenes = function (query) {
     if (!query) return [];
 
     const tokens = query.toUpperCase().match(/[A-Z0-9]+/g) || [];
     const validGenes = [];
     
-    // FIX 1: Safely access the genes set, defaulting to an empty Set if undefined.
-    // Use the comprehensive lookup map key (which you use later) or the dedicated Set.
-    // Since this function requires a Set, let's prioritize defining that Set.
-    const knownGenesSet = window.CiliAI.genes || new Set();
+    // FIX: Safely access the genes set (now initialized in GLOBAL STATE)
+    const knownGenesSet = window.CiliAI.genes; // No need for || new Set() as it's initialized
 
     for (const t of tokens) {
         if (knownGenesSet.has(t)) {
@@ -1403,6 +1402,7 @@ window.extractMultipleGenes = function (query) {
 
     return [...new Set(validGenes)];
 };
+
 
 // Build minimal backend context from local dataset
 window.buildContextForGenes = function (genes) {
