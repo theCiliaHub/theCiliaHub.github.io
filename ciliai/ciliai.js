@@ -3139,100 +3139,123 @@ window.terminologyQueries = {
 
 
  
-
 async function handleAIQuery(question) {
+    if (!question || !document.getElementById('messages')) return;
+
+    let htmlResult = null;
     window.updateStatus("Processing query locally...", "loading");
 
-    // 1. Check for immediate static/explanatory matches (fastest route)
-    let localResult = findTerminologyMatch(question);
+    // --- 1. Local Terminology Match ---
+    let localResult = window.findTerminologyMatch(question);
     if (localResult) {
         window.updateStatus("Local terminology match found.", "success");
         return `<div class="ai-result-card">🧠 **Terminology Match:** ${localResult}</div>`;
     }
 
-    // 2. Check for high-level local structural queries (Comparison, Process)
-    localResult = handleExplanatoryQuery(question);
+    // --- 2. Local Explanatory Queries ---
+    localResult = window.handleExplanatoryQuery(question);
     if (localResult) {
         window.updateStatus("Local explanatory synthesis executed.", "success");
         return localResult;
     }
-    
-    // --- Determine Intent and Entities ---
-    
-    // Fallback: Use simple keyword scoring if direct match fails
-    const intentAnalysis = scoreIntents(question);
+
+    // --- 3. Determine Intent and Entities ---
+    const intentAnalysis = window.scoreIntents(question);
     const intent = intentAnalysis.intent;
-    
-    // Detect gene symbols using the most robust method
-    const exactGenes = extractMultipleGenes(question);
+
+    const exactGenes = window.extractMultipleGenes(question);
     const hasGenes = exactGenes.length > 0;
 
-    window.log(`[Intent] Detected: ${intent}`);
-    window.log(`[Genes] Detected: ${exactGenes.join(', ')}`);
-
-    // --- 3. Execute Local/Structural Intent Handlers ---
-
-    // Visualization: UMAP, Phylogeny, Heatmaps (High Priority)
-    if (intent === 'visualize' || question.toLowerCase().includes('plot')) {
-        window.updateStatus("Routing to Visualization Engine...", "loading");
-        return window.routeVisualizationAction(question, exactGenes);
+    // Build context for backend
+    const contextData = {};
+    for (const gene of exactGenes) {
+        if (window.CiliAI.GENE_DB?.[gene]) {
+            contextData[gene] = window.CiliAI.GENE_DB[gene];
+        }
+    }
+    if (Object.keys(contextData).length === 0) {
+        contextData['note'] = "No gene context provided.";
     }
 
-    // Graph/Synthesis Queries: Complex lists, Disease lists, Relationships
+    window.log(`[Intent] Detected: ${intent}`);
+    window.log(`[Genes] Detected: ${exactGenes.join(', ')}, context size: ${Object.keys(contextData).length}`);
+
+    // --- 4. Local Visualization ---
+    if (intent === 'visualize' || question.toLowerCase().includes('plot')) {
+        window.updateStatus("Routing to Visualization Engine...", "loading");
+        return await window.routeVisualizationAction(question, exactGenes);
+    }
+
+    // --- 5. Graph/Quantitative/Complex Queries ---
     if (['complex_query', 'disease_query', 'localization_query', 'compare', 'relationship'].includes(intent) || intentAnalysis.confidence >= 5) {
         window.updateStatus("Routing to Local Graph/Synthesis Engine...", "loading");
-        
-        // This runs the local functions like getComplexGenesAndFormat(), handleLocalizationQuery(), etc.
         localResult = await window.runGraphQuery(question, intent, exactGenes);
         if (localResult && !localResult.includes('Synthesis path failed')) {
             window.updateStatus("Local Graph/Synthesis complete.", "success");
             return localResult;
         }
     }
-    
-    // Data List Queries not covered by Graph/Synthesis (e.g., Domains)
-    const entityMatch = flexibleIntentParser(question);
-    if (entityMatch) {
-        window.updateStatus(`Executing specific local handler for ${entityMatch.type}...`, "loading");
-        return entityMatch.handler(entityMatch.entity, question);
-    }
-    
-    // --- 4. Gene-specific Information Request (Full Details) ---
 
-    // If the intent is a definition OR we only have a single gene detected
+    // --- 6. Gene-specific Full Details ---
     if (hasGenes && (intent === 'definition' || intentAnalysis.confidence < 2)) {
         window.updateStatus(`Fetching full data for ${exactGenes[0]}...`, "loading");
-        return await displayFullGeneInfo(exactGenes[0]);
+        return await window.displayFullGeneInfo(exactGenes[0]);
     }
 
-
-    // --- 5. FALLBACK TO GEMINI SYNTHESIS ENGINE ---
-    
-    // Build context using locally loaded data for the backend
-    const context = {};
-    const geneMap = window.CiliAI.lookups?.geneMap || {};
-    let contextSize = 0;
-
-    for (const gene of exactGenes) {
-        if (geneMap[gene]) {
-            // Send the full data record for synthesis
-            context[gene] = geneMap[gene];
-            contextSize++;
-        }
-    }
-
-    window.updateStatus(`Querying Gemini (Context: ${contextSize} genes)...`, "loading");
-
-    // Call the external backend API
+    // --- 7. FALLBACK TO GEMINI BACKEND ---
+    window.updateStatus(`Querying Gemini (Context: ${Object.keys(contextData).length} genes)...`, "loading");
     try {
-        const result = await getCiliAIAssistance(question, context, exactGenes);
+        const geminiResponse = await getCiliAIAssistance({
+            question: question,
+            context: contextData,
+            detected_genes: exactGenes
+        });
+        htmlResult = `<div class="ai-result-card">🧠 **AI Synthesis:** ${geminiResponse}</div>`;
         window.updateStatus("AI synthesis received.", "success");
-        return result; // result is already formatted HTML/Markdown from app.py
+        return htmlResult;
     } catch (error) {
         window.updateStatus("AI Query failed.", "error");
         return `<div class="ai-result-card">**Gemini Error:** Failed to communicate with the backend. Details: ${error.message}</div>`;
     }
 }
+
+// ----------------------------------------------------------
+// GEMINI COMMUNICATION LAYER
+// ----------------------------------------------------------
+async function getCiliAIAssistance({ question, context = {}, detected_genes = [] }) {
+    window.updateStatus("Waiting for Gemini response...", "loading");
+
+    const requestBody = { question, context, detected_genes };
+
+    try {
+        const response = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            window.updateStatus(`Error: Gemini Service Failed (Code ${response.status})`, "error");
+            return `Error: Failed to fetch synthesis. Status: ${response.status}. Details: ${errorText.substring(0, 100)}...`;
+        }
+
+        const data = await response.json();
+
+        if (data && data.answer) {
+            window.updateStatus("AI response received.", "success");
+            return data.answer;
+        } else {
+            window.updateStatus("Error: Invalid response format.", "error");
+            return "Error: Received an empty or invalid synthesis response.";
+        }
+
+    } catch (error) {
+        window.updateStatus("Error: Network connection failed.", "error");
+        return `Error: A network issue prevented connection to the CiliAI service. Details: ${error.message}`;
+    }
+}
+
 
 // ==========================
 // SAFE FALLBACKS
