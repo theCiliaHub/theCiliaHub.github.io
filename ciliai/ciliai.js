@@ -1,12 +1,12 @@
 /* ==============================================================
- * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
- * ==============================================================
- * • BUILT FROM SCRATCH based on user's question list.
- * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
- * • Lazy-loads the large phylogeny files only when needed.
- * • Fixes all known layout, normalization, and query routing bugs.
- * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
- * ============================================================== */
+ * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
+ * ==============================================================
+ * • BUILT FROM SCRATCH based on user's question list.
+ * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
+ * • Lazy-loads the large phylogeny files only when needed.
+ * • Fixes all known layout, normalization, and query routing bugs.
+ * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
+ * ============================================================== */
 
 // ==========================================================
 // SAFE FALLBACKS (Prevents crashes if UI functions missing)
@@ -15,97 +15,98 @@
 // CRITICAL FIX: Ensure all functions called early are defined globally or via fallbacks.
 
 if (typeof window.updateStatus !== "function") {
-    window.updateStatus = function (msg, state) {
-        console.log(`STATUS[${state}]: ${msg}`);
-    };
+    window.updateStatus = function (msg, state) {
+        console.log(`STATUS[${state}]: ${msg}`);
+    };
 }
 if (typeof window.drawDefaultUMAP !== "function") {
-    window.drawDefaultUMAP = function () {
-        window.log("drawDefaultUMAP() placeholder called");
-        return "<p>Default UMAP plot placeholder.</p>"; // ✅ return inside function
-    };
+    window.drawDefaultUMAP = function () {
+        window.log("drawDefaultUMAP() placeholder called");
+        return "<p>Default UMAP plot placeholder.</p>"; // ✅ return inside function
+    };
 }
 
-/* --- DELETED CODE BLOCK START (ciliai.js:39-44) ---
 // Safe usage inside handleAIQuery
 if (query.toLowerCase().includes("default umap")) {
-    window.log("[Visualization] Default UMAP requested");
-    htmlResult = window.drawDefaultUMAP(); // ✅ inside function
+    window.log("[Visualization] Default UMAP requested");
+    htmlResult = window.drawDefaultUMAP(); // ✅ inside function
 }
 
 
 // If no genes AND not default plot → avoid crash
 if (!exactGenes || exactGenes.length === 0) {
-    window.log("[Visualization] No genes detected → gene-free plot?");
-    // you may choose your default behavior:
-    return window.drawDefaultUMAP();
+    window.log("[Visualization] No genes detected → gene-free plot?");
+    // you may choose your default behavior:
+    return window.drawDefaultUMAP();
 }
-// --- DELETED CODE BLOCK END --- */
 
+if (typeof window.renderUMAPPlot !== "function") {
+    window.renderUMAPPlot = function () {
+        console.warn("renderUMAPPlot() not implemented.");
+    };
+}
 
 // FIX ADDITIONS: These three are called *inside* loadCiliAIData and initCiliAI early on.
 if (typeof window.log !== "function") {
-    window.log = function (msg) {
-        console.log(`CiliAI LOG: ${msg}`);
-    };
+    window.log = function (msg) {
+        console.log(`CiliAI LOG: ${msg}`);
+    };
 }
 
 if (typeof window.addChatMessage !== "function") {
-    window.addChatMessage = function (msg, isUser) {
-        // This simple fallback ensures no crash if the chat UI isn't ready
-        console.log(`CHAT [${isUser ? 'USER' : 'AI'}]: ${msg}`);
-    };
+    window.addChatMessage = function (msg, isUser) {
+        // This simple fallback ensures no crash if the chat UI isn't ready
+        console.log(`CHAT [${isUser ? 'USER' : 'AI'}]: ${msg}`);
+    };
 }
 
 if (typeof window.react !== "function") {
-    window.react = function (type) {
-        // Fallback relies on addChatMessage being defined above
-        window.addChatMessage(`Feedback received: ${type}`, false);
-    };
+    window.react = function (type) {
+        // Fallback relies on addChatMessage being defined above
+        window.addChatMessage(`Feedback received: ${type}`, false);
+    };
 }
 
 if (typeof window.clearChat !== "function") {
-    window.clearChat = function () {
-        // Fallback uses the logging function
-        window.log('clearChat() fallback executed.');
-    };
+    window.clearChat = function () {
+        // Fallback uses the logging function
+        window.log('clearChat() fallback executed.');
+    };
 }
 
-// NOTE: We also ensure 'handleUserSend' and 'handleGeneSearch' have fallbacks 
+// NOTE: We also ensure 'handleUserSend' and 'handleGeneSearch' have fallbacks 
 // as they are often called early by HTML event listeners.
 
 if (typeof window.handleUserSend !== "function") {
-    window.handleUserSend = function () {
-        window.log("handleUserSend() fallback executed.");
-    };
+    window.handleUserSend = function () {
+        window.log("handleUserSend() fallback executed.");
+    };
 }
 
 if (typeof window.handleGeneSearch !== "function") {
-    window.handleGeneSearch = function () {
-        window.log("handleGeneSearch() fallback executed.");
-    };
+    window.handleGeneSearch = function () {
+        window.log("handleGeneSearch() fallback executed.");
+    };
 }
 
-// --- CRITICAL CONFIGURATION ---
-const BACKEND_URL = 'https://cili-ai-gemini-backend-687107394688.us-central1.run.app';
+    
+    // ==========================================================
+    // GLOBAL STATE
+    // ==========================================================
+    window.CiliAI = {
+        data: { umap: [] },
+        masterData: [],
+        ready: false,
+        lookups: {}
+    };
 
-// ==========================================================
-// GLOBAL STATE
-// ==========================================================
-    window.CiliAI = {
-        data: { umap: [] },
-        masterData: [],
-        ready: false,
-        genes: new Set(),         // <--- ADD THIS LINE
-        lookups: {}
-    };
 window.getGenesByComplex = function(complexTerm) {
-  const map = getComplexPhylogenyTableMap();
-  const normTerm = normalizeTerm(complexTerm);
-  const key = Object.keys(map).find(k => normalizeTerm(k) === normTerm);
-  return key ? map[key].map(g => ({ gene: g, description: `Part of ${key}` })) : [];
+  const map = getComplexPhylogenyTableMap();
+  const normTerm = normalizeTerm(complexTerm);
+  const key = Object.keys(map).find(k => normalizeTerm(k) === normTerm);
+  return key ? map[key].map(g => ({ gene: g, description: `Part of ${key}` })) : [];
 };
-    // --- Global variables to hold your data ---
+    // --- Global variables to hold your data ---
 let ciliaryGeneMap = new Map();
 let screenDatabase = {};
 let lastQueryContext = { type: null, data: [], term: null };
@@ -118,8 +119,10 @@ window.CiliAI_UMAP = null; // This will be populated from the master DB
 window.extractDiseaseTerm = window.extractDiseaseIntent;
 
 // --- CRITICAL FIX: Alias for complex term extractor ---
-window.extractComplexTerm = window.extractComplexIntent; 
-
+window.extractComplexTerm = window.extractComplexIntent; 
+// ---
+   
+    // --- Data Maps (These are now just for the AI brain) ---
 
 
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
@@ -274,6 +277,14 @@ window.extractComplexTerm = window.extractComplexIntent; 
  * Features: Three-column layout (Nav | Vis | Chat), Blue Branding, Organized Menus.
  * ============================================================== */
 
+// ==========================================================
+// 1. SAFE FALLBACKS & GLOBAL STATE (Keep as is)
+// ... (The entire SAFE FALLBACKS block remains unchanged from previous step) ...
+// ... (The entire GLOBAL STATE block remains unchanged from previous step) ...
+// ... (The entire Data Maps and Constants block remains unchanged from previous step) ...
+// ... (The entire CILIBRAIN and Plotting Logic sections remain defined locally) ...
+
+    
 /**
  * Loads the external data files required only by the Cilia Analysis Page plots.
  */
@@ -299,60 +310,6 @@ async function loadAnalysisData() {
 
     } catch (error) {
         window.log(`Failed to load a required analysis data file: ${error.message}`, 'error');
-    }
-}
-
-// NEW/REVISED HELPER FUNCTIONS (Must be defined globally in your script)
-
-// Data URLs (already defined in your context)
-// const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
-// const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
-
-/**
- * Ensures UMAP coordinate data is loaded into window.CiliAI_UMAP.
- */
-/**
- * Ensures UMAP coordinate data is loaded into window.CiliAI_UMAP.
- */
-async function ensureUmapCoordinatesLoaded() {
-    if (window.CiliAI_UMAP && window.CiliAI_UMAP.length > 0) return true;
-    try {
-        window.log("Fetching UMAP coordinates...");
-        const resp = await fetch(UMAP_COORDINATES_DB);
-        const data = await resp.json();
-        
-        if (Array.isArray(data) && data.length > 0) {
-            window.CiliAI_UMAP = data;
-            return true;
-        }
-        window.log("UMAP coordinates data is empty or invalid.", "warning");
-        return false;
-    } catch (e) {
-        window.log(`Failed to fetch UMAP coordinates: ${e.message}`, "error");
-        return false;
-    }
-}
-
-/**
- * Ensures cell expression data is loaded into window.CiliAI.cellDataCache.
- */
-async function ensureCellExpressionLoaded() {
-    // Note: The correct cache key is window.CiliAI.cellDataCache
-    if (window.CiliAI.cellDataCache && Object.keys(window.CiliAI.cellDataCache).length > 0) return true;
-    try {
-        window.log("Fetching Cell Expression data...");
-        const resp = await fetch(CELLXGENE_EXPRESSION_DB);
-        const data = await resp.json();
-        
-        if (typeof data === 'object' && Object.keys(data).length > 0) {
-            window.CiliAI.cellDataCache = data;
-            return true;
-        }
-        window.log("Cell Expression data is empty or invalid.", "warning");
-        return false;
-    } catch (e) {
-        window.log(`Failed to fetch Cell Expression data: ${e.message}`, "error");
-        return false;
     }
 }
 
@@ -528,148 +485,6 @@ window.semanticSearch = async function(query, topK=5, minScore=0.60) {
     return [{ id: 'NONE', text: 'no semantic match found', score: 0.1 }];
 };
 
-// REVISED window.routeQueryIntent (The error occurred here, around line 529 in previous context)
-
-async function routeQueryIntent(query) {
-    const qLower = query.toLowerCase();
-    
-    // 💡 FIX: Define exactGenes and hasGenes immediately upon entering the router
-    const exactGenes = window.extractMultipleGenes(query);
-    const hasGenes = exactGenes.length > 0; // <--- FIX: Ensure this line exists here.
-
-    const intentAnalysis = window.scoreIntents(query);
-    const intent = intentAnalysis.intent;
-
-    window.log(`[Router] Intent: ${intent}, Genes: ${exactGenes.join(', ')}`);
-
-    // --- A. PRIORITY: QUICK STATIC LOOKUPS ---
-    // ... (rest of logic follows, safely using hasGenes) ...
-    
-    // ...
-    
-    // Final fallback block needs to be self-contained:
-    // ...
-    // --- C. FALLBACK TO GEMINI SYNTHESIS ---
-    window.updateStatus("Local processing complete. Falling back to Gemini Synthesis...", "loading");
-    
-    // ... (build context and call backend)
-}
-
-/**
- * RESTORED: Extracts phenotype keywords from a query (e.g., 'short cilia', 'longer cilia').
- * @param {string} qLower - The lowercase query string.
- * @returns {string|null} The found phenotype term, or null.
- */
-function extractPhenotypeIntent(qLower) {
-    const keywords = {
-        'short cilia': ['short cilia', 'shorter cilia', 'decreased cilia length', 'short'],
-        'longer cilia': ['long cilia', 'longer cilia', 'increased cilia length', 'long'],
-        'loss of cilia': ['loss of cilia', 'no cilia', 'cilia loss', 'reduced ciliation'],
-        'no effect': ['no effect', 'no change', 'normal length']
-    };
-    for (const [term, synonyms] of Object.entries(keywords)) {
-        if (synonyms.some(syn => qLower.includes(syn))) {
-            return term;
-        }
-    }
-    return null;
-}
-
-/**
- * RESTORED: Extracts organism keywords from a query (e.g., 'C. elegans', 'mouse').
- * @param {string} qLower - The lowercase query string.
- * @returns {string|null} The found organism term, or null.
- */
-function extractOrganismIntent(qLower) {
-    const keywords = {
-        'C. elegans': ['c. elegans', 'elegans', 'worm'],
-        'Mus musculus': ['mouse', 'mus musculus'],
-        'Danio rerio': ['zebrafish', 'danio rerio'],
-        'Drosophila melanogaster': ['fly', 'drosophila', 'd. melanogaster'],
-        'Homo sapiens': ['human', 'homo sapiens']
-    };
-    for (const [term, synonyms] of Object.entries(keywords)) {
-        if (synonyms.some(syn => qLower.includes(syn))) {
-            return term;
-        }
-    }
-    return null;
-}
-
-/**
- * RESTORED CORE HELPER: Filters genes based on up to four criteria.
- * This integrates the logic needed for all complex local queries.
- * @param {object} filters {localization: str, disease: str, expression: str, phenotype: str}
- * @returns {Array<object>} Filtered gene list with standardized columns.
- */
-function getGenesByMultipleFilters(filters) {
-    const geneMap = window.CiliAI.lookups.geneMap;
-    if (!geneMap) return [];
-    
-    // Start with all genes currently loaded into the lookup map
-    let geneSymbols = Object.keys(geneMap);
-    
-    // Filter 1: Localization
-    if (filters.localization) {
-        const locGenes = window.getGenesByLocalization(filters.localization).map(g => g.gene);
-        geneSymbols = geneSymbols.filter(g => locGenes.includes(g));
-    }
-    
-    // Filter 2: Disease
-    if (filters.disease) {
-        const normDisease = window.normalizeDiseaseKey(filters.disease);
-        // Note: window.CiliAI.lookups.byCiliopathy must be populated during initialization
-        const diseaseGenes = window.CiliAI.lookups.byCiliopathy?.[normDisease] || [];
-        geneSymbols = geneSymbols.filter(g => diseaseGenes.includes(g));
-    }
-    
-    const results = [];
-    
-    // Filter 3 & 4: Expression and Phenotype Check
-    for (const geneSymbol of geneSymbols) {
-        const g = geneMap[geneSymbol];
-        if (!g) continue;
-
-        // Check A: Expression Filter (Tissue-specific expression)
-        let passesExpression = true;
-        if (filters.expression && !window.hasExpressionInTissue(g, filters.expression)) {
-            passesExpression = false;
-        }
-
-        // Check B: Phenotype Filter (LoF effects on cilia)
-        let passesPhenotype = true;
-        if (filters.phenotype) {
-            const phenLower = filters.phenotype.toLowerCase();
-            // Use the exact field names from your master CSV/JSON
-            const lof = (g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '').toLowerCase();
-            const perc = (g['Percentage of ciliated cells (increase/decrease/no effect)'] || '').toLowerCase();
-            
-            // Simplified Phenotype Check (covers 'short cilia', 'loss of cilia')
-            if (phenLower.includes('short') && !lof.includes('decrease')) {
-                passesPhenotype = false;
-            } else if (phenLower.includes('loss') && !perc.includes('reduced')) {
-                passesPhenotype = false;
-            } 
-            // Add other phenotype checks here (e.g., 'no effect')
-        }
-        
-        if (passesExpression && passesPhenotype) {
-            results.push({
-                gene: geneSymbol,
-                localization_detail: g.Localization || 'N/A',
-                lof_effect_detail: g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'N/A',
-                disease: filters.disease || 'N/A',
-                expression: filters.expression ? (g.expression?.tissue?.[filters.expression] || 'N/A') : 'N/A',
-            });
-        }
-    }
-    
-    return results;
-}
-
-
-
-
 // --- NEW/UPDATED Quantitative Engine Stub (Implementation of Gap 4) ---
 window.runQuantitativeEngine = async function(query, exactGenes) {
     window.log('IMPLEMENTATION: Executing Quantitative Engine');
@@ -711,19 +526,17 @@ window.runQuantitativeEngine = async function(query, exactGenes) {
 window.routeVisualizationAction = async function(query, exactGenes) {
     const qLower = query.toLowerCase();
     const hasGenes = exactGenes && exactGenes.length > 0;
-    
-    // --- 1. UMAP / scRNA / Default Plotting ---
-    // This is the combined logic: Handles explicit UMAP/scRNA requests AND the implicit default.
-    if (qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('default plot') || !hasGenes) {
-        const gene = hasGenes ? exactGenes[0] : 'FOXJ1'; // Default marker if no gene or if 'default' requested.
-        
-        if (window.renderUMAPPlot) {
-            window.log(`[Visualization] Default/Gene-specific UMAP requested for ${gene}.`);
-            window.renderUMAPPlot(gene); 
-            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. Displaying now.</div>`;
+    const gene = hasGenes ? exactGenes[0] : 'FOXJ1'; // default marker if no gene
+
+    // -------------------------------
+    // 1. Default / gene-free UMAP
+    // -------------------------------
+    if (!hasGenes || qLower.includes('default umap')) {
+        if (window.drawDefaultUMAP) {
+            window.drawDefaultUMAP();
+            return `<div class="ai-result-card">📊 Default UMAP plot requested. Displaying now.</div>`;
         } else {
-            // This is the fallback if renderUMAPPlot itself isn't defined, which should be avoided.
-            return `<div class="ai-result-card">📊 UMAP plot requested. **renderUMAPPlot()** function not initialized.</div>`;
+            return `<div class="ai-result-card">📊 Default UMAP plot requested. Function not implemented.</div>`;
         }
     }
 
@@ -740,7 +553,19 @@ window.routeVisualizationAction = async function(query, exactGenes) {
     }
 
     // -------------------------------
-    // 3. Phylogeny / Heatmap
+    // 3. Gene-colored UMAP / scRNA
+    // -------------------------------
+    if (qLower.includes('umap') || qLower.includes('scrna')) {
+        if (window.renderUMAPPlot) {
+            window.renderUMAPPlot(gene); // V1 visualizer
+            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. Displaying now.</div>`;
+        } else {
+            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. renderUMAPPlot() not implemented.</div>`;
+        }
+    }
+
+    // -------------------------------
+    // 4. Phylogeny / Heatmap
     // -------------------------------
     if (qLower.includes('phylogen') || qLower.includes('heatmap')) {
         if (window.routePhylogenyAnalysis) {
@@ -751,10 +576,11 @@ window.routeVisualizationAction = async function(query, exactGenes) {
     }
 
     // -------------------------------
-    // 4. Fallback visualization
+    // 5. Fallback visualization
     // -------------------------------
     return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized, but no specific plot matched the query.</div>`;
 };
+
 
 /**
  * ENHANCED NLP FIX: Smart Terminology Matcher (RESTRICTED TO DEFINITIONS)
@@ -802,9 +628,9 @@ function handleHighLevelExplanations(query) {
 }
 
 /**
- * V2.0 FINAL IMPLEMENTATION: window.runGraphQuery
+ * V2.0 FINAL STUB IMPLEMENTATION: window.runGraphQuery (Step 6)
  * Handles Synthesis, Comparison, and Complex/Disease Filtering for intents:
- * 'compare', 'relationship', 'disease_query', 'complex_query', 'localization_query', and complex multi-parameter queries.
+ * 'compare', 'relationship', 'disease_query', 'complex_query', 'localization_query'.
  */
 window.runGraphQuery = async function(query, intent, exactGenes) {
     window.log(`EXECUTING V2.0 GRAPH/SYNTHESIS for Intent: ${intent}`);
@@ -821,43 +647,11 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
     
     // 2. Check 2-gene synthesis/relationship queries (e.g., ARL13B and INPP5E)
     if (exactGenes.length === 2) {
+        // We use the simpler alias here since the full synthesis logic is complex.
         return window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]); 
     }
 
-    // --- B. NEW: MULTI-PARAMETER FILTERING (Localization + Disease + Expression/Phenotype) ---
-
-    const locTerm = window.extractLocalizationIntent(qLower);
-    const diseaseTerm = window.extractDiseaseIntent(qLower);
-    const tissueTerm = window.extractExpressionIntent(qLower); 
-    const phenotypeTerm = window.extractPhenotypeIntent(qLower); 
-    
-    if (locTerm || diseaseTerm || tissueTerm || phenotypeTerm) {
-        const filters = {
-            localization: locTerm,
-            disease: diseaseTerm,
-            expression: tissueTerm,
-            phenotype: phenotypeTerm
-        };
-
-        const results = getGenesByMultipleFilters(filters);
-        // Build readable criteria list for the title
-        const criteria = Object.entries(filters)
-            .filter(([, val]) => val)
-            .map(([key, val]) => `${key}: ${val}`)
-            .join('; ');
-
-        if (results.length > 0) {
-            window.updateStatus("Local multi-filter query successful.", "success");
-            // The formatListResult implementation should be able to handle the returned structure (localization_detail, lof_effect_detail)
-            // 
-            return window.formatListResult(`Genes matching: ${criteria}`, results);
-        }
-        // If results are 0, fall through to the simple handlers below, 
-        // as the query might have been a simple localization query that failed 
-        // the phenotype/expression check.
-    }
-
-    // --- C. SIMPLE LIST RETRIEVAL (Fallback if multi-filter fails or is unnecessary) ---
+    // --- B. LIST RETRIEVAL AND SYNTHESIS (Resolves E2, E3) ---
 
     // 3. Simple Complex/Module Query (e.g., "Genes in BBSome")
     if (intent === 'complex_query') {
@@ -865,27 +659,31 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
         const gene = exactGenes[0]; 
         
         if (complexTerm) {
-            return window.getComplexGenesAndFormat(complexTerm);
+             // Case: What genes are in the BBSome?
+             return window.getComplexGenesAndFormat(complexTerm);
         } else if (gene) {
-            return window.handleGeneInComplexQuery(gene);
+             // Case: What complexes is KIF3A a member of?
+             return window.handleGeneInComplexQuery(gene);
         }
     }
     
     // 4. Simple Localization Query (e.g., "List genes in the transition zone")
     if (intent === 'localization_query') {
-        const locTermSimple = window.extractLocalizationIntent(query);
-        if (locTermSimple) {
-            return window.handleLocalizationQuery(locTermSimple, query); 
+        const locTerm = window.extractLocalizationIntent(query);
+        if (locTerm) {
+            // Use V1 helper to get list and format it.
+            return window.handleLocalizationQuery(locTerm, query); 
         }
     }
     
     // 5. Simple Disease Query (e.g., "Genes associated with Primary Ciliary Dyskinesia")
     if (intent === 'disease_query' && exactGenes.length === 0) {
-        const diseaseTermSimple = window.extractDiseaseIntent(query);
+        const diseaseTerm = window.extractDiseaseIntent(query);
         
-        if (diseaseTermSimple) {
-            const { genes, description } = window.getCiliopathyGenes(diseaseTermSimple);
-            return window.formatListResult(`Genes for ${diseaseTermSimple}`, genes, description);
+        if (diseaseTerm) {
+            const { genes, description } = window.getCiliopathyGenes(diseaseTerm);
+            // V2.0 FIX: Directly output the list.
+            return window.formatListResult(`Genes for ${diseaseTerm}`, genes, description);
         }
     }
     
@@ -1597,42 +1395,7 @@ function handleLocalizationQuery(term, query) {
         return gene && gene.Ortholog_C_elegans;
     }
 
-
-// ----------------------------------------------------------
-// FAST GENE EXTRACTION (for visualization + Gemini context)
-// ----------------------------------------------------------
-window.extractMultipleGenes = function (query) {
-    if (!query || !/[A-Z]/i.test(query)) return [];
-
-    const tokens = [...new Set(query.toUpperCase().match(/[A-Z0-9]+/g) || [])];
-    const knownGenesSet = window.CiliAI.genes;
-
-    return tokens.filter(t => knownGenesSet.has(t));
-};
-
-
-// Build minimal backend context from local dataset
-window.buildContextForGenes = function (genes) {
-    const context = {};
-    for (const g of genes) {
-        if (window.CiliAI.data[g]) {
-            context[g] = window.CiliAI.data[g];
-        }
-    }
-    return context;
-};
-
-window.runQuantitativeEngine = async (query, genes) => {
-    window.log("Quantitative intent. Local check → Gemini fallback.");
-    return null;   // always fallback for now
-};
-
-window.runGraphQuery = async function (query, intent, entities = []) {
-    window.log("Graph/complex intent. Local attempts allowed → Gemini fallback.");
-    return null;   // no local graph engine yet
-};
-
-
+    
    /**
  * V2.0 Integration Helper: Gets genes for a Complex and formats the output directly.
  * * Replaces V1's handleSimpleComplexQuery by eliminating the multi-turn confirmation.
@@ -1753,29 +1516,13 @@ function handleClassificationQuery(classificationName, query) {
     }
     
 
-
-/**
- * UMAP PLOT (Expression Mapping Mode)
- * Renders a UMAP visualization where points are colored and sized based on the
- * expression level of the requested gene (or FOXJ1 by default).
- */
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization where points are colored and sized based on the
  * expression level of the requested gene (or FOXJ1 by default).
  */
 async function renderUMAPPlot(geneSymbol) { 
-    
-    // --- 💡 CRITICAL FIX: Await UMAP and Cell Data loading ---
-    // Ensure the required data is loaded into global caches before proceeding.
-        await Promise.all([
-    ensureUmapCoordinatesLoaded(),
-    ensureCellExpressionLoaded()
-]);
-    // ----------------------------------------------------
-
     const plotDivId = 'cilia-svg';
-    // The variables are now populated (or still null if fetch failed)
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
     const plotDiv = document.getElementById(plotDivId);
@@ -1787,18 +1534,15 @@ async function renderUMAPPlot(geneSymbol) {
         console.error('UMAP plot container "cilia-svg" not found.');
         return;
     }
-    
-    // Check if data is NOW available after the async fetch
-    if (!umapData || umapData.length === 0 || !cellData || Object.keys(cellData).length === 0) {
-        window.addChatMessage('UMAP coordinates or scRNA-seq expression data failed to load. Cannot render plot.', false);
-        window.generateAndInjectSVG(); // Restore the diagram to prevent an empty visualization panel
-        return; 
+    if (!umapData || !cellData) {
+        window.addChatMessage('UMAP or scRNA-seq expression data is not available to plot.', false);
+        return;
     }
 
-    // --- Reset SVG panel: Clear previous diagrams/plots ---
+    // --- Reset SVG panel ---
     plotDiv.innerHTML = '';
     const wrapper = plotDiv.closest('.interactive-cilium');
-    if (wrapper) wrapper.classList.add('table-view-active'); // Use full space for the plot
+    if (wrapper) wrapper.classList.add('table-view-active');
 
     // 1. Fetch Expression Data and prepare arrays
     const geneExpressionData = cellData[gene] || {};
@@ -1813,9 +1557,9 @@ async function renderUMAPPlot(geneSymbol) {
     const sizeScaleMax = 12;     // Maximum dot size
     const expressionThreshold = 2; // Expression cap for dot size scaling
 
-    const sourceData = umapData.length > sampleSize
-                        ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize)
-                        : umapData;
+    const sourceData = umapData.length > sampleSize 
+                       ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
+                       : umapData;
 
     for (const point of sourceData) {
         // Look up expression value for this cell's type for the target gene
@@ -1837,7 +1581,7 @@ async function renderUMAPPlot(geneSymbol) {
         window.addChatMessage(`Gene <strong>${gene}</strong> found, but has no detectable expression in the loaded Lung scRNA-seq dataset.`, false);
     }
     
-    // --- Annotations (Cell Type Labels) ---
+    // --- Annotations (Cell Type Labels) remain unchanged ---
     const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
     const annotations = [];
     const median = arr => {
@@ -1865,9 +1609,9 @@ async function renderUMAPPlot(geneSymbol) {
 
     // 3. Define Plotly Trace with Color Mapping (Red Gradient)
     const colorScaleRedGradient = [
-        [0, '#F8F8F8'], 
-        [0.0001, '#FFDAD0'], 
-        [1, '#E60000']       
+        [0, '#F8F8F8'], // Light Gray/Off-White (0 expression)
+        [0.0001, '#FFDAD0'], // Peach/Very Light Red (Start of expression, matches requested light red base)
+        [1, '#E60000']       // Vibrant Red (Max expression color)
     ];
     
     const plotData = [{
@@ -1904,8 +1648,8 @@ async function renderUMAPPlot(geneSymbol) {
     };
 
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
-    
-    // Add Back button (Crucial for UI functionality)
+
+    // --- Back button ---
     const backButton = document.createElement('button');
     backButton.id = 'ciliai-back-btn';
     backButton.className = 'ciliai-button';
@@ -1914,8 +1658,6 @@ async function renderUMAPPlot(geneSymbol) {
     backButton.onclick = () => window.generateAndInjectSVG();
     plotDiv.prepend(backButton);
 }
-
-
     
     /**
      * Helper function to lazy-load phylogeny data only when needed
@@ -3366,124 +3108,141 @@ window.terminologyQueries = {
 };
 
 
- 
-async function handleAIQuery(question) {
-    if (!question || !document.getElementById('messages')) return;
+/*
+ * CiliAI V2.0: The Main Query Router (Hybrid Semantic-RAG Model)
+ * FINAL EXECUTABLE VERSION - Terminology check is prioritized.
+ * NOTE: This function relies on functional stubs for semanticSearch, runQuantitativeEngine,
+ * and runGraphQuery being defined in the global scope (window).
+ */
+// ============================================================
+// FULL UPDATED handleAIQuery()  (DROP-IN SAFE REPLACEMENT)
+// ============================================================
 
-    let htmlResult = null;
-    window.updateStatus("Processing query locally...", "loading");
-
-    // --- 1. Local Terminology Match ---
-    let localResult = window.findTerminologyMatch(question);
-    if (localResult) {
-        window.updateStatus("Local terminology match found.", "success");
-        return `<div class="ai-result-card">🧠 **Terminology Match:** ${localResult}</div>`;
-    }
-
-    // --- 2. Local Explanatory Queries ---
-    localResult = window.handleExplanatoryQuery(question);
-    if (localResult) {
-        window.updateStatus("Local explanatory synthesis executed.", "success");
-        return localResult;
-    }
-
-    // --- 3. Determine Intent and Entities ---
-    const intentAnalysis = window.scoreIntents(question);
-    const intent = intentAnalysis.intent;
-
-    const exactGenes = window.extractMultipleGenes(question);
-    const hasGenes = exactGenes.length > 0;
-
-    // Build context for backend
-    const contextData = {};
-    for (const gene of exactGenes) {
-        if (window.CiliAI.GENE_DB?.[gene]) {
-            contextData[gene] = window.CiliAI.GENE_DB[gene];
-        }
-    }
-    if (Object.keys(contextData).length === 0) {
-        contextData['note'] = "No gene context provided.";
-    }
-
-    window.log(`[Intent] Detected: ${intent}`);
-    window.log(`[Genes] Detected: ${exactGenes.join(', ')}, context size: ${Object.keys(contextData).length}`);
-
-    // --- 4. Local Visualization ---
-    if (intent === 'visualize' || question.toLowerCase().includes('plot')) {
-        window.updateStatus("Routing to Visualization Engine...", "loading");
-        return await window.routeVisualizationAction(question, exactGenes);
-    }
-
-    // --- 5. Graph/Quantitative/Complex Queries ---
-    if (['complex_query', 'disease_query', 'localization_query', 'compare', 'relationship'].includes(intent) || intentAnalysis.confidence >= 5) {
-        window.updateStatus("Routing to Local Graph/Synthesis Engine...", "loading");
-        localResult = await window.runGraphQuery(question, intent, exactGenes);
-        if (localResult && !localResult.includes('Synthesis path failed')) {
-            window.updateStatus("Local Graph/Synthesis complete.", "success");
-            return localResult;
-        }
-    }
-
-    // --- 6. Gene-specific Full Details ---
-    if (hasGenes && (intent === 'definition' || intentAnalysis.confidence < 2)) {
-        window.updateStatus(`Fetching full data for ${exactGenes[0]}...`, "loading");
-        return await window.displayFullGeneInfo(exactGenes[0]);
-    }
-
-    // --- 7. FALLBACK TO GEMINI BACKEND ---
-    window.updateStatus(`Querying Gemini (Context: ${Object.keys(contextData).length} genes)...`, "loading");
+// ==========================
+// CiliAI v2.0 Safe Query Handler
+// ==========================
+window.handleAIQuery = async function (query) {
     try {
-        const geminiResponse = await getCiliAIAssistance({
-            question: question,
-            context: contextData,
-            detected_genes: exactGenes
-        });
-        htmlResult = `<div class="ai-result-card">🧠 **AI Synthesis:** ${geminiResponse}</div>`;
-        window.updateStatus("AI synthesis received.", "success");
+        // -----------------------------
+        // 0. VALIDATE QUERY
+        // -----------------------------
+        if (!query || typeof query !== "string") {
+            window.log("Empty or invalid query");
+            return "<p>Invalid query</p>";
+        }
+        query = query.trim();
+        window.log(`Routing query (V2.0 Semantic-First): ${query}`);
+
+        // -----------------------------
+        // 1. GENE / ENTITY EXTRACTION
+        // -----------------------------
+        const exactGenes = window.extractMultipleGenes
+            ? window.extractMultipleGenes(query)
+            : [];
+        window.log(`[Gene Extraction] Processing: "${query}"`);
+        window.log(`[Gene Extraction] Final valid genes: ${exactGenes.join(", ") || "(none)"}`);
+
+        // -----------------------------
+        // 2. DEFAULT PLOT HANDLING (gene-free visualization)
+        // -----------------------------
+        const queryLower = query.toLowerCase();
+        if (queryLower.includes("default umap")) {
+            window.log("[Visualization] Default UMAP requested");
+            return window.drawDefaultUMAP ? window.drawDefaultUMAP() : "<p>UMAP plot not implemented</p>";
+        }
+        if (queryLower.includes("default tsne")) {
+            window.log("[Visualization] Default t-SNE requested");
+            return window.drawDefaultTSNE ? window.drawDefaultTSNE() : "<p>t-SNE plot not implemented</p>";
+        }
+
+        // -----------------------------
+        // 3. SEMANTIC SEARCH (definitions / concepts)
+        // -----------------------------
+        const semanticMatches = window.searchSemanticIndex
+            ? await window.searchSemanticIndex(query)
+            : [];
+
+        // -----------------------------
+        // 4. INTENT CLASSIFICATION
+        // -----------------------------
+        let { intent, confidence } = window.scoreIntents
+            ? window.scoreIntents(query, semanticMatches)
+            : { intent: "definition", confidence: 0 };
+
+        window.log(`Predicted Intent: ${intent} (Confidence: ${confidence.toFixed(2)}). Genes: ${exactGenes.join(', ')}`);
+
+        // -----------------------------
+        // 5. INTENT POST-PROCESSING (comparison phrases)
+        // -----------------------------
+        const compareRegex = /\b(higher in|lower in|more expressed|less expressed|compared to|versus|vs |vs\.|differential expression|which cell type|which tissue|expressed higher|is .* expressed)\b/;
+
+        if (compareRegex.test(queryLower)) {
+            intent = "compare";
+            confidence = Math.max(confidence, 0.95); // boost confidence for quantitative
+            window.log(`Intent override: forced "compare" due to phrase match`);
+        }
+        window.log(`Post-processed Intent: ${intent} (Confidence: ${confidence.toFixed(2)})`);
+
+        // -----------------------------
+        // 6. ROUTING LOGIC
+        // -----------------------------
+        let htmlResult = "";
+
+        // --- VISUALIZATION / SC-RNA ---
+        if ((intent === "visualize" || intent === "scRNA") && exactGenes.length > 0) {
+            window.log("Routing via: Intent (Visualize)");
+            htmlResult = window.routeVisualizationAction
+                ? await window.routeVisualizationAction(query, exactGenes)
+                : "<p>Visualization not implemented.</p>";
+        }
+
+        // --- QUANTITATIVE / COMPARISON ---
+        else if (intent === "ranking" || intent === "quantitative" || intent === "compare") {
+            window.log("Routing via: Intent (Quantitative Engine)");
+            htmlResult = window.runQuantitativeEngine
+                ? await window.runQuantitativeEngine(query, exactGenes)
+                : "<p>Quantitative comparison engine not implemented.</p>";
+        }
+
+        // --- GRAPH REASONING ---
+        else if (["relationship", "disease_query", "complex_query", "localization_query"].includes(intent)) {
+            window.log("Routing via: Intent (Graph Reasoning / Synthesis)");
+            htmlResult = window.runGraphQuery
+                ? await window.runGraphQuery(query, intent, exactGenes)
+                : "<p>Graph reasoning not implemented.</p>";
+        }
+
+        // --- DEFINITION / RAG FALLBACK ---
+        else if (intent === "definition" || (confidence < 0.3 && !compareRegex.test(queryLower) && exactGenes.length === 0)) {
+            window.log("Routing via: Intent (Definition / RAG Retrieval)");
+            if (exactGenes.length > 0) {
+                htmlResult = window.displayFullGeneInfo
+                    ? await window.displayFullGeneInfo(exactGenes[0])
+                    : `<p>Full gene info for ${exactGenes[0]} not available.</p>`;
+            } else if (semanticMatches[0] && semanticMatches[0].score > 0.7) {
+                htmlResult = window.formatRAGAnswer
+                    ? window.formatRAGAnswer(semanticMatches[0])
+                    : `<p>Semantic match found, but RAG formatting not implemented.</p>`;
+            } else {
+                htmlResult = `<p>No definition found.</p>`;
+            }
+        }
+
+        // --- FALLBACK ---
+        else {
+            window.log("Routing via: Default fallback");
+            htmlResult = `<p>I'm not sure how to handle this query.</p>`;
+        }
+
+        // -----------------------------
+        // 7. RETURN
+        // -----------------------------
         return htmlResult;
-    } catch (error) {
-        window.updateStatus("AI Query failed.", "error");
-        return `<div class="ai-result-card">**Gemini Error:** Failed to communicate with the backend. Details: ${error.message}</div>`;
+    } catch (err) {
+        window.log("ERROR in handleAIQuery:", err);
+        return `<p>Error: ${err.message}</p>`;
     }
-}
-
-// ----------------------------------------------------------
-// GEMINI COMMUNICATION LAYER
-// ----------------------------------------------------------
-async function getCiliAIAssistance({ question, context = {}, detected_genes = [] }) {
-    window.updateStatus("Waiting for Gemini response...", "loading");
-
-    const requestBody = { question, context, detected_genes };
-
-    try {
-        const response = await fetch(API_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            window.updateStatus(`Error: Gemini Service Failed (Code ${response.status})`, "error");
-            return `Error: Failed to fetch synthesis. Status: ${response.status}. Details: ${errorText.substring(0, 100)}...`;
-        }
-
-        const data = await response.json();
-
-        if (data && data.answer) {
-            window.updateStatus("AI response received.", "success");
-            return data.answer;
-        } else {
-            window.updateStatus("Error: Invalid response format.", "error");
-            return "Error: Received an empty or invalid synthesis response.";
-        }
-
-    } catch (error) {
-        window.updateStatus("Error: Network connection failed.", "error");
-        return `Error: A network issue prevented connection to the CiliAI service. Details: ${error.message}`;
-    }
-}
-
+};
 
 // ==========================
 // SAFE FALLBACKS
@@ -3829,23 +3588,6 @@ window.generateAndInjectSVG = function() {
     
     svgContainer.innerHTML = svgHTML;
 };
-
-
-// REVISED window.handleAIQuery
-window.handleAIQuery = async function(query) {
-    if (!query) return; // Prevent empty queries from progressing
-    window.addChatMessage(query, true); // Echo query to chat window
-
-    try {
-        const resultHtml = await routeQueryIntent(query);
-        window.addChatMessage(resultHtml, false);
-    } catch (error) {
-        window.updateStatus("Critical Error", "error");
-        window.addChatMessage(`🚨 Critical Frontend Error: ${error.message}`, false);
-        console.error("Critical Frontend Error:", error);
-    }
-};
-
 
 // ==========================================================
 // GLOBAL EXPOSURE (REQUIRED FOR index.html)
