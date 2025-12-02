@@ -1602,21 +1602,12 @@ function handleLocalizationQuery(term, query) {
 // FAST GENE EXTRACTION (for visualization + Gemini context)
 // ----------------------------------------------------------
 window.extractMultipleGenes = function (query) {
-    if (!query) return [];
+    if (!query || !/[A-Z]/i.test(query)) return [];
 
-    const tokens = query.toUpperCase().match(/[A-Z0-9]+/g) || [];
-    const validGenes = [];
-    
-    // FIX: Safely access the genes set (now initialized in GLOBAL STATE)
-    const knownGenesSet = window.CiliAI.genes; // No need for || new Set() as it's initialized
+    const tokens = [...new Set(query.toUpperCase().match(/[A-Z0-9]+/g) || [])];
+    const knownGenesSet = window.CiliAI.genes;
 
-    for (const t of tokens) {
-        if (knownGenesSet.has(t)) {
-            validGenes.push(t);
-        }
-    }
-
-    return [...new Set(validGenes)];
+    return tokens.filter(t => knownGenesSet.has(t));
 };
 
 
