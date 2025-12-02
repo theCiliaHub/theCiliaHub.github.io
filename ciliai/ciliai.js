@@ -3133,15 +3133,8 @@ window.terminologyQueries = {
 };
 
 
-/*
- * CiliAI V2.0: The Main Query Router (Hybrid Semantic-RAG Model)
- * FINAL EXECUTABLE VERSION - Terminology check is prioritized.
- * NOTE: This function relies on functional stubs for semanticSearch, runQuantitativeEngine,
- * and runGraphQuery being defined in the global scope (window).
  
-// ============================================================
-// CiliAI V5.1 - Main Query Router (Hybrid Frontend Execution)
-// ============================================================
+
 async function handleAIQuery(question) {
     window.updateStatus("Processing query locally...", "loading");
 
