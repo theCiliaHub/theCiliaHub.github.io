@@ -35,15 +35,9 @@ if (query.toLowerCase().includes("default umap")) {
 
 // If no genes AND not default plot → avoid crash
 if (!exactGenes || exactGenes.length === 0) {
-    window.log("[Visualization] No genes detected → gene-free plot?");
-    // you may choose your default behavior:
-    return window.drawDefaultUMAP();
-}
-
-if (typeof window.renderUMAPPlot !== "function") {
-    window.renderUMAPPlot = function () {
-        console.warn("renderUMAPPlot() not implemented.");
-    };
+    window.log("[Visualization] No genes detected → gene-free plot?");
+    // you may choose your default behavior:
+    return window.drawDefaultUMAP();
 }
 
 // FIX ADDITIONS: These three are called *inside* loadCiliAIData and initCiliAI early on.
