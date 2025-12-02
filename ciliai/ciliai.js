@@ -1,12 +1,12 @@
 /* ==============================================================
- * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
- * ==============================================================
- * • BUILT FROM SCRATCH based on user's question list.
- * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
- * • Lazy-loads the large phylogeny files only when needed.
- * • Fixes all known layout, normalization, and query routing bugs.
- * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
- * ============================================================== */
+ * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
+ * ==============================================================
+ * • BUILT FROM SCRATCH based on user's question list.
+ * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
+ * • Lazy-loads the large phylogeny files only when needed.
+ * • Fixes all known layout, normalization, and query routing bugs.
+ * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
+ * ============================================================== */
 
 // ==========================================================
 // SAFE FALLBACKS (Prevents crashes if UI functions missing)
@@ -15,21 +15,22 @@
 // CRITICAL FIX: Ensure all functions called early are defined globally or via fallbacks.
 
 if (typeof window.updateStatus !== "function") {
-    window.updateStatus = function (msg, state) {
-        console.log(`STATUS[${state}]: ${msg}`);
-    };
+    window.updateStatus = function (msg, state) {
+        console.log(`STATUS[${state}]: ${msg}`);
+    };
 }
 if (typeof window.drawDefaultUMAP !== "function") {
-    window.drawDefaultUMAP = function () {
-        window.log("drawDefaultUMAP() placeholder called");
-        return "<p>Default UMAP plot placeholder.</p>"; // ✅ return inside function
-    };
+    window.drawDefaultUMAP = function () {
+        window.log("drawDefaultUMAP() placeholder called");
+        return "<p>Default UMAP plot placeholder.</p>"; // ✅ return inside function
+    };
 }
 
+/* --- DELETED CODE BLOCK START (ciliai.js:39-44) ---
 // Safe usage inside handleAIQuery
 if (query.toLowerCase().includes("default umap")) {
-    window.log("[Visualization] Default UMAP requested");
-    htmlResult = window.drawDefaultUMAP(); // ✅ inside function
+    window.log("[Visualization] Default UMAP requested");
+    htmlResult = window.drawDefaultUMAP(); // ✅ inside function
 }
 
 
@@ -39,68 +40,70 @@ if (!exactGenes || exactGenes.length === 0) {
     // you may choose your default behavior:
     return window.drawDefaultUMAP();
 }
+// --- DELETED CODE BLOCK END --- */
+
 
 // FIX ADDITIONS: These three are called *inside* loadCiliAIData and initCiliAI early on.
 if (typeof window.log !== "function") {
-    window.log = function (msg) {
-        console.log(`CiliAI LOG: ${msg}`);
-    };
+    window.log = function (msg) {
+        console.log(`CiliAI LOG: ${msg}`);
+    };
 }
 
 if (typeof window.addChatMessage !== "function") {
-    window.addChatMessage = function (msg, isUser) {
-        // This simple fallback ensures no crash if the chat UI isn't ready
-        console.log(`CHAT [${isUser ? 'USER' : 'AI'}]: ${msg}`);
-    };
+    window.addChatMessage = function (msg, isUser) {
+        // This simple fallback ensures no crash if the chat UI isn't ready
+        console.log(`CHAT [${isUser ? 'USER' : 'AI'}]: ${msg}`);
+    };
 }
 
 if (typeof window.react !== "function") {
-    window.react = function (type) {
-        // Fallback relies on addChatMessage being defined above
-        window.addChatMessage(`Feedback received: ${type}`, false);
-    };
+    window.react = function (type) {
+        // Fallback relies on addChatMessage being defined above
+        window.addChatMessage(`Feedback received: ${type}`, false);
+    };
 }
 
 if (typeof window.clearChat !== "function") {
-    window.clearChat = function () {
-        // Fallback uses the logging function
-        window.log('clearChat() fallback executed.');
-    };
+    window.clearChat = function () {
+        // Fallback uses the logging function
+        window.log('clearChat() fallback executed.');
+    };
 }
 
-// NOTE: We also ensure 'handleUserSend' and 'handleGeneSearch' have fallbacks 
+// NOTE: We also ensure 'handleUserSend' and 'handleGeneSearch' have fallbacks 
 // as they are often called early by HTML event listeners.
 
 if (typeof window.handleUserSend !== "function") {
-    window.handleUserSend = function () {
-        window.log("handleUserSend() fallback executed.");
-    };
+    window.handleUserSend = function () {
+        window.log("handleUserSend() fallback executed.");
+    };
 }
 
 if (typeof window.handleGeneSearch !== "function") {
-    window.handleGeneSearch = function () {
-        window.log("handleGeneSearch() fallback executed.");
-    };
+    window.handleGeneSearch = function () {
+        window.log("handleGeneSearch() fallback executed.");
+    };
 }
 
-    
-    // ==========================================================
-    // GLOBAL STATE
-    // ==========================================================
-    window.CiliAI = {
-        data: { umap: [] },
-        masterData: [],
-        ready: false,
-        lookups: {}
-    };
+    
+    // ==========================================================
+    // GLOBAL STATE
+    // ==========================================================
+    window.CiliAI = {
+        data: { umap: [] },
+        masterData: [],
+        ready: false,
+        lookups: {}
+    };
 
 window.getGenesByComplex = function(complexTerm) {
-  const map = getComplexPhylogenyTableMap();
-  const normTerm = normalizeTerm(complexTerm);
-  const key = Object.keys(map).find(k => normalizeTerm(k) === normTerm);
-  return key ? map[key].map(g => ({ gene: g, description: `Part of ${key}` })) : [];
+  const map = getComplexPhylogenyTableMap();
+  const normTerm = normalizeTerm(complexTerm);
+  const key = Object.keys(map).find(k => normalizeTerm(k) === normTerm);
+  return key ? map[key].map(g => ({ gene: g, description: `Part of ${key}` })) : [];
 };
-    // --- Global variables to hold your data ---
+    // --- Global variables to hold your data ---
 let ciliaryGeneMap = new Map();
 let screenDatabase = {};
 let lastQueryContext = { type: null, data: [], term: null };
@@ -113,50 +116,8 @@ window.CiliAI_UMAP = null; // This will be populated from the master DB
 window.extractDiseaseTerm = window.extractDiseaseIntent;
 
 // --- CRITICAL FIX: Alias for complex term extractor ---
-window.extractComplexTerm = window.extractComplexIntent; 
-// ---
-   
-// ----------------------------------------------------------
-// 3. GEMINI COMMUNICATION LAYER
-// ----------------------------------------------------------
+window.extractComplexTerm = window.extractComplexIntent; 
 
-async function getCiliAIAssistance(userQuery, context = {}, detectedGenes = []) {
-    window.updateStatus("Waiting for Gemini response...", "loading");
-
-    const requestBody = {
-        question: userQuery,
-        context: JSON.stringify(context),
-        detected_genes: detectedGenes
-    };
-
-    try {
-        const response = await fetch(API_ENDPOINT + "/ask-ciliai", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            window.updateStatus(`Error: Gemini backend failed (${response.status})`, "error");
-            return `Error: Backend failed. Details: ${errorText.slice(0, 100)}...`;
-        }
-
-        const data = await response.json();
-
-        if (data && data.answer) {
-            window.updateStatus("AI response received.", "success");
-            return data.answer;
-        }
-
-        window.updateStatus("Error: Invalid backend response.", "error");
-        return "Error: Gemini returned an empty response.";
-
-    } catch (error) {
-        window.updateStatus("Network failure", "error");
-        return `Network error: ${error.message}`;
-    }
-}
 
 
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
@@ -561,15 +522,17 @@ window.routeVisualizationAction = async function(query, exactGenes) {
     const qLower = query.toLowerCase();
     const hasGenes = exactGenes && exactGenes.length > 0;
     
-    // --- 1. DEFAULT UMAP LOGIC (Handles requests for 'default umap' or when no genes are found) ---
-    if (!hasGenes || qLower.includes('default umap') || qLower.includes('umap')) { 
-        const gene = hasGenes ? exactGenes[0] : 'FOXJ1'; // Use FOXJ1 if no specific gene provided
+    // --- 1. UMAP / scRNA / Default Plotting ---
+    // This is the combined logic: Handles explicit UMAP/scRNA requests AND the implicit default.
+    if (qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('default plot') || !hasGenes) {
+        const gene = hasGenes ? exactGenes[0] : 'FOXJ1'; // Default marker if no gene or if 'default' requested.
         
         if (window.renderUMAPPlot) {
             window.log(`[Visualization] Default/Gene-specific UMAP requested for ${gene}.`);
             window.renderUMAPPlot(gene); 
             return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. Displaying now.</div>`;
         } else {
+            // This is the fallback if renderUMAPPlot itself isn't defined, which should be avoided.
             return `<div class="ai-result-card">📊 UMAP plot requested. **renderUMAPPlot()** function not initialized.</div>`;
         }
     }
@@ -587,19 +550,7 @@ window.routeVisualizationAction = async function(query, exactGenes) {
     }
 
     // -------------------------------
-    // 3. Gene-colored UMAP / scRNA
-    // -------------------------------
-    if (qLower.includes('umap') || qLower.includes('scrna')) {
-        if (window.renderUMAPPlot) {
-            window.renderUMAPPlot(gene); // V1 visualizer
-            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. Displaying now.</div>`;
-        } else {
-            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. renderUMAPPlot() not implemented.</div>`;
-        }
-    }
-
-    // -------------------------------
-    // 4. Phylogeny / Heatmap
+    // 3. Phylogeny / Heatmap
     // -------------------------------
     if (qLower.includes('phylogen') || qLower.includes('heatmap')) {
         if (window.routePhylogenyAnalysis) {
@@ -610,9 +561,9 @@ window.routeVisualizationAction = async function(query, exactGenes) {
     }
 
     // -------------------------------
-    // 5. Fallback visualization
+    // 4. Fallback visualization
     // -------------------------------
- return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized, but no specific plot matched the query.</div>`;
+    return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized, but no specific plot matched the query.</div>`;
 };
 
 /**
