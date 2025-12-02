@@ -560,17 +560,17 @@ window.runQuantitativeEngine = async function(query, exactGenes) {
 window.routeVisualizationAction = async function(query, exactGenes) {
     const qLower = query.toLowerCase();
     const hasGenes = exactGenes && exactGenes.length > 0;
-    const gene = hasGenes ? exactGenes[0] : 'FOXJ1'; // default marker if no gene
-
-    // -------------------------------
-    // 1. Default / gene-free UMAP
-    // -------------------------------
-    if (!hasGenes || qLower.includes('default umap')) {
-        if (window.drawDefaultUMAP) {
-            window.drawDefaultUMAP();
-            return `<div class="ai-result-card">📊 Default UMAP plot requested. Displaying now.</div>`;
+    
+    // --- 1. DEFAULT UMAP LOGIC (Handles requests for 'default umap' or when no genes are found) ---
+    if (!hasGenes || qLower.includes('default umap') || qLower.includes('umap')) { 
+        const gene = hasGenes ? exactGenes[0] : 'FOXJ1'; // Use FOXJ1 if no specific gene provided
+        
+        if (window.renderUMAPPlot) {
+            window.log(`[Visualization] Default/Gene-specific UMAP requested for ${gene}.`);
+            window.renderUMAPPlot(gene); 
+            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. Displaying now.</div>`;
         } else {
-            return `<div class="ai-result-card">📊 Default UMAP plot requested. Function not implemented.</div>`;
+            return `<div class="ai-result-card">📊 UMAP plot requested. **renderUMAPPlot()** function not initialized.</div>`;
         }
     }
 
@@ -612,9 +612,8 @@ window.routeVisualizationAction = async function(query, exactGenes) {
     // -------------------------------
     // 5. Fallback visualization
     // -------------------------------
-    return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized, but no specific plot matched the query.</div>`;
+ return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized, but no specific plot matched the query.</div>`;
 };
-
 
 /**
  * ENHANCED NLP FIX: Smart Terminology Matcher (RESTRICTED TO DEFINITIONS)
