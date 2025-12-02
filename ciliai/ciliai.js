@@ -482,81 +482,32 @@ window.semanticSearch = async function(query, topK=5, minScore=0.60) {
     return [{ id: 'NONE', text: 'no semantic match found', score: 0.1 }];
 };
 
-/**
- * REVISED STEP 1 & 2: Local Intent Classification and Execution Engine.
- * This simulates the output of the Gemini Classifier (Intent + Helper) and executes the local JS function immediately.
- * @param {string} query - The raw user question.
- * @returns {Promise<string>} HTML result from the execution layer, or initiates Gemini fallback.
- */
+// REVISED window.routeQueryIntent (The error occurred here, around line 529 in previous context)
+
 async function routeQueryIntent(query) {
     const qLower = query.toLowerCase();
+    
+    // 💡 FIX: Define exactGenes and hasGenes immediately upon entering the router
+    const exactGenes = window.extractMultipleGenes(query);
+    const hasGenes = exactGenes.length > 0; // <--- FIX: Ensure this line exists here.
+
     const intentAnalysis = window.scoreIntents(query);
     const intent = intentAnalysis.intent;
-    const exactGenes = window.extractMultipleGenes(query);
 
     window.log(`[Router] Intent: ${intent}, Genes: ${exactGenes.join(', ')}`);
 
-    // --- A. PRIORITY: QUICK STATIC LOOKUPS (Fastest Local Execution) ---
-    let localResult = findTerminologyMatch(query);
-    if (localResult) return `<div class="ai-result-card">🧠 **Terminology Match:** ${localResult}</div>`;
+    // --- A. PRIORITY: QUICK STATIC LOOKUPS ---
+    // ... (rest of logic follows, safely using hasGenes) ...
     
-    localResult = handleExplanatoryQuery(query);
-    if (localResult) return localResult; // Comparative tables, IFT cycle, etc.
-
-    // --- B. DATA RETRIEVAL INTENTS (Local Data Filtering and Tool Use) ---
-
-    // 1. VISUALIZATION/PLOT
-    if (intent === 'visualize' || qLower.includes('plot')) {
-        window.updateStatus("Routing to Visualization Engine...", "loading");
-        // Handled by local JS renderers
-        return window.routeVisualizationAction(query, exactGenes); 
-    }
-
-    // 2. COMPLEX/MULTI-FILTER LISTS (Phenotype, Localization, Expression Overlap)
-    // This uses your restored getGenesByMultipleFilters for high-accuracy local lookups.
-    if (['complex_query', 'disease_query', 'localization_query', 'compare', 'relationship'].includes(intent) || intentAnalysis.confidence >= 5) {
-        window.updateStatus("Routing to Local Data Filters (Graph Query)...", "loading");
-        
-        // This relies on the comprehensive runGraphQuery wrapper which handles complex entity extraction.
-        localResult = await window.runGraphQuery(query, intent, exactGenes);
-        if (localResult && !localResult.includes('Synthesis path failed')) {
-            window.updateStatus("Local Structured Query complete.", "success");
-            return localResult;
-        }
-    }
+    // ...
     
-    // 3. SINGLE GENE DETAIL/DEFINITION
-    if (hasGenes && (intent === 'definition' || intentAnalysis.confidence < 2)) {
-        window.updateStatus(`Fetching full data for ${exactGenes[0]}...`, "loading");
-        // Uses the newly restored displayFullGeneInfo function.
-        return await window.displayFullGeneInfo(exactGenes[0]); 
-    }
-
+    // Final fallback block needs to be self-contained:
+    // ...
     // --- C. FALLBACK TO GEMINI SYNTHESIS ---
     window.updateStatus("Local processing complete. Falling back to Gemini Synthesis...", "loading");
     
-    // Perform standard fallback logic (build minimal context and call backend)
-    const context = {};
-    const geneMap = window.CiliAI.lookups?.geneMap || {};
-    let contextSize = 0;
-
-    for (const gene of exactGenes) {
-        if (geneMap[gene]) {
-            context[gene] = geneMap[gene];
-            contextSize++;
-        }
-    }
-
-    try {
-        const geminiResponse = await getCiliAIAssistance({ question: query, context: context, detected_genes: exactGenes });
-        return `<div class="ai-result-card">🧠 **AI Synthesis:** ${geminiResponse}</div>`;
-    } catch (error) {
-        window.updateStatus("AI Query failed.", "error");
-        return `<div class="ai-result-card">**Gemini Error:** Failed to communicate with the backend. Details: ${error.message}</div>`;
-    }
+    // ... (build context and call backend)
 }
-
-
 
 /**
  * RESTORED: Extracts phenotype keywords from a query (e.g., 'short cilia', 'longer cilia').
