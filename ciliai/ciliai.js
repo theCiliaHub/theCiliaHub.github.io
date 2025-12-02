@@ -87,16 +87,16 @@ if (typeof window.handleGeneSearch !== "function") {
 }
 
     
-    // ==========================================================
-    // GLOBAL STATE
-    // ==========================================================
+ // ==========================================================
+// GLOBAL STATE
+// ==========================================================
     window.CiliAI = {
         data: { umap: [] },
         masterData: [],
         ready: false,
+        genes: new Set(),         // <--- ADD THIS LINE
         lookups: {}
     };
-
 window.getGenesByComplex = function(complexTerm) {
   const map = getComplexPhylogenyTableMap();
   const normTerm = normalizeTerm(complexTerm);
@@ -1389,9 +1389,14 @@ window.extractMultipleGenes = function (query) {
 
     const tokens = query.toUpperCase().match(/[A-Z0-9]+/g) || [];
     const validGenes = [];
+    
+    // FIX 1: Safely access the genes set, defaulting to an empty Set if undefined.
+    // Use the comprehensive lookup map key (which you use later) or the dedicated Set.
+    // Since this function requires a Set, let's prioritize defining that Set.
+    const knownGenesSet = window.CiliAI.genes || new Set();
 
     for (const t of tokens) {
-        if (window.CiliAI.genes.has(t)) {   
+        if (knownGenesSet.has(t)) {
             validGenes.push(t);
         }
     }
