@@ -482,6 +482,121 @@ window.semanticSearch = async function(query, topK=5, minScore=0.60) {
     return [{ id: 'NONE', text: 'no semantic match found', score: 0.1 }];
 };
 
+/**
+ * RESTORED: Extracts phenotype keywords from a query (e.g., 'short cilia', 'longer cilia').
+ * @param {string} qLower - The lowercase query string.
+ * @returns {string|null} The found phenotype term, or null.
+ */
+function extractPhenotypeIntent(qLower) {
+    const keywords = {
+        'short cilia': ['short cilia', 'shorter cilia', 'decreased cilia length', 'short'],
+        'longer cilia': ['long cilia', 'longer cilia', 'increased cilia length', 'long'],
+        'loss of cilia': ['loss of cilia', 'no cilia', 'cilia loss', 'reduced ciliation'],
+        'no effect': ['no effect', 'no change', 'normal length']
+    };
+    for (const [term, synonyms] of Object.entries(keywords)) {
+        if (synonyms.some(syn => qLower.includes(syn))) {
+            return term;
+        }
+    }
+    return null;
+}
+
+/**
+ * RESTORED: Extracts organism keywords from a query (e.g., 'C. elegans', 'mouse').
+ * @param {string} qLower - The lowercase query string.
+ * @returns {string|null} The found organism term, or null.
+ */
+function extractOrganismIntent(qLower) {
+    const keywords = {
+        'C. elegans': ['c. elegans', 'elegans', 'worm'],
+        'Mus musculus': ['mouse', 'mus musculus'],
+        'Danio rerio': ['zebrafish', 'danio rerio'],
+        'Drosophila melanogaster': ['fly', 'drosophila', 'd. melanogaster'],
+        'Homo sapiens': ['human', 'homo sapiens']
+    };
+    for (const [term, synonyms] of Object.entries(keywords)) {
+        if (synonyms.some(syn => qLower.includes(syn))) {
+            return term;
+        }
+    }
+    return null;
+}
+
+/**
+ * RESTORED CORE HELPER: Filters genes based on up to four criteria.
+ * This integrates the logic needed for all complex local queries.
+ * @param {object} filters {localization: str, disease: str, expression: str, phenotype: str}
+ * @returns {Array<object>} Filtered gene list with standardized columns.
+ */
+function getGenesByMultipleFilters(filters) {
+    const geneMap = window.CiliAI.lookups.geneMap;
+    if (!geneMap) return [];
+    
+    // Start with all genes currently loaded into the lookup map
+    let geneSymbols = Object.keys(geneMap);
+    
+    // Filter 1: Localization
+    if (filters.localization) {
+        const locGenes = window.getGenesByLocalization(filters.localization).map(g => g.gene);
+        geneSymbols = geneSymbols.filter(g => locGenes.includes(g));
+    }
+    
+    // Filter 2: Disease
+    if (filters.disease) {
+        const normDisease = window.normalizeDiseaseKey(filters.disease);
+        // Note: window.CiliAI.lookups.byCiliopathy must be populated during initialization
+        const diseaseGenes = window.CiliAI.lookups.byCiliopathy?.[normDisease] || [];
+        geneSymbols = geneSymbols.filter(g => diseaseGenes.includes(g));
+    }
+    
+    const results = [];
+    
+    // Filter 3 & 4: Expression and Phenotype Check
+    for (const geneSymbol of geneSymbols) {
+        const g = geneMap[geneSymbol];
+        if (!g) continue;
+
+        // Check A: Expression Filter (Tissue-specific expression)
+        let passesExpression = true;
+        if (filters.expression && !window.hasExpressionInTissue(g, filters.expression)) {
+            passesExpression = false;
+        }
+
+        // Check B: Phenotype Filter (LoF effects on cilia)
+        let passesPhenotype = true;
+        if (filters.phenotype) {
+            const phenLower = filters.phenotype.toLowerCase();
+            // Use the exact field names from your master CSV/JSON
+            const lof = (g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '').toLowerCase();
+            const perc = (g['Percentage of ciliated cells (increase/decrease/no effect)'] || '').toLowerCase();
+            
+            // Simplified Phenotype Check (covers 'short cilia', 'loss of cilia')
+            if (phenLower.includes('short') && !lof.includes('decrease')) {
+                passesPhenotype = false;
+            } else if (phenLower.includes('loss') && !perc.includes('reduced')) {
+                passesPhenotype = false;
+            } 
+            // Add other phenotype checks here (e.g., 'no effect')
+        }
+        
+        if (passesExpression && passesPhenotype) {
+            results.push({
+                gene: geneSymbol,
+                localization_detail: g.Localization || 'N/A',
+                lof_effect_detail: g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'N/A',
+                disease: filters.disease || 'N/A',
+                expression: filters.expression ? (g.expression?.tissue?.[filters.expression] || 'N/A') : 'N/A',
+            });
+        }
+    }
+    
+    return results;
+}
+
+
+
+
 // --- NEW/UPDATED Quantitative Engine Stub (Implementation of Gap 4) ---
 window.runQuantitativeEngine = async function(query, exactGenes) {
     window.log('IMPLEMENTATION: Executing Quantitative Engine');
@@ -614,9 +729,9 @@ function handleHighLevelExplanations(query) {
 }
 
 /**
- * V2.0 FINAL STUB IMPLEMENTATION: window.runGraphQuery (Step 6)
+ * V2.0 FINAL IMPLEMENTATION: window.runGraphQuery
  * Handles Synthesis, Comparison, and Complex/Disease Filtering for intents:
- * 'compare', 'relationship', 'disease_query', 'complex_query', 'localization_query'.
+ * 'compare', 'relationship', 'disease_query', 'complex_query', 'localization_query', and complex multi-parameter queries.
  */
 window.runGraphQuery = async function(query, intent, exactGenes) {
     window.log(`EXECUTING V2.0 GRAPH/SYNTHESIS for Intent: ${intent}`);
@@ -633,11 +748,43 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
     
     // 2. Check 2-gene synthesis/relationship queries (e.g., ARL13B and INPP5E)
     if (exactGenes.length === 2) {
-        // We use the simpler alias here since the full synthesis logic is complex.
         return window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]); 
     }
 
-    // --- B. LIST RETRIEVAL AND SYNTHESIS (Resolves E2, E3) ---
+    // --- B. NEW: MULTI-PARAMETER FILTERING (Localization + Disease + Expression/Phenotype) ---
+
+    const locTerm = window.extractLocalizationIntent(qLower);
+    const diseaseTerm = window.extractDiseaseIntent(qLower);
+    const tissueTerm = window.extractExpressionIntent(qLower); 
+    const phenotypeTerm = window.extractPhenotypeIntent(qLower); 
+    
+    if (locTerm || diseaseTerm || tissueTerm || phenotypeTerm) {
+        const filters = {
+            localization: locTerm,
+            disease: diseaseTerm,
+            expression: tissueTerm,
+            phenotype: phenotypeTerm
+        };
+
+        const results = getGenesByMultipleFilters(filters);
+        // Build readable criteria list for the title
+        const criteria = Object.entries(filters)
+            .filter(([, val]) => val)
+            .map(([key, val]) => `${key}: ${val}`)
+            .join('; ');
+
+        if (results.length > 0) {
+            window.updateStatus("Local multi-filter query successful.", "success");
+            // The formatListResult implementation should be able to handle the returned structure (localization_detail, lof_effect_detail)
+            // 
+            return window.formatListResult(`Genes matching: ${criteria}`, results);
+        }
+        // If results are 0, fall through to the simple handlers below, 
+        // as the query might have been a simple localization query that failed 
+        // the phenotype/expression check.
+    }
+
+    // --- C. SIMPLE LIST RETRIEVAL (Fallback if multi-filter fails or is unnecessary) ---
 
     // 3. Simple Complex/Module Query (e.g., "Genes in BBSome")
     if (intent === 'complex_query') {
@@ -645,31 +792,27 @@ window.runGraphQuery = async function(query, intent, exactGenes) {
         const gene = exactGenes[0]; 
         
         if (complexTerm) {
-             // Case: What genes are in the BBSome?
-             return window.getComplexGenesAndFormat(complexTerm);
+            return window.getComplexGenesAndFormat(complexTerm);
         } else if (gene) {
-             // Case: What complexes is KIF3A a member of?
-             return window.handleGeneInComplexQuery(gene);
+            return window.handleGeneInComplexQuery(gene);
         }
     }
     
     // 4. Simple Localization Query (e.g., "List genes in the transition zone")
     if (intent === 'localization_query') {
-        const locTerm = window.extractLocalizationIntent(query);
-        if (locTerm) {
-            // Use V1 helper to get list and format it.
-            return window.handleLocalizationQuery(locTerm, query); 
+        const locTermSimple = window.extractLocalizationIntent(query);
+        if (locTermSimple) {
+            return window.handleLocalizationQuery(locTermSimple, query); 
         }
     }
     
     // 5. Simple Disease Query (e.g., "Genes associated with Primary Ciliary Dyskinesia")
     if (intent === 'disease_query' && exactGenes.length === 0) {
-        const diseaseTerm = window.extractDiseaseIntent(query);
+        const diseaseTermSimple = window.extractDiseaseIntent(query);
         
-        if (diseaseTerm) {
-            const { genes, description } = window.getCiliopathyGenes(diseaseTerm);
-            // V2.0 FIX: Directly output the list.
-            return window.formatListResult(`Genes for ${diseaseTerm}`, genes, description);
+        if (diseaseTermSimple) {
+            const { genes, description } = window.getCiliopathyGenes(diseaseTermSimple);
+            return window.formatListResult(`Genes for ${diseaseTermSimple}`, genes, description);
         }
     }
     
