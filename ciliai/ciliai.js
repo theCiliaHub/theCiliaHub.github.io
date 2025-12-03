@@ -384,6 +384,23 @@ function setupPageEventListeners() {
         console.log(`[CiliAI] ${message}`);
     }
 
+// --- NEW FUNCTION: Feedback Email Sender ---
+function sendFeedbackEmail(feedbackType, userQuestion) {
+    const subject = `CiliAI ${feedbackType === 'up' ? '👍 Positive' : '👎 Negative'} Feedback`;
+    const body = `
+User Question: ${userQuestion}
+Feedback Type: ${feedbackType === 'up' ? 'Positive (👍)' : 'Negative (👎)'}
+Time: ${new Date().toLocaleString()}
+Page: ${window.location.href}
+
+--
+Sent from CiliAI Chat
+    `.trim();
+    
+    // Open user's email client with pre-filled message
+    window.open(`mailto:oktay.kaplan@agu.edu.tr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+}
+
 /**
  * (REPLACEMENT) Robust Gene Extractor
  * This version uses a manual map for common genes and an expanded stopword list
