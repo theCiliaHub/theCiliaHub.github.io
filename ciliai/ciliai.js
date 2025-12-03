@@ -3043,63 +3043,28 @@ async function handleAIQuery(query) {
         }
 
         // =( 15 )= FINAL FALLBACK (ERROR)
-        // =( 15 )= SMART FINAL FALLBACK: Local Error → Gemini Brain
-if (htmlResult === null) {
-    window.log(`Routing via: Smart Fallback Check`);
-
-    const genes = window.extractMultipleGenes(query);
-    const intents = { // Collect any detected intents (from your extract* functions)
-        disease: window.extractDiseaseIntent(qLower),
-        expression: window.extractExpressionIntent(qLower),
-        complex: window.extractComplexIntent(qLower),
-        evolution: window.extractEvolutionIntent(qLower),
-        phenotype: window.extractPhenotypeIntent(qLower),
-        localization: window.extractLocalizationIntent(qLower)
-    };
-    const detectedIntents = Object.values(intents).filter(Boolean);
-
-    if (isComplexQuery(query, genes, detectedIntents)) {
-        // Complex → Gemini with enriched context
-        const enrichedContext = {
-            query: query,
-            genes_for_synthesis: genes.map(gene => window.CiliAI.lookups.geneMap[gene]).filter(g => g),
-            detected_intents: intents,
-            database_summary: {
-                total_genes: window.CiliAI.masterData.length,
-                structures: Object.keys(structureInfoMap),
-                complexes: Object.keys(getComplexPhylogenyTableMap()),
-                diseases: Object.keys(getDiseaseClassificationMap()).flatMap(cat => getDiseaseClassificationMap()[cat])
+        if (htmlResult === null) {
+            window.log(`Routing via: Final Fallback (Error)`);
+            const genes = window.extractMultipleGenes(query);
+            if (genes.length > 0) {
+                window.log(`Final fallback, found gene: ${genes[0]}`);
+                htmlResult = await window.displayFullGeneInfo(genes[0]);
+            } else {
+                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
             }
-        };
-        await sendQueryToGemini(query, genes, enrichedContext);
-        return; // Gemini handles display
-    } else {
-        // Truly simple unknown → your old error message
-        htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
-    }
-}
+        }
+
+        // Send the final result to chat
+        if (htmlResult) {
+            window.addChatMessage(htmlResult, false);
+        }
+
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
 
-// NEW: Complexity Scorer (decides local vs Gemini)
-function isComplexQuery(query, extractedGenes, detectedIntents) {
-    const qLower = query.toLowerCase();
-    const wordCount = query.split(/\s+/).length;
-
-    // Complex if: long query, multiple intents, no genes but keywords, or specific flags
-    if (wordCount > 10) return true;
-    if (detectedIntents.length > 1) return true; // e.g., localization + disease
-    if (extractedGenes.length === 0 && 
-        (qLower.match(/(zone|body|axoneme|ift|bbsome|disease|syndrome|expressed|cause|knocked|conserved)/gi) || []).length > 1) {
-        return true;
-    }
-    if (qLower.includes('compare') || qLower.includes('vs') || qLower.includes('no known phenotype') || qLower.includes('discovery')) return true;
-
-    return false;
-}
        
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
