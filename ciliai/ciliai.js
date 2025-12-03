@@ -3293,10 +3293,6 @@ window.generateAndInjectSVG = function() {
 // ==========================================================
 // 4H. GEMINI INTEGRATION AND FALLBACK
 // ==========================================================
-
-* @param {Array<string>} genes An array of gene symbols detected in the query.
- * @param {Array<Object>} geneData The full structured data objects for the genes.
- */
 async function sendQueryToGemini(query, genes, geneData) {
     window.log(`Sending query to Gemini backend: ${query} (Genes: ${genes.join(', ')})`);
 
