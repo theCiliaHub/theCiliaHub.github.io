@@ -3294,19 +3294,15 @@ window.generateAndInjectSVG = function() {
 // 4H. GEMINI INTEGRATION AND FALLBACK
 // ==========================================================
 
-/**
- * NEW CORE FUNCTION: Handles sending queries and relevant context to the Gemini backend.
- * @param {string} query The user's question.
- * @param {Array<string>} genes An array of gene symbols detected in the query.
+* @param {Array<string>} genes An array of gene symbols detected in the query.
  * @param {Array<Object>} geneData The full structured data objects for the genes.
  */
 async function sendQueryToGemini(query, genes, geneData) {
     window.log(`Sending query to Gemini backend: ${query} (Genes: ${genes.join(', ')})`);
 
-    // We will use a placeholder or the actual deployed URL (e.g., in a cloud environment).
-    // For development, keep the URL local. For deployment, this should be the public URL
-    const GEMINI_ENDPOINT_URL = "http://localhost:8080/ask-ciliai"; 
-    // NOTE: Replace "http://localhost:8080" with your actual Cloud Run URL in production.
+    // --- CRITICAL FIX: PRODUCTION GEMINI ENDPOINT ---
+    const GEMINI_ENDPOINT_URL = "https://cili-ai-gemini-backend-687107394688.us-central1.run.app/ask-ciliai";
+    // --- END CRITICAL FIX ---
     
     // Prepare the context: serialize the complex data structure to JSON
     const context_json = JSON.stringify(geneData, null, 2); 
