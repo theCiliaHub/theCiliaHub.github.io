@@ -92,6 +92,18 @@ window.CiliAI_UMAP = null; // This will be populated from the master DB
    
     // --- Data Maps (These are now just for the AI brain) ---
 
+// --- CRITICAL FIX: Missing Structure Info Map ---
+const structureInfoMap = {
+    'basal-body': { title: 'Basal Body', description: 'Anchors the ciliary axoneme to the cell cortex.' },
+    'transition-zone': { title: 'Transition Zone', description: 'Acts as a ciliary gate, regulating entry and exit of proteins.' },
+    'axoneme': { title: 'Axoneme', description: 'The microtubule core providing structural support and motility.' },
+    'ciliary-tip': { title: 'Ciliary Tip', description: 'The site of IFT turnaround and a major signaling hub.' },
+    'ciliary-membrane': { title: 'Ciliary Membrane', description: 'Houses ciliary GPCRs and ion channels for signaling.' },
+    'nucleus': { title: 'Nucleus', description: 'Gene transcription location (non-ciliary element).' },
+    'cell-body': { title: 'Cell Body/Cytoplasm', description: 'Protein synthesis and trafficking machinery location.' }
+    // Add other relevant SVG IDs as keys here
+};
+// --- END CRITICAL FIX ---
 
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
     const NEVERS_CIL_PANEL = [
@@ -1182,25 +1194,29 @@ function handleScreenQuery(geneSymbol) {
             `;
         }
     }
-    
-    function tellAboutCiliAI() {
-        return `
-            <div class="ai-result-card">
-                <strong>Welcome to CiliAI!</strong>
-                <p>I am an AI assistant designed to help you explore data on ciliary biology. You can ask me questions like:</p>
-                <ul>
-                    <li><b>Gene Details:</b> "What is IFT88?" or "Describe ARL13B."</li>
-                    <li><b>Localization:</b> "List genes in the transition zone." or "Where is CEP290?"</li>
-                    <li><b>Complexes:</b> "What genes are in the BBSome?" or "Complex components of OFD1."</li>
-                    <li><b>Ciliopathies:</b> "Gene list of Joubert Syndrome." or "What genes cause PCD?"</li>
-                    <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
-                    <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
-                </ul>
-                <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
-            </div>
-        `;
-    }
-    
+
+   // --- MODIFIED: tellAboutCiliAI (Gemini branding added back) ---
+function tellAboutCiliAI() {
+    return `
+        <div class="ai-result-card">
+            <strong>Welcome to CiliAI!</strong>
+            <p>I am an AI assistant designed to help you explore data on ciliary biology. You can ask me questions like:</p>
+            <ul>
+                <li><b>Gene Details:</b> "What is IFT88?" or "Describe ARL13B."</li>
+                <li><b>Localization:</b> "List genes in the transition zone." or "Where is CEP290?"</li>
+                <li><b>Complexes:</b> "What genes are in the BBSome?" or "Complex components of OFD1."</li>
+                <li><b>Ciliopathies:</b> "Gene list of Joubert Syndrome." or "What genes cause PCD?"</li>
+                <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
+                <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
+            </ul>
+            <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
+            <p style="font-size: 11px; margin-top: 10px; padding-top: 5px; border-top: 1px solid #e0e0e0;">
+                **Powered by Gemini**: This CiliAI interface utilizes the Gemini model for its natural language understanding and conversational structure.
+            </p>
+        </div>
+    `;
+}
+// --- END MODIFIED BLOCK ---
 
 /**
  * UMAP PLOT (Expression Mapping Mode)
@@ -2969,9 +2985,9 @@ async function handleAIQuery(query) {
         }
 
 
-        // =( 13 )= INTENT: FALLBACK (GET DETAILS)
+       // =( 13 )= INTENT: FALLBACK (GET DETAILS) / GEMINI ROUTING
         if (htmlResult === null) {
-            window.log(`Routing via: Fallback (Get Details)`);
+            window.log(`Routing via: Fallback/Gemini Check`);
             let term = qLower;
             if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
                 term = match[1];
@@ -2980,7 +2996,15 @@ async function handleAIQuery(query) {
             
             const genes = window.extractMultipleGenes(term);
             
+            // --- NEW: Check if this is a complex synthesis question for Gemini ---
+            if (window.attemptGeminiFallback(query, genes)) {
+                 // Gemini has taken over the query handling
+                 return; 
+            }
+            // --- END NEW ---
+
             if (genes.length > 0) {
+                window.log(`Final fallback, found gene: ${genes[0]} - local processing.`);
                 htmlResult = await window.displayFullGeneInfo(genes[0]);
             }
         }
@@ -3264,6 +3288,121 @@ window.generateAndInjectSVG = function() {
     
     svgContainer.innerHTML = svgHTML;
 };
+
+
+// ==========================================================
+// 4H. GEMINI INTEGRATION AND FALLBACK
+// ==========================================================
+
+/**
+ * NEW CORE FUNCTION: Handles sending queries and relevant context to the Gemini backend.
+ * @param {string} query The user's question.
+ * @param {Array<string>} genes An array of gene symbols detected in the query.
+ * @param {Array<Object>} geneData The full structured data objects for the genes.
+ */
+async function sendQueryToGemini(query, genes, geneData) {
+    window.log(`Sending query to Gemini backend: ${query} (Genes: ${genes.join(', ')})`);
+
+    // We will use a placeholder or the actual deployed URL (e.g., in a cloud environment).
+    // For development, keep the URL local. For deployment, this should be the public URL
+    const GEMINI_ENDPOINT_URL = "http://localhost:8080/ask-ciliai"; 
+    // NOTE: Replace "http://localhost:8080" with your actual Cloud Run URL in production.
+    
+    // Prepare the context: serialize the complex data structure to JSON
+    const context_json = JSON.stringify(geneData, null, 2); 
+
+    try {
+        window.addChatMessage(`🧠 Handing off to CiliAI (Gemini) for synthesis...`, false);
+        
+        const response = await fetch(GEMINI_ENDPOINT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                question: query,
+                context: context_json,
+                detected_genes: genes,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Backend request failed with status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.answer) {
+            // Display the rich markdown answer from Gemini
+            window.addChatMessage(result.answer, false);
+            
+            // Add a footer indicating the source/model used
+            window.addChatMessage(`<div style="font-size: 10px; color: #718096; text-align: right; padding-top: 5px;">
+                Synthesized by ${result.model}
+            </div>`, false);
+        } else {
+            window.addChatMessage(`Sorry, the Gemini synthesis engine did not return an answer. Error: ${result.error || 'Unknown'}`, false);
+        }
+        
+    } catch (e) {
+        console.error("Gemini connection error:", e);
+        window.addChatMessage(`An error occurred while connecting to the CiliAI Gemini service. Please check the backend URL and status. (${e.message})`, false);
+    }
+}
+
+// ------------------------------
+// MODIFIED FALLBACK HANDLER
+// ------------------------------
+
+/**
+ * Determines if a query is complex enough for Gemini, collects required data, and routes the query.
+ * @param {string} query The user's question.
+ * @param {Array<string>} genes An array of gene symbols detected by local logic.
+ * @returns {boolean} True if the query was handled and sent to Gemini, false otherwise.
+ */
+function attemptGeminiFallback(query, genes) {
+    const qLower = query.toLowerCase();
+
+    // Condition 1: Synthesis or Comparison Queries
+    if (qLower.includes('compare') || qLower.includes('role') || qLower.includes('mechanism') || qLower.includes('explain how') || qLower.includes('significance')) {
+        
+        // Ensure we have at least one gene to provide context for synthesis
+        if (genes.length === 0) {
+            // This is a complex conceptual question without a gene context, Gemini is the best path.
+            // Send the raw question with minimal context.
+            sendQueryToGemini(query, [], {});
+            return true;
+        }
+
+        // Collect comprehensive data for all detected genes
+        const geneData = genes.map(gene => window.CiliAI.lookups.geneMap[gene]).filter(g => g);
+        
+        if (geneData.length > 0) {
+            sendQueryToGemini(query, genes, {
+                query: query,
+                genes_for_synthesis: geneData
+            });
+            return true;
+        }
+    }
+    
+    // Condition 2: Deep detail queries (handled by local code for single genes, 
+    // but Gemini can improve synthesis for multiple genes if local handling fails)
+    if (qLower.includes('tell me about') && genes.length > 1) {
+        const geneData = genes.map(gene => window.CiliAI.lookups.geneMap[gene]).filter(g => g);
+        if (geneData.length > 0) {
+            sendQueryToGemini(query, genes, {
+                query: query,
+                genes_for_synthesis: geneData
+            });
+            return true;
+        }
+    }
+    
+    return false; // Let the local fallback take over (simple single gene info, lookup error, etc.)
+}
+
+
 
 // ==========================================================
 // GLOBAL EXPOSURE (REQUIRED FOR index.html)
