@@ -1112,15 +1112,16 @@ function handleScreenQuery(geneSymbol) {
         return null;
     }
 
-    /**
-     * (NEW) Extracts evolutionary keywords from a query.
-     */
-    function extractEvolutionIntent(qLower) {
-        if (qLower.includes('conserved') || qLower.includes('c. elegans')) return 'conserved_in_elegans';
-        if (qLower.includes('ciliary specific') || qLower.includes('ciliary-specific')) return 'ciliary_specific';
-        if (qLower.includes('vertebrate specific') || qLower.includes('vertebrate-specific')) return 'vertebrate_specific';
-        return null;
-    }
+
+// Helper function to extract evolutionary concepts
+function extractEvolutionIntent(qLower) {
+    if (qLower.includes('ciliary-specific') || qLower.includes('ciliary specific')) return 'Ciliary_specific';
+    if (qLower.includes('vertebrate-specific') || qLower.includes('vertebrate specific')) return 'Vertebrate_specific';
+    if (qLower.includes('mammalian-specific') || qLower.includes('mammalian specific')) return 'Mammalian_specific';
+    if (qLower.includes('c. elegans') || qLower.includes('conserved in')) return 'Conserved_in_elegans';
+    return null;
+}
+
 
     /**
      * (NEW) Helper to check if a gene is conserved (basic check).
@@ -1590,6 +1591,148 @@ function getEnrichedGOTerms(genes) {
         }
     }
     
+// ==========================================================
+// 1. UPDATED INTENT EXTRACTORS (Adding Domain and Evo Types)
+// ==========================================================
+
+// Helper function to extract domain keywords
+function extractDomainIntent(qLower) {
+    const keywords = ['wd40 domain', 'pfam domain pf13432', 'wd40', 'pf13432', 'coiled-coil', 'ef-hand', 'tpr', 'aaa+ atpase', 'aaa domain', 'atpase domain', 'wd40 repeat'];
+    for (const term of keywords) {
+        if (qLower.includes(term)) {
+            return term;
+        }
+    }
+    return null;
+}
+
+// Helper to check for a domain (can be used by the main filter)
+function hasDomain(gene, domainTerm) {
+    const normTerm = normalizeTerm(domainTerm);
+    const allDomains = [...ensureArray(gene.pfam_ids), ...ensureArray(gene.domain_descriptions)];
+    return allDomains.some(d => d && normalizeTerm(d).includes(normTerm));
+}
+
+// Helper to check if gene belongs to a phylogeny class
+function isInPhylogenyClass(gene, evoClass) {
+    if (!gene.phylogeny || !gene.phylogeny.li) return false;
+    const geneClass = (gene.phylogeny.li.class || '').replace(/_/g, ' ').toLowerCase();
+    const targetClass = evoClass.replace(/_/g, ' ').toLowerCase();
+    return geneClass.includes(targetClass);
+}
+
+/**
+ * Core filtering loop for multi-criteria queries.
+ * This handles all Localization/Phenotype/Expression/Disease/Evo/Domain combinations.
+ */
+function performMultiCriteriaFilter(query, intents) {
+    let titleParts = [];
+    const filteredGenes = window.CiliAI.masterData.filter(gene => {
+        if (!gene || !gene.Gene) return false; 
+        
+        // --- Filter 1: Localization (e.g., 'basal body', 'lysosomal')
+        if (intents.localization) {
+            if (!titleParts.includes(`Loc: ${intents.localization}`)) titleParts.push(`Loc: ${intents.localization}`);
+            const geneLoc = (gene.Localization || '').toLowerCase();
+            if (!geneLoc.includes(intents.localization)) return false;
+        }
+
+        // --- Filter 2: Phenotype (e.g., 'short cilia', 'loss of cilia', 'no effect')
+        if (intents.phenotype) {
+            if (!titleParts.includes(`Pheno: ${intents.phenotype}`)) titleParts.push(`Pheno: ${intents.phenotype}`);
+            const genePheno = (gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '').toLowerCase();
+            const phenoMatch = (intents.phenotype === 'short cilia' && (genePheno.includes('short') || genePheno.includes('decrease'))) ||
+                               (intents.phenotype === 'longer cilia' && (genePheno.includes('long') || genePheno.includes('increase'))) ||
+                               (intents.phenotype === 'loss of cilia' && (genePheno.includes('absent') || genePheno.includes('loss of cilia'))) ||
+                               (intents.phenotype === 'no effect' && (genePheno.includes('no effect') || genePheno === ''));
+            
+            if (!phenoMatch) return false;
+        }
+
+        // --- Filter 3: Disease Association (e.g., 'Joubert Syndrome')
+        if (intents.disease) {
+            if (!titleParts.includes(`Disease: ${intents.disease}`)) titleParts.push(`Disease: ${intents.disease}`);
+            const diseaseKey = normalizeDiseaseKey(intents.disease);
+            const diseaseGenes = window.CiliAI.lookups.byCiliopathy[diseaseKey];
+            if (!diseaseGenes || !diseaseGenes.includes(gene.Gene.toUpperCase())) return false;
+        }
+
+        // --- Filter 4: Expression (e.g., 'expressed in kidney', 'not expressed in testis')
+        if (intents.expression) {
+            const hasExpr = hasExpressionInTissue(gene, intents.expression);
+            const title = `Expr: ${intents.isNegative ? 'NOT ' : ''}${intents.expression}`;
+            if (!titleParts.includes(title)) titleParts.push(title);
+            
+            if (intents.isNegative ? hasExpr : !hasExpr) return false;
+        }
+
+        // --- Filter 5: Complex (e.g., 'IFT-B complex', 'not in known ciliary complex')
+        if (intents.complex) {
+            const inComplex = gene.complex_components && Object.keys(gene.complex_components).some(comp => comp.toLowerCase().includes(intents.complex));
+            const title = `Complex: ${intents.isNegative ? 'NOT ' : ''}${intents.complex}`;
+            if (!titleParts.includes(title)) titleParts.push(title);
+            
+            if (intents.isNegative ? inComplex : !inComplex) return false;
+        } else if (query.toLowerCase().includes('not in a known ciliary complex')) {
+             // Discovery query: "List all genes that are not in a known ciliary complex..."
+            const hasAnyComplex = gene.complex_components && Object.keys(gene.complex_components).length > 0;
+            if (hasAnyComplex) return false;
+            if (!titleParts.includes('Complex: NOT in any known complex')) titleParts.push('Complex: NOT in any known complex');
+        }
+
+        // --- Filter 6: Evolution/Domain (e.g., 'vertebrate-specific', 'WD40 domain')
+        if (intents.evolution) {
+            if (!titleParts.includes(`Evo: ${intents.evolution}`)) titleParts.push(`Evo: ${intents.evolution}`);
+            if (intents.evolution === 'Conserved_in_elegans') {
+                if (!isGeneConserved(gene)) return false;
+            } else if (!isInPhylogenyClass(gene, intents.evolution)) {
+                 return false;
+            }
+        }
+        
+        if (intents.domain) {
+            if (!titleParts.includes(`Domain: ${intents.domain}`)) titleParts.push(`Domain: ${intents.domain}`);
+            if (!hasDomain(gene, intents.domain)) return false;
+        }
+        
+        // All filters passed
+        return true;
+    });
+
+    // --- 7. Format the Results (Custom columns based on query)
+    const resultTitle = titleParts.join(' + ');
+
+    if (filteredGenes.length === 0) {
+        return `<div class="ai-result-card"><p>I found no genes that match all of your criteria: <strong>${resultTitle}</strong>.</p></div>`;
+    }
+
+    const geneListObjects = filteredGenes.map(g => {
+        const geneObject = { gene: g.Gene };
+        if (intents.localization) geneObject.localization = g.Localization || '—';
+        if (intents.phenotype) geneObject.phenotype = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—';
+        if (intents.disease) geneObject.disease = intents.disease;
+        if (intents.expression) geneObject.expression = hasExpressionInTissue(g, intents.expression) ? intents.expression : 'Absent';
+        if (intents.complex) geneObject.complex = intents.complex;
+        if (intents.domain) geneObject.domain = intents.domain;
+        if (intents.evolution) geneObject.evolution = intents.evolution.replace(/_/g, ' ');
+        
+        // Final fallback column if only gene is present
+        if (Object.keys(geneObject).length === 1) { 
+            geneObject.description = g['Gene.Description'] || 'No description available.';
+        }
+        return geneObject;
+    });
+
+    // Set context for follow-up
+    lastQueryContext = {
+        type: 'list_followup',
+        data: geneListObjects,
+        term: `Genes matching: ${resultTitle}`
+    };
+
+    return `I found ${filteredGenes.length} gene(s) matching your criteria: <strong>${resultTitle}</strong>. Do you want to view the list?`;
+}
+
 
     // --- (Phylogeny Plotting Helpers) ---
     
@@ -2590,175 +2733,210 @@ function extractPhenotypeIntent(qLower) {
     return null;
 }
 
-    /**
-     * (REPLACEMENT) The main "Level 2/3" query router.
-     * This is the new "brain" that handles multi-intent queries.
-     * @param {string} query - The original user query.
-     * @returns {string|null} An HTML string if a complex query is handled, or null to fall back.
-     */
-    function handleComplexQuery(query) {
-        const qLower = query.toLowerCase();
+  /**
+ * (REPLACEMENT) The main "Level 2/3" query router.
+ * This is the new "brain" that handles multi-intent queries.
+ * @param {string} query - The original user query.
+ * @returns {string|null} An HTML string if a complex query is handled, or null to fall back.
+ */
+function handleComplexQuery(query) {
+    const qLower = query.toLowerCase();
 
-        // 1. Extract all possible intents
-        const intents = {
-            localization: extractLocalizationIntent(qLower),
-            phenotype: extractPhenotypeIntent(qLower),
-            disease: extractDiseaseIntent(qLower),
-            expression: extractExpressionIntent(qLower),
-            complex: extractComplexIntent(qLower),
-            evolution: extractEvolutionIntent(qLower),
-            isNegative: qLower.includes('not in') || qLower.includes('not expressed') || qLower.includes('no known phenotype')
-        };
+    // 1. Extract all possible intents (Expanded to include domain and negation in complex/phenotype)
+    const intents = {
+        localization: extractLocalizationIntent(qLower),
+        phenotype: extractPhenotypeIntent(qLower),
+        disease: extractDiseaseIntent(qLower),
+        expression: extractExpressionIntent(qLower),
+        complex: extractComplexIntent(qLower),
+        evolution: extractEvolutionIntent(qLower),
+        domain: extractDomainIntent(qLower), // <-- NEW INTENT ADDED
+        isNegative: qLower.includes('not in') || qLower.includes('not expressed') || qLower.includes('no known phenotype') || qLower.includes('not expressed in') // <-- Expanded Negation
+    };
 
-        // 2. Count how many intents we found (excluding isNegative flag)
-        let intentCount = 0;
-        if (intents.localization) intentCount++;
-        if (intents.phenotype) intentCount++;
-        if (intents.disease) intentCount++;
-        if (intents.expression) intentCount++;
-        if (intents.complex) intentCount++;
-        if (intents.evolution) intentCount++;
+    // 2. Count how many intents we found (excluding isNegative flag)
+    let intentCount = 0;
+    if (intents.localization) intentCount++;
+    if (intents.phenotype || qLower.includes('no known phenotype')) intentCount++; // Count 'no known phenotype' as a phenotype intent
+    if (intents.disease) intentCount++;
+    if (intents.expression) intentCount++;
+    if (intents.complex || qLower.includes('not in a known ciliary complex')) intentCount++; // Count 'not in complex' as a complex intent
+    if (intents.evolution) intentCount++;
+    if (intents.domain) intentCount++; // <-- Domain Count
 
+    // 3. If it's not a multi-intent query (at least 2 criteria), fall back to the simple router
+    if (intentCount < 2) {
+        log(`[Complex Router] Only ${intentCount} intent(s) found. Falling back to simple router.`);
+        return null;
+    }
 
-        // 3. If it's not a multi-intent query (at least 2 criteria), fall back to the simple router
-        if (intentCount < 2) {
-            log(`[Complex Router] Only ${intentCount} intent(s) found. Falling back to simple router.`);
-            return null;
+    log(`[Complex Router] Handling complex query with ${intentCount} intents:`, intents);
+    
+    // 4. Build a filter chain
+    let titleParts = []; // For formatting the response
+    
+    const filteredGenes = window.CiliAI.masterData.filter(gene => {
+        if (!gene || !gene.Gene) return false; // Ensure gene object and Gene name exist
+
+        // --- Filter 1: Localization (e.g., 'basal body', 'lysosomal')
+        if (intents.localization) {
+            if (!titleParts.includes(`Loc: ${intents.localization}`)) titleParts.push(`Loc: ${intents.localization}`);
+            const geneLoc = (gene.Localization || '').toLowerCase();
+            if (!geneLoc.includes(intents.localization)) return false;
         }
 
-        log(`[Complex Router] Handling complex query with ${intentCount} intents:`, intents);
-        
-        // 4. Build a filter chain
-        let titleParts = []; // For formatting the response
-        
-        const filteredGenes = window.CiliAI.masterData.filter(gene => {
-            if (!gene || !gene.Gene) return false; // Ensure gene object and Gene name exist
+        // --- Filter 2: Phenotype (e.g., 'short cilia', 'loss of cilia', 'no effect')
+        if (intents.phenotype || qLower.includes('no known phenotype')) {
+            const genePheno = (gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '').toLowerCase();
+            
+            let phenoMatch = false;
 
-            // Filter by Localization
-            if (intents.localization) {
-                if (!titleParts.includes(`Loc: ${intents.localization}`)) titleParts.push(`Loc: ${intents.localization}`);
-                const geneLoc = (gene.Localization || '').toLowerCase();
-                if (!geneLoc.includes(intents.localization)) return false;
-            }
+            if (qLower.includes('no known phenotype') || intents.phenotype === 'no effect') {
+                // Discovery Query: 'no known phenotype' (LoF field is empty or says 'no effect')
+                if (!titleParts.includes('Pheno: no known phenotype')) titleParts.push('Pheno: no known phenotype');
+                phenoMatch = (genePheno.includes('no effect') || genePheno === '');
 
-            // Filter by Phenotype
-            if (intents.phenotype) {
+            } else if (intents.phenotype) {
+                // Standard Phenotype Queries
                 if (!titleParts.includes(`Pheno: ${intents.phenotype}`)) titleParts.push(`Pheno: ${intents.phenotype}`);
-                const genePheno = (gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '').toLowerCase();
-                // This logic is flawed. "short cilia" is not the same as "no effect". 
-                // Let's fix this to be more precise.
-                let phenoMatch = false;
-                if (intents.phenotype === 'short cilia' && (genePheno.includes('short') || genePheno.includes('absent'))) {
+                
+                if (intents.phenotype === 'short cilia' && (genePheno.includes('short') || genePheno.includes('decrease'))) {
                     phenoMatch = true;
-                } else if (intents.phenotype === 'longer cilia' && genePheno.includes('long')) {
-                     phenoMatch = true;
+                } else if (intents.phenotype === 'longer cilia' && (genePheno.includes('long') || genePheno.includes('increase'))) {
+                    phenoMatch = true;
                 } else if (intents.phenotype === 'loss of cilia' && (genePheno.includes('absent') || genePheno.includes('no cilia'))) {
-                     phenoMatch = true;
-                } else if (intents.phenotype === 'no effect' && (genePheno.includes('no effect') || genePheno === '')) {
-                     phenoMatch = true;
+                    phenoMatch = true;
                 }
-                
-                if (!phenoMatch) return false;
-            }
-
-            // Filter by Disease
-            if (intents.disease) {
-                if (!titleParts.includes(`Disease: ${intents.disease}`)) titleParts.push(`Disease: ${intents.disease}`);
-                const diseaseKey = normalizeDiseaseKey(intents.disease);
-                const diseaseGenes = window.CiliAI.lookups.byCiliopathy[diseaseKey];
-                if (!diseaseGenes || !diseaseGenes.includes(gene.Gene.toUpperCase())) return false;
-            }
-
-            // Filter by Expression
-            if (intents.expression) {
-                const hasExpr = hasExpressionInTissue(gene, intents.expression);
-                const title = `Expr: ${intents.isNegative ? 'NOT ' : ''}${intents.expression}`;
-                if (!titleParts.includes(title)) titleParts.push(title);
-
-                // If query is negative (NOT expressed) and gene HAS expression, filter it out
-                if (intents.isNegative && hasExpr) return false;
-                // If query is positive (IS expressed) and gene does NOT have expression, filter it out
-                if (!intents.isNegative && !hasExpr) return false;
-            }
-
-            // Filter by Complex
-            if (intents.complex) {
-                const title = `Complex: ${intents.isNegative ? 'NOT ' : ''}${intents.complex}`;
-                if (!titleParts.includes(title)) titleParts.push(title);
-                
-                const inComplex = gene.complex_components && Object.keys(gene.complex_components).some(comp => 
-                    comp.toLowerCase().includes(intents.complex)
-                );
-                
-                if (intents.isNegative && inComplex) return false;
-                if (!intents.isNegative && !inComplex) return false;
-            }
-
-            // Filter by Evolution
-            if (intents.evolution) {
-                if (intents.evolution === 'conserved_in_elegans') {
-                    if (!titleParts.includes("Conserved in C. elegans")) titleParts.push("Conserved in C. elegans");
-                    if (!isGeneConserved(gene)) return false;
-                }
-                // (Future: Add 'ciliary_specific' logic here if needed)
             }
             
-            // All filters passed
-            return true;
-        });
+            // If the criteria were set, and it didn't match, filter it out.
+            if ((intents.phenotype || qLower.includes('no known phenotype')) && !phenoMatch) return false;
+        }
 
-        // 5. Format the results
-        const resultTitle = titleParts.join(' + ');
+        // --- Filter 3: Disease Association (e.g., 'Joubert Syndrome')
+        if (intents.disease) {
+            if (!titleParts.includes(`Disease: ${intents.disease}`)) titleParts.push(`Disease: ${intents.disease}`);
+            const diseaseKey = normalizeDiseaseKey(intents.disease);
+            const diseaseGenes = window.CiliAI.lookups.byCiliopathy[diseaseKey];
+            if (!diseaseGenes || !diseaseGenes.includes(gene.Gene.toUpperCase())) return false;
+        }
 
-        if (filteredGenes.length === 0) {
-            return `I found no genes that match all of your criteria (${resultTitle}).`;
+        // --- Filter 4: Expression (e.g., 'expressed in kidney', 'not expressed in testis')
+        if (intents.expression) {
+            const hasExpr = hasExpressionInTissue(gene, intents.expression);
+            const title = `Expr: ${intents.isNegative ? 'NOT ' : ''}${intents.expression}`;
+            if (!titleParts.includes(title)) titleParts.push(title);
+
+            // If query is negative (NOT expressed) and gene HAS expression, filter it out
+            if (intents.isNegative && hasExpr) return false;
+            // If query is positive (IS expressed) and gene does NOT have expression, filter it out
+            if (!intents.isNegative && !hasExpr) return false;
+        }
+
+        // --- Filter 5: Complex (e.g., 'IFT-B complex', 'not in known ciliary complex')
+        if (intents.complex) {
+            const complexToSearch = intents.complex;
+            const title = `Complex: ${intents.isNegative ? 'NOT ' : ''}${complexToSearch}`;
+            if (!titleParts.includes(title)) titleParts.push(title);
+            
+            const inComplex = gene.complex_components && Object.keys(gene.complex_components).some(comp => 
+                comp.toLowerCase().includes(complexToSearch)
+            );
+            
+            if (intents.isNegative && inComplex) return false;
+            if (!intents.isNegative && !inComplex) return false;
+
+        } else if (qLower.includes('not in a known ciliary complex')) {
+             // Discovery query: "List all genes that are not in a known ciliary complex..."
+            if (!titleParts.includes('Complex: NOT in any known ciliary complex')) titleParts.push('Complex: NOT in any known ciliary complex');
+            const hasAnyCiliaryComplex = gene.complex_components && Object.keys(gene.complex_components).length > 0;
+            if (hasAnyCiliaryComplex) return false;
+        }
+
+        // --- Filter 6: Evolution (e.g., 'ciliary-specific', 'conserved in c. elegans')
+        if (intents.evolution) {
+            if (!titleParts.includes(`Evo: ${intents.evolution}`)) titleParts.push(`Evo: ${intents.evolution}`);
+            
+            if (intents.evolution === 'Conserved_in_elegans') {
+                if (!isGeneConserved(gene)) return false; // isGeneConserved checks for C. elegans ortholog
+            } else if (intents.evolution.endsWith('_specific')) {
+                // Filter by Li/Nevers classification
+                if (!isInPhylogenyClass(gene, intents.evolution)) return false;
+            }
         }
         
-        // (MODIFIED) Dynamically build the gene list objects based on the intents
-        const geneListObjects = filteredGenes.map(g => {
-            const geneObject = {
-                gene: g.Gene
-            };
-
-            // Add localization if it was part of the query
-            if (intents.localization) {
-                geneObject.localization = g.Localization || '—';
-            }
-
-            // Add phenotype if it was part of the query
-            if (intents.phenotype) {
-                geneObject.phenotype = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—';
-            }
-            
-            // Add other intents if they exist
-            if (intents.disease) {
-                const diseaseKey = normalizeDiseaseKey(intents.disease);
-                // Find the specific disease name from the gene's data, if available
-                const diseaseList = (g.Ciliopathies || []).map(d => d.name);
-                geneObject.disease = diseaseList.find(d => normalizeTerm(d) === diseaseKey) || intents.disease;
-            }
-
-            if (intents.expression) {
-                 geneObject.expression = `Data available for ${intents.expression}`;
-            }
-
-            // (MODIFIED) Add description *only if* no other data columns were added
-            if (Object.keys(geneObject).length === 1) { // Only 'gene' is present
-                geneObject.description = g['Gene.Description'] || 'No description available.';
-            }
-
-            return geneObject;
-        });
-
-        // (MODIFIED) Remove the static 'descriptionHeader'
-        lastQueryContext = {
-            type: 'list_followup', 
-            data: geneListObjects, 
-            term: `Genes matching: ${resultTitle}`
-        };
+        // --- Filter 7: Domain (e.g., 'WD40 domain', 'PFAM domain PF13432') <-- NEW FILTER
+        if (intents.domain) {
+            if (!titleParts.includes(`Domain: ${intents.domain}`)) titleParts.push(`Domain: ${intents.domain}`);
+            if (!hasDomain(gene, intents.domain)) return false;
+        }
         
-        return `I found ${filteredGenes.length} gene(s) matching your criteria: <strong>${resultTitle}</strong>. Do you want to view the list?`;
-   }
+        // All filters passed
+        return true;
+    });
+
+    // 5. Format the results
+    const resultTitle = titleParts.join(' + ');
+
+    if (filteredGenes.length === 0) {
+        // IMPROVED: Added image prompt for contextually relevant search term
+        const loc = intents.localization || intents.disease || 'Ciliary Protein';
+        return `I found no genes that match all of your criteria (${resultTitle}). `;
+    }
+    
+    // (MODIFIED) Dynamically build the gene list objects based on the intents
+    const geneListObjects = filteredGenes.map(g => {
+        const geneObject = {
+            gene: g.Gene
+        };
+
+        // Add columns for all relevant intents to the output table
+        if (intents.localization) {
+            geneObject.localization = g.Localization || '—';
+        }
+        if (intents.phenotype || qLower.includes('no known phenotype')) {
+            geneObject.phenotype = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—';
+        }
+        if (intents.disease) {
+            const diseaseKey = normalizeDiseaseKey(intents.disease);
+            const diseaseList = (g.Ciliopathies || []).map(d => d.name);
+            geneObject.disease = diseaseList.find(d => normalizeTerm(d) === diseaseKey) || intents.disease;
+        }
+        if (intents.expression) {
+            geneObject.expression_in_tissue = hasExpressionInTissue(g, intents.expression) ? intents.expression : 'Absent';
+        }
+        if (intents.complex) {
+            geneObject.complex = intents.complex;
+        } else if (qLower.includes('not in a known ciliary complex')) {
+            geneObject.complex_status = 'None Known';
+        }
+        if (intents.evolution) {
+            geneObject.evolution = intents.evolution.replace(/_/g, ' ');
+        }
+        if (intents.domain) {
+            geneObject.domain = intents.domain;
+        }
+
+        // Fallback description *only if* only 'gene' is present
+        if (Object.keys(geneObject).length === 1) { 
+            geneObject.description = g['Gene.Description'] || 'No description available.';
+        }
+
+        return geneObject;
+    });
+
+    // (MODIFIED) Remove the static 'descriptionHeader'
+    lastQueryContext = {
+        type: 'list_followup', 
+        data: geneListObjects, 
+        term: `Genes matching: ${resultTitle}`
+    };
+    
+    // Use an image that represents the most concrete localization intent found
+    const imgLoc = intents.localization || intents.disease || 'Ciliary Protein';
+    
+    return `I found ${filteredGenes.length} gene(s) matching your criteria: <strong>${resultTitle}</strong>.  Do you want to view the list?`;
+}
 
 /**
  * Global object containing predefined answers for common Cilia/IFT/Ciliopathy terminology.
@@ -2849,36 +3027,27 @@ async function handleAIQuery(query) {
             htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
         }
         
-        // =( 1 )= INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES (Highest Priority for Filtering)
-        const intentChecker = window.flexibleIntentParser(query);
-
-        if (htmlResult === null && intentChecker) {
-             const intents = {
-                disease: window.extractDiseaseIntent(qLower),
-                expression: window.extractExpressionIntent(qLower),
-                complex: window.extractComplexIntent(qLower)
-            };
-
-            // Case 1A: Complex AND Disease (e.g., BBSome genes causing Joubert Syndrome)
-            if (intents.complex && intents.disease) {
-                window.log('Routing via: Intent (Complex + Disease)');
-                htmlResult = window.handleGeneInDiseaseQuery(intents.complex, intents.disease);
-            }
-            // Case 1B: Disease AND Expression/Tissue (e.g., Joubert Syndrome genes expressed in kidney)
-            else if (intents.disease && intents.expression) {
-                window.log('Routing via: Intent (Disease + Expression)');
-                htmlResult = window.handleTissueSpecificDiseaseQuery(intents.disease, intents.expression);
-            }
-            // Case 1C: Simple Complex Query (e.g., "Genes in BBSome") - Fall back to L1 handler
-            else if (intents.complex) {
-                window.log('Routing via: Intent (Simple Complex List)');
-                htmlResult = window.handleSimpleComplexQuery(intents.complex, query);
+        // = ( 1 ) = INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES (NEW - Highest Priority)
+        // This is the single entry point for all advanced, multi-criteria questions.
+        if (htmlResult === null) {
+            window.log('Routing via: Intent (Unified Complex Query Engine)');
+            htmlResult = window.handleComplexQuery(query);
+            
+            // If the result is a prompt for a list (e.g., "Do you want to view the list?"), 
+            // we stop here and wait for the user's "Yes" follow-up.
+            if (htmlResult !== null && htmlResult.includes("Do you want to view the list?")) {
+                window.addChatMessage(htmlResult, false);
+                return;
             }
         }
         
+        // The original complex intent block (Case 1A, 1B, 1C) has been removed, 
+        // as it is now consolidated and handled by the new window.handleComplexQuery(query) above.
+
+
         // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
         const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
-                         !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
+                             !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
         if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && window.lastQueryContext.type === null) {
             window.log('Routing via: Intent (Ignored standalone "yes")');
@@ -2973,7 +3142,7 @@ async function handleAIQuery(query) {
                 htmlResult = `Please specify which gene(s) you want to check expression for.`;
             }
         }
-            
+        
         // =( 11 )= INTENT: UMAP (VISUAL) - Simplified UMAP/Lung scRNA
         else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
             window.log('Routing via: Intent (UMAP Plot)');
@@ -3012,6 +3181,7 @@ async function handleAIQuery(query) {
             const genes = window.extractMultipleGenes(term);
             
             if (genes.length > 0) {
+                window.log(`Final fallback, found gene: ${genes[0]}`);
                 htmlResult = await window.displayFullGeneInfo(genes[0]);
             }
         }
