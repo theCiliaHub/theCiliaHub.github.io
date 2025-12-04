@@ -2762,6 +2762,10 @@ window.terminologyQueries = {
  * (REPLACEMENT) The Main "Level 1" Query Router
  * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
  */
+/**
+ * (REPLACEMENT) The Main "Level 1" Query Router
+ * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
+ */
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
@@ -2779,80 +2783,110 @@ async function handleAIQuery(query) {
 
         let htmlResult = null;
         let match;
-        
+
+        // Extract gene symbols from query
         const genesFromQuery = window.extractMultipleGenes(query);
 
         // =========================================================
-        // 1. COMPLEX SYNTHESIS (GEMINI PATH) - HIGHEST PRIORITY
+        // 1. SIMPLE vs COMPLEX ROUTING FOR GEMINI (The main dispatcher)
         // =========================================================
-        
-        // Check for complex intent keywords AND complex phrasing/length
-        const isSynthesisTopic = ['compare', 'role', 'mechanism', 'explain', 'associated with', 'which proteins are', 'joubert', 'meckel', 'bbs', 'nphp', 'mks', 'localization'].some(k => qLower.includes(k));
-        const isMultiEntityQuery = isSynthesisTopic || genesFromQuery.length > 1 || qLower.split(/\s+/).filter(w => w.length > 0).length > 6;
+        const complexKeywords = [
+            'compare', 'difference', 'roles', 'mechanism', 'pathway',
+            'how does', 'explain', 'associated with',
+            'joubert', 'meckel', 'bbs', 'nphp', 'mks',
+            'localization', 'interact', 'interaction', 'network', 'expressed in' // Added 'expressed in' for tissue queries
+        ];
 
-        if (isMultiEntityQuery) {
+        // Check if the query is simple (one gene, few words, no complex keywords)
+        const isSimpleGeneQuery =
+            genesFromQuery.length === 1 &&
+            qLower.split(/\s+/).length <= 8 &&
+            !complexKeywords.some(k => qLower.includes(k));
+
+        // The query is complex if it fails the simple test AND has multiple triggers (genes, keywords, length)
+        const isComplexQuery =
+            !isSimpleGeneQuery &&
+            (
+                genesFromQuery.length > 1 ||
+                complexKeywords.some(k => qLower.includes(k)) ||
+                qLower.split(/\s+/).filter(w => w.length > 0).length > 8
+            );
+
+        if (isComplexQuery) {
             window.log('Routing via: COMPLEX_SYNTHESIS - Delegating to Gemini.');
-            
-            // This is the primary synthesis path now. If the Gemini call is attempted, we stop local processing.
+            // This is the primary synthesis path now.
             if (window.attemptGeminiFallback(query, genesFromQuery)) {
-                return; // SUCCESS: Gemini path initiated. Stop processing.
+                return;  // Gemini path successful, stop local handling
             }
         }
-        
+
         // =========================================================
-        // 2. SIMPLE LOCAL PLOTS, GREETINGS, and FOLLOW-UPS
+        // 2. SIMPLE LOCAL PLOTS, GREETINGS, BASIC COMMANDS
         // =========================================================
-        
-        // --- Greetings / Terminology --- (Blocks 0)
+
+        // --- Greetings ---
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
         const terminologyQueries = window.terminologyQueries || {};
-        
+
         if (simpleGreetings.includes(qLower)) {
             window.log('Routing via: Intent (Greeting)');
-            window.addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
+            window.addChatMessage(
+                "Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.",
+                false
+            );
             return;
         }
-        
+
+        // --- Terminology ---
         if (terminologyQueries[qLower]) {
             window.log('Routing via: Intent (Terminology)');
-            window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
+            window.addChatMessage(
+                `<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`,
+                false
+            );
             return;
         }
-        
-        // --- Direct Plot/UMAP commands ---
-        // (Block 0 & 11 logic integrated here)
-        if (qLower === 'plot default umap' || qLower.includes('plot default phylogeny') || qLower.includes('umap') || qLower.includes('scrna')) {
-            // Re-run the plot logic (which sets htmlResult)
+
+        // --- Plot and UMAP commands ---
+        if (
+            qLower === 'plot default umap' ||
+            qLower.includes('plot default phylogeny') ||
+            qLower.includes('umap') ||
+            qLower.includes('scrna')
+        ) {
             if (qLower === 'plot default umap') {
                 window.renderUMAPPlot('FOXJ1');
                 htmlResult = `<div class="ai-result-card"><p>Displaying default UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
             } else if (qLower.includes('plot default phylogeny')) {
                 const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-                htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
+                htmlResult = await window.routePhylogenyAnalysis(
+                    `show nevers plot for ${defaultGenes.join(',')}`
+                );
             }
         }
 
-        // --- Follow-up/Yes command ---
-        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list')) && !qLower.includes('phylogen');
+        // --- Follow-up commands ---
+        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list'))
+            && !qLower.includes('phylogen');
+
         if (isFollowUp && window.lastQueryContext.type === 'list_followup') {
             window.log('Routing via: Intent (Follow-up: Show List)');
-            window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+            window.showDataInLeftPanel(
+                lastQueryContext.term,
+                lastQueryContext.data
+            );
             window.lastQueryContext = { type: null, data: [], term: null };
             return;
-        }
-        else if (isFollowUp && window.lastQueryContext.type === 'screen_references') {
+        } else if (isFollowUp && window.lastQueryContext.type === 'screen_references') {
             window.log('Routing via: Intent (Follow-up: Screen References)');
             htmlResult = window.handleScreenReferenceFollowup();
         }
 
-
         // =========================================================
-        // 3. FINAL LOCAL FALLBACK (Single Gene Lookup)
+        // 3. SINGLE GENE DETAILS (LOCAL) - Last chance for quick data lookup
         // =========================================================
-        
-        if (htmlResult === null) { 
-            // If the query was NOT complex and NOT a command, try a simple single gene lookup.
-            if (genesFromQuery.length === 1) {
+        if (htmlResult === null) {
+            if (isSimpleGeneQuery) {
                 const geneSymbol = genesFromQuery[0];
                 if (window.CiliAI.lookups.geneMap[geneSymbol]) {
                     window.log(`Routing via: Single Gene Details (Local) - ${geneSymbol}`);
@@ -2861,14 +2895,15 @@ async function handleAIQuery(query) {
             }
         }
 
-        // 4. FINAL ERROR HANDLING
+        // =========================================================
+        // 4. FALLBACK ERROR HANDLING
+        // =========================================================
         if (htmlResult === null) {
-            window.log(`Routing via: Final Fallback (Error)`);
-            // The query was complex, but Gemini failed its checks, or was a simple keyword missed by all previous checks.
-            htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". While I send complex queries to the Gemini synthesis engine, I couldn't identify the core genes or keywords for a direct answer.`;
+            window.log('Routing via: Final Fallback (Error)');
+            htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try simplifying the question or asking about a single gene.`;
         }
 
-        // Send the final result to chat
+        // Send result to UI
         if (htmlResult) {
             window.addChatMessage(htmlResult, false);
         }
