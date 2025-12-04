@@ -2804,9 +2804,15 @@ async function handleAIQuery(query) {
             window.log("Routing via: COMPLEX_SYNTHESIS → Gemini");
 
             // Flexible intent parser transforms user question before Gemini
-            const parsedQuery = window.flexibleIntentParser(query);
+           let parsedQuery = window.flexibleIntentParser(query);
+
+             // If parser returns non-string → force string
+                if (typeof parsedQuery !== "string") {
+                parsedQuery = query;
+                }
 
             const handled = await window.attemptGeminiFallback(parsedQuery, genesFromQuery);
+
 
             if (handled) return;   // ⭐ CRITICAL: STOP EXECUTION HERE
             // If Gemini fails internally but returns false,
@@ -3201,45 +3207,66 @@ async function sendQueryToGemini(query, genes, geneData) {
  * @returns {boolean} True if the query was handled and sent to Gemini, false otherwise.
  */
 function attemptGeminiFallback(query, genes) {
+    // 🔥 Fix the crash: ensure query is a string
+    if (typeof query !== "string") {
+        console.error("[CiliAI] attemptGeminiFallback: query is not a string:", query);
+        query = String(query || "");
+    }
+
     const qLower = query.toLowerCase();
 
-    // Condition 1: Synthesis or Comparison Queries
-    if (qLower.includes('compare') || qLower.includes('role') || qLower.includes('mechanism') || qLower.includes('explain how') || qLower.includes('significance')) {
-        
-        // Ensure we have at least one gene to provide context for synthesis
-        if (genes.length === 0) {
-            // This is a complex conceptual question without a gene context, Gemini is the best path.
-            // Send the raw question with minimal context.
-            sendQueryToGemini(query, [], {});
+    // -------------------------------
+    // Condition 1 — Synthesis / Mechanism / Comparison Queries
+    // -------------------------------
+    if (
+        qLower.includes("compare") ||
+        qLower.includes("role") ||
+        qLower.includes("mechanism") ||
+        qLower.includes("explain how") ||
+        qLower.includes("explain the") ||
+        qLower.includes("significance") ||
+        qLower.includes("interaction") ||
+        qLower.includes("interact")
+    ) {
+
+        // If no genes detected, still a conceptual question → Gemini
+        if (!genes || genes.length === 0) {
+            sendQueryToGemini(query, [], { query });
             return true;
         }
 
-        // Collect comprehensive data for all detected genes
-        const geneData = genes.map(gene => window.CiliAI.lookups.geneMap[gene]).filter(g => g);
-        
+        // Collect mapped gene objects
+        const geneData = genes
+            .map(g => window.CiliAI.lookups.geneMap[g])
+            .filter(Boolean);
+
+        sendQueryToGemini(query, genes, {
+            query,
+            genes_for_synthesis: geneData
+        });
+        return true;
+    }
+
+    // -------------------------------
+    // Condition 2 — Multi-gene detail requests
+    // Example: “Tell me about short cilia phenotype genes”
+    // -------------------------------
+    if (qLower.includes("tell me about") && genes && genes.length > 1) {
+        const geneData = genes
+            .map(g => window.CiliAI.lookups.geneMap[g])
+            .filter(Boolean);
+
         if (geneData.length > 0) {
             sendQueryToGemini(query, genes, {
-                query: query,
+                query,
                 genes_for_synthesis: geneData
             });
             return true;
         }
     }
-    
-    // Condition 2: Deep detail queries (handled by local code for single genes, 
-    // but Gemini can improve synthesis for multiple genes if local handling fails)
-    if (qLower.includes('tell me about') && genes.length > 1) {
-        const geneData = genes.map(gene => window.CiliAI.lookups.geneMap[gene]).filter(g => g);
-        if (geneData.length > 0) {
-            sendQueryToGemini(query, genes, {
-                query: query,
-                genes_for_synthesis: geneData
-            });
-            return true;
-        }
-    }
-    
-    return false; // Let the local fallback take over (simple single gene info, lookup error, etc.)
+
+    // No Gemini fallback → local handler continues
+    return false;
 }
 
 
