@@ -3199,29 +3199,45 @@ function collectRelevantData(question, genes) {
 
     return context;
 }
+/**
+ * Unified Gemini Fallback
+ * Always sends the query to Gemini with full context.
+ * This is Option 1: Gemini always receives the template + structured dataset.
+ */
 async function attemptGeminiFallback(query, genes) {
-    if (typeof query !== "string") return false;
-
-    const qLower = query.toLowerCase();
-
-    // Collect selective data
-    const contextData = collectRelevantData(query, genes);
-
-    // Always send query + selected data to Gemini
     try {
+        const qLower = query.toLowerCase();
+
+        // Collect all relevant CiliAI knowledge to send to Gemini
+        const contextData = {
+            genes_requested: genes || [],
+            gene_objects: [],
+            entire_dataset: window.CiliAI.lookups || {},
+            query: query
+        };
+
+        // Attach gene objects if found
+        if (genes && genes.length > 0) {
+            contextData.gene_objects =
+                genes.map(g => window.CiliAI.lookups.geneMap[g])
+                     .filter(Boolean);
+        }
+
+        // ALWAYS send request to Gemini with the universal template
         await sendQueryToGemini({
-            question: query,
-            genes_detected: genes,
+            query: query,
+            genes_detected: genes || [],
             ciliai_context: contextData,
-            prompt: GEMINI_ROUTER_PROMPT
+            prompt: window.GEMINI_ROUTER_PROMPT   // hidden system template
         });
 
-        return true; // fully handled
+        return true;   // IMPORTANT: Stop handleAIQuery from falling through
     } catch (err) {
-        console.error("Gemini fallback failed:", err);
-        return false; // let local fallback work
+        console.error("Gemini fallback error:", err);
+        return false;
     }
 }
+
 
 async function sendQueryToGemini(payload) {
     window.log('[Gemini] Sending:', payload);
