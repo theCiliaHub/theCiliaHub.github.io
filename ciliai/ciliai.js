@@ -3045,21 +3045,23 @@ async function handleAIQuery(query) {
         // as it is now consolidated and handled by the new window.handleComplexQuery(query) above.
 
 
-        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
-                             !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
+       // = ( 2 ) = INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+    const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
+                     !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
-        if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && window.lastQueryContext.type === null) {
-            window.log('Routing via: Intent (Ignored standalone "yes")');
-            return;
-        }
-
-        if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'list_followup') {
-            window.log('Routing via: Intent (Follow-up: Show List)');
-            window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
-            window.lastQueryContext = { type: null, data: [], term: null };
-            return;
-        }
+// Priority 2A: List Follow-up (Always check for a list first)
+if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'list_followup') {
+    window.log('Routing via: Intent (Follow-up: Show List)');
+    window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+    window.lastQueryContext = { type: null, data: [], term: null };
+    return;
+}
+    
+// Priority 2B: Screen References Follow-up (Only if 2A failed and context matches)
+else if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'screen_references') {
+    window.log('Routing via: Intent (Follow-up: Screen References)');
+    htmlResult = window.handleScreenReferenceFollowup();
+}
         
         // =( 3 )= INTENT: CONTEXTUAL FOLLOW-UP (Screen References)
         else if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'screen_references') {
