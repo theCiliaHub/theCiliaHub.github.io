@@ -3242,14 +3242,14 @@ async function attemptGeminiFallback(query, genes) {
     }
 }
 
-async function sendQueryToGemini(userQuestion, extractedData) {
+async function sendQueryToGemini(question, contextData = {}, detectedGenes = []) {
     const payload = {
-        question: userQuestion,
-        data: extractedData,
-        template: window.GEMINI_PROMPT_TEMPLATE   // <-- Hidden prompt template
+        question: question,                         // ✔ backend expects this
+        context: JSON.stringify(contextData),       // ✔ backend expects JSON string
+        detected_genes: detectedGenes               // ✔ backend reads this
     };
 
-    window.log("[Gemini] Sending:", payload);
+    window.log("[Gemini] Sending payload:", payload);
 
     const response = await fetch(window.GEMINI_API_URL, {
         method: "POST",
@@ -3258,14 +3258,8 @@ async function sendQueryToGemini(userQuestion, extractedData) {
     });
 
     const data = await response.json();
-
-    window.addChatMessage(
-        data.answer || "No response from Gemini.",
-        false
-    );
+    window.addChatMessage(data.answer || "No response from Gemini.", false);
 }
-
-
 
 
 // ==========================================================
