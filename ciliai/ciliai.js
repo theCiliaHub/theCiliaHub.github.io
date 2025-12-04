@@ -2094,14 +2094,11 @@ function getEnrichedGOTerms(genes) {
         `;
     }
 
+
+
     // --- 4F. Data Getter Helpers ---
 
-   /**
-     * NEW INTEGRATED FUNCTION
-     * Replaces getComprehensiveDetails with the detailed HTML formatter
-     * provided by the user.
-     * (FIXED Nov 17 2025): Added optional chaining for g.OMIM.ID
-     */
+
    /**
  * Fancy Table Enhanced Version
  * (Nov 2025 - polished UI)
@@ -2763,9 +2760,13 @@ window.terminologyQueries = {
  * Main Level-1 Router with correct simple/complex separation
  * + integrated flexibleIntentParser and attemptGeminiFallback.
  */
+/**
+ * Main "Level 1" Query Router (with Option 1 disease→Gemini routing)
+ */
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
-    if (!chatWindow || !query) return;
+    if (!chatWindow) return;
+    if (!query) return;
 
     const qLower = query.toLowerCase().trim();
     window.log(`Routing query: ${query}`);
@@ -2777,66 +2778,62 @@ async function handleAIQuery(query) {
         }
 
         let htmlResult = null;
-
-        // ----------------------------
-        // Extract gene tokens
-        // ----------------------------
         const genesFromQuery = window.extractMultipleGenes(query);
 
+        // =========================================================
+        // 0. NEW: ALL CILIOPATHY DISEASE QUERIES → GEMINI
+        // =========================================================
+        const diseaseTriggers = [
+            "joubert", "jbts",
+            "meckel", "mks",
+            "bardet", "bbs",
+            "nphp", "nephronophthisis",
+            "oro-facial", "orofacial", "oro facial"
+        ];
 
-        // ================================================================
-        // 1. COMPLEX SYNTHESIS (GEMINI PATH) — Highest Priority
-        // ================================================================
+        if (diseaseTriggers.some(k => qLower.includes(k))) {
+            window.log("Routing via: DISEASE→GEMINI (Option 1)");
 
+            const handled = await window.attemptGeminiFallback(query, genesFromQuery || []);
+            if (handled) return;  // Gemini handled it
+        }
+
+        // =========================================================
+        // 1. COMPLEX SYNTHESIS → GEMINI
+        // =========================================================
         const complexKeywords = [
-            'compare','difference','roles','mechanism','pathway',
-            'how does','explain','associated with','interact','interaction',
-            'network','joubert','meckel','bbs','nphp','mks',
-            'localization','expressed in'
+            "compare", "difference", "roles", "mechanism", "pathway",
+            "how does", "explain", "associated with", "interact",
+            "interaction", "network",
+            "localization", "expressed in"
         ];
 
         const isComplexQuery =
             genesFromQuery.length > 1 ||
             complexKeywords.some(k => qLower.includes(k)) ||
-            qLower.split(/\s+/).filter(Boolean).length > 8;
+            qLower.split(/\s+/).filter(w => w.length > 0).length > 8;
 
         if (isComplexQuery) {
             window.log("Routing via: COMPLEX_SYNTHESIS → Gemini");
 
-            // Flexible intent parser transforms user question before Gemini
-           let parsedQuery = window.flexibleIntentParser(query);
-
-             // If parser returns non-string → force string
-                if (typeof parsedQuery !== "string") {
-                parsedQuery = query;
-                }
-
-            const handled = await window.attemptGeminiFallback(parsedQuery, genesFromQuery);
-
-
-            if (handled) return;   // ⭐ CRITICAL: STOP EXECUTION HERE
-            // If Gemini fails internally but returns false,
-            // we continue to local lookups below (very rare).
+            const handled = await window.attemptGeminiFallback(query, genesFromQuery);
+            if (handled) return;
         }
 
-
-        // ================================================================
-        // 2. SIMPLE LOCAL INTENTS (greetings, terminology, commands)
-        // ================================================================
-
-        const simpleGreetings = ['hello','hi','hey','greetings'];
+        // =========================================================
+        // 2. SIMPLE COMMANDS / GREETINGS
+        // =========================================================
+        const simpleGreetings = ["hello", "hi", "hey", "greetings"];
         const terminologyQueries = window.terminologyQueries || {};
 
-        // --- Greetings ---
         if (simpleGreetings.includes(qLower)) {
-            window.log("Routing via: Greeting");
-            window.addChatMessage("Hello! I'm CiliAI. How can I help you?", false);
+            window.log("Routing: Greeting");
+            window.addChatMessage("Hello! I am CiliAI. How can I help you?", false);
             return;
         }
 
-        // --- Terminology ---
         if (terminologyQueries[qLower]) {
-            window.log("Routing via: Terminology");
+            window.log("Routing: Terminology");
             window.addChatMessage(
                 `<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`,
                 false
@@ -2844,74 +2841,76 @@ async function handleAIQuery(query) {
             return;
         }
 
-        // --- Plot commands ---
+        // ---------------- Plot commands -----------------
         if (
-            qLower === 'plot default umap' ||
-            qLower.includes('plot default phylogeny') ||
-            qLower.includes('umap') ||
-            qLower.includes('scrna')
+            qLower === "plot default umap" ||
+            qLower.includes("plot default phylogeny") ||
+            qLower.includes("umap") ||
+            qLower.includes("scrna")
         ) {
             window.log("Routing via: Plot command");
 
-            if (qLower === 'plot default umap') {
-                window.renderUMAPPlot('FOXJ1');
+            if (qLower === "plot default umap") {
+                window.renderUMAPPlot("FOXJ1");
                 htmlResult = `<div class="ai-result-card"><p>Displaying default UMAP for <strong>FOXJ1</strong>.</p></div>`;
-            }
-            else if (qLower.includes('plot default phylogeny')) {
-                const defaultGenes = ["ZC2HC1A","CEP41","BBS1","BBS2","BBS5","ZNF474","IFT81","BBS7"];
+            } else if (qLower.includes("plot default phylogeny")) {
+                const defaultGenes = [
+                    "ZC2HC1A", "CEP41", "BBS1", "BBS2",
+                    "BBS5", "ZNF474", "IFT81", "BBS7"
+                ];
                 htmlResult = await window.routePhylogenyAnalysis(
-                    `show nevers plot for ${defaultGenes.join(',')}`
+                    `show nevers plot for ${defaultGenes.join(",")}`
                 );
             }
         }
 
-
-        // ================================================================
-        // 3. FOLLOW-UP INTENTS
-        // ================================================================
-
+        // ---------------- Follow-up responses ----------------
         const isFollowUp =
-            (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list')) &&
-            !qLower.includes('phylogen');
+            (qLower === "yes" || qLower === "ok" || qLower.includes("view the list")) &&
+            !qLower.includes("phylogen");
 
-        if (isFollowUp && window.lastQueryContext.type === 'list_followup') {
-            window.log("Routing via: Follow-up List");
-            window.showDataInLeftPanel(window.lastQueryContext.term, window.lastQueryContext.data);
-            window.lastQueryContext = {type:null,data:[],term:null};
+        if (isFollowUp && window.lastQueryContext.type === "list_followup") {
+            window.log("Routing: Follow-up list");
+            window.showDataInLeftPanel(
+                window.lastQueryContext.term,
+                window.lastQueryContext.data
+            );
+            window.lastQueryContext = { type: null, data: [], term: null };
             return;
         }
 
-        if (isFollowUp && window.lastQueryContext.type === 'screen_references') {
-            window.log("Routing via: Follow-up Screen References");
+        if (isFollowUp && window.lastQueryContext.type === "screen_references") {
+            window.log("Routing: Follow-up screen references");
             htmlResult = window.handleScreenReferenceFollowup();
         }
 
+        // =========================================================
+        // 3. LOCAL SINGLE GENE LOOKUP
+        // =========================================================
+        if (htmlResult === null) {
+            if (genesFromQuery.length === 1) {
+                const gene = genesFromQuery[0];
 
-        // ================================================================
-        // 4. SIMPLE SINGLE-GENE LOOKUP
-        // ================================================================
-
-        if (!htmlResult && genesFromQuery.length === 1) {
-            const g = genesFromQuery[0];
-            if (window.CiliAI.lookups.geneMap[g]) {
-                window.log(`Routing via: Local single gene: ${g}`);
-                htmlResult = await window.displayFullGeneInfo(g);
+                if (window.CiliAI.lookups.geneMap[gene]) {
+                    window.log(`Routing: Local single gene (${gene})`);
+                    htmlResult = await window.displayFullGeneInfo(gene);
+                }
             }
         }
 
-
-        // ================================================================
-        // 5. FINAL CATCH-ALL
-        // ================================================================
-        if (!htmlResult) {
-            window.log("Routing via: Final Fallback");
+        // =========================================================
+        // 4. FINAL FALLBACK
+        // =========================================================
+        if (htmlResult === null) {
+            window.log("Routing: Final Fallback");
             htmlResult = `
-                Sorry, I couldn't interpret:
-                <strong>${query}</strong>.
+                Sorry, I couldn't interpret: "<strong>${query}</strong>".
             `;
         }
 
-        window.addChatMessage(htmlResult, false);
+        if (htmlResult) {
+            window.addChatMessage(htmlResult, false);
+        }
 
     } catch (err) {
         console.error("Error in handleAIQuery:", err);
@@ -3147,126 +3146,95 @@ window.generateAndInjectSVG = function() {
 // ==========================================================
 // 4H. GEMINI INTEGRATION AND FALLBACK
 // ==========================================================
-async function sendQueryToGemini(query, genes, geneData) {
-    window.log(`Sending query to Gemini backend: ${query} (Genes: ${genes.join(', ')})`);
 
-    // --- CRITICAL FIX: PRODUCTION GEMINI ENDPOINT ---
-    const GEMINI_ENDPOINT_URL = "https://cili-ai-gemini-backend-687107394688.us-central1.run.app/ask-ciliai";
-    // --- END CRITICAL FIX ---
-    
-    // Prepare the context: serialize the complex data structure to JSON
-    const context_json = JSON.stringify(geneData, null, 2); 
-
-    try {
-        window.addChatMessage(`🧠 Handing off to CiliAI (Gemini) for synthesis...`, false);
-        
-        const response = await fetch(GEMINI_ENDPOINT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                question: query,
-                context: context_json,
-                detected_genes: genes,
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Backend request failed with status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        if (result.answer) {
-            // Display the rich markdown answer from Gemini
-            window.addChatMessage(result.answer, false);
-            
-            // Add a footer indicating the source/model used
-            window.addChatMessage(`<div style="font-size: 10px; color: #718096; text-align: right; padding-top: 5px;">
-                Synthesized by ${result.model}
-            </div>`, false);
-        } else {
-            window.addChatMessage(`Sorry, the Gemini synthesis engine did not return an answer. Error: ${result.error || 'Unknown'}`, false);
-        }
-        
-    } catch (e) {
-        console.error("Gemini connection error:", e);
-        window.addChatMessage(`An error occurred while connecting to the CiliAI Gemini service. Please check the backend URL and status. (${e.message})`, false);
-    }
-}
 
 // ------------------------------
 // MODIFIED FALLBACK HANDLER
 // ------------------------------
 
-/**
- * Determines if a query is complex enough for Gemini, collects required data, and routes the query.
- * @param {string} query The user's question.
- * @param {Array<string>} genes An array of gene symbols detected by local logic.
- * @returns {boolean} True if the query was handled and sent to Gemini, false otherwise.
- */
-function attemptGeminiFallback(query, genes) {
-    // 🔥 Fix the crash: ensure query is a string
-    if (typeof query !== "string") {
-        console.error("[CiliAI] attemptGeminiFallback: query is not a string:", query);
-        query = String(query || "");
+const GEMINI_ROUTER_PROMPT = `
+You are the CiliAI biological inference engine.
+
+You will receive:
+1. "question": the user's question
+2. "ciliai_context": structured biological data extracted from the local CiliAI database
+
+Your task:
+- Use the provided CiliAI data to answer the question accurately.
+- If the question is conceptual or mechanistic, integrate data + biological reasoning.
+- If a disease is mentioned, use disease associations in ciliai_context.
+- If multiple genes are included, synthesize interactions.
+- If the local data is empty, answer using biological knowledge.
+
+Return ONLY HTML-safe text (no markdown unless wrapped in <div>).
+`;
+function collectRelevantData(question, genes) {
+    const dataset = window.CiliAI.lookups;
+
+    const context = {
+        matched_genes: {},
+        disease_associations: {},
+        categories: {}
+    };
+
+    // Include gene-level info
+    genes.forEach(g => {
+        if (dataset.geneMap[g]) {
+            context.matched_genes[g] = dataset.geneMap[g];
+        }
+    });
+
+    // Disease-related queries → include relevant disease index
+    const diseaseKeywords = ['joubert', 'meckel', 'bbs', 'nphp', 'mks', 'bardet'];
+    if (diseaseKeywords.some(k => question.toLowerCase().includes(k))) {
+        context.disease_associations = dataset.diseaseAssociations || {};
     }
+
+    // Phenotype or screen queries
+    if (question.toLowerCase().includes('short cilia') ||
+        question.toLowerCase().includes('phenotype') ||
+        question.toLowerCase().includes('screen')) {
+        context.categories = dataset.categories || {};
+    }
+
+    return context;
+}
+async function attemptGeminiFallback(query, genes) {
+    if (typeof query !== "string") return false;
 
     const qLower = query.toLowerCase();
 
-    // -------------------------------
-    // Condition 1 — Synthesis / Mechanism / Comparison Queries
-    // -------------------------------
-    if (
-        qLower.includes("compare") ||
-        qLower.includes("role") ||
-        qLower.includes("mechanism") ||
-        qLower.includes("explain how") ||
-        qLower.includes("explain the") ||
-        qLower.includes("significance") ||
-        qLower.includes("interaction") ||
-        qLower.includes("interact")
-    ) {
+    // Collect selective data
+    const contextData = collectRelevantData(query, genes);
 
-        // If no genes detected, still a conceptual question → Gemini
-        if (!genes || genes.length === 0) {
-            sendQueryToGemini(query, [], { query });
-            return true;
-        }
-
-        // Collect mapped gene objects
-        const geneData = genes
-            .map(g => window.CiliAI.lookups.geneMap[g])
-            .filter(Boolean);
-
-        sendQueryToGemini(query, genes, {
-            query,
-            genes_for_synthesis: geneData
+    // Always send query + selected data to Gemini
+    try {
+        await sendQueryToGemini({
+            question: query,
+            genes_detected: genes,
+            ciliai_context: contextData,
+            prompt: GEMINI_ROUTER_PROMPT
         });
-        return true;
+
+        return true; // fully handled
+    } catch (err) {
+        console.error("Gemini fallback failed:", err);
+        return false; // let local fallback work
     }
+}
 
-    // -------------------------------
-    // Condition 2 — Multi-gene detail requests
-    // Example: “Tell me about short cilia phenotype genes”
-    // -------------------------------
-    if (qLower.includes("tell me about") && genes && genes.length > 1) {
-        const geneData = genes
-            .map(g => window.CiliAI.lookups.geneMap[g])
-            .filter(Boolean);
+async function sendQueryToGemini(payload) {
+    window.log('[Gemini] Sending:', payload);
 
-        if (geneData.length > 0) {
-            sendQueryToGemini(query, genes, {
-                query,
-                genes_for_synthesis: geneData
-            });
-            return true;
-        }
-    }
+    const response = await fetch(GEMINI_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
 
-    // No Gemini fallback → local handler continues
-    return false;
+    const data = await response.json();
+
+    window.addChatMessage(data.answer_html || "No answer.", false);
 }
 
 
