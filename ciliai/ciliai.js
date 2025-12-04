@@ -2775,6 +2775,9 @@ async function handleAIQuery(query) {
 
         let htmlResult = null;
         let match;
+        
+        // Use a default term for gene extraction if query looks like a complex question initially
+        let currentTerm = query; 
 
         // =( 0 )= INTENT: GREETINGS & TERMINOLOGY (Handle locally for speed)
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
@@ -2792,62 +2795,95 @@ async function handleAIQuery(query) {
             return;
         }
 
-        // --- High Priority Plot Buttons (Immediate Actions) ---
-        // (Keep these local as they are direct commands, not synthesis requests)
-        if (qLower === 'plot default umap') {
-             // ... (logic remains here) ...
+        // --- High Priority Plot/Table/Follow-up (Local Only) ---
+        
+        // Follow-up/Yes command
+        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show')) && 
+                           !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
+
+        if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'list_followup') {
+            window.log('Routing via: Intent (Follow-up: Show List)');
+            window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+            window.lastQueryContext = { type: null, data: [], term: null };
+            return;
+        }
+        else if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'screen_references') {
+            window.log('Routing via: Intent (Follow-up: Screen References)');
+            htmlResult = window.handleScreenReferenceFollowup();
+        }
+        
+        // Direct Plot/UMAP commands
+        if (qLower.includes('plot default umap')) {
              window.log('Routing via: Intent (Default UMAP Plot)');
              window.renderUMAPPlot('FOXJ1');
              htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
         }
-        else if (qLower === 'plot default phylogeny') {
-             // ... (logic remains here) ...
+        else if (qLower.includes('plot default phylogeny')) {
              window.log('Routing via: Intent (Default Phylogeny Plot)');
              const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
              htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
         }
-        
-        // =( 1 )= COMPLEX SYNTHESIS (NEW CENTRAL ROUTING)
-        // If the query is complex, it is routed to Gemini immediately.
-        const complexIntent = window.flexibleIntentParser(query);
+        // Direct UMAP Visualization command (Block 11 logic integrated here)
+        else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
+            window.log('Routing via: Intent (UMAP Plot)');
+            let gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : 'FOXJ1';
+            window.renderUMAPPlot(gene);
+            htmlResult = `<div class="ai-result-card">
+                <p>Displaying Lung scRNA-seq UMAP for <strong>${gene}</strong> on the left.</p>
+                <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="downloadUMAPDataAsCSV('${gene}')">⬇️ Download UMAP Data (CSV)</a></p>
+            </div>`;
+        }
 
-        if (htmlResult === null && complexIntent?.type === 'COMPLEX_SYNTHESIS') {
-            window.log('Routing via: Intent (COMPLEX_SYNTHESIS) - Delegating to Gemini.');
-            const genes = window.extractMultipleGenes(query);
+        // --- Intent Parsing and Routing ---
+        
+        // Re-extract potential gene terms from the cleaned query for context
+        // NOTE: We only clean the term if a non-plot/non-greeting intent is being processed.
+        const genesFromQuery = window.extractMultipleGenes(query);
+
+        // 1. COMPLEX SYNTHESIS (GEMINI PATH)
+        // Check for complex intent or complex phrasing (Block 1 logic + new trigger logic)
+        const isSynthesisTopic = ['compare', 'role', 'mechanism', 'explain', 'associated with', 'which proteins are', 'joubert', 'meckel', 'bbs', 'nphp', 'mks'].some(k => qLower.includes(k));
+        const isMultiEntityQuery = isSynthesisTopic || genesFromQuery.length > 1 || qLower.split(/\s+/).filter(w => w.length > 0).length > 8;
+
+        if (htmlResult === null && isMultiEntityQuery) {
+            window.log('Routing via: COMPLEX_SYNTHESIS - Delegating to Gemini.');
             
-            // This is the primary synthesis path now.
-            if (window.attemptGeminiFallback(query, genes)) {
-                return; 
+            // The attemptGeminiFallback function contains the data collection and the network call.
+            if (window.attemptGeminiFallback(query, genesFromQuery)) {
+                return; // SUCCESS: Gemini path initiated. Stop local processing.
+            }
+            // If the attempt fails (e.g., no context data found), htmlResult remains null, and we fall through.
+        }
+        
+        // 2. SIMPLE LOCAL QUERIES (Remaining standard local lookup blocks)
+        
+        // A. Single Gene Details (Block 5 logic)
+        if (htmlResult === null && genesFromQuery.length === 1) {
+            const geneSymbol = genesFromQuery[0];
+            if (window.CiliAI.lookups.geneMap[geneSymbol]) {
+                window.log('Routing via: Single Gene Details (Local)');
+                htmlResult = await window.displayFullGeneInfo(geneSymbol);
             }
         }
         
-        // (Blocks 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 are all REMOVED)
-        // The remaining blocks are simplified down to the final fallback.
-        
-        // =( 13 )= FINAL FALLBACK / SINGLE-GENE DETAILS
-        // If we reach here, it wasn't a plot, a follow-up, or a complex synthesis request. 
-        // It's likely a simple gene or keyword lookup that failed to match any explicit simple handler.
-        
+        // B. Simple List Lookups (Only attempt if htmlResult is still null)
         if (htmlResult === null) {
-            window.log(`Routing via: Final Local Fallback (Get Gene Details/Error)`);
-            let term = qLower;
-            // Attempt to clean the term
-            if ((match = qLower.match(/(?:what is|describe|localization of)\s+(?:the\s+)?(.+)/i))) {
-                term = match[1];
+            const intent = window.flexibleIntentParser(query);
+            if (intent) {
+                // Execute basic local lookups (Localization, Simple Ciliopathy lists)
+                // If the query was complex, the flexibleIntentParser now returns { type: 'COMPLEX_SYNTHESIS' } which returns null, preventing this block from running.
+                window.log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
+                htmlResult = intent.handler(intent.entity, query);
             }
-            term = term.replace(/[?.]/g, '').trim().toUpperCase();
+        }
+
+        // 3. FINAL FALLBACK (ERROR)
+        if (htmlResult === null) {
+            window.log(`Routing via: Final Fallback (Error)`);
             
-            const genes = window.extractMultipleGenes(term);
-            
-            if (genes.length > 0) {
-                // For simple single-gene questions ("What is IFT88?"), we still do the fast local lookup.
-                window.log(`Final local lookup for gene: ${genes[0]}`);
-                htmlResult = await window.displayFullGeneInfo(genes[0]);
-            } else {
-                // Generic error handler
-                window.log(`Routing via: Final Fallback (Error)`);
-                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". I'm sending complex queries to the Gemini synthesis engine, but I couldn't identify a target gene or topic in this case.`;
-            }
+            // If the query was not complex enough for Gemini or Gemini failed immediately,
+            // or if local lookup failed, display a helpful error.
+            htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". I'm sending complex queries to the Gemini synthesis engine, but I couldn't identify a target gene or topic in this case.`;
         }
 
         // Send the final result to chat
@@ -2860,7 +2896,6 @@ async function handleAIQuery(query) {
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
-
        
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
