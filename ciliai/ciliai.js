@@ -11,6 +11,10 @@
 // ==========================================================
 // SAFE FALLBACKS (Prevents crashes if UI functions missing)
 // ==========================================================
+// ==========================================
+// Gemini Backend Endpoint (DEFINE THIS!)
+// ==========================================
+window.GEMINI_API_URL = "https://cili-ai-gemini-backend-687107394688.us-central1.run.app/ask-ciliai";
 
 // CRITICAL FIX: Ensure all functions called early are defined globally or via fallbacks.
 
@@ -3238,20 +3242,19 @@ async function attemptGeminiFallback(query, genes) {
     }
 }
 
-
 async function sendQueryToGemini(payload) {
-    window.log('[Gemini] Sending:', payload);
+    window.log("[Gemini] Sending:", payload);
 
-    const response = await fetch(GEMINI_API_URL, {
+    const response = await fetch(window.GEMINI_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     });
 
     const data = await response.json();
-
-    window.addChatMessage(data.answer_html || "No answer.", false);
+    window.addChatMessage(data.answer || "No response from Gemini.", false);
 }
+
 
 
 
