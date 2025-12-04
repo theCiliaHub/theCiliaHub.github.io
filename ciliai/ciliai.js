@@ -2756,17 +2756,65 @@ window.terminologyQueries = {
 };
 
 /**
- * (REPLACEMENT) The Main "Level 1" Query Router
- * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
+ * Sends a query to Gemini using the backend REST API.
+ * Returns true if Gemini handled the query.
  */
+window.attemptGeminiFallback = async function (query, detectedGenes = []) {
+    try {
+        // Build JSON context sent to backend
+        const contextData = window.buildContextForGenes
+            ? window.buildContextForGenes(detectedGenes)
+            : {};
+
+        window.log("[Gemini] Sending:", {
+            question: query,
+            detected_genes: detectedGenes,
+            context: contextData
+        });
+
+        // Call new backend (REST)
+        const response = await fetch(window.GEMINI_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                question: query,
+                detected_genes: detectedGenes,
+                context: contextData
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            window.addChatMessage(
+                `Gemini backend error: ${data.error}`,
+                false
+            );
+            return true; // handled (even on error)
+        }
+
+        const ans = data.answer || "No response from Gemini.";
+        window.addChatMessage(ans, false);
+
+        return true;
+
+    } catch (err) {
+        console.error("Gemini fallback exception:", err);
+        window.addChatMessage(
+            `Gemini error: ${err.message || err.toString()}`,
+            false
+        );
+        return true;
+    }
+};
+
+
 /**
- * (FINAL FIXED VERSION)
+ * (FINAL FIXED VERSION – MATCHED TO BACKEND)
  * Main Level-1 Router with correct simple/complex separation
  * + integrated flexibleIntentParser and attemptGeminiFallback.
  */
-/**
- * Main "Level 1" Query Router (with Option 1 disease→Gemini routing)
- */
+
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
@@ -2782,7 +2830,7 @@ async function handleAIQuery(query) {
         }
 
         let htmlResult = null;
-        const genesFromQuery = window.extractMultipleGenes(query);
+        const genesFromQuery = window.extractMultipleGenes(query) || [];
 
         // =========================================================
         // 0. NEW: ALL CILIOPATHY DISEASE QUERIES → GEMINI
@@ -2798,8 +2846,8 @@ async function handleAIQuery(query) {
         if (diseaseTriggers.some(k => qLower.includes(k))) {
             window.log("Routing via: DISEASE→GEMINI (Option 1)");
 
-            const handled = await window.attemptGeminiFallback(query, genesFromQuery || []);
-            if (handled) return;  // Gemini handled it
+            const handled = await window.attemptGeminiFallback(query, genesFromQuery);
+            if (handled === true) return;
         }
 
         // =========================================================
@@ -2815,13 +2863,13 @@ async function handleAIQuery(query) {
         const isComplexQuery =
             genesFromQuery.length > 1 ||
             complexKeywords.some(k => qLower.includes(k)) ||
-            qLower.split(/\s+/).filter(w => w.length > 0).length > 8;
+            qLower.split(/\s+/).length > 8;
 
         if (isComplexQuery) {
             window.log("Routing via: COMPLEX_SYNTHESIS → Gemini");
 
             const handled = await window.attemptGeminiFallback(query, genesFromQuery);
-            if (handled) return;
+            if (handled === true) return;
         }
 
         // =========================================================
@@ -2891,14 +2939,12 @@ async function handleAIQuery(query) {
         // =========================================================
         // 3. LOCAL SINGLE GENE LOOKUP
         // =========================================================
-        if (htmlResult === null) {
-            if (genesFromQuery.length === 1) {
-                const gene = genesFromQuery[0];
+        if (htmlResult === null && genesFromQuery.length === 1) {
+            const gene = genesFromQuery[0];
 
-                if (window.CiliAI.lookups.geneMap[gene]) {
-                    window.log(`Routing: Local single gene (${gene})`);
-                    htmlResult = await window.displayFullGeneInfo(gene);
-                }
+            if (window.CiliAI.lookups.geneMap[gene]) {
+                window.log(`Routing: Local single gene (${gene})`);
+                htmlResult = await window.displayFullGeneInfo(gene);
             }
         }
 
@@ -2907,9 +2953,7 @@ async function handleAIQuery(query) {
         // =========================================================
         if (htmlResult === null) {
             window.log("Routing: Final Fallback");
-            htmlResult = `
-                Sorry, I couldn't interpret: "<strong>${query}</strong>".
-            `;
+            htmlResult = `Sorry, I couldn't interpret: "<strong>${query}</strong>".`;
         }
 
         if (htmlResult) {
