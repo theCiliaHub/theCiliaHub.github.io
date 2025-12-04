@@ -19,26 +19,6 @@ if (typeof window.updateStatus !== "function") {
         console.log(`STATUS[${state}]: ${msg}`);
     };
 }
-if (typeof window.drawDefaultUMAP !== "function") {
-    window.drawDefaultUMAP = function () {
-        window.log("drawDefaultUMAP() placeholder called");
-        return "<p>Default UMAP plot placeholder.</p>"; // ✅ return inside function
-    };
-}
-
-// Safe usage inside handleAIQuery
-if (query.toLowerCase().includes("default umap")) {
-    window.log("[Visualization] Default UMAP requested");
-    htmlResult = window.drawDefaultUMAP(); // ✅ inside function
-}
-
-
-// If no genes AND not default plot → avoid crash
-if (!exactGenes || exactGenes.length === 0) {
-    window.log("[Visualization] No genes detected → gene-free plot?");
-    // you may choose your default behavior:
-    return window.drawDefaultUMAP();
-}
 
 if (typeof window.renderUMAPPlot !== "function") {
     window.renderUMAPPlot = function () {
@@ -100,12 +80,6 @@ if (typeof window.handleGeneSearch !== "function") {
         lookups: {}
     };
 
-window.getGenesByComplex = function(complexTerm) {
-  const map = getComplexPhylogenyTableMap();
-  const normTerm = normalizeTerm(complexTerm);
-  const key = Object.keys(map).find(k => normalizeTerm(k) === normTerm);
-  return key ? map[key].map(g => ({ gene: g, description: `Part of ${key}` })) : [];
-};
     // --- Global variables to hold your data ---
 let ciliaryGeneMap = new Map();
 let screenDatabase = {};
@@ -114,55 +88,9 @@ let lastQueryContext = { type: null, data: [], term: null };
 window.liPhylogenyCache = null;
 window.neversPhylogenyCache = null;
 window.CiliAI_UMAP = null; // This will be populated from the master DB
-// --- CRITICAL FIX: ALIASING OLD/INCORRECT V1 FUNCTION NAMES ---
-// This resolves the fatal "window.extractDiseaseTerm is not a function" error in runGraphQuery.
-window.extractDiseaseTerm = window.extractDiseaseIntent;
 
-// --- CRITICAL FIX: Alias for complex term extractor ---
-window.extractComplexTerm = window.extractComplexIntent; 
-// ---
    
-// ----------------------------------------------------------
-// 3. GEMINI COMMUNICATION LAYER
-// ----------------------------------------------------------
-
-async function getCiliAIAssistance(userQuery, context = {}, detectedGenes = []) {
-    window.updateStatus("Waiting for Gemini response...", "loading");
-
-    const requestBody = {
-        question: userQuery,
-        context: JSON.stringify(context),
-        detected_genes: detectedGenes
-    };
-
-    try {
-        const response = await fetch(API_ENDPOINT + "/ask-ciliai", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            window.updateStatus(`Error: Gemini backend failed (${response.status})`, "error");
-            return `Error: Backend failed. Details: ${errorText.slice(0, 100)}...`;
-        }
-
-        const data = await response.json();
-
-        if (data && data.answer) {
-            window.updateStatus("AI response received.", "success");
-            return data.answer;
-        }
-
-        window.updateStatus("Error: Invalid backend response.", "error");
-        return "Error: Gemini returned an empty response.";
-
-    } catch (error) {
-        window.updateStatus("Network failure", "error");
-        return `Network error: ${error.message}`;
-    }
-}
+    // --- Data Maps (These are now just for the AI brain) ---
 
 
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
@@ -507,258 +435,8 @@ function extractMultipleGenes(query) {
     log(`[Gene Extraction] Final valid genes:`, finalGenes);
     return finalGenes;
 }
-/**
- * STUB: Simulates Semantic Search (Step 1).
- * Always returns a low-confidence dummy match unless the query is specific.
- */
-window.semanticSearch = async function(query, topK=5, minScore=0.60) {
-    const qLower = query.toLowerCase();
+
     
-    if (qLower.includes('bbsome') || qLower.includes('ift88')) {
-        return [{ 
-            id: 'IFT88_DESC', 
-            text: 'IFT88 is a core component of the IFT-B complex.', 
-            score: 0.95,
-            meta: { type: 'definition', gene_symbol: qLower.includes('ift88') ? 'IFT88' : 'BBSome' }
-        }];
-    }
-    return [{ id: 'NONE', text: 'no semantic match found', score: 0.1 }];
-};
-
-// --- NEW/UPDATED Quantitative Engine Stub (Implementation of Gap 4) ---
-window.runQuantitativeEngine = async function(query, exactGenes) {
-    window.log('IMPLEMENTATION: Executing Quantitative Engine');
-    const qLower = query.toLowerCase();
-    
-    // 1. Identify Gene and Cell Types for A vs B Comparison
-    if (qLower.includes('expressed higher') && exactGenes.length === 1) {
-        const gene = exactGenes[0];
-        // NOTE: This logic needs strong NLP to extract 'ciliated cells' and 'basal cells' robustly.
-        // For the stub, we use hardcoded detection based on the user's data table:
-        const expData = window.CiliAI.lookups.geneMap[gene]?.expression?.scRNA;
-        
-        if (expData) {
-            const valA = expData['ciliated cell'] || 0;
-            const valB = expData['basal cell'] || 0;
-
-            if (valA !== 0 || valB !== 0) {
-                const resultText = (valA > valB) 
-                    ? `The gene **${gene}** is expressed **higher in the ciliated cell cluster** (${valA.toFixed(3)}) compared to the basal cell cluster (${valB.toFixed(3)}).`
-                    : `The gene **${gene}** is expressed higher in the **basal cell cluster** (${valB.toFixed(3)}) compared to the ciliated cell cluster (${valA.toFixed(3)}).`;
-
-                return `<div class="ai-result-card">📊 **Quantitative Comparison:** ${resultText} This is biologically expected, as IFT88 is essential for ciliary maintenance.</div>`;
-            }
-        }
-    }
-    
-    // Fallback if the specific comparison is missed (the original intention of the stub)
-    if (qLower.includes('highest expression') || qLower.includes('top 10')) {
-        return `<div class="ai-result-card">📈 **Quantitative Engine Result (Simulated Rank):** Execution successful, but specific quantitative logic is not yet fully implemented for ranking algorithms.</div>`;
-    }
-    
-    return `<div class="ai-result-card">**Quantitative Engine:** Intent [ranking] recognized, but the specific comparison logic failed.</div>`;
-};
-
-/**
- * Handles Visualization Intents (Step 4).
- * Centralizes UMAP / t-SNE / Phylogeny routing.
- */
-window.routeVisualizationAction = async function(query, exactGenes) {
-    const qLower = query.toLowerCase();
-    const hasGenes = exactGenes && exactGenes.length > 0;
-    const gene = hasGenes ? exactGenes[0] : 'FOXJ1'; // default marker if no gene
-
-    // -------------------------------
-    // 1. Default / gene-free UMAP
-    // -------------------------------
-    if (!hasGenes || qLower.includes('default umap')) {
-        if (window.drawDefaultUMAP) {
-            window.drawDefaultUMAP();
-            return `<div class="ai-result-card">📊 Default UMAP plot requested. Displaying now.</div>`;
-        } else {
-            return `<div class="ai-result-card">📊 Default UMAP plot requested. Function not implemented.</div>`;
-        }
-    }
-
-    // -------------------------------
-    // 2. Default / gene-free t-SNE
-    // -------------------------------
-    if (qLower.includes('default tsne')) {
-        if (window.drawDefaultTSNE) {
-            window.drawDefaultTSNE();
-            return `<div class="ai-result-card">📊 Default t-SNE plot requested. Displaying now.</div>`;
-        } else {
-            return `<div class="ai-result-card">📊 Default t-SNE plot requested. Function not implemented.</div>`;
-        }
-    }
-
-    // -------------------------------
-    // 3. Gene-colored UMAP / scRNA
-    // -------------------------------
-    if (qLower.includes('umap') || qLower.includes('scrna')) {
-        if (window.renderUMAPPlot) {
-            window.renderUMAPPlot(gene); // V1 visualizer
-            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. Displaying now.</div>`;
-        } else {
-            return `<div class="ai-result-card">📊 UMAP / scRNA plot for **${gene}** requested. renderUMAPPlot() not implemented.</div>`;
-        }
-    }
-
-    // -------------------------------
-    // 4. Phylogeny / Heatmap
-    // -------------------------------
-    if (qLower.includes('phylogen') || qLower.includes('heatmap')) {
-        if (window.routePhylogenyAnalysis) {
-            return window.routePhylogenyAnalysis(query);
-        } else {
-            return `<div class="ai-result-card">📊 Phylogeny / heatmap requested. routePhylogenyAnalysis() not implemented.</div>`;
-        }
-    }
-
-    // -------------------------------
-    // 5. Fallback visualization
-    // -------------------------------
-    return `<div class="ai-result-card">**Visualization:** Intent [visualize] recognized, but no specific plot matched the query.</div>`;
-};
-
-
-/**
- * ENHANCED NLP FIX: Smart Terminology Matcher (RESTRICTED TO DEFINITIONS)
- */
-function findTerminologyMatch(query) {
-    const terminologyQueries = window.terminologyQueries || {};
-    const qLower = query.toLowerCase().trim();
-    
-    // Clean query to handle trailing punctuation (e.g., "what is IFT?")
-    const qLowerClean = qLower.replace(/[?.,!]/g, '');
-
-    // 1. Check for Exact Key Match (e.g., "what is ift-a" or "what is IFT?")
-    if (terminologyQueries[qLowerClean]) {
-        return terminologyQueries[qLowerClean];
-    }
-
-    // 2. Handle "what is X" patterns where X is the dictionary key
-    if (qLowerClean.startsWith('what is ') || qLowerClean.startsWith("what's ")) {
-        const target = qLowerClean.replace(/^(what is|what's)\s+/, '').trim();
-        const fullKey = 'what is ' + target;
-
-        if (terminologyQueries[fullKey]) {
-            return terminologyQueries[fullKey];
-        }
-        // CRITICAL: Ensure we don't accidentally match and return generic answers for genes
-        if (window.CiliAI.lookups.geneMap[target.toUpperCase()]) {
-             return null; 
-        }
-    }
-    
-    return null; // Let the V2.0 Intent Router (Step B) handle all other cases.
-}
-
-
-// ... (New helper function)
-function handleHighLevelExplanations(query) {
-    let result = handleComparativeQuery(query); // Tries to build a rich table
-    if (result) return result;
-    
-    result = handleProcessQuery(query); // Tries to build a step-by-step list
-    if (result) return result;
-    
-    // Add V2.0 synthesis checks here (ARL13B/INPP5E, etc.)
-    return null;
-}
-
-/**
- * V2.0 FINAL STUB IMPLEMENTATION: window.runGraphQuery (Step 6)
- * Handles Synthesis, Comparison, and Complex/Disease Filtering for intents:
- * 'compare', 'relationship', 'disease_query', 'complex_query', 'localization_query'.
- */
-window.runGraphQuery = async function(query, intent, exactGenes) {
-    window.log(`EXECUTING V2.0 GRAPH/SYNTHESIS for Intent: ${intent}`);
-    const qLower = query.toLowerCase();
-
-    // --- A. HIGH-LEVEL EXPLANATORY STUBS (Comparison, Process, Relationship) ---
-    
-    // 1. Check V2.0 Enhanced Explanations (Compare/Process)
-    let result = handleComparativeQuery(query); 
-    if (result) return result;
-    
-    result = handleProcessQuery(query); 
-    if (result) return result;
-    
-    // 2. Check 2-gene synthesis/relationship queries (e.g., ARL13B and INPP5E)
-    if (exactGenes.length === 2) {
-        // We use the simpler alias here since the full synthesis logic is complex.
-        return window.handleTwoGeneRelationshipQuery(exactGenes[0], exactGenes[1]); 
-    }
-
-    // --- B. LIST RETRIEVAL AND SYNTHESIS (Resolves E2, E3) ---
-
-    // 3. Simple Complex/Module Query (e.g., "Genes in BBSome")
-    if (intent === 'complex_query') {
-        const complexTerm = window.extractComplexIntent(query);
-        const gene = exactGenes[0]; 
-        
-        if (complexTerm) {
-             // Case: What genes are in the BBSome?
-             return window.getComplexGenesAndFormat(complexTerm);
-        } else if (gene) {
-             // Case: What complexes is KIF3A a member of?
-             return window.handleGeneInComplexQuery(gene);
-        }
-    }
-    
-    // 4. Simple Localization Query (e.g., "List genes in the transition zone")
-    if (intent === 'localization_query') {
-        const locTerm = window.extractLocalizationIntent(query);
-        if (locTerm) {
-            // Use V1 helper to get list and format it.
-            return window.handleLocalizationQuery(locTerm, query); 
-        }
-    }
-    
-    // 5. Simple Disease Query (e.g., "Genes associated with Primary Ciliary Dyskinesia")
-    if (intent === 'disease_query' && exactGenes.length === 0) {
-        const diseaseTerm = window.extractDiseaseIntent(query);
-        
-        if (diseaseTerm) {
-            const { genes, description } = window.getCiliopathyGenes(diseaseTerm);
-            // V2.0 FIX: Directly output the list.
-            return window.formatListResult(`Genes for ${diseaseTerm}`, genes, description);
-        }
-    }
-    
-    // Default V2.0 failure message for synthesis/graph queries
-    return `<div class="ai-result-card">**Synthesis Engine:** Query intent [${intent}] recognized. The specific synthesis path failed. Try simplifying the list request.</div>`;
-};
-
-/**
- * STUB: Handles two-gene relationships (extracted from runGraphQuery)
- */
-window.handleTwoGeneRelationshipQuery = function(geneA, geneB) {
-    const sortedTerms = [geneA.toUpperCase(), geneB.toUpperCase()].sort().join('_'); 
-
-    if (sortedTerms === 'CEP290_NPHP1') {
-        return `<div class="ai-result-card">🤝 **Relationship: CEP290 and NPHP1**<br>Both proteins are key members of the **Transition Zone** gate (NPHP and MKS modules). They physically interact to maintain the ciliary barrier. Defects in either cause Joubert Syndrome.</div>`;
-    }
-    return `<div class="ai-result-card">**Relationship:** No strong, predefined relationship found between ${geneA} and ${geneB}.</div>`;
-}
-
-/**
- * STUB: V2.0 Entity Extractors (used by runGraphQuery)
- */
-window.extractComplexTerm = function(query) {
-    const qLower = query.toLowerCase();
-    const map = {'bbsome': 'BBSome', 'ift-a': 'IFT-A Complex', 'mks complex': 'MKS Complex'};
-    for (const [key, val] of Object.entries(map)) {
-        if (qLower.includes(key)) return val;
-    }
-    return null;
-}
-window.formatRAGAnswer = function(semanticMatch) {
-    return `<div class="ai-result-card">🧠 **RAG Answer:** The semantic model found a relevant passage: "${semanticMatch.text}" (Score: ${semanticMatch.score.toFixed(2)}).</div>`;
-}
-
-
     
 function formatListResult(title, genes, description = "") {
         let geneListHtml = '';
@@ -784,61 +462,7 @@ function formatListResult(title, genes, description = "") {
         `;
     }
 
-function react(type) {
-    const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
-    const lastQuestion = userMessages.length > 0 
-        ? (userMessages[userMessages.length - 1].querySelector('.ciliai-message-content')?.textContent || '').trim()
-        : 'No question';
 
-    const feedbackType = type === 'up' ? 'Positive' : 'Negative';
-
-    // 100 % silent, 100 % reliable, zero console errors
-    new Image().src = 'https://script.google.com/macros/s/AKfycby5PdLZdYKN9S06Tbt3x8lQfDrFhOXo3RteQbY6NFZawx22bH_EC2XuIf5_I6lDPSl5/exec' +
-        '?type='     + encodeURIComponent(feedbackType) +
-        '&question=' + encodeURIComponent(lastQuestion.substring(0, 500)) +
-        '&url='      + encodeURIComponent(location.href) +
-        '&t='        + Date.now();
-
-    if (type === 'up') {
-        addChatMessage('Thank you! Feedback received', false);
-    } else {
-        addChatMessage('Got it – thank you for the feedback!', false);
-    }
-}
-
-
-function sendFeedbackEmail(feedbackType, userQuestion) {
-    const subject = `CiliAI ${feedbackType === 'up' ? '👍 Positive' : '👎 Negative'} Feedback`;
-    const body = `
-User Question: ${userQuestion}
-Feedback Type: ${feedbackType === 'up' ? 'Positive (👍)' : 'Negative (👎)'}
-Time: ${new Date().toLocaleString()}
-Page: ${window.location.href}
-
---
-Sent from CiliAI Chat
-    `.trim();
-    
-    // Open user's email client with pre-filled message
-    window.open(`mailto:oktay.kaplan@agu.edu.tr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-}
-
-function addChatMessage(html, isUser = false) {
-        const chatWindow = document.getElementById('messages');
-        if (!chatWindow) return;
-        const msg = document.createElement('div');
-        msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
-        msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
-        if (!isUser) {
-            msg.querySelector('.ciliai-message-content').innerHTML += `
-                <div class="ciliai-reaction-buttons">
-                    <span class="ciliai-reaction-btn" onclick="react('up')">👍</span>
-                    <span class="ciliai-reaction-btn" onclick="react('down')">👎</span>
-                </div>`;
-        }
-        chatWindow.appendChild(msg);
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-    }
 
     function handleUserSend() {
         const chatInput = document.getElementById('chatInput');
@@ -910,12 +534,10 @@ function normalizeTerm(term) {
 
 // --- NEW HELPER: TISSUE-SPECIFIC DISEASE QUERY ---
 /**
- * V2.0 UPDATED: handleTissueSpecificDiseaseQuery
  * Finds genes associated with a specific disease that are also expressed in a target tissue.
- * Replaces the 'lastQueryContext' flow with direct HTML list generation.
  * @param {string} diseaseTerm - The disease keyword (e.g., "Joubert Syndrome").
  * @param {string} tissueTerm - The tissue keyword (e.g., "kidney").
- * @returns {string} HTML message for the chat window (formatted list or error message).
+ * @returns {string} HTML message for the chat window.
  */
 function handleTissueSpecificDiseaseQuery(diseaseTerm, tissueTerm) {
     const normDiseaseKey = normalizeDiseaseKey(diseaseTerm);
@@ -960,12 +582,13 @@ function handleTissueSpecificDiseaseQuery(diseaseTerm, tissueTerm) {
                 </div>`;
     }
 
-    // V2.0 FIX: Directly call formatListResult and return the HTML.
-    // The columns will be 'gene', 'disease', and 'expression_in_tissue'.
-    return window.formatListResult(
-        `Genes for ${diseaseTerm} expressed in ${tissueTerm} (${results.length})`, 
-        results
-    );
+    lastQueryContext = {
+        type: 'list_followup',
+        data: results,
+        term: `Genes for ${diseaseTerm} expressed in ${tissueTerm}`
+    };
+
+    return `I found ${results.length} genes causing <strong>${diseaseTerm}</strong> that are expressed in <strong>${tissueTerm}</strong>. Do you want to view the list?`;
 }
 
 // --- NEW HELPER: COMPLEX + DISEASE OVERLAP QUERY ---
@@ -975,20 +598,28 @@ function handleTissueSpecificDiseaseQuery(diseaseTerm, tissueTerm) {
  * @param {string} diseaseTerm - The disease keyword (e.g., "Joubert Syndrome").
  * @returns {string} HTML message for the chat window.
  */
-// --- FIX: handleGeneInDiseaseQuery (Complex + Disease Overlap) ---
 function handleGeneInDiseaseQuery(complexTerm, diseaseTerm) {
     const normComplex = normalizeTerm(complexTerm);
     const normDisease = normalizeDiseaseKey(diseaseTerm);
+    
+    // 1. Get genes in the complex
     const complexGenes = getGenesByComplex(complexTerm).map(g => g.gene);
-    const diseaseGenes = window.CiliAI.lookups.byCiliopathy[normDisease] || [];
     const complexSet = new Set(complexGenes);
+    
+    // 2. Get genes associated with the disease
+    const diseaseGenes = window.CiliAI.lookups.byCiliopathy[normDisease] || [];
     const diseaseSet = new Set(diseaseGenes);
 
-    if (complexSet.size === 0 || diseaseSet.size === 0) {
-         return `<div class="ai-result-card"><p>No genes found for <strong>${complexTerm}</strong> or <strong>${diseaseTerm}</strong>.</p></div>`;
+    if (complexSet.size === 0) {
+        return `<div class="ai-result-card"><p>I found no genes associated with the <strong>${complexTerm}</strong> complex.</p></div>`;
+    }
+    if (diseaseSet.size === 0) {
+        return `<div class="ai-result-card"><p>I found no genes associated with <strong>${diseaseTerm}</strong>.</p></div>`;
     }
 
+    // 3. Find the overlap
     const overlappingGenes = [...complexSet].filter(gene => diseaseSet.has(gene));
+    const geneMap = window.CiliAI.lookups.geneMap;
     
     const results = overlappingGenes.map(geneSymbol => ({
         gene: geneSymbol,
@@ -1002,12 +633,15 @@ function handleGeneInDiseaseQuery(complexTerm, diseaseTerm) {
                 </div>`;
     }
 
-    // V2.0 FIX: Directly call formatListResult and return the HTML.
-    return window.formatListResult(
-        `${complexTerm} Genes Causing ${diseaseTerm} (${results.length})`, 
-        results
-    );
+    lastQueryContext = {
+        type: 'list_followup',
+        data: results,
+        term: `${complexTerm} Genes Causing ${diseaseTerm}`
+    };
+
+    return `I found ${results.length} genes that are both in the <strong>${complexTerm}</strong> complex and associated with <strong>${diseaseTerm}</strong>. Do you want to view the list?`;
 }
+
 
 
 /**
@@ -1118,6 +752,63 @@ function findAndMergeGenes(userInputArray) {
             generateAndInjectSVG();
         });
     }
+
+
+function react(type) {
+    const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
+    const lastQuestion = userMessages.length > 0 
+        ? (userMessages[userMessages.length - 1].querySelector('.ciliai-message-content')?.textContent || '').trim()
+        : 'No question';
+
+    const feedbackType = type === 'up' ? 'Positive' : 'Negative';
+
+    // 100 % silent, 100 % reliable, zero console errors
+    new Image().src = 'https://script.google.com/macros/s/AKfycby5PdLZdYKN9S06Tbt3x8lQfDrFhOXo3RteQbY6NFZawx22bH_EC2XuIf5_I6lDPSl5/exec' +
+        '?type='     + encodeURIComponent(feedbackType) +
+        '&question=' + encodeURIComponent(lastQuestion.substring(0, 500)) +
+        '&url='      + encodeURIComponent(location.href) +
+        '&t='        + Date.now();
+
+    if (type === 'up') {
+        addChatMessage('Thank you! Feedback received', false);
+    } else {
+        addChatMessage('Got it – thank you for the feedback!', false);
+    }
+}
+
+function sendFeedbackEmail(feedbackType, userQuestion) {
+    const subject = `CiliAI ${feedbackType === 'up' ? '👍 Positive' : '👎 Negative'} Feedback`;
+    const body = `
+User Question: ${userQuestion}
+Feedback Type: ${feedbackType === 'up' ? 'Positive (👍)' : 'Negative (👎)'}
+Time: ${new Date().toLocaleString()}
+Page: ${window.location.href}
+
+--
+Sent from CiliAI Chat
+    `.trim();
+    
+    // Open user's email client with pre-filled message
+    window.open(`mailto:oktay.kaplan@agu.edu.tr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+}
+
+function addChatMessage(html, isUser = false) {
+        const chatWindow = document.getElementById('messages');
+        if (!chatWindow) return;
+        const msg = document.createElement('div');
+        msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+        msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
+        if (!isUser) {
+            msg.querySelector('.ciliai-message-content').innerHTML += `
+                <div class="ciliai-reaction-buttons">
+                    <span class="ciliai-reaction-btn" onclick="react('up')">👍</span>
+                    <span class="ciliai-reaction-btn" onclick="react('down')">👎</span>
+                </div>`;
+        }
+        chatWindow.appendChild(msg);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
 
     /**
      * (MODIFIED) Downloads the dynamic table as a CSV.
@@ -1389,16 +1080,20 @@ function handleScreenQuery(geneSymbol) {
 
     // --- 4D. Conversational Query Handlers ---
 
-   // --- FIX: handleLocalizationQuery ---
-function handleLocalizationQuery(term, query) {
-    const geneList = getGenesByLocalization(term); // This already returns objects with 'gene' and 'localization'
-    const count = geneList.length;
-    if (count === 0) {
-        return `Sorry, I could not find any genes localized to "${term}".`;
+    function handleLocalizationQuery(term, query) {
+        const geneList = getGenesByLocalization(term); 
+        const count = geneList.length;
+        if (count === 0) {
+            return `Sorry, I could not find any genes localized to "${term}".`;
+        }
+        // (MODIFIED) Removed 'descriptionHeader'
+        lastQueryContext = {
+            type: 'list_followup',
+            data: geneList, 
+            term: `Genes localized to ${term}`
+        };
+        return `According to the latest data, ${count} genes are enriched in the ${term}. Do you want to view the list?`;
     }
-    // V2.0 FIX: Return the formatted list directly.
-    return window.formatListResult(`Genes localized to ${term} (${count})`, geneList);
-}
 
 
     /**
@@ -1435,78 +1130,26 @@ function handleLocalizationQuery(term, query) {
         return gene && gene.Ortholog_C_elegans;
     }
 
-
-// ----------------------------------------------------------
-// FAST GENE EXTRACTION (for visualization + Gemini context)
-// ----------------------------------------------------------
-
-window.extractMultipleGenes = function (query) {
-    if (!query) return [];
-
-    const tokens = query.toUpperCase().match(/[A-Z0-9]+/g) || [];
-    const validGenes = [];
-
-    for (const t of tokens) {
-        if (window.CiliAI.genes.has(t)) {   
-            validGenes.push(t);
-        }
-    }
-
-    return [...new Set(validGenes)];
-};
-
-// Build minimal backend context from local dataset
-window.buildContextForGenes = function (genes) {
-    const context = {};
-    for (const g of genes) {
-        if (window.CiliAI.data[g]) {
-            context[g] = window.CiliAI.data[g];
-        }
-    }
-    return context;
-};
-
-window.runQuantitativeEngine = async (query, genes) => {
-    window.log("Quantitative intent. Local check → Gemini fallback.");
-    return null;   // always fallback for now
-};
-
-window.runGraphQuery = async function (query, intent, entities = []) {
-    window.log("Graph/complex intent. Local attempts allowed → Gemini fallback.");
-    return null;   // no local graph engine yet
-};
-
-
-   /**
- * V2.0 Integration Helper: Gets genes for a Complex and formats the output directly.
- * * Replaces V1's handleSimpleComplexQuery by eliminating the multi-turn confirmation.
- * @param {string} complexTerm - The name of the complex (e.g., 'BBSome').
- */
-function getComplexGenesAndFormat(complexTerm) {
-    // getGenesByComplex is assumed to be a V1 helper that fetches gene symbols.
-    const geneList = window.getGenesByComplex(complexTerm);
-    const count = geneList.length;
-
-    if (count === 0) {
-        // Preserve V1 Fallback: check if the user meant "complexes for gene..."
-        const genes = window.extractMultipleGenes(complexTerm);
-        if (genes.length > 0) {
-            return window.handleGeneInComplexQuery(genes[0]);
-        }
-        return `Sorry, I could not find any genes for the complex "${complexTerm}".`;
-    }
     
-    // V2.0 Standard: Directly format and return the full list result.
-    // The final list is formatted with a call to the V1 helper formatListResult.
-    return window.formatListResult(`Genes in the ${complexTerm} complex (${count})`, geneList);
-}
-
-/**
- * V1 Function Preservation: handleGeneInComplexQuery remains as-is, 
- * but is now solely a helper for V2.0 routing. It returns the formatted HTML.
- */
-// The original V1 function is kept because its logic is sound for: "What complexes is IFT88 in?"
-// function handleGeneInComplexQuery(geneSymbol) { ... } // (Returns formatted list)
+   function handleSimpleComplexQuery(term, query) {
+        const geneList = getGenesByComplex(term);
+        const count = geneList.length;
+        if (count === 0) {
+            // Fallback: check if the user meant "complexes for gene..."
+            const genes = extractMultipleGenes(term);
+            if (genes.length > 0) {
+                return handleGeneInComplexQuery(genes[0]);
+            }
+            return `Sorry, I could not find any genes for the complex "${term}".`;
+        }
+        lastQueryContext = {
+            type: 'list_followup', 
+            data: geneList, 
+            term: `Genes in ${term}`,
+            descriptionHeader: 'Description'
+        };
+        return `I found ${count} genes in the ${term} complex. Do you want to view the list?`;
+    }
     
     function handleGeneInComplexQuery(geneSymbol) {
         const g = window.CiliAI.lookups.geneMap[geneSymbol];
@@ -1521,63 +1164,56 @@ function getComplexGenesAndFormat(complexTerm) {
         }));
         return formatListResult(`Complexes containing ${geneSymbol}`, complexList);
     }
-/**
- * V2.0 UPDATED: handleClassificationQuery (Genes in Classification)
- * Handles queries asking for the gene list belonging to a general ciliopathy classification 
- * (e.g., "Genes in Primary Ciliopathies") or the diseases within it.
- * * @param {string} classificationName - The broad classification name (e.g., "Primary Ciliopathies").
- * @param {string} query - The original user query.
- * @returns {string} HTML list or explanatory message.
- */
-function handleClassificationQuery(classificationName, query) {
-    const qLower = query.toLowerCase();
     
-    // Find the cased name, e.g., "Primary Ciliopathies"
-    const casedClassificationName = Object.keys(getDiseaseClassificationMap()).find(key => normalizeTerm(key) === normalizeTerm(classificationName));
-    if (!casedClassificationName) {
-        return `Sorry, I don't recognize the classification "${classificationName}".`;
-    }
-    
-    const normKey = normalizeTerm(casedClassificationName);
-    
-    // Case 1: User asks for the list of genes associated with the classification
-    if (qLower.includes('gene') || qLower.includes('genes') || qLower.includes('gene list')) {
-        const geneList = window.CiliAI.lookups.byClassification[normKey] || [];
-        const count = geneList.length;
-
-        if (count === 0) {
-            return `I did not find any genes directly associated with the classification "${casedClassificationName}".`;
+    function handleClassificationQuery(classificationName, query) {
+        const qLower = query.toLowerCase();
+        
+        // Find the cased name, e.g., "Primary Ciliopathies"
+        const casedClassificationName = Object.keys(getDiseaseClassificationMap()).find(key => normalizeTerm(key) === normalizeTerm(classificationName));
+        if (!casedClassificationName) {
+            return `Sorry, I don't recognize the classification "${classificationName}".`;
         }
         
-        const geneMap = window.CiliAI.lookups.geneMap;
-        // Map gene symbols to objects containing classification data for display
-        const geneListObjects = geneList.map(gene => ({
-            gene: gene,
-            classification: geneMap[gene]?.ciliopathy_classification || 'No classification listed'
-        })).sort((a, b) => a.gene.localeCompare(b.gene)); 
+        const normKey = normalizeTerm(casedClassificationName);
+        
+        if (qLower.includes('gene') || qLower.includes('genes') || qLower.includes('gene list')) {
+            const geneList = window.CiliAI.lookups.byClassification[normKey] || [];
+            const count = geneList.length;
 
-        // V2.0 FIX: Directly call formatListResult and return the HTML.
-        // This eliminates the 'lastQueryContext' and follow-up prompt.
-        return window.formatListResult(
-            `Genes for ${casedClassificationName} (${count})`, 
-            geneListObjects
-        );
-    
-    } else {
-        // Case 2: User asks for the diseases within the classification (e.g., "What is Primary Ciliopathies?")
-        const diseaseMap = getDiseaseClassificationMap();
-        const diseaseList = diseaseMap[casedClassificationName] || [];
-        const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
-        return `
-            <div class="ai-result-card">
-                <strong>${casedClassificationName}</strong>
-                <p>This classification includes the following diseases:</p>
-                <ul>${diseaseHtml}</ul>
-            </div>
-        `;
+            if (count === 0) {
+                return `I did not find any genes directly associated with the classification "${casedClassificationName}".`;
+            }
+            
+            const geneMap = window.CiliAI.lookups.geneMap;
+            // (MODIFIED) Use 'classification' as the key
+            const geneListObjects = geneList.map(gene => ({
+                gene: gene,
+                classification: geneMap[gene]?.ciliopathy_classification || 'No classification listed'
+            })).sort((a, b) => a.gene.localeCompare(b.gene)); 
+
+            // (MODIFIED) Removed 'descriptionHeader'
+            lastQueryContext = {
+                type: 'list_followup',
+                data: geneListObjects,
+                term: `Genes for ${casedClassificationName}`
+            };
+            return `I found ${count} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
+        
+        } else {
+            // User just wants to list the diseases in the classification
+            const diseaseMap = getDiseaseClassificationMap();
+            const diseaseList = diseaseMap[casedClassificationName] || [];
+            const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
+            return `
+                <div class="ai-result-card">
+                    <strong>${casedClassificationName}</strong>
+                    <p>This classification includes the following diseases:</p>
+                    <ul>${diseaseHtml}</ul>
+                </div>
+            `;
+        }
     }
-}
-
+    
     function tellAboutCiliAI() {
         return `
             <div class="ai-result-card">
@@ -2632,27 +2268,48 @@ async function displayFullGeneInfo(geneSymbol) {
             };
         });
     }
-// --- FIX: getGenesByDomain ---
-function getGenesByDomain(domainTerm, query) {
-    const normTerm = normalizeTerm(domainTerm);
-    const results = [];
-    window.CiliAI.masterData.forEach(g => {
-        if (!g.Gene) return;
-        const allDomains = [...ensureArray(g.pfam_ids), ...ensureArray(g.domain_descriptions)];
-        const matchingDomain = allDomains.find(d => d && normalizeTerm(d).includes(normTerm));
-        if (matchingDomain) {
-            results.push({ gene: g.Gene, domain: matchingDomain });
+
+    function getGenesByDomain(domainTerm, query) {
+        const normTerm = normalizeTerm(domainTerm);
+        const results = [];
+        window.CiliAI.masterData.forEach(g => {
+            if (!g.Gene) return;
+            const allDomains = [...ensureArray(g.pfam_ids), ...ensureArray(g.domain_descriptions)];
+            
+            const matchingDomain = allDomains.find(d => d && normalizeTerm(d).includes(normTerm));
+            if (matchingDomain) {
+                // (MODIFIED) Use 'domain' as the key
+                results.push({ gene: g.Gene, domain: matchingDomain });
+            }
+        });
+        
+        if (results.length === 0) {
+            return `Sorry, I could not find any genes with a "${domainTerm}" domain.`;
         }
-    });
-    
-    if (results.length === 0) {
-        return `Sorry, I could not find any genes with a "${domainTerm}" domain.`;
+
+        // (MODIFIED) Removed 'descriptionHeader'
+        lastQueryContext = {
+            type: 'list_followup',
+            data: results,
+            term: `Genes containing "${domainTerm}"`
+        };
+        return `I found ${results.length} genes containing a "${domainTerm}" domain. Do you want to view the list?`;
     }
 
-    // V2.0 FIX: Directly call formatListResult and return the HTML.
-    return window.formatListResult(`Genes containing "${domainTerm}" (${results.length})`, results);
-}
-
+    function getGenesByComplex(term) {
+        const normTerm = normalizeTerm(term);
+        const L = window.CiliAI.lookups;
+        const geneMap = L.geneMap;
+        const complexKey = Object.keys(L.byModuleOrComplex).find(key => normalizeTerm(key).includes(normTerm));
+        if (complexKey) {
+            const geneSymbols = L.byModuleOrComplex[complexKey];
+            return geneSymbols.map(gene => ({
+                gene: gene,
+                description: geneMap[gene]?.['Gene.Description'] || `Component of ${complexKey}`
+            }));
+        }
+        return [];
+    }
     
     function getGenesByModule(term) {
         const normTerm = term.toLowerCase();
@@ -2667,8 +2324,6 @@ function getGenesByDomain(domainTerm, query) {
         }
         return [];
     }
-
-
     /**
      * (NEW) Extracts disease keywords from a query.
      * @param {string} qLower - The lowercase query string.
@@ -2795,77 +2450,74 @@ function getGenesByDomain(domainTerm, query) {
 
     // --- 4G. Main "Brain" (Query Routers) ---
 
-    // --- 4G. Main "Brain" (Query Routers) ---
+    function flexibleIntentParser(query) {
+        const qLower = query.toLowerCase().trim();
+        
+        const diseaseMap = getDiseaseClassificationMap();
+        let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
+        for (const classification in diseaseMap) {
+            allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
+        }
+        
+        const classificationKeywords = Object.keys(window.CiliAI.lookups.byClassification || {});
+        classificationKeywords.push(...Object.keys(diseaseMap)); 
 
-    function flexibleIntentParser(query) {
-        const qLower = query.toLowerCase().trim();
-        
-        const diseaseMap = getDiseaseClassificationMap();
-        let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
-        for (const classification in diseaseMap) {
-            allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
-        }
-        
-        const classificationKeywords = Object.keys(window.CiliAI.lookups.byClassification || {});
-        classificationKeywords.push(...Object.keys(diseaseMap)); 
+        const complexKeywords = Object.keys(window.CiliAI.lookups.byModuleOrComplex || {});
+        complexKeywords.push(...Object.keys(getComplexPhylogenyTableMap())); 
 
-        const complexKeywords = Object.keys(window.CiliAI.lookups.byModuleOrComplex || {});
-        complexKeywords.push(...Object.keys(getComplexPhylogenyTableMap())); 
-
-        const entityKeywords = [
-            {
-                type: 'CLASSIFICATION', 
-                keywords: classificationKeywords,
-                handler: handleClassificationQuery 
-            },
-            {
+        const entityKeywords = [
+            {
+                type: 'CLASSIFICATION', 
+                keywords: classificationKeywords,
+                handler: handleClassificationQuery 
+            },
+            {
                 type: 'COMPLEX',
                 keywords: complexKeywords,
-                handler: getComplexGenesAndFormat // <-- FIX: Points to the correct V2.0 standardized function
+                handler: handleComplexQuery 
             },
-            {
-                type: 'LOCALIZATION',
-                keywords: [
-                    'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
-                    'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
-                    'lysosome', 'lysosomes', 'Ciliary associated gene', 'Ciliary associated genes', 
-                    'Microbody', 'Peroxisome', 'flagella'
-                ],
-                handler: handleLocalizationQuery 
-            },
-            {
-                type: 'CILIOPATHY',
-                keywords: allDiseaseKeywords, 
-                handler: (term, query) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes, getCiliopathyGenes(term).description)
-            },
-            {
-                type: 'DOMAIN',
-                keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand', 'TPR', 'AAA+ ATPase', 'AAA domain', 'ATPase domain', 'WD40 repeat'],
-                handler: getGenesByDomain 
-            },
-            {
-                type: 'META', // For "what can you do?"
-                keywords: ['about yourself', 'what can you do', 'help me', 'information do you have', 'datasets', 'capabilities', 'questions can i ask', 'overview of your features'],
-                handler: tellAboutCiliAI
-            }
-        ];
+            {
+                type: 'LOCALIZATION',
+                keywords: [
+                    'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
+                    'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
+                    'lysosome', 'lysosomes', 'Ciliary associated gene', 'Ciliary associated genes', 
+                    'Microbody', 'Peroxisome', 'flagella'
+                ],
+                handler: handleLocalizationQuery 
+            },
+            {
+                type: 'CILIOPATHY',
+                keywords: allDiseaseKeywords, 
+                handler: (term, query) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes, getCiliopathyGenes(term).description)
+            },
+            {
+                type: 'DOMAIN',
+                keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand', 'TPR', 'AAA+ ATPase', 'AAA domain', 'ATPase domain', 'WD40 repeat'],
+                handler: getGenesByDomain 
+            },
+            {
+                type: 'META', // For "what can you do?"
+                keywords: ['about yourself', 'what can you do', 'help me', 'information do you have', 'datasets', 'capabilities', 'questions can i ask', 'overview of your features'],
+                handler: tellAboutCiliAI
+            }
+        ];
 
-        const normalizedQuery = normalizeTerm(query);
-        for (const entityType of entityKeywords) {
-            const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
-            for (const keyword of sortedKeywords) {
-                const normKeyword = normalizeTerm(keyword);
-                if (!normKeyword) continue;
-                
-                if (normalizedQuery.includes(normKeyword)) { 
-                    if (qLower.includes('not in') || qLower.includes('except')) continue;
-                    return { type: entityType.type, entity: keyword, handler: entityType.handler };
-                }
-            }
-        }
-        return null;
-    }
-
+        const normalizedQuery = normalizeTerm(query);
+        for (const entityType of entityKeywords) {
+            const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
+            for (const keyword of sortedKeywords) {
+                const normKeyword = normalizeTerm(keyword);
+                if (!normKeyword) continue;
+                
+                if (normalizedQuery.includes(normKeyword)) { 
+                    if (qLower.includes('not in') || qLower.includes('except')) continue;
+                    return { type: entityType.type, entity: keyword, handler: entityType.handler };
+                }
+            }
+        }
+        return null;
+    }
 
 function getCiliopathyGenes(term) {
     // This is a minimal placeholder structure to prevent crashes.
@@ -2894,12 +2546,8 @@ function getCiliopathyGenes(term) {
 // 4B. COMPLEX QUERY ENGINE (L2/L3) - NEW
 // ==========================================================
 
-// ==========================================================
-// NEW: V2.0 Component Definitions (Browser-Safe Stubs)
-// ==========================================================
-
 /**
- * (CLEANED) Extracts localization keywords from a query.
+ * (NEW) Extracts localization keywords from a query.
  * @param {string} qLower - The lowercase query string.
  * @returns {string|null} The found localization term, or null.
  */
@@ -2923,93 +2571,6 @@ function extractLocalizationIntent(qLower) {
 }
 
 /**
- * STUB: Generates Vector Index Records.
- * This is a simplified placeholder that only generates the necessary *structure* * for the V2.0 system to simulate its data foundation (Phase 1).
- */
-async function generateVectorIndexRecords(masterDBData, terminologyData) {
-    window.log("STUB: Generating Vector Index Records (Simulated)");
-    const records = [];
-    
-    // Simulate indexing a few key concepts from masterDBData
-    const geneMap = masterDBData.lookups.geneMap || {};
-    
-    // 1. Terminology
-    for (const [key, definition] of Object.entries(terminologyData || {})) {
-        records.push({
-            id: `TERM_${key.toUpperCase().slice(0, 15)}`,
-            text: definition.substring(0, 50) + "...",
-            meta: { type: 'definition' }
-        });
-    }
-
-    // 2. Sample Gene Description
-    if (geneMap['IFT88']) {
-        records.push({
-            id: 'IFT88_DESC',
-            text: geneMap['IFT88']['Gene.Description'].substring(0, 50) + "...",
-            meta: { type: 'gene_description', gene_symbol: 'IFT88' }
-        });
-    }
-    
-    window.log(`STUB: Generated ${records.length} sample index records.`);
-    return records;
-}
-
-
-// intentClassifier.js (Simplified V2.0 Logic)
-const INTENTS = ['definition', 'visualize', 'ranking', 'compare', 'localization_query', 'disease_query', 'complex_query', 'relationship'];
-
-// Curated list of high-value trigger phrases (TRAINING)
-const TRAINING = {
-  ranking: ['which five', 'highest expression', 'lowest expression', 'rank by', 'more than', 'less than'],
-  compare: ['compare', 'versus', 'vs', 'difference between', 'how do', 'differ from'],
-  relationship: ['relationship between', 'how do', 'work together', 'connect to'],
-  definition: ['what is', 'explain', 'define', 'tell me about'],
-  visualize: ['show me', 'plot', 'umap', 'heatmap', 'display'],
-  localization_query: ['localized to', 'where is', 'cellular location'],
-  disease_query: ['associated with', 'causes', 'mutated in', 'joubert', 'bbs', 'nphp'],
-  complex_query: ['genes in', 'members of', 'subunits', 'complex', 'bbsome', 'ift-a', 'mks']
-};
-
-/**
- * Predicts the most likely intent based on keyword overlap.
- * In a production V2.0 system, this would be heavily augmented by semanticMatches.
- */
-function scoreIntents(query, semanticMatches = []) {
-  const q = query.toLowerCase().trim();
-  const scores = INTENTS.reduce((acc, i) => { acc[i] = 0; return acc; }, {});
-  
-  // 1. Exact Phrase/Keyword Match Scoring (High Weight)
-  for (const intent of Object.keys(TRAINING)) {
-    for (const phrase of TRAINING[intent]) {
-      if (q.includes(phrase)) scores[intent] += 5;
-    }
-  }
-
-  // 2. Prioritize specific disease/complex tokens if present (medium weight)
-  // This logic ensures 'Joubert syndrome' boosts 'disease_query' even if 'genes in' is missing.
-  if (q.includes('joubert') || q.includes('bbs') || q.includes('nphp')) {
-      scores.disease_query += 2;
-  }
-  if (q.includes('ift-b') || q.includes('bbsome') || q.includes('mks')) {
-      scores.complex_query += 2;
-  }
-  
-  // 3. Select the best intent (highest score)
-  const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
-  const maxScore = best ? best[1] : 0;
-  
-  if (maxScore > 0) {
-      // Find all intents tied for the highest score (for multi-label support)
-      const tiedIntents = Object.entries(scores).filter(([i, s]) => s === maxScore);
-      return { intent: best[0], confidence: maxScore, tiedIntents: tiedIntents.map(t => t[0]) };
-  }
-
-  return { intent: 'definition', confidence: 0, tiedIntents: ['definition'] }; // Default fallback
-}
-
-
-/**
  * (NEW) Extracts phenotype keywords from a query.
  * @param {string} qLower - The lowercase query string.
  * @returns {string|null} The found phenotype term, or null.
@@ -3029,126 +2590,175 @@ function extractPhenotypeIntent(qLower) {
     return null;
 }
 
-   
-/**
- * @param {string} query
- * @returns {string | null} HTML result for an explanatory query, or null.
- */
-function handleExplanatoryQuery(query) {
-    const qLower = query.toLowerCase().trim();
+    /**
+     * (REPLACEMENT) The main "Level 2/3" query router.
+     * This is the new "brain" that handles multi-intent queries.
+     * @param {string} query - The original user query.
+     * @returns {string|null} An HTML string if a complex query is handled, or null to fall back.
+     */
+    function handleComplexQuery(query) {
+        const qLower = query.toLowerCase();
 
-    // --- GAP 1: Comparative Questions ---
-    if (qLower.includes('compare') || qLower.includes('difference between') || (qLower.includes('how do') && qLower.includes('differ'))) {
-        window.log('Routing via: Enhanced NLP (Comparative Analysis)');
+        // 1. Extract all possible intents
+        const intents = {
+            localization: extractLocalizationIntent(qLower),
+            phenotype: extractPhenotypeIntent(qLower),
+            disease: extractDiseaseIntent(qLower),
+            expression: extractExpressionIntent(qLower),
+            complex: extractComplexIntent(qLower),
+            evolution: extractEvolutionIntent(qLower),
+            isNegative: qLower.includes('not in') || qLower.includes('not expressed') || qLower.includes('no known phenotype')
+        };
 
-        // Comparative Analysis 1: Ciliopathies
-        if ((qLower.includes('joubert syndrome') || qLower.includes('js')) && (qLower.includes('meckel-gruber syndrome') || qLower.includes('mks'))) {
-            return `
-                <div class="ai-result-card">
-                    <h4>Comparing Joubert Syndrome (JS) and Meckel-Gruber Syndrome (MKS)</h4>
-                    <p>Both are severe ciliopathies, but MKS is generally lethal in the perinatal period, whereas JS severity is highly variable.</p>
-                    <table>
-                        <thead>
-                            <tr><th>Feature</th><th>Joubert Syndrome (JS)</th><th>Meckel-Gruber Syndrome (MKS)</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr><td><strong>Severity</strong></td><td>Highly variable (often manageable)</td><td>**Lethal**, prenatal onset</td></tr>
-                            <tr><td><strong>Classic Sign</strong></td><td>'Molar tooth sign' on brain MRI</td><td>Occipital encephalocele, large cystic kidneys</td></tr>
-                            <tr><td><strong>Primary Defect</strong></td><td>Primarily **Transition Zone** and IFT genes (e.g., *CEP290*, *IFT88*)</td><td>Primarily **MKS Complex** genes (e.g., *MKS1*, *B9D1*)</td></tr>
-                        </tbody>
-                    </table>
-                </div>`;
+        // 2. Count how many intents we found (excluding isNegative flag)
+        let intentCount = 0;
+        if (intents.localization) intentCount++;
+        if (intents.phenotype) intentCount++;
+        if (intents.disease) intentCount++;
+        if (intents.expression) intentCount++;
+        if (intents.complex) intentCount++;
+        if (intents.evolution) intentCount++;
+
+
+        // 3. If it's not a multi-intent query (at least 2 criteria), fall back to the simple router
+        if (intentCount < 2) {
+            log(`[Complex Router] Only ${intentCount} intent(s) found. Falling back to simple router.`);
+            return null;
+        }
+
+        log(`[Complex Router] Handling complex query with ${intentCount} intents:`, intents);
+        
+        // 4. Build a filter chain
+        let titleParts = []; // For formatting the response
+        
+        const filteredGenes = window.CiliAI.masterData.filter(gene => {
+            if (!gene || !gene.Gene) return false; // Ensure gene object and Gene name exist
+
+            // Filter by Localization
+            if (intents.localization) {
+                if (!titleParts.includes(`Loc: ${intents.localization}`)) titleParts.push(`Loc: ${intents.localization}`);
+                const geneLoc = (gene.Localization || '').toLowerCase();
+                if (!geneLoc.includes(intents.localization)) return false;
+            }
+
+            // Filter by Phenotype
+            if (intents.phenotype) {
+                if (!titleParts.includes(`Pheno: ${intents.phenotype}`)) titleParts.push(`Pheno: ${intents.phenotype}`);
+                const genePheno = (gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '').toLowerCase();
+                // This logic is flawed. "short cilia" is not the same as "no effect". 
+                // Let's fix this to be more precise.
+                let phenoMatch = false;
+                if (intents.phenotype === 'short cilia' && (genePheno.includes('short') || genePheno.includes('absent'))) {
+                    phenoMatch = true;
+                } else if (intents.phenotype === 'longer cilia' && genePheno.includes('long')) {
+                     phenoMatch = true;
+                } else if (intents.phenotype === 'loss of cilia' && (genePheno.includes('absent') || genePheno.includes('no cilia'))) {
+                     phenoMatch = true;
+                } else if (intents.phenotype === 'no effect' && (genePheno.includes('no effect') || genePheno === '')) {
+                     phenoMatch = true;
+                }
+                
+                if (!phenoMatch) return false;
+            }
+
+            // Filter by Disease
+            if (intents.disease) {
+                if (!titleParts.includes(`Disease: ${intents.disease}`)) titleParts.push(`Disease: ${intents.disease}`);
+                const diseaseKey = normalizeDiseaseKey(intents.disease);
+                const diseaseGenes = window.CiliAI.lookups.byCiliopathy[diseaseKey];
+                if (!diseaseGenes || !diseaseGenes.includes(gene.Gene.toUpperCase())) return false;
+            }
+
+            // Filter by Expression
+            if (intents.expression) {
+                const hasExpr = hasExpressionInTissue(gene, intents.expression);
+                const title = `Expr: ${intents.isNegative ? 'NOT ' : ''}${intents.expression}`;
+                if (!titleParts.includes(title)) titleParts.push(title);
+
+                // If query is negative (NOT expressed) and gene HAS expression, filter it out
+                if (intents.isNegative && hasExpr) return false;
+                // If query is positive (IS expressed) and gene does NOT have expression, filter it out
+                if (!intents.isNegative && !hasExpr) return false;
+            }
+
+            // Filter by Complex
+            if (intents.complex) {
+                const title = `Complex: ${intents.isNegative ? 'NOT ' : ''}${intents.complex}`;
+                if (!titleParts.includes(title)) titleParts.push(title);
+                
+                const inComplex = gene.complex_components && Object.keys(gene.complex_components).some(comp => 
+                    comp.toLowerCase().includes(intents.complex)
+                );
+                
+                if (intents.isNegative && inComplex) return false;
+                if (!intents.isNegative && !inComplex) return false;
+            }
+
+            // Filter by Evolution
+            if (intents.evolution) {
+                if (intents.evolution === 'conserved_in_elegans') {
+                    if (!titleParts.includes("Conserved in C. elegans")) titleParts.push("Conserved in C. elegans");
+                    if (!isGeneConserved(gene)) return false;
+                }
+                // (Future: Add 'ciliary_specific' logic here if needed)
+            }
+            
+            // All filters passed
+            return true;
+        });
+
+        // 5. Format the results
+        const resultTitle = titleParts.join(' + ');
+
+        if (filteredGenes.length === 0) {
+            return `I found no genes that match all of your criteria (${resultTitle}).`;
         }
         
-        // Comparative Analysis 2: IFT Complexes
-        if (qLower.includes('ift-a') && qLower.includes('ift-b')) {
-            const iftA = window.terminologyQueries["what is ift-a"];
-            const iftB = window.terminologyQueries["what is ift-b"];
-            return `<div class="ai-result-card">
-                <h4>IFT-A vs. IFT-B Complexes (Intraflagellar Transport)</h4>
-                <p><strong>IFT-B (Anterograde)</strong>: ${iftB.replace(/IFT-B is /, '')} It transports cargo **to the tip** (base $\\to$ tip) using the **Kinesin-2** motor. Essential for initial cilium assembly (ciliogenesis). </p>
-                <hr>
-                <p><strong>IFT-A (Retrograde)</strong>: ${iftA.replace(/IFT-A \(.+\) is /, '')} It transports cargo **back to the base** (tip $\\to$ base) using the **Dynein-2** motor. Essential for recycling and ciliary maintenance.</p>
-            </div>`;
-        }
+        // (MODIFIED) Dynamically build the gene list objects based on the intents
+        const geneListObjects = filteredGenes.map(g => {
+            const geneObject = {
+                gene: g.Gene
+            };
 
-        // Comparative Analysis 3: Ciliary Gate Components
-        if (qLower.includes('bbsome') && qLower.includes('mks complex')) {
-            return `<div class="ai-result-card">
-                <h4>BBSome vs. MKS Complex</h4>
-                <p>Both are critical ciliary trafficking complexes localized near the base, but they manage different types of cargo:</p>
-                <ul>
-                    <li>**MKS Complex:** Forms the core **Transition Zone (TZ) gate structure**; controls access of proteins *into* the cilium's membrane. Defects cause structural gate failure (MKS).</li>
-                    <li>**BBSome:** A **cargo adaptor complex** that ferries transmembrane proteins (like GPCRs) *out* of the cilium for degradation or recycling. Defects cause trafficking defects (BBS).</li>
-                </ul>
-            </div>`;
-        }
-    }
+            // Add localization if it was part of the query
+            if (intents.localization) {
+                geneObject.localization = g.Localization || '—';
+            }
 
+            // Add phenotype if it was part of the query
+            if (intents.phenotype) {
+                geneObject.phenotype = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—';
+            }
+            
+            // Add other intents if they exist
+            if (intents.disease) {
+                const diseaseKey = normalizeDiseaseKey(intents.disease);
+                // Find the specific disease name from the gene's data, if available
+                const diseaseList = (g.Ciliopathies || []).map(d => d.name);
+                geneObject.disease = diseaseList.find(d => normalizeTerm(d) === diseaseKey) || intents.disease;
+            }
 
-    // --- GAP 2: Process & Mechanism Questions (How/Why) ---
-    if (qLower.startsWith('how does ift work') || qLower.includes('ift step by step')) {
-        window.log('Routing via: Enhanced NLP (IFT Mechanism)');
-        return `
-            <div class="ai-result-card">
-                <h4>How Intraflagellar Transport (IFT) Works: Step-by-Step</h4>
-                <ol>
-                    <li>**Assembly:** IFT-B complexes (e.g., IFT88, IFT81) load ciliary building blocks (tubulin, IFT-A, motors) at the **basal body**.</li>
-                    <li>**Anterograde Transport:** The train moves **from the base to the tip** powered by the **Kinesin-2** motor (anterograde = forward).</li>
-                    <li>**Turnaround:** At the ciliary tip, IFT-B disassembles. IFT-A complexes (e.g., IFT140) bind to the returning cargo.</li>
-                    <li>**Retrograde Transport:** The train moves **from the tip back to the base** powered by the **Dynein-2** motor (retrograde = backward).</li>
-                    <li>**Recycling:** Components are unloaded and recycled at the base to initiate the next transport cycle.</li>
-                </ol>
-            </div>`;
-    }
-    
-    if (qLower.includes('why do transition zone defects cause joubert syndrome')) {
-        window.log('Routing via: Enhanced NLP (Mechanism: TZ/JS)');
-        return `
-            <div class="ai-result-card">
-                <h4>Transition Zone (TZ) Defects and Joubert Syndrome (JS)</h4>
-                <p>The **Transition Zone** is the molecular **gate** at the ciliary base. JS-associated genes (like *CEP290*, *NPHP1*, *MKS1*) encode components that form this gate. </p>
-                <p>Defects cause **gate failure**, resulting in:</p>
-                <ul>
-                    <li>**Loss of Enrichment:** Key ciliary signaling components (like some GPCRs) fail to enter the cilium, disrupting vital pathways.</li>
-                    <li>**Corrupted Membrane:** Non-ciliary membrane proteins are allowed to diffuse into the cilium, corrupting the organelle's specialized environment.</li>
-                </ul>
-                <p>This failure in ciliary signaling is the root cause of the pleiotropic JS phenotypes, particularly the cerebellar malformation.</p>
-            </div>`;
-    }
-    
-    // --- GAP 3: Relationship & Pathway Questions ---
-    if (qLower.includes('how do ift88 and ift140 work together') || qLower.includes('relationship between ift88 and ift140')) {
-        window.log('Routing via: Enhanced NLP (Relationship: IFT Proteins)');
-        return `<div class="ai-result-card">
-            <h4>Relationship between IFT88 and IFT140</h4>
-            <p><strong>IFT88</strong> is a core component of the **IFT-B** complex (anterograde transport). <strong>IFT140</strong> is a core component of the **IFT-A** complex (retrograde transport).</p>
-            <p>They don't directly interact to form one complex, but they are intrinsically linked by their opposing roles in the **IFT Cycle**:</p>
-            <ul>
-                <li>IFT88 drives the cargo **to the tip** (anterograde).</li>
-                <li>IFT140 is essential for returning components **from the tip to the base** (retrograde).</li>
-            </ul>
-            <p>The proper function of IFT88 is dependent on IFT140 recycling the machinery, and vice-versa, to maintain the steady state of the cilium.</p>
-        </div>`;
-    }
+            if (intents.expression) {
+                 geneObject.expression = `Data available for ${intents.expression}`;
+            }
 
-    if (qLower.includes('hedgehog signaling pathway in cilia')) {
-        window.log('Routing via: Enhanced NLP (Pathway: Hedgehog)');
-        return `
-            <div class="ai-result-card">
-                <h4>Hedgehog (Hh) Signaling in the Primary Cilium</h4>
-                <p>${window.terminologyQueries["what is hedgehog signaling"]}</p>
-                <p>The cilium acts as the **central signaling hub**:</p>
-                <ul>
-                    <li>**OFF State (No Ligand):** The receptor **PTCH1** is present in the ciliary membrane, and the key transducer **SMOOTHENED (SMO)** is sequestered in vesicles at the ciliary base. The transcription factor **GLI** is processed into a repressor form.</li>
-                    <li>**ON State (Ligand Binding):** PTCH1 exits the cilium, allowing SMO to translocate into the ciliary axoneme. This movement prevents GLI processing, leading to the accumulation of the active GLI form that translocates to the nucleus to induce gene expression.</li>
-                </ul>
-                
-            </div>`;
-    }
+            // (MODIFIED) Add description *only if* no other data columns were added
+            if (Object.keys(geneObject).length === 1) { // Only 'gene' is present
+                geneObject.description = g['Gene.Description'] || 'No description available.';
+            }
 
-    return null; // No explanatory match found
-}
+            return geneObject;
+        });
+
+        // (MODIFIED) Remove the static 'descriptionHeader'
+        lastQueryContext = {
+            type: 'list_followup', 
+            data: geneListObjects, 
+            term: `Genes matching: ${resultTitle}`
+        };
+        
+        return `I found ${filteredGenes.length} gene(s) matching your criteria: <strong>${resultTitle}</strong>. Do you want to view the list?`;
+   }
 
 /**
  * Global object containing predefined answers for common Cilia/IFT/Ciliopathy terminology.
@@ -3188,201 +2798,281 @@ window.terminologyQueries = {
     "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
 };
 
-
-/*
- * CiliAI V2.0: The Main Query Router (Hybrid Semantic-RAG Model)
- * FINAL EXECUTABLE VERSION - Terminology check is prioritized.
- * NOTE: This function relies on functional stubs for semanticSearch, runQuantitativeEngine,
- * and runGraphQuery being defined in the global scope (window).
- */
-// ============================================================
-// FULL UPDATED handleAIQuery()  (DROP-IN SAFE REPLACEMENT)
-// ============================================================
-
-// ==========================
-// CiliAI v2.0 Safe Query Handler
-// ==========================
-// ------------------------------------------------------------
-// CiliAI V3 — FINAL handleAIQuery()
-// Backend does NO data loading. All data provided by frontend.
-// ------------------------------------------------------------
-async function handleAIQuery(question) {
-  try {
-    // 1. Ensure context is already loaded in ciliai.js
-    if (!window.CILIAI_DB) {
-      throw new Error("CILIAI_DB not loaded.");
-    }
-
-    // 2. Detect gene symbols mentioned in the question
-    const detectedGenes = extractGenes(question, window.CILIAI_DB);
-
-    // 3. Build minimal context (only detected genes)
-    const context = {};
-    for (const gene of detectedGenes) {
-      if (window.CILIAI_DB[gene]) {
-        context[gene] = window.CILIAI_DB[gene];
-      }
-    }
-
-    // 4. Call backend
-    const response = await fetch(BACKEND_URL + "/ask-ciliai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        context: JSON.stringify(context),
-        detected_genes: detectedGenes
-      })
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error("Backend error: " + err);
-    }
-
-    const data = await response.json();
-
-    return {
-      answer: data.answer || "No answer returned.",
-      detected_genes: data.detected_genes,
-      model: data.model,
-      gene_count: data.context_size_genes
-    };
-
-  } catch (err) {
-    console.error("CiliAI error:", err);
-    return {
-      answer: "An error occurred: " + err.message,
-      detected_genes: [],
-      model: "unknown",
-      gene_count: 0
-    };
-  }
-}
-
-
-// ==========================
-// SAFE FALLBACKS
-// ==========================
-if (typeof window.log !== "function") window.log = msg => console.log(`CiliAI LOG: ${msg}`);
-if (typeof window.drawDefaultUMAP !== "function") window.drawDefaultUMAP = () => "<p>Default UMAP plot placeholder.</p>";
-if (typeof window.drawDefaultTSNE !== "function") window.drawDefaultTSNE = () => "<p>Default t-SNE plot placeholder.</p>";
-if (typeof window.routeVisualizationAction !== "function") window.routeVisualizationAction = async () => "<p>Visualization route not implemented.</p>";
-if (typeof window.runQuantitativeEngine !== "function") window.runQuantitativeEngine = async () => "<p>Quantitative engine not implemented.</p>";
-if (typeof window.runGraphQuery !== "function") window.runGraphQuery = async () => "<p>Graph query engine not implemented.</p>";
-if (typeof window.displayFullGeneInfo !== "function") window.displayFullGeneInfo = async gene => `<p>Full info for ${gene} not available.</p>`;
-if (typeof window.formatRAGAnswer !== "function") window.formatRAGAnswer = semanticMatch => `<p>RAG output placeholder for ${semanticMatch.term}</p>`;
-
-
-
-function handleComparativeQuery(query) {
-    const qLower = query.toLowerCase();
-    
-    // Comparative Analysis 1: Ciliopathies
-    if ((qLower.includes('joubert syndrome') || qLower.includes('js')) && 
-        (qLower.includes('meckel-gruber syndrome') || qLower.includes('mks'))) {
-        return `
-            <div class="ai-result-card">
-                <h4>Comparing Joubert Syndrome (JS) and Meckel-Gruber Syndrome (MKS)</h4>
-                <p>Both are severe ciliopathies, but MKS is generally lethal in the perinatal period, whereas JS severity is highly variable.</p>
-                <table class="fancy-table">
-                    <thead>
-                        <tr><th>Feature</th><th>Joubert Syndrome (JS)</th><th>Meckel-Gruber Syndrome (MKS)</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td><strong>Severity</strong></td><td>Highly variable (often manageable)</td><td><strong>Lethal</strong>, prenatal onset</td></tr>
-                        <tr><td><strong>Classic Sign</strong></td><td>'Molar tooth sign' on brain MRI</td><td>Occipital encephalocele, large cystic kidneys</td></tr>
-                        <tr><td><strong>Primary Defect</strong></td><td>Primarily <strong>Transition Zone</strong> and IFT genes (e.g., CEP290, IFT88)</td><td>Primarily <strong>MKS Complex</strong> genes (e.g., MKS1, B9D1)</td></tr>
-                        <tr><td><strong>Key Genes</strong></td><td>AHI1, CEP290, TMEM67, NPHP1</td><td>MKS1, TMEM67, TMEM216, CC2D2A</td></tr>
-                    </tbody>
-                </table>
-            </div>`;
-    }
-    
-    // Comparative Analysis 2: IFT Complexes
-    if (qLower.includes('ift-a') && qLower.includes('ift-b')) {
-        return `
-            <div class="ai-result-card">
-                <h4>IFT-A vs. IFT-B Complexes</h4>
-                <table class="fancy-table">
-                    <thead>
-                        <tr><th>Aspect</th><th>IFT-B Complex</th><th>IFT-A Complex</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td><strong>Direction</strong></td><td>Anterograde (base → tip)</td><td>Retrograde (tip → base)</td></tr>
-                        <tr><td><strong>Motor</strong></td><td>Kinesin-2</td><td>Dynein-2</td></tr>
-                        <tr><td><strong>Function</strong></td><td>Delivers axonemal building blocks</td><td>Returns cargo and turnover products</td></tr>
-                        <tr><td><strong>Key Components</strong></td><td>IFT88, IFT81, IFT74</td><td>IFT140, WDR19, TTC21B</td></tr>
-                        <tr><td><strong>Mutation Effect</strong></td><td>Cilia assembly failure</td><td>Cargo accumulation at tip</td></tr>
-                    </tbody>
-                </table>
-            </div>`;
-    }
-    
-    // Comparative Analysis 3: Ciliary Gate Components
-    if (qLower.includes('bbsome') && qLower.includes('mks complex')) {
-        return `
-            <div class="ai-result-card">
-                <h4>BBSome vs. MKS Complex</h4>
-                <p>Both are critical ciliary trafficking complexes localized near the base, but they manage different types of cargo:</p>
-                <table class="fancy-table">
-                    <thead>
-                        <tr><th>Feature</th><th>BBSome</th><th>MKS Complex</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td><strong>Primary Function</strong></td><td>Cargo adaptor for membrane protein trafficking</td><td>Structural gate at transition zone</td></tr>
-                        <tr><td><strong>Direction</strong></td><td>Bidirectional (entry and exit)</td><td>Gatekeeper (entry control)</td></tr>
-                        <tr><td><strong>Key Cargo</strong></td><td>GPCRs, membrane proteins</td><td>All ciliary proteins</td></tr>
-                        <tr><td><strong>Disease</strong></td><td>Bardet-Biedl Syndrome (BBS)</td><td>Meckel-Gruber Syndrome (MKS)</td></tr>
-                        <tr><td><strong>Key Components</strong></td><td>BBS1, BBS2, BBS4, BBS5</td><td>MKS1, TMEM67, CC2D2A, B9D1</td></tr>
-                    </tbody>
-                </table>
-            </div>`;
-    }
-    
-    return null;
-}
-
 /**
- * ENHANCED PROCESS EXPLANATION HANDLER
+ * (REPLACEMENT) The Main "Level 1" Query Router
+ * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
  */
-function handleProcessQuery(query) {
-    const qLower = query.toLowerCase();
-    
-    if (qLower.includes('how does ift work') || qLower.includes('ift step by step')) {
-        return `
-            <div class="ai-result-card">
-                <h4>How Intraflagellar Transport (IFT) Works: Step-by-Step</h4>
-                <ol>
-                    <li><strong>Assembly:</strong> IFT-B complexes load ciliary building blocks (tubulin, IFT-A, motors) at the basal body.</li>
-                    <li><strong>Anterograde Transport:</strong> The train moves from the base to the tip powered by the Kinesin-2 motor.</li>
-                    <li><strong>Turnaround:</strong> At the ciliary tip, IFT-B disassembles. IFT-A complexes bind to returning cargo.</li>
-                    <li><strong>Retrograde Transport:</strong> The train moves from the tip back to the base powered by the Dynein-2 motor.</li>
-                    <li><strong>Recycling:</strong> Components are unloaded and recycled at the base to initiate the next transport cycle.</li>
-                </ol>
-                <p><em>This continuous process maintains ciliary structure and enables signaling.</em></p>
+async function handleAIQuery(query) {
+    const chatWindow = document.getElementById('messages');
+    if (!chatWindow) return;
+
+    // Validate query *before* any routing
+    if (!query) return;
+    const qLower = query.toLowerCase().trim();
+
+    window.log(`Routing query: ${query}`);
+
+    try {
+        if (!window.CiliAI.ready) {
+            window.addChatMessage("Data is still loading, please wait...", false);
+            return;
+        }
+
+        let htmlResult = null;
+        let match;
+
+        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
+        const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
+        const terminologyQueries = window.terminologyQueries || {};
+        
+        if (simpleGreetings.includes(qLower)) {
+            window.log('Routing via: Intent (Greeting)');
+            window.addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
+            return;
+        }
+        
+        if (terminologyQueries[qLower]) {
+            window.log('Routing via: Intent (Terminology)');
+            window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
+            return;
+        }
+
+        // --- High Priority Plot Buttons (Immediate Actions) ---
+        if (qLower === 'plot default umap') {
+            window.log('Routing via: Intent (Default UMAP Plot)');
+            window.renderUMAPPlot('FOXJ1');
+            htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
+        }
+        else if (qLower === 'plot default phylogeny') {
+            window.log('Routing via: Intent (Default Phylogeny Plot)');
+            const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+            htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
+        }
+        
+        // =( 1 )= INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES (Highest Priority for Filtering)
+        const intentChecker = window.flexibleIntentParser(query);
+
+        if (htmlResult === null && intentChecker) {
+             const intents = {
+                disease: window.extractDiseaseIntent(qLower),
+                expression: window.extractExpressionIntent(qLower),
+                complex: window.extractComplexIntent(qLower)
+            };
+
+            // Case 1A: Complex AND Disease (e.g., BBSome genes causing Joubert Syndrome)
+            if (intents.complex && intents.disease) {
+                window.log('Routing via: Intent (Complex + Disease)');
+                htmlResult = window.handleGeneInDiseaseQuery(intents.complex, intents.disease);
+            }
+            // Case 1B: Disease AND Expression/Tissue (e.g., Joubert Syndrome genes expressed in kidney)
+            else if (intents.disease && intents.expression) {
+                window.log('Routing via: Intent (Disease + Expression)');
+                htmlResult = window.handleTissueSpecificDiseaseQuery(intents.disease, intents.expression);
+            }
+            // Case 1C: Simple Complex Query (e.g., "Genes in BBSome") - Fall back to L1 handler
+            else if (intents.complex) {
+                window.log('Routing via: Intent (Simple Complex List)');
+                htmlResult = window.handleSimpleComplexQuery(intents.complex, query);
+            }
+        }
+        
+        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
+                         !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
+
+        if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && window.lastQueryContext.type === null) {
+            window.log('Routing via: Intent (Ignored standalone "yes")');
+            return;
+        }
+
+        if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'list_followup') {
+            window.log('Routing via: Intent (Follow-up: Show List)');
+            window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+            window.lastQueryContext = { type: null, data: [], term: null };
+            return;
+        }
+        
+        // =( 3 )= INTENT: CONTEXTUAL FOLLOW-UP (Screen References)
+        else if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'screen_references') {
+            window.log('Routing via: Intent (Follow-up: Screen References)');
+            htmlResult = window.handleScreenReferenceFollowup();
+        }
+
+        // =( 4 )= INTENT: SCREENS / PHENOTYPES (HIGH PRIORITY)
+        else if (htmlResult === null && (
+            qLower.includes('loss-of-function') || qLower.includes('lof') ||
+            qLower.includes('overexpression') || qLower.includes('oe') ||
+            qLower.includes('percent ciliated') || qLower.includes('cilia length') || (qLower.includes('effect') && qLower.includes('of'))
+        )) {
+            window.log('Routing via: Intent (Screens/Effects)');
+            const genes = window.extractMultipleGenes(query);
+            if (genes.length > 0) {
+                htmlResult = window.handleScreenQuery(genes[genes.length - 1]);
+            } else {
+                htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
+            }
+        }
+
+        // =( 5 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?" (STRICTER REGEX)
+        else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
+            window.log('Routing via: Intent (High-Priority Get Details)');
+            htmlResult = await window.displayFullGeneInfo(match[1].toUpperCase());
+        }
+
+        // =( 6 )= INTENT: ORTHOLOGS
+        else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
+            window.log('Routing via: Intent (Ortholog)');
+            htmlResult = window.handleOrthologQuery(match[1].toUpperCase(), match[2]);
+        }
+        else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
+            window.log('Routing via: Intent (Ortholog)');
+            htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
+        }
+
+        // =( 7 )= INTENT: DOMAINS
+        else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
+            window.log('Routing via: Intent (Domains)');
+            const genes = window.extractMultipleGenes(match[1]);
+            if (genes.length > 0) {
+                htmlResult = window.handleDomainQuery(genes);
+            }
+        }
+
+        // =( 8 )= INTENT: PHYLOGENY / EVOLUTION
+        else if (htmlResult === null && (
+            qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
+            qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
+            qLower.includes('mammalian specific') || qLower.includes('ciliary specific') ||
+            qLower.includes('table')
+        )) {
+            window.log('Routing via: Intent (Phylogeny Engine)');
+            htmlResult = await window.routePhylogenyAnalysis(query);
+        }
+
+        // =( 9 )= INTENT: FUNCTIONAL MODULES
+        else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
+            window.log('Routing via: Intent (Get Modules)');
+            const gene = match[1].toUpperCase();
+            const g = window.CiliAI.lookups.geneMap[gene];
+            if (g && g['Functional.category']) {
+                htmlResult = window.formatListResult(`Functional Modules for ${gene}`, window.ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
+            } else {
+                htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
+            }
+        }
+
+        // =( 10 )= INTENT: scRNA Expression
+        else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression') || qLower.includes('expression of'))) {
+            window.log('Routing via: Intent (scRNA)');
+            const genes = window.extractMultipleGenes(query);
+            if (genes.length > 0) {
+                htmlResult = window.handleScRnaQuery(genes);
+                htmlResult = htmlResult.replace(`</div>`,
+                    `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-umap-plot" data-genes="${genes[0]}">View ${genes[0]} on UMAP</a></p></div>`);
+            } else {
+                htmlResult = `Please specify which gene(s) you want to check expression for.`;
+            }
+        }
+            
+        // =( 11 )= INTENT: UMAP (VISUAL) - Simplified UMAP/Lung scRNA
+        else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
+            window.log('Routing via: Intent (UMAP Plot)');
+            let gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : null;
+            
+            if (!gene && (qLower.includes('umap') || qLower.includes('lung scrna'))) { gene = 'FOXJ1'; }
+            
+            window.renderUMAPPlot(gene);
+
+            htmlResult = `<div class="ai-result-card">
+                <p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p>
+                <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="downloadUMAPDataAsCSV('${gene}')">⬇️ Download UMAP Data (CSV)</a></p>
             </div>`;
+        }
+
+
+        // =( 12 )= INTENT: SIMPLE KEYWORD LISTS (Catch-all for simple Localization/Disease/Domain lookups)
+        else if (htmlResult === null) {
+            const intent = window.flexibleIntentParser(query);
+            if (intent) {
+                window.log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
+                htmlResult = intent.handler(intent.entity, query);
+            }
+        }
+
+
+        // =( 13 )= INTENT: FALLBACK (GET DETAILS)
+        if (htmlResult === null) {
+            window.log(`Routing via: Fallback (Get Details)`);
+            let term = qLower;
+            if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
+                term = match[1];
+            }
+            term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
+            
+            const genes = window.extractMultipleGenes(term);
+            
+            if (genes.length > 0) {
+                htmlResult = await window.displayFullGeneInfo(genes[0]);
+            }
+        }
+
+        // =( 14 )= INTENT: GENE SET ANALYSIS
+        const enrichmentMatch = qLower.match(/enrichment for (.+)/);
+        const compareMatch = qLower.match(/compare (.+) and (.+)/);
+
+        if (enrichmentMatch) {
+            window.log('Routing via: Intent (Gene Set Enrichment)');
+            const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
+            const terms = window.getEnrichedGOTerms(geneList);
+            
+            if (terms.length === 0) {
+                htmlResult = "Not enough genes provided, or no significant enrichment found.";
+            } else {
+                let html = `<div class="ai-result-card"><h4>Gene Set Enrichment for ${geneList.length} Genes</h4>`;
+                html += `<p>Top enriched biological terms (simulated):</p><ul>`;
+                terms.forEach(t => { html += `<li><strong>${t.term}</strong>: Found ${t.count} genes (p-value ${t.pval.toExponential(1)})</li>`; });
+                html += `</ul></div>`;
+                htmlResult = html;
+            }
+        }
+        else if (compareMatch) {
+            window.log('Routing via: Intent (Gene Set Comparison)');
+            const termA = compareMatch[1].trim().toUpperCase();
+            const termB = compareMatch[2].trim().toUpperCase();
+            
+            const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
+            const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
+
+            const jaccardIndex = window.calculateJaccard(setA, setB);
+            const overlapCount = Math.round(jaccardIndex * (setA.length + setB.length));
+            
+            htmlResult = `<div class="ai-result-card"><h4>Gene Set Comparison: ${termA} vs. ${termB}</h4><p><strong>Genes in ${termA}:</strong> ${setA.length}</p><p><strong>Genes in ${termB}:</strong> ${setB.length}</p><p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p><p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p></div>`;
+        }
+
+        // =( 15 )= FINAL FALLBACK (ERROR)
+        if (htmlResult === null) {
+            window.log(`Routing via: Final Fallback (Error)`);
+            const genes = window.extractMultipleGenes(query);
+            if (genes.length > 0) {
+                window.log(`Final fallback, found gene: ${genes[0]}`);
+                htmlResult = await window.displayFullGeneInfo(genes[0]);
+            } else {
+                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
+            }
+        }
+
+        // Send the final result to chat
+        if (htmlResult) {
+            window.addChatMessage(htmlResult, false);
+        }
+
+    } catch (e) {
+        console.error("Error in handleAIQuery:", e);
+        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
-    
-    if (qLower.includes('how are proteins targeted to cilia')) {
-        return `
-            <div class="ai-result-card">
-                <h4>Ciliary Protein Targeting Mechanism</h4>
-                <ol>
-                    <li><strong>Recognition:</strong> Ciliary targeting signals (e.g., RVxP motif) are recognized by import machinery</li>
-                    <li><strong>Transition Zone Gate:</strong> MKS and NPHP complexes at the transition zone control entry</li>
-                    <li><strong>IFT Association:</strong> Proteins bind to IFT complexes for transport</li>
-                    <li><strong>Motor Attachment:</strong> Kinesin-2 motors move cargo anterogradely</li>
-                    <li><strong>Membrane Delivery:</strong> BBSome facilitates delivery of membrane proteins</li>
-                    <li><strong>Retention:</strong> Proteins are retained via specific ciliary retention signals</li>
-                </ol>
-            </div>`;
-    }
-    
-    return null;
 }
 
-
+       
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
  */
