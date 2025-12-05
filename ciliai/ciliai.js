@@ -945,8 +945,9 @@ function addChatMessage(html, isUser = false) {
 
     // --- 4C. Specific Data Handlers ---
 
-   /**
- * (UPDATED) Handles screen queries and adds a follow-up for references.
+/**
+ * (UPDATED) Handles screen queries and adds a hint for references.
+ * **FIXED:** Removed the internal follow-up context to prevent it from hijacking 'yes' for gene lists.
  */
 function handleScreenQuery(geneSymbol) {
     // --- Data Retrieval (DO NOT REMOVE) ---
@@ -955,8 +956,7 @@ function handleScreenQuery(geneSymbol) {
     if (!g) return `Sorry, I could not find data for "${gene}".`;
     
     let html = `<div class="ai-result-card"><h4>Screen Results for <strong>${gene}</strong></h4>`;
-    let foundScreenKeys = [];
-
+    
     // Use the exact column names from your CSV
     const percEffect = g['Percentage of ciliated cells (increase/decrease/no effect)'];
     const lofEffect = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'];
@@ -976,24 +976,16 @@ function handleScreenQuery(geneSymbol) {
     if (g.screens && Array.isArray(g.screens) && g.screens.length > 0) {
         html += '<strong>All Screen Data:</strong><ul>';
         g.screens.forEach(s => {
-            if (s.source) {
-                foundScreenKeys.push(s.source); // Store key for follow-up
-                html += `<li><strong>${s.source}</strong>: ${s.result || 'No result'}</li>`;
-            }
+            // FoundScreenKeys is no longer needed here, as there is no follow-up logic.
+            html += `<li><strong>${s.source}</strong>: ${s.result || 'No result'}</li>`;
         });
         html += '</ul>';
 
-        // Add follow-up question
-        html += `<p style="margin-top:10px;"><em>Would you like the references for these screens?</em></p>`;
+        // Add a non-interactive hint instead of a context-setting question
+        html += `<p style="font-size: 11px; margin-top: 10px;">(Hint: Ask "show screen references" to see publication details.)</p>`;
         
-        // Set context for the next turn
-        // NOTE: The 'lastQueryContext' variable must be available in the global scope.
-        window.lastQueryContext = {
-            type: 'screen_references',
-            data: foundScreenKeys,
-            term: `References for ${gene}`,
-            descriptionHeader: 'References'
-        };
+        // *** CRITICAL REMOVAL: The lastQueryContext object for 'screen_references' is removed. ***
+        // This prevents the context from being active when the user types 'yes' for a gene list.
 
     } else if (
         (!percEffect || percEffect === "Not Reported") &&
@@ -1006,31 +998,6 @@ function handleScreenQuery(geneSymbol) {
     html += `</div>`; // Close ai-result-card
     return html;
 }
-    
-    function handleDomainQuery(geneSymbols) {
-        let html = '';
-        const genes = Array.isArray(geneSymbols) ? geneSymbols : [geneSymbols];
-        genes.forEach(geneSymbol => {
-            const gene = geneSymbol.toUpperCase();
-            const g = window.CiliAI.lookups.geneMap[gene];
-            if (!g) {
-                html += `<p>Sorry, I could not find data for "${gene}".</p>`;
-                return;
-            }
-            html += `<h4>Domain Architecture for <strong>${gene}</strong></h4>`;
-            if (g.pfam_ids && ensureArray(g.pfam_ids).length > 0) {
-                html += '<p><strong>PFAM Domains:</strong></p><ul>';
-                ensureArray(g.pfam_ids).forEach((id, index) => {
-                    const desc = ensureArray(g.domain_descriptions)[index] || 'No description';
-                    html += `<li><strong>${id}:</strong> ${desc}</li>`;
-                });
-                html += '</ul>';
-            } else {
-                html += '<p>No PFAM domain data found for this gene.</p>';
-            }
-        });
-        return html;
-    }
 
     function handleOrthologQuery(geneSymbol, organism) {
         const gene = geneSymbol.toUpperCase();
