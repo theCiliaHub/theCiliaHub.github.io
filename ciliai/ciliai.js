@@ -2467,17 +2467,11 @@ function performMultiCriteriaFilter(query, intents) {
         `;
     }
 
-    // --- 4F. Data Getter Helpers ---
-
-   /**
-     * NEW INTEGRATED FUNCTION
-     * Replaces getComprehensiveDetails with the detailed HTML formatter
-     * provided by the user.
-     * (FIXED Nov 17 2025): Added optional chaining for g.OMIM.ID
-     */
-   /**
- * Fancy Table Enhanced Version
- * (Nov 2025 - polished UI)
+// --- 4F. Data Getter Helpers ---
+/**
+ * Fancy Table Enhanced Version (v5.1 - Nov 2025 - polished UI)
+ * Displays a comprehensive, structured data card for a single gene.
+ * This is the fixed version, incorporating null checks for phylogeny data.
  */
 async function displayFullGeneInfo(geneSymbol) {
     const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
@@ -2519,12 +2513,14 @@ async function displayFullGeneInfo(geneSymbol) {
 
     let html = `${fancyCSS}<div class="ai-result-card"><h4>Gene: ${geneSymbol}</h4>`;
     
+    // --- Basic Information ---
     html += `<p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>`;
     html += `<p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>`;
     html += `<p><strong>OMIM ID:</strong> ${g.OMIM?.ID || '—'}</p>`;
     html += `<p><strong>Localization:</strong> ${g.Localization || '—'}</p>`;
     html += `<p><strong>Functional category:</strong> ${g['Functional.category'] || '—'}</p>`;
     
+    // --- Cilia Effects ---
     html += `<h3>Cilia Effects</h3>`;
     html += `<table class="fancy-table">
                 <tr><th>Effect</th><th>Value</th></tr>
@@ -2533,6 +2529,7 @@ async function displayFullGeneInfo(geneSymbol) {
                 <tr><td>% Ciliated Cells</td><td>${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</td></tr>
             </table>`;
 
+    // --- Screens ---
     html += `<h3>Screens</h3>`;
     if (Array.isArray(g.screens) && g.screens.length > 0) {
         html += `<table class="fancy-table">
@@ -2545,6 +2542,7 @@ async function displayFullGeneInfo(geneSymbol) {
         html += `<p>None</p>`;
     }
 
+    // --- Expression Data (scRNA-seq) ---
     html += `<h3>Expression Data (scRNA-seq)</h3>`;
     if (g.expression?.scRNA) {
         html += `<table class="fancy-table">
@@ -2557,6 +2555,7 @@ async function displayFullGeneInfo(geneSymbol) {
         html += `<p>None</p>`;
     }
 
+    // --- Expression Data (Tissue) ---
     html += `<h3>Expression Data (Tissue)</h3>`;
     if (g.expression?.tissue) {
         html += `<table class="fancy-table">
@@ -2569,6 +2568,7 @@ async function displayFullGeneInfo(geneSymbol) {
         html += `<p>None</p>`;
     }
 
+    // --- Orthologs & Mouse Phenotype ---
     html += `<h3>Orthologs & Mouse Phenotype</h3>`;
     html += `<table class="fancy-table">
                 <tr><th>Category</th><th>Value</th></tr>
@@ -2579,16 +2579,20 @@ async function displayFullGeneInfo(geneSymbol) {
                 <tr><td>Mouse ciliopathy phenotype</td><td>${g.mouse_ciliopathy_phenotype || '—'}</td></tr>
             </table>`;
 
+    // --- Phylogeny (FIXED for null pval entries) ---
     html += `<h3>Phylogeny</h3>`;
     if (g.phylogeny) {
         html += `<table class="fancy-table">
                     <tr><th>Group</th><th>Class</th><th>Class ID</th><th>Species Count</th></tr>`;
         for (const [pkey, pval] of Object.entries(g.phylogeny)) {
+            // FIX: Use pval || {} to safely handle null or undefined nested objects
+            const pvalSafe = pval || {}; 
+            
             html += `<tr>
                         <td>${pkey}</td>
-                        <td>${pval.class}</td>
-                        <td>${pval.class_id}</td>
-                        <td>${pval.species_data?.length || '—'}</td>
+                        <td>${pvalSafe.class || 'N/A'}</td> 
+                        <td>${pvalSafe.class_id || 'N/A'}</td>
+                        <td>${pvalSafe.species_data?.length || '—'}</td>
                      </tr>`;
         }
         html += `</table>`;
@@ -2596,6 +2600,7 @@ async function displayFullGeneInfo(geneSymbol) {
         html += `<p>None</p>`;
     }
 
+    // --- Complexes ---
     html += `<h3>Complexes</h3>`;
     if (g.complex_components) {
         html += `<table class="fancy-table">
@@ -2608,6 +2613,7 @@ async function displayFullGeneInfo(geneSymbol) {
         html += `<p>None</p>`;
     }
 
+    // --- Action Button ---
     html += `<p style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${geneSymbol}">
                     Show Conservation Plot
@@ -2617,7 +2623,6 @@ async function displayFullGeneInfo(geneSymbol) {
     html += `</div>`;
     return html;
 }
-
     
     function getGenesByLocalization(term) {
         let normTerm = term.toLowerCase();
@@ -3282,30 +3287,29 @@ window.handleAIQuery = async function (query) {
             }
         }
         
-        // =======================================================
-        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-        // =======================================================
-        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
-                             !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
+// =======================================================
+// =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+// =======================================================
+const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
+                         !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
-        if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
-            // 2A: List Follow-up (Prioritize general list)
-            if (window.lastQueryContext.type === 'list_followup') {
-                window.log('Routing via: Intent (Follow-up: Show List)');
-                // Assuming showDataInLeftPanel is defined elsewhere
-                window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
-                window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
-                return; // CRITICAL: Stop execution immediately after showing the list.
-            }
-            
-            // 2B: Screen References Follow-up
-            else if (window.lastQueryContext.type === 'screen_references') {
-                window.log('Routing via: Intent (Follow-up: Screen References)');
-                // Assuming handleScreenReferenceFollowup is defined elsewhere
-                htmlResult = window.handleScreenReferenceFollowup();
-            }
-        }
-
+if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
+    // 2A: List Follow-up (Prioritize general list)
+    if (window.lastQueryContext.type === 'list_followup') {
+        window.log('Routing via: Intent (Follow-up: Show List)');
+        // Assuming showDataInLeftPanel is defined elsewhere
+        window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+        window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
+        return; // CRITICAL: Stop execution immediately after showing the list.
+    }
+    
+    // 2B: Screen References Follow-up
+    else if (window.lastQueryContext.type === 'screen_references') {
+        window.log('Routing via: Intent (Follow-up: Screen References)');
+        // Assuming handleScreenReferenceFollowup is defined elsewhere
+        htmlResult = window.handleScreenReferenceFollowup();
+    }
+}
         // =======================================================
         // =( 3 )= INTENT: EXPLICIT SCREEN REFERENCES
         // =======================================================
