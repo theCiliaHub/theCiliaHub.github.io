@@ -3157,9 +3157,9 @@ window.terminologyQueries = {
  * (REPLACEMENT) The Main "Level 1" Query Router
  * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
  * * FIXES APPLIED:
- * 1. Contextual Follow-up ('yes') now uses 'return' to stop execution.
- * 2. Default 'plot default umap' calls renderUMAPPlot with the correct multi-gene signature.
- * 3. New blocks for Advanced Expression Analysis and Phylogenetic Overlap integrated.
+ * 1. Contextual Follow-up ('yes') now uses 'return' to stop execution (Bug 1 Fix).
+ * 2. Default 'plot default umap' calls renderUMAPPlot with the correct multi-gene signature (Bug 2 Fix).
+ * 3. New blocks for Advanced Expression Analysis and Phylogenetic Overlap integrated (New Features).
  */
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
@@ -3180,7 +3180,9 @@ async function handleAIQuery(query) {
         let htmlResult = null;
         let match;
 
+        // =======================================================
         // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
+        // =======================================================
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
         const terminologyQueries = window.terminologyQueries || {};
         
@@ -3209,7 +3211,9 @@ async function handleAIQuery(query) {
             htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
         }
         
-        // = ( 1 ) = INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES (NEW - Highest Priority)
+        // =======================================================
+        // =( 1 )= INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES
+        // =======================================================
         if (htmlResult === null) {
             window.log('Routing via: Intent (Unified Complex Query Engine)');
             htmlResult = window.handleComplexQuery(query);
@@ -3222,8 +3226,9 @@ async function handleAIQuery(query) {
             }
         }
         
-    
-        // = ( 2 ) = INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+        // =======================================================
+        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+        // =======================================================
         const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
                              !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
@@ -3244,13 +3249,17 @@ async function handleAIQuery(query) {
             }
         }
 
-        // = ( 3 ) = INTENT: EXPLICIT SCREEN REFERENCES (New Block for explicit request, replacing old block 3)
+        // =======================================================
+        // =( 3 )= INTENT: EXPLICIT SCREEN REFERENCES
+        // =======================================================
         else if (htmlResult === null && (qLower.includes('show screen references') || qLower.includes('show publication details') || qLower.includes('provide the paper'))) {
             window.log('Routing via: Intent (Explicit Screen References)');
             htmlResult = window.handleScreenReferenceFollowup(); 
         }
 
-        // =( 4 )= INTENT: SCREENS / PHENOTYPES (HIGH PRIORITY)
+        // =======================================================
+        // =( 4 )= INTENT: SCREENS / PHENOTYPES
+        // =======================================================
         else if (htmlResult === null && (
             qLower.includes('loss-of-function') || qLower.includes('lof') ||
             qLower.includes('overexpression') || qLower.includes('oe') ||
@@ -3265,13 +3274,17 @@ async function handleAIQuery(query) {
             }
         }
 
-        // =( 5 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?" (STRICTER REGEX)
+        // =======================================================
+        // =( 5 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
+        // =======================================================
         else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
             window.log('Routing via: Intent (High-Priority Get Details)');
             htmlResult = await window.displayFullGeneInfo(match[1].toUpperCase());
         }
 
+        // =======================================================
         // =( 6 )= INTENT: ORTHOLOGS
+        // =======================================================
         else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
             window.log('Routing via: Intent (Ortholog)');
             htmlResult = window.handleOrthologQuery(match[1].toUpperCase(), match[2]);
@@ -3281,16 +3294,21 @@ async function handleAIQuery(query) {
             htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
         }
 
+        // =======================================================
         // =( 7 )= INTENT: DOMAINS
+        // =======================================================
         else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
             window.log('Routing via: Intent (Domains)');
             const genes = window.extractMultipleGenes(match[1]);
             if (genes.length > 0) {
+                // Assuming handleDomainQuery exists and is accessible
                 htmlResult = window.handleDomainQuery(genes);
             }
         }
 
+        // =======================================================
         // =( 8 )= INTENT: PHYLOGENY / EVOLUTION
+        // =======================================================
         else if (htmlResult === null && (
             qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
             qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
@@ -3301,7 +3319,9 @@ async function handleAIQuery(query) {
             htmlResult = await window.routePhylogenyAnalysis(query);
         }
 
+        // =======================================================
         // =( 9 )= INTENT: FUNCTIONAL MODULES
+        // =======================================================
         else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
             window.log('Routing via: Intent (Get Modules)');
             const gene = match[1].toUpperCase();
@@ -3313,7 +3333,9 @@ async function handleAIQuery(query) {
             }
         }
 
+        // =======================================================
         // =( 10 )= INTENT: scRNA Expression
+        // =======================================================
         else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression') || qLower.includes('expression of'))) {
             window.log('Routing via: Intent (scRNA)');
             const genes = window.extractMultipleGenes(query);
@@ -3326,7 +3348,9 @@ async function handleAIQuery(query) {
             }
         }
         
-        // =( 11 )= INTENT: UMAP (VISUAL) - Single Gene or Complex Expression Plot (New Routing)
+        // =======================================================
+        // =( 11 )= INTENT: UMAP (VISUAL) - Single Gene or Complex Plot
+        // =======================================================
         else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+(.+)|(?: of| in)\s+(.+))?/i))) {
             window.log('Routing via: Intent (UMAP Plot / Complex)');
             let targetTerm = (match[1] || match[2]) ? (match[1] || match[2]).trim() : null;
@@ -3338,6 +3362,7 @@ async function handleAIQuery(query) {
                 // Check if the term is a complex/module
                 const complexName = window.extractComplexIntent(targetTerm);
                 if (complexName) {
+                    // Assuming getGenesByComplex exists and is accessible
                     const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
                     if (complexGenes.length > 0) {
                         genes = complexGenes;
@@ -3354,6 +3379,7 @@ async function handleAIQuery(query) {
             const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i);
             const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
 
+            // Assuming renderUMAPPlot exists and is accessible
             window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
 
             htmlResult = `<div class="ai-result-card">
@@ -3363,7 +3389,9 @@ async function handleAIQuery(query) {
             </div>`;
         }
 
-        // =( 12 )= INTENT: SIMPLE KEYWORD LISTS (Catch-all for simple Localization/Disease/Domain lookups)
+        // =======================================================
+        // =( 12 )= INTENT: SIMPLE KEYWORD LISTS
+        // =======================================================
         else if (htmlResult === null) {
             const intent = window.flexibleIntentParser(query);
             if (intent) {
@@ -3373,7 +3401,9 @@ async function handleAIQuery(query) {
         }
 
 
+        // =======================================================
         // =( 13 )= INTENT: FALLBACK (GET DETAILS)
+        // =======================================================
         if (htmlResult === null) {
             window.log(`Routing via: Fallback (Get Details)`);
             let term = qLower;
@@ -3390,7 +3420,9 @@ async function handleAIQuery(query) {
             }
         }
 
+        // =======================================================
         // = ( 14 ) = INTENT: ADVANCED EXPRESSION ANALYSIS (Fold Change)
+        // =======================================================
         else if (htmlResult === null) {
             // Look for "compare [complex] in [cellTypeA] vs [cellTypeB]"
             const foldChangeMatch = qLower.match(/compare\s+(.+)\s+in\s+(.+)\s+vs\s+(.+)/i);
@@ -3403,6 +3435,7 @@ async function handleAIQuery(query) {
                 const cellTypeA = foldChangeMatch[2].trim();
                 const cellTypeB = foldChangeMatch[3].trim();
 
+                // Assuming calculateFoldChangeForComplex exists and is accessible
                 const result = window.calculateFoldChangeForComplex(complexTerm, cellTypeA, cellTypeB);
 
                 if (result.error) {
@@ -3425,7 +3458,9 @@ async function handleAIQuery(query) {
             }
         }
 
+        // =======================================================
         // = ( 15 ) = INTENT: COMPLEX PHYLOGENETIC OVERLAP
+        // =======================================================
         else if (htmlResult === null) {
             // Look for "species overlap between [classA] and [classB]"
             const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
@@ -3439,6 +3474,7 @@ async function handleAIQuery(query) {
                 const dataLoaded = await window.ensurePhylogenyDataLoaded();
 
                 if (dataLoaded) {
+                    // Assuming getPhylogenyClassSpeciesOverlap exists and is accessible
                     const result = window.getPhylogenyClassSpeciesOverlap(classA, classB, 'li');
 
                     if (result.error) {
@@ -3458,14 +3494,17 @@ async function handleAIQuery(query) {
             }
         }
         
-        // =( 16 )= INTENT: GENE SET ANALYSIS (Moved for new blocks)
+        // =======================================================
+        // =( 16 )= INTENT: GENE SET ANALYSIS
+        // =======================================================
         const enrichmentMatch = qLower.match(/enrichment for (.+)/);
         const compareMatch = qLower.match(/compare (.+) and (.+)/);
 
         if (enrichmentMatch) {
             window.log('Routing via: Intent (Gene Set Enrichment)');
             const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
-            const terms = window.getEnrichedGOTerms(geneList);
+            // Assuming getEnrichedGOTerms exists and is accessible
+            const terms = window.getEnrichedGOTerms(geneList); 
             
             if (terms.length === 0) {
                 htmlResult = "Not enough genes provided, or no significant enrichment found.";
@@ -3482,6 +3521,7 @@ async function handleAIQuery(query) {
             const termA = compareMatch[1].trim().toUpperCase();
             const termB = compareMatch[2].trim().toUpperCase();
             
+            // Assuming calculateJaccard exists and is accessible
             const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
             const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
 
@@ -3491,7 +3531,9 @@ async function handleAIQuery(query) {
             htmlResult = `<div class="ai-result-card"><h4>Gene Set Comparison: ${termA} vs. ${termB}</h4><p><strong>Genes in ${termA}:</strong> ${setA.length}</p><p><strong>Genes in ${termB}:</strong> ${setB.length}</p><p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p><p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p></div>`;
         }
 
+        // =======================================================
         // =( 17 )= FINAL FALLBACK (ERROR)
+        // =======================================================
         if (htmlResult === null) {
             window.log(`Routing via: Final Fallback (Error)`);
             const genes = window.extractMultipleGenes(query);
@@ -3512,7 +3554,8 @@ async function handleAIQuery(query) {
         console.error("Error in handleAIQuery:", e);
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
-}       
+}
+    
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
  */
