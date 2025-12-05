@@ -3561,7 +3561,6 @@ window.handleAIQuery = async function (query) {
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
-}
 
     
 /**
@@ -3787,11 +3786,14 @@ window.generateAndInjectSVG = function() {
     svgContainer.innerHTML = svgHTML;
 };
 
-// ==========================================================
-// GLOBAL EXPOSURE (REQUIRED FOR index.html)
-// ==========================================================
-// These manually expose the functions defined above to the global 'window' scope.
+// ============================================
+// GLOBAL UI WRAPPERS & STARTUP (EXPOSURE FIXED)
+// ============================================
 
+// Expose only the functions that must be globally available, do NOT reassign handleAIQuery again.
+// The inline `window.handleAIQuery = async function(query){…}` at the top is the real definition.
+
+// Global exposure block:
 window.log = log;
 window.react = react;
 window.handleUserSend = handleUserSend;
@@ -3800,8 +3802,7 @@ window.showDefaultUMAP = showDefaultUMAP;
 window.showDefaultPhylogeny = showDefaultPhylogeny;
 window.downloadPlot = downloadPlot;
 
-// --- Core Logic & Analysis (Existing) ---
-window.handleAIQuery = handleAIQuery; 
+// Core Logic & Analysis exposure — keep only once:
 window.renderUMAPPlot = renderUMAPPlot; 
 window.getGenesByLocalization = getGenesByLocalization;
 window.showDataInLeftPanel = showDataInLeftPanel;
@@ -3809,24 +3810,20 @@ window.generateAndInjectSVG = generateAndInjectSVG;
 window.normalizeTerm = normalizeTerm;
 window.ensureArray = ensureArray;
 
-// --- Missing Helper Functions (New) ---
-// These are critical for the complex queries you recently integrated:
-
+// Helper exposures needed for complex queries:
 window.handleComplexQuery = handleComplexQuery;
 window.extractComplexIntent = extractComplexIntent; 
 window.extractCellTypeIntent = extractCellTypeIntent; 
 window.extractDiseaseIntent = extractDiseaseIntent;
 window.extractDomainIntent = extractDomainIntent;
-
-// Statistical & Comparative Helpers
 window.calculateFoldChangeForComplex = calculateFoldChangeForComplex;
 window.getAverageComplexExpression = getAverageComplexExpression;
 window.getPhylogenyClassSpeciesOverlap = getPhylogenyClassSpeciesOverlap;
 window.getClusterBoundaries = getClusterBoundaries;
-
-// Other core helpers used in routing
 window.getGenesByComplex = getGenesByComplex;
 window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
 
-// Note: If 'handleDomainQuery' is a wrapper, expose it here:
-window.handleDomainQuery = handleDomainQuery;
+// Expose optional additional handlers if defined
+if (typeof handleDomainQuery === 'function') {
+    window.handleDomainQuery = handleDomainQuery;
+}
