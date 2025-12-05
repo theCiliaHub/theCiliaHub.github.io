@@ -1367,7 +1367,64 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
     backButton.onclick = () => window.generateAndInjectSVG();
     plotDiv.prepend(backButton);
 }
-    
+
+/**
+ * Calculates the bounding box (min/max UMAP coordinates) for a specified cell type cluster.
+ * Also calculates the center point for potential annotation placement.
+ * @param {string} cellType - The name of the cell cluster to find boundaries for.
+ * @returns {object|null} {xMin, xMax, yMin, yMax, center: {x, y}} or null if not found.
+ */
+function getClusterBoundaries(cellType) {
+    const umapData = window.CiliAI_UMAP;
+    if (!umapData) return null;
+
+    const targetPoints = umapData.filter(d => d.cell_type.toLowerCase() === cellType.toLowerCase());
+
+    if (targetPoints.length === 0) {
+        window.log(`[UMAP] No points found for cell type: ${cellType}`);
+        return null;
+    }
+
+    let xMin = Infinity;
+    let xMax = -Infinity;
+    let yMin = Infinity;
+    let yMax = -Infinity;
+    let sumX = 0;
+    let sumY = 0;
+
+    targetPoints.forEach(p => {
+        xMin = Math.min(xMin, p.x);
+        xMax = Math.max(xMax, p.x);
+        yMin = Math.min(yMin, p.y);
+        yMax = Math.max(yMax, p.y);
+        sumX += p.x;
+        sumY += p.y;
+    });
+
+    // Add a small buffer to the bounds for better visualization padding
+    const buffer = 0.5;
+
+    return {
+        xMin: xMin - buffer,
+        xMax: xMax + buffer,
+        yMin: yMin - buffer,
+        yMax: yMax + buffer,
+        center: {
+            x: sumX / targetPoints.length,
+            y: sumY / targetPoints.length
+        }
+    };
+}
+
+// And ensure the median function used inside renderUMAPPlot's annotation loop is defined globally,
+// as it was left as a comment placeholder:
+window.median = function (arr) {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
     /**
      * Helper function to lazy-load phylogeny data only when needed
      */
