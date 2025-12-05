@@ -3561,6 +3561,7 @@ window.handleAIQuery = async function (query) {
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
+}
 
     
 /**
