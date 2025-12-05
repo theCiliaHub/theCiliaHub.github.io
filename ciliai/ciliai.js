@@ -1215,26 +1215,21 @@ function extractEvolutionIntent(qLower) {
  * @param {Array<string>} targetGenes - Array of gene symbols for which to calculate expression.
  * @param {string|null} zoomToCellType - Cell type to zoom into, if provided.
  */
-async function renderUMAPPlot(displayName, targetGenes, zoomToCellType = null) {
+// FIX: Provide a default empty array [] for targetGenes argument in the function definition
+async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = null) { 
     const plotDivId = 'cilia-svg';
     const umapData = window.CiliAI_UMAP;
     const plotDiv = document.getElementById(plotDivId);
-    
+
+    // This line is safer if targetGenes defaults to []
     const gene = displayName.toUpperCase(); 
 
     if (!plotDiv || !umapData) {
         window.addChatMessage('UMAP data is not available to plot.', false);
         return;
     }
-
-    // --- Reset SVG panel ---
-    plotDiv.innerHTML = '';
-    const wrapper = plotDiv.closest('.interactive-cilium');
-    if (wrapper) wrapper.classList.add('table-view-active');
-
-    let expressionMap;
-    let plotTitle;
-
+    
+if (targetGenes.length === 1 && targetGenes[0] !== displayName) {
     if (targetGenes.length === 1 && targetGenes[0] !== displayName) {
         // Single Gene Lookup (Direct expression value for the cell type)
         expressionMap = window.CiliAI.cellDataCache[targetGenes[0].toUpperCase()] || {};
@@ -3222,19 +3217,20 @@ async function handleAIQuery(query) {
             }
         }
         
-        // = ( 2 ) = INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
+    
+       // = ( 2 ) = INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+qqconst isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
                              !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
-        // CRITICAL FIX: Ensure window.lastQueryContext exists before accessing '.type'
-        if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
-             // 2A: List Follow-up (Prioritize general list)
-            if (window.lastQueryContext.type === 'list_followup') {
-                window.log('Routing via: Intent (Follow-up: Show List)');
-                window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
-                window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
-                return;
-            }
+// CRITICAL FIX: Ensure window.lastQueryContext exists before accessing '.type'
+if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
+    // 2A: List Follow-up (Prioritize general list)
+    if (window.lastQueryContext.type === 'list_followup') {
+        window.log('Routing via: Intent (Follow-up: Show List)');
+        window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+        window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
+        return; // <-- CRITICAL: Stop execution immediately after showing the list.
+    }
             
             // 2B: Screen References Follow-up (Secondary, triggered by 'yes' only if context is set)
             else if (window.lastQueryContext.type === 'screen_references') {
