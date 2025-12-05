@@ -3153,15 +3153,15 @@ window.terminologyQueries = {
     "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
 };
 
+// ==========================================================
+// 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
+// ==========================================================
+
 /**
  * (REPLACEMENT) The Main "Level 1" Query Router
- * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
- * * FIXES APPLIED:
- * 1. Contextual Follow-up ('yes') now uses 'return' to stop execution (Bug 1 Fix).
- * 2. Default 'plot default umap' calls renderUMAPPlot with the correct multi-gene signature (Bug 2 Fix).
- * 3. New blocks for Advanced Expression Analysis and Phylogenetic Overlap integrated (New Features).
+ * This function is declared globally immediately to solve ReferenceError issues.
  */
-async function handleAIQuery(query) {
+window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
 
@@ -3188,7 +3188,7 @@ async function handleAIQuery(query) {
         
         if (simpleGreetings.includes(qLower)) {
             window.log('Routing via: Intent (Greeting)');
-            window.addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
+            window.addChatMessage("Hello! I'm CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
             return;
         }
         
@@ -3216,9 +3216,10 @@ async function handleAIQuery(query) {
         // =======================================================
         if (htmlResult === null) {
             window.log('Routing via: Intent (Unified Complex Query Engine)');
+            // Assuming handleComplexQuery is defined elsewhere
             htmlResult = window.handleComplexQuery(query);
             
-            // If the result is a prompt for a list (e.g., "Do you want to view the list?"), 
+            // If the result is a prompt for a list ("Do you want to view the list?"), 
             // we stop here and wait for the user's "Yes" follow-up.
             if (htmlResult !== null && htmlResult.includes("Do you want to view the list?")) {
                 window.addChatMessage(htmlResult, false);
@@ -3232,19 +3233,20 @@ async function handleAIQuery(query) {
         const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
                              !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
-        // CRITICAL FIX: Ensure window.lastQueryContext exists before accessing '.type'
         if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
             // 2A: List Follow-up (Prioritize general list)
             if (window.lastQueryContext.type === 'list_followup') {
                 window.log('Routing via: Intent (Follow-up: Show List)');
+                // Assuming showDataInLeftPanel is defined elsewhere
                 window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
                 window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
-                return; // <-- CRITICAL: Stop execution immediately after showing the list.
+                return; // CRITICAL: Stop execution immediately after showing the list.
             }
             
-            // 2B: Screen References Follow-up (Secondary, triggered by 'yes' only if context is set)
+            // 2B: Screen References Follow-up
             else if (window.lastQueryContext.type === 'screen_references') {
                 window.log('Routing via: Intent (Follow-up: Screen References)');
+                // Assuming handleScreenReferenceFollowup is defined elsewhere
                 htmlResult = window.handleScreenReferenceFollowup();
             }
         }
@@ -3268,6 +3270,7 @@ async function handleAIQuery(query) {
             window.log('Routing via: Intent (Screens/Effects)');
             const genes = window.extractMultipleGenes(query);
             if (genes.length > 0) {
+                // Assuming handleScreenQuery is defined elsewhere
                 htmlResult = window.handleScreenQuery(genes[genes.length - 1]);
             } else {
                 htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
@@ -3279,6 +3282,7 @@ async function handleAIQuery(query) {
         // =======================================================
         else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
             window.log('Routing via: Intent (High-Priority Get Details)');
+            // Assuming displayFullGeneInfo is defined elsewhere
             htmlResult = await window.displayFullGeneInfo(match[1].toUpperCase());
         }
 
@@ -3287,6 +3291,7 @@ async function handleAIQuery(query) {
         // =======================================================
         else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
             window.log('Routing via: Intent (Ortholog)');
+            // Assuming handleOrthologQuery is defined elsewhere
             htmlResult = window.handleOrthologQuery(match[1].toUpperCase(), match[2]);
         }
         else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
@@ -3301,7 +3306,7 @@ async function handleAIQuery(query) {
             window.log('Routing via: Intent (Domains)');
             const genes = window.extractMultipleGenes(match[1]);
             if (genes.length > 0) {
-                // Assuming handleDomainQuery exists and is accessible
+                // Assuming handleDomainQuery is defined elsewhere
                 htmlResult = window.handleDomainQuery(genes);
             }
         }
@@ -3316,6 +3321,7 @@ async function handleAIQuery(query) {
             qLower.includes('table')
         )) {
             window.log('Routing via: Intent (Phylogeny Engine)');
+            // Assuming routePhylogenyAnalysis is defined elsewhere
             htmlResult = await window.routePhylogenyAnalysis(query);
         }
 
@@ -3340,6 +3346,7 @@ async function handleAIQuery(query) {
             window.log('Routing via: Intent (scRNA)');
             const genes = window.extractMultipleGenes(query);
             if (genes.length > 0) {
+                // Assuming handleScRnaQuery is defined elsewhere
                 htmlResult = window.handleScRnaQuery(genes);
                 htmlResult = htmlResult.replace(`</div>`,
                     `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-umap-plot" data-genes="${genes[0]}">View ${genes[0]} on UMAP</a></p></div>`);
@@ -3362,7 +3369,6 @@ async function handleAIQuery(query) {
                 // Check if the term is a complex/module
                 const complexName = window.extractComplexIntent(targetTerm);
                 if (complexName) {
-                    // Assuming getGenesByComplex exists and is accessible
                     const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
                     if (complexGenes.length > 0) {
                         genes = complexGenes;
@@ -3379,9 +3385,9 @@ async function handleAIQuery(query) {
             const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i);
             const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
 
-            // Assuming renderUMAPPlot exists and is accessible
             window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
 
+            // Assuming downloadUMAPDataAsCSV is defined elsewhere
             htmlResult = `<div class="ai-result-card">
                 <p>Displaying Lung scRNA-seq UMAP for **${geneSymbol}** (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
                 ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster boundaries.</p>` : ''}
@@ -3393,6 +3399,7 @@ async function handleAIQuery(query) {
         // =( 12 )= INTENT: SIMPLE KEYWORD LISTS
         // =======================================================
         else if (htmlResult === null) {
+            // Assuming flexibleIntentParser is defined elsewhere
             const intent = window.flexibleIntentParser(query);
             if (intent) {
                 window.log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
@@ -3416,6 +3423,7 @@ async function handleAIQuery(query) {
             
             if (genes.length > 0) {
                 window.log(`Final fallback, found gene: ${genes[0]}`);
+                // Assuming displayFullGeneInfo is defined elsewhere
                 htmlResult = await window.displayFullGeneInfo(genes[0]);
             }
         }
@@ -3430,12 +3438,12 @@ async function handleAIQuery(query) {
             if (foldChangeMatch) {
                 window.log('Routing via: Intent (Fold Change Complex/Cell Type)');
                 
-                // Extract terms (Complex is first match, Cell Types are second and third)
+                // Extract terms
                 const complexTerm = foldChangeMatch[1].trim().toUpperCase();
                 const cellTypeA = foldChangeMatch[2].trim();
                 const cellTypeB = foldChangeMatch[3].trim();
 
-                // Assuming calculateFoldChangeForComplex exists and is accessible
+                // Assuming calculateFoldChangeForComplex is defined elsewhere
                 const result = window.calculateFoldChangeForComplex(complexTerm, cellTypeA, cellTypeB);
 
                 if (result.error) {
@@ -3465,16 +3473,16 @@ async function handleAIQuery(query) {
             // Look for "species overlap between [classA] and [classB]"
             const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
 
-            if (classOverlapMatch && qLower.includes('li')) { // Force Li for now, as Nevers implementation is partial
+            if (classOverlapMatch && qLower.includes('li')) { // Force Li for now
                 window.log('Routing via: Intent (Phylogenetic Class Overlap)');
                 const classA = classOverlapMatch[1].trim();
                 const classB = classOverlapMatch[2].trim();
                 
-                // Need to ensure phylogeny data is loaded before calling the overlap function
+                // Assuming ensurePhylogenyDataLoaded is defined elsewhere
                 const dataLoaded = await window.ensurePhylogenyDataLoaded();
 
                 if (dataLoaded) {
-                    // Assuming getPhylogenyClassSpeciesOverlap exists and is accessible
+                    // Assuming getPhylogenyClassSpeciesOverlap is defined elsewhere
                     const result = window.getPhylogenyClassSpeciesOverlap(classA, classB, 'li');
 
                     if (result.error) {
@@ -3503,8 +3511,7 @@ async function handleAIQuery(query) {
         if (enrichmentMatch) {
             window.log('Routing via: Intent (Gene Set Enrichment)');
             const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
-            // Assuming getEnrichedGOTerms exists and is accessible
-            const terms = window.getEnrichedGOTerms(geneList); 
+            const terms = window.getEnrichedGOTerms(geneList); // Assuming getEnrichedGOTerms is defined
             
             if (terms.length === 0) {
                 htmlResult = "Not enough genes provided, or no significant enrichment found.";
@@ -3521,11 +3528,10 @@ async function handleAIQuery(query) {
             const termA = compareMatch[1].trim().toUpperCase();
             const termB = compareMatch[2].trim().toUpperCase();
             
-            // Assuming calculateJaccard exists and is accessible
             const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
             const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
 
-            const jaccardIndex = window.calculateJaccard(setA, setB);
+            const jaccardIndex = window.calculateJaccard(setA, setB); // Assuming calculateJaccard is defined
             const overlapCount = Math.round(jaccardIndex * (setA.length + setB.length));
             
             htmlResult = `<div class="ai-result-card"><h4>Gene Set Comparison: ${termA} vs. ${termB}</h4><p><strong>Genes in ${termA}:</strong> ${setA.length}</p><p><strong>Genes in ${termB}:</strong> ${setB.length}</p><p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p><p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p></div>`;
@@ -3551,11 +3557,11 @@ async function handleAIQuery(query) {
         }
 
     } catch (e) {
-        console.error("Error in handleAIQuery:", e);
-        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
-    }
-} // <--- This brace closes the try...catch block
-} // <--- This final brace closes the 'async function handleAIQuery(query)' declaration
+        console.error("Error in handleAIQuery:", e);
+        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+    }
+}
+
     
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
@@ -3822,4 +3828,4 @@ window.getGenesByComplex = getGenesByComplex;
 window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
 
 // Note: If 'handleDomainQuery' is a wrapper, expose it here:
-// window.handleDomainQuery = handleDomainQuery;
+window.handleDomainQuery = handleDomainQuery;
