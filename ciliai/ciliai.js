@@ -1202,19 +1202,14 @@ function extractEvolutionIntent(qLower) {
     
 
 /**
- * UMAP PLOT (Expression Mapping Mode)
- * Renders a UMAP visualization where points are colored and sized based on the
- * expression level of the requested gene (or FOXJ1 by default).
- */
-/**
- * UMAP PLOT (Expression Mapping Mode) - MODIFIED FOR COMPLEX/ZOOM
- * Renders a UMAP visualization where points are colored and sized based on the
- * expression level of the requested gene (or FOXJ1 by default), or the average 
- * expression of a gene set.
- * * @param {string} displayName - The name shown in the title (e.g., 'IFT-B COMPLEX' or 'IFT88').
- * @param {Array<string>} targetGenes - Array of gene symbols for which to calculate expression.
- * @param {string|null} zoomToCellType - Cell type to zoom into, if provided.
- */
+* UMAP PLOT (Expression Mapping Mode) - MODIFIED FOR COMPLEX/ZOOM
+* Renders a UMAP visualization where points are colored and sized based on the
+* expression level of the requested gene (or FOXJ1 by default), or the average 
+* expression of a gene set.
+* * @param {string} displayName - The name shown in the title (e.g., 'IFT-B COMPLEX' or 'IFT88').
+* @param {Array<string>} targetGenes - Array of gene symbols for which to calculate expression.
+* @param {string|null} zoomToCellType - Cell type to zoom into, if provided.
+*/
 // FIX: Provide a default empty array [] for targetGenes argument in the function definition
 async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = null) { 
     const plotDivId = 'cilia-svg';
@@ -1229,8 +1224,11 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
         return;
     }
     
-if (targetGenes.length === 1 && targetGenes[0] !== displayName) {
-    if (targetGenes.length === 1 && targetGenes[0] !== displayName) {
+    // --- CRITICAL FIX: The outer IF statement was nested again incorrectly ---
+    let expressionMap;
+    let plotTitle;
+
+    if (targetGenes.length === 1 && targetGenes[0] !== displayName) { // Assuming this checks for single gene vs complex/default
         // Single Gene Lookup (Direct expression value for the cell type)
         expressionMap = window.CiliAI.cellDataCache[targetGenes[0].toUpperCase()] || {};
         plotTitle = `UMAP: **${displayName}** Expression`;
