@@ -3156,6 +3156,10 @@ window.terminologyQueries = {
 /**
  * (REPLACEMENT) The Main "Level 1" Query Router
  * (FINAL FIX): Consolidated all logic blocks and ensured correct prioritization and async handling.
+ * * FIXES APPLIED:
+ * 1. Contextual Follow-up ('yes') now uses 'return' to stop execution.
+ * 2. Default 'plot default umap' calls renderUMAPPlot with the correct multi-gene signature.
+ * 3. New blocks for Advanced Expression Analysis and Phylogenetic Overlap integrated.
  */
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
@@ -3195,7 +3199,8 @@ async function handleAIQuery(query) {
         // --- High Priority Plot Buttons (Immediate Actions) ---
         if (qLower === 'plot default umap') {
             window.log('Routing via: Intent (Default UMAP Plot)');
-            window.renderUMAPPlot('FOXJ1');
+            // FIX: Pass the gene as an array for targetGenes
+            window.renderUMAPPlot('FOXJ1', ['FOXJ1']); 
             htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
         }
         else if (qLower === 'plot default phylogeny') {
@@ -3218,19 +3223,19 @@ async function handleAIQuery(query) {
         }
         
     
-       // = ( 2 ) = INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-qqconst isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
+        // = ( 2 ) = INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
                              !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
-// CRITICAL FIX: Ensure window.lastQueryContext exists before accessing '.type'
-if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
-    // 2A: List Follow-up (Prioritize general list)
-    if (window.lastQueryContext.type === 'list_followup') {
-        window.log('Routing via: Intent (Follow-up: Show List)');
-        window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
-        window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
-        return; // <-- CRITICAL: Stop execution immediately after showing the list.
-    }
+        // CRITICAL FIX: Ensure window.lastQueryContext exists before accessing '.type'
+        if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
+            // 2A: List Follow-up (Prioritize general list)
+            if (window.lastQueryContext.type === 'list_followup') {
+                window.log('Routing via: Intent (Follow-up: Show List)');
+                window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+                window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
+                return; // <-- CRITICAL: Stop execution immediately after showing the list.
+            }
             
             // 2B: Screen References Follow-up (Secondary, triggered by 'yes' only if context is set)
             else if (window.lastQueryContext.type === 'screen_references') {
@@ -3321,43 +3326,42 @@ if (htmlResult === null && isFollowUp && window.lastQueryContext) {
             }
         }
         
-       // =( 11 )= INTENT: UMAP (VISUAL) - Simplified UMAP/Lung scRNA
-else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+(.+)|(?: of| in)\s+(.+))?/i))) {
-    window.log('Routing via: Intent (UMAP Plot / Complex)');
-    let targetTerm = (match[1] || match[2]) ? (match[1] || match[2]).trim() : null;
-    
-    let genes = targetTerm ? window.extractMultipleGenes(targetTerm) : [];
-    let isComplex = false;
+        // =( 11 )= INTENT: UMAP (VISUAL) - Single Gene or Complex Expression Plot (New Routing)
+        else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+(.+)|(?: of| in)\s+(.+))?/i))) {
+            window.log('Routing via: Intent (UMAP Plot / Complex)');
+            let targetTerm = (match[1] || match[2]) ? (match[1] || match[2]).trim() : null;
+            
+            let genes = targetTerm ? window.extractMultipleGenes(targetTerm) : [];
+            let isComplex = false;
 
-    if (genes.length === 0 && targetTerm) {
-        // Check if the term is a complex/module
-        const complexName = window.extractComplexIntent(targetTerm);
-        if (complexName) {
-            const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
-            if (complexGenes.length > 0) {
-                genes = complexGenes;
-                targetTerm = complexName;
-                isComplex = true;
+            if (genes.length === 0 && targetTerm) {
+                // Check if the term is a complex/module
+                const complexName = window.extractComplexIntent(targetTerm);
+                if (complexName) {
+                    const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
+                    if (complexGenes.length > 0) {
+                        genes = complexGenes;
+                        targetTerm = complexName;
+                        isComplex = true;
+                    }
+                }
             }
+
+            const finalGenes = genes.length > 0 ? genes : ['FOXJ1']; // Default if no gene/complex found
+            const geneSymbol = isComplex ? targetTerm : finalGenes[0]; // Term to display
+            
+            // Check for "zoom to" instruction
+            const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i);
+            const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
+
+            window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
+
+            htmlResult = `<div class="ai-result-card">
+                <p>Displaying Lung scRNA-seq UMAP for **${geneSymbol}** (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
+                ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster boundaries.</p>` : ''}
+                <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="downloadUMAPDataAsCSV('${geneSymbol}')">⬇️ Download UMAP Data (CSV)</a></p>
+            </div>`;
         }
-    }
-
-    const finalGenes = genes.length > 0 ? genes : ['FOXJ1']; // Default if no gene/complex found
-    const geneSymbol = isComplex ? targetTerm : finalGenes[0]; // Term to display
-    
-    // Check for "zoom to" instruction
-    const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|goblet cell|basal cell|neuroendocrine cell)/i);
-    const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
-
-    window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
-
-    htmlResult = `<div class="ai-result-card">
-        <p>Displaying Lung scRNA-seq UMAP for **${geneSymbol}** (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
-        ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster boundaries.</p>` : ''}
-        <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="downloadUMAPDataAsCSV('${geneSymbol}')">⬇️ Download UMAP Data (CSV)</a></p>
-    </div>`;
-}
-
 
         // =( 12 )= INTENT: SIMPLE KEYWORD LISTS (Catch-all for simple Localization/Disease/Domain lookups)
         else if (htmlResult === null) {
@@ -3386,75 +3390,129 @@ else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(
             }
         }
 
-       // = ( 14 ) = INTENT: ADVANCED EXPRESSION ANALYSIS (Fold Change)
-else if (htmlResult === null) {
-    const complex = window.extractComplexIntent(qLower);
-    const cellTypes = window.extractCellTypeIntent(qLower);
+        // = ( 14 ) = INTENT: ADVANCED EXPRESSION ANALYSIS (Fold Change)
+        else if (htmlResult === null) {
+            // Look for "compare [complex] in [cellTypeA] vs [cellTypeB]"
+            const foldChangeMatch = qLower.match(/compare\s+(.+)\s+in\s+(.+)\s+vs\s+(.+)/i);
+            
+            if (foldChangeMatch) {
+                window.log('Routing via: Intent (Fold Change Complex/Cell Type)');
+                
+                // Extract terms (Complex is first match, Cell Types are second and third)
+                const complexTerm = foldChangeMatch[1].trim().toUpperCase();
+                const cellTypeA = foldChangeMatch[2].trim();
+                const cellTypeB = foldChangeMatch[3].trim();
 
-    // Look for "compare [complex] in [cellTypeA] vs [cellTypeB]"
-    const foldChangeMatch = qLower.match(/compare\s+(.+)\s+in\s+(.+)\s+vs\s+(.+)/i);
-    
-    if (foldChangeMatch) {
-        window.log('Routing via: Intent (Fold Change Complex/Cell Type)');
-        
-        // Extract terms (Complex is first match, Cell Types are second and third)
-        const complexTerm = foldChangeMatch[1].trim().toUpperCase();
-        const cellTypeA = foldChangeMatch[2].trim();
-        const cellTypeB = foldChangeMatch[3].trim();
+                const result = window.calculateFoldChangeForComplex(complexTerm, cellTypeA, cellTypeB);
 
-        const result = window.calculateFoldChangeForComplex(complexTerm, cellTypeA, cellTypeB);
-
-        if (result.error) {
-             htmlResult = `<div class="ai-result-card"><h4>Differential Expression Error</h4><p>${result.error}</p></div>`;
-        } else {
-             htmlResult = `
-                <div class="ai-result-card">
-                    <h4>Differential Expression: ${result.complex}</h4>
-                    <p>Comparing average expression in **${result.cellTypeA}** (A) vs **${result.cellTypeB}** (B) (N=${result.count} genes).</p>
-                    <table class="ciliai-data-table" style="width:100%; font-size: 12px; margin-top: 10px;">
-                        <thead><tr><th>Metric</th><th>Value</th></tr></thead>
-                        <tbody>
-                            <tr><td>Avg. Expression in ${result.cellTypeA} (TPM)</td><td>${result.avgA.toFixed(3)}</td></tr>
-                            <tr><td>Avg. Expression in ${result.cellTypeB} (TPM)</td><td>${result.avgB.toFixed(3)}</td></tr>
-                            <tr><td>**Fold Change (A/B)**</td><td>**${result.foldChange.toFixed(3)}**</td></tr>
-                        </tbody>
-                    </table>
-                </div>`;
+                if (result.error) {
+                    htmlResult = `<div class="ai-result-card"><h4>Differential Expression Error</h4><p>${result.error}</p></div>`;
+                } else {
+                    htmlResult = `
+                        <div class="ai-result-card">
+                            <h4>Differential Expression: ${result.complex}</h4>
+                            <p>Comparing average expression in **${result.cellTypeA}** (A) vs **${result.cellTypeB}** (B) (N=${result.count} genes).</p>
+                            <table class="ciliai-data-table" style="width:100%; font-size: 12px; margin-top: 10px;">
+                                <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+                                <tbody>
+                                    <tr><td>Avg. Expression in ${result.cellTypeA} (TPM)</td><td>${result.avgA.toFixed(3)}</td></tr>
+                                    <tr><td>Avg. Expression in ${result.cellTypeB} (TPM)</td><td>${result.avgB.toFixed(3)}</td></tr>
+                                    <tr><td>**Fold Change (A/B)**</td><td>**${result.foldChange.toFixed(3)}**</td></tr>
+                                </tbody>
+                            </table>
+                        </div>`;
+                }
+            }
         }
-    }
-}
 
-// = ( 15 ) = INTENT: COMPLEX PHYLOGENETIC OVERLAP
-else if (htmlResult === null) {
-    // Look for "species overlap between [classA] and [classB]"
-    const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
+        // = ( 15 ) = INTENT: COMPLEX PHYLOGENETIC OVERLAP
+        else if (htmlResult === null) {
+            // Look for "species overlap between [classA] and [classB]"
+            const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
 
-    if (classOverlapMatch && qLower.includes('li')) { // Force Li for now, as Nevers implementation is partial
-        window.log('Routing via: Intent (Phylogenetic Class Overlap)');
-        const classA = classOverlapMatch[1].trim();
-        const classB = classOverlapMatch[2].trim();
-        
-        const result = await window.ensurePhylogenyDataLoaded() && window.getPhylogenyClassSpeciesOverlap(classA, classB, 'li');
+            if (classOverlapMatch && qLower.includes('li')) { // Force Li for now, as Nevers implementation is partial
+                window.log('Routing via: Intent (Phylogenetic Class Overlap)');
+                const classA = classOverlapMatch[1].trim();
+                const classB = classOverlapMatch[2].trim();
+                
+                // Need to ensure phylogeny data is loaded before calling the overlap function
+                const dataLoaded = await window.ensurePhylogenyDataLoaded();
 
-        if (result.error) {
-             htmlResult = `<div class="ai-result-card"><h4>Phylogenetic Overlap Error</h4><p>${result.error}</p></div>`;
-        } else {
-             htmlResult = `
-                <div class="ai-result-card">
-                    <h4>Species Overlap: ${result.classA} vs ${result.classB} (Li et al. 2014)</h4>
-                    <p>Found **${result.sharedCount}** species that contain at least one gene from **both** phylogenetic classes.</p>
-                    <p style="font-size: 12px;">**Shared Species:** ${result.sharedSpecies.slice(0, 10).join(', ')}${result.sharedSpecies.length > 10 ? '... (+ ' + (result.sharedSpecies.length - 10) + ' more)' : ''}</p>
-                    <p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-table-view" data-genes="${result.sharedSpecies.join(',')}" data-title="Shared Species">📋 View Full Species List</a></p>
-                </div>`;
+                if (dataLoaded) {
+                    const result = window.getPhylogenyClassSpeciesOverlap(classA, classB, 'li');
+
+                    if (result.error) {
+                        htmlResult = `<div class="ai-result-card"><h4>Phylogenetic Overlap Error</h4><p>${result.error}</p></div>`;
+                    } else {
+                        htmlResult = `
+                            <div class="ai-result-card">
+                                <h4>Species Overlap: ${result.classA} vs ${result.classB} (Li et al. 2014)</h4>
+                                <p>Found **${result.sharedCount}** species that contain at least one gene from **both** phylogenetic classes.</p>
+                                <p style="font-size: 12px;">**Shared Species:** ${result.sharedSpecies.slice(0, 10).join(', ')}${result.sharedSpecies.length > 10 ? '... (+ ' + (result.sharedSpecies.length - 10) + ' more)' : ''}</p>
+                                <p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-table-view" data-genes="${result.sharedSpecies.join(',')}" data-title="Shared Species">📋 View Full Species List</a></p>
+                            </div>`;
+                    }
+                } else {
+                    htmlResult = `<div class="ai-result-card"><h4>Phylogenetic Overlap Error</h4><p>Failed to load necessary phylogenetic data. Please check connection.</p></div>`;
+                }
+            }
         }
-    }
-}
+        
+        // =( 16 )= INTENT: GENE SET ANALYSIS (Moved for new blocks)
+        const enrichmentMatch = qLower.match(/enrichment for (.+)/);
+        const compareMatch = qLower.match(/compare (.+) and (.+)/);
+
+        if (enrichmentMatch) {
+            window.log('Routing via: Intent (Gene Set Enrichment)');
+            const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
+            const terms = window.getEnrichedGOTerms(geneList);
+            
+            if (terms.length === 0) {
+                htmlResult = "Not enough genes provided, or no significant enrichment found.";
+            } else {
+                let html = `<div class="ai-result-card"><h4>Gene Set Enrichment for ${geneList.length} Genes</h4>`;
+                html += `<p>Top enriched biological terms (simulated):</p><ul>`;
+                terms.forEach(t => { html += `<li><strong>${t.term}</strong>: Found ${t.count} genes (p-value ${t.pval.toExponential(1)})</li>`; });
+                html += `</ul></div>`;
+                htmlResult = html;
+            }
+        }
+        else if (compareMatch) {
+            window.log('Routing via: Intent (Gene Set Comparison)');
+            const termA = compareMatch[1].trim().toUpperCase();
+            const termB = compareMatch[2].trim().toUpperCase();
+            
+            const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
+            const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
+
+            const jaccardIndex = window.calculateJaccard(setA, setB);
+            const overlapCount = Math.round(jaccardIndex * (setA.length + setB.length));
+            
+            htmlResult = `<div class="ai-result-card"><h4>Gene Set Comparison: ${termA} vs. ${termB}</h4><p><strong>Genes in ${termA}:</strong> ${setA.length}</p><p><strong>Genes in ${termB}:</strong> ${setB.length}</p><p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p><p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p></div>`;
+        }
+
+        // =( 17 )= FINAL FALLBACK (ERROR)
+        if (htmlResult === null) {
+            window.log(`Routing via: Final Fallback (Error)`);
+            const genes = window.extractMultipleGenes(query);
+            if (genes.length > 0) {
+                window.log(`Final fallback, found gene: ${genes[0]}`);
+                htmlResult = await window.displayFullGeneInfo(genes[0]);
+            } else {
+                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
+            }
+        }
+
+        // Send the final result to chat
+        if (htmlResult) {
+            window.addChatMessage(htmlResult, false);
+        }
+
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
-}
-       
+}       
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
  */
