@@ -3551,10 +3551,11 @@ async function handleAIQuery(query) {
         }
 
     } catch (e) {
-        console.error("Error in handleAIQuery:", e);
-        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
-    }
-}
+        console.error("Error in handleAIQuery:", e);
+        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+    }
+} // <--- This brace closes the try...catch block
+} // <--- This final brace closes the 'async function handleAIQuery(query)' declaration
     
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
