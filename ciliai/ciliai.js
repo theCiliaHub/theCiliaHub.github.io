@@ -2995,7 +2995,6 @@ async function handleAIQuery(query) {
         }
         
         // = ( 1 ) = INTENT: L2/L3 MULTI-CRITERIA & COMPLEX QUERIES (NEW - Highest Priority)
-        // This is the single entry point for all advanced, multi-criteria questions.
         if (htmlResult === null) {
             window.log('Routing via: Intent (Unified Complex Query Engine)');
             htmlResult = window.handleComplexQuery(query);
@@ -3008,32 +3007,31 @@ async function handleAIQuery(query) {
             }
         }
         
-        // The original complex intent block (Case 1A, 1B, 1C) has been removed, 
-        // as it is now consolidated and handled by the new window.handleComplexQuery(query) above.
+        // = ( 2 ) = INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+        const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
+                             !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
+        // CRITICAL FIX: Ensure window.lastQueryContext exists before accessing '.type'
+        if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
+             // 2A: List Follow-up (Prioritize general list)
+            if (window.lastQueryContext.type === 'list_followup') {
+                window.log('Routing via: Intent (Follow-up: Show List)');
+                window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+                window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
+                return;
+            }
+            
+            // 2B: Screen References Follow-up (Secondary, triggered by 'yes' only if context is set)
+            else if (window.lastQueryContext.type === 'screen_references') {
+                window.log('Routing via: Intent (Follow-up: Screen References)');
+                htmlResult = window.handleScreenReferenceFollowup();
+            }
+        }
 
-       // = ( 2 ) = INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-    const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show') || qLower.includes('provide the paper')) && 
-                     !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
-
-// Priority 2A: List Follow-up (Always check for a list first)
-if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'list_followup') {
-    window.log('Routing via: Intent (Follow-up: Show List)');
-    window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
-    window.lastQueryContext = { type: null, data: [], term: null };
-    return;
-}
-    
-// Priority 2B: Screen References Follow-up (Only if 2A failed and context matches)
-else if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'screen_references') {
-    window.log('Routing via: Intent (Follow-up: Screen References)');
-    htmlResult = window.handleScreenReferenceFollowup();
-}
-        
-        // =( 3 )= INTENT: CONTEXTUAL FOLLOW-UP (Screen References)
-        else if (htmlResult === null && isFollowUp && window.lastQueryContext.type === 'screen_references') {
-            window.log('Routing via: Intent (Follow-up: Screen References)');
-            htmlResult = window.handleScreenReferenceFollowup();
+        // = ( 3 ) = INTENT: EXPLICIT SCREEN REFERENCES (New Block for explicit request, replacing old block 3)
+        else if (htmlResult === null && (qLower.includes('show screen references') || qLower.includes('show publication details') || qLower.includes('provide the paper'))) {
+            window.log('Routing via: Intent (Explicit Screen References)');
+            htmlResult = window.handleScreenReferenceFollowup(); 
         }
 
         // =( 4 )= INTENT: SCREENS / PHENOTYPES (HIGH PRIORITY)
@@ -3210,7 +3208,6 @@ else if (htmlResult === null && isFollowUp && window.lastQueryContext.type === '
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
-
        
 /**
  * Downloads the current UMAP coordinate and expression data as a CSV.
