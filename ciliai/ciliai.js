@@ -3291,28 +3291,27 @@ window.handleAIQuery = async function (query) {
         }
         
 // =======================================================
-// =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-// =======================================================
-const isFollowUp = (qLower === 'yes' || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
-                         !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
+        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes") - FIXED
+        // =======================================================
+        // FIX: Use includes('yes') on qLower to catch "Yes" and "YES"
+        const isFollowUp = (qLower.includes('yes') || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
+                             !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
-if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
-    // 2A: List Follow-up (Prioritize general list)
-    if (window.lastQueryContext.type === 'list_followup') {
-        window.log('Routing via: Intent (Follow-up: Show List)');
-        // Assuming showDataInLeftPanel is defined elsewhere
-        window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
-        window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
-        return; // CRITICAL: Stop execution immediately after showing the list.
-    }
-    
-    // 2B: Screen References Follow-up
-    else if (window.lastQueryContext.type === 'screen_references') {
-        window.log('Routing via: Intent (Follow-up: Screen References)');
-        // Assuming handleScreenReferenceFollowup is defined elsewhere
-        htmlResult = window.handleScreenReferenceFollowup();
-    }
-}
+        if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
+            // 2A: List Follow-up (Prioritize general list)
+            if (window.lastQueryContext.type === 'list_followup') {
+                window.log('Routing via: Intent (Follow-up: Show List)');
+                window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+                window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
+                return; // CRITICAL: Stop execution immediately after showing the list.
+            }
+            
+            // 2B: Screen References Follow-up
+            else if (window.lastQueryContext.type === 'screen_references') {
+                window.log('Routing via: Intent (Follow-up: Screen References)');
+                htmlResult = window.handleScreenReferenceFollowup();
+            }
+        }
         // =======================================================
     // =( 3 )= INTENT: EXPLICIT SCREEN REFERENCES (FIXED)
     // =======================================================
