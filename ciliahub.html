@@ -185,11 +185,11 @@
         let homeSearchInput;
         let homeSuggestionsContainer;
         
-        // Placeholders for external dependencies (to prevent ReferenceErrors)
+        // FIX: Define Chart robustly (resolves SyntaxError: Missing initializer in const declaration)
         const Chart = typeof Chart !== 'undefined' ? Chart : { register: () => {} };
         const window.showErrorMessage = window.showErrorMessage || ((msg) => console.error("Error:", msg));
         
-        // Placeholder updateActiveNavLink function (since the full one is complex)
+        // Placeholder updateActiveNavLink function (to be defined by index.html or external router)
         window.updateActiveNavLink = (path) => { 
             document.querySelectorAll('.nav-links a').forEach(link => {
                 link.classList.remove('active');
@@ -284,8 +284,6 @@
                     if (g.localization) {
                         geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
                     }
-                    // NOTE: This is where full parsing for synonyms and orthologs should occur.
-                    // Added Ortholog and Synonym handling from script.js logic:
                     
                     // Add Human Synonyms
                     if (g.synonym) {
@@ -520,6 +518,8 @@
                         </div>
                     </div>
 
+                    <p>Search for a single gene below...</p>
+
                     <div class="search-container">
                         <input type="text" id="single-gene-search" placeholder="Search gene (e.g., IFT88, ARL13B)">
                         <button id="single-search-btn" class="search-btn">Search</button>
@@ -536,8 +536,13 @@
             
             // --- Wire up functionality ---
             const newSearchButton = document.getElementById('single-search-btn');
-            if (newSearchButton) {
+            const newSearchInput = document.getElementById('single-gene-search');
+            
+            if (newSearchButton && newSearchInput) {
                 newSearchButton.onclick = performSingleSearch;
+                // Update global references (for external/internal functions)
+                homeSearchInput = newSearchInput;
+                homeSuggestionsContainer = document.getElementById('search-suggestions'); // Assumes this div exists or needs to be added for suggestions
             }
             
             // Update stats immediately if data is already loaded
