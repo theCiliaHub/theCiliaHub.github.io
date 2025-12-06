@@ -6,36 +6,112 @@
     <title>About — CiliAI</title>
 
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f7fbff;
-            margin: 0;
-            padding: 20px 30px;
-            color: #2d3748;
+        /* --- Root and Base Styles --- */
+        :root {
+            --primary-blue: #005b96;
+            --secondary-blue: #b3cde0;
+            --accent-text: #2d3748;
+            --light-bg: #f7fbff;
+            --code-bg: #f1f8ff;
+            --link-color: #6c8aa3;
         }
 
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--light-bg);
+            color: var(--accent-text);
+            margin: 0;
+            padding-top: 60px; /* Space for fixed navbar */
+            min-height: 100vh;
+        }
+        
+        .content-wrapper {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        /* --- Navigation Bar Styles (Copied from index.html) --- */
+        .top-navbar {
+            background: var(--primary-blue);
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            height: 60px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 30px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0 15px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+
+        .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+        
+        /* --- Content Styles --- */
         h1, h2, h3 {
-            color: #2d3748;
+            color: var(--primary-blue);
             margin-top: 30px;
+        }
+        
+        h1 {
+            border-bottom: 2px solid var(--border-light);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
         }
 
         strong {
-            color: #b3cde0;
+            color: var(--secondary-blue);
             font-weight: 700;
         }
 
         code, pre {
-            background: #f1f8ff;
+            background: var(--code-bg);
             padding: 10px;
             border-radius: 6px;
             display: block;
             font-size: 13px;
             white-space: pre-line;
-            margin-bottom: 10px;
+            margin: 10px 0;
+            border: 1px solid #e1e8ed;
         }
 
         a {
-            color: #6c8aa3;
+            color: var(--link-color);
             text-decoration: none;
         }
 
@@ -44,90 +120,151 @@
         }
 
         .section {
-            margin-bottom: 40px;
+            padding: 20px 0;
+            border-bottom: 1px dashed var(--border-light);
+        }
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        /* Download Button Styling */
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 15px;
+            padding: 12px 25px;
+            background: #27ae60; /* Green color for download */
+            color: white;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: background 0.3s;
+            gap: 10px;
+        }
+        .download-btn:hover {
+            background: #219d54;
+            text-decoration: none;
+        }
+        .download-icon {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: white;
+            stroke-width: 2;
         }
     </style>
 </head>
 
 <body>
-
-    <h1>About CiliAI</h1>
-
-    <!-- INTRO SECTION -->
-    <div id="intro" class="section">
-        <h2>Welcome to <strong>CiliAI</strong>!</h2>
-
-        <p>
-            I am an AI assistant designed to help you explore and analyze data on ciliary biology. 
-            You can ask questions or paste full gene lists. Below are examples of what I understand:
-        </p>
-
-<pre><code>
-Gene Details: <strong>"What is IFT88?"</strong> or <strong>"Describe ARL13B."</strong>
-Localization: <strong>"List genes in the transition zone."</strong> or <strong>"Where is CEP290?"</strong>
-Complexes: <strong>"What genes are in the BBSome?"</strong> or <strong>"Complex components of OFD1."</strong>
-Ciliopathies: <strong>"Gene list of Joubert Syndrome."</strong> or <strong>"What genes cause PCD?"</strong>
-Phylogeny: <strong>"Show conservation of IFT88."</strong>
-Domains: <strong>"Which genes have WD40 domains?"</strong>
-</code></pre>
-
-        <p>
-            My data comes from a pre-compiled database of over 
-            <strong>23,000 genes</strong>,
-            enriched with <strong>8 specialized datasets</strong> (CORUM, UMAP, scRNA, Phylogeny, etc.).
-        </p>
-    </div>
-
-    <!-- SYSTEM DESCRIPTION -->
-    <div class="section">
-        <h2>What is CiliAI?</h2>
-        <p>
-            CiliAI is a specialized knowledge engine for ciliary biology, integrating 
-            multi-omics datasets, curated gene annotations, protein interactions, 
-            ciliopathy gene lists, and evolutionary datasets into a unified AI-assisted interface.
-        </p>
-        <p>
-            It is built to help researchers, clinicians, and students explore ciliary genes,
-            pathways, protein complexes, structures, disease associations, and 
-            cell-type–specific expression with ease.
-        </p>
-    </div>
-
-    <!-- CITATIONS -->
-    <div id="citations" class="section">
-        <h2>Citations</h2>
-        <p>
-            If you use CiliAI or The CiliaHub in your research, please cite relevant resources 
-            associated with the datasets you query (CORUM, Human Protein Atlas, UMAP, Phylogeny, 
-            and disease databases). A formal CiliAI citation will be provided after publication.
-        </p>
-    </div>
-
-    <!-- FEEDBACK -->
-    <div id="feedback" class="section">
-        <h2>Feedback 💡</h2>
-        <p>
-            We welcome suggestions, corrections, feature requests, or bug reports.<br><br>
-            Please send your feedback directly to:<br>
-            <strong>
-                <a href="mailto:Oktaykaplan@gmail.com">Oktaykaplan@gmail.com</a>
-            </strong>
-        </p>
-    </div>
-
-    <!-- CONTACT -->
-    <div id="contact" class="section">
-        <h2>Contact</h2>
-        <p>
-            For collaboration inquiries or dataset contributions, 
-            please email <strong><a href="mailto:Oktaykaplan@gmail.com">Oktaykaplan@gmail.com</a></strong>
-            or visit the project's GitHub repository:
-        </p>
-
-        <p>
-            <a href="https://github.com/theCiliaHub/theCiliaHub.github.io">github.com/theCiliaHub</a>
-        </p>
-    </div>
-
-</body>
+    
+    <nav class="top-navbar">
+        <div class="brand">
+            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
+            <div>
+                <div>CiliAI</div>
+                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
+            </div>
+        </div>
+        
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="plots.html">Cilia Analysis</a></li>
+            <li><a href="ciliahub.html">CiliaHub</a></li>
+            <li><a href="about.html" class="active">About</a></li>
+        </ul>
+    </nav>
+    
+    <div class="content-wrapper">
+    
+        <h1>About CiliAI & The CiliaHub Project 🔬</h1>
+    
+        <div id="intro" class="section">
+            <h2>Welcome to <strong>CiliAI</strong>!</h2>
+    
+            <p>
+                I am an **AI assistant** designed to help you explore and analyze data on ciliary biology. 
+                You can ask questions or paste full gene lists. Below are examples of what I understand:
+            </p>
+            
+        <pre><code>
+    Gene Details: <strong>"What is IFT88?"</strong> or <strong>"Describe ARL13B."</strong>
+    Localization: <strong>"List genes in the transition zone."</strong> or <strong>"Where is CEP290?"</strong>
+    Complexes: <strong>"What genes are in the BBSome?"</strong> or <strong>"Complex components of OFD1."</strong>
+    Ciliopathies: <strong>"Gene list of Joubert Syndrome."</strong> or <strong>"What genes cause PCD?"</strong>
+    Phylogeny: <strong>"Show conservation of IFT88."</strong>
+    Domains: <strong>"Which genes have WD40 domains?"</strong>
+    </code></pre>
+    
+            <p>
+                My data comes from a pre-compiled database of over 
+                **23,000 genes**,
+                enriched with **8 specialized datasets** (CORUM, UMAP, scRNA, Phylogeny, etc.).
+            </p>
+        </div>
+    
+        <div class="section">
+            <h2>What is CiliAI?</h2>
+            <p>
+                CiliAI is a specialized knowledge engine for **ciliary biology**, integrating 
+                multi-omics datasets, curated gene annotations, protein interactions, 
+                ciliopathy gene lists, and evolutionary datasets into a unified AI-assisted interface.
+            </p>
+            <p>
+                It is built to help researchers, clinicians, and students explore ciliary genes,
+                pathways, protein complexes, structures, disease associations, and 
+                cell-type–specific expression with ease.
+            </p>
+        </div>
+        
+        <div id="citations" class="section">
+            <h2>Data & Citations</h2>
+            
+            <h3 style="margin-top: 15px;">Download CiliaHub Data</h3>
+            <p>
+                Access the complete **Gold Standard Ciliary Gene List** dataset (ciliahub_data.json) directly from the CiliaHub repository.
+            </p>
+            
+            <a href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json" 
+               download="ciliahub_data.json" 
+               class="download-btn">
+                <svg class="download-icon" viewBox="0 0 24 24">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download ciliahub_data.json
+            </a>
+            
+            <p style="margin-top: 30px;">
+                If you use CiliAI or The CiliaHub in your research, please cite relevant resources 
+                associated with the datasets you query (CORUM, Human Protein Atlas, UMAP, Phylogeny, 
+                and disease databases). A formal CiliAI citation will be provided after publication.
+            </p>
+        </div>
+    
+        <div id="feedback" class="section">
+            <h2>Feedback 💡</h2>
+            <p>
+                We welcome suggestions, corrections, feature requests, or bug reports.<br><br>
+                Please send your feedback directly to:<br>
+                <strong>
+                    <a href="mailto:Oktaykaplan@gmail.com">Oktaykaplan@gmail.com</a>
+                </strong>
+            </p>
+        </div>
+    
+        <div id="contact" class="section">
+            <h2>Contact</h2>
+            <p>
+                For collaboration inquiries or dataset contributions, 
+                please email <strong><a href="mailto:Oktaykaplan@gmail.com">Oktaykaplan@gmail.com</a></strong>
+                or visit the project's GitHub repository:
+            </p>
+    
+            <p>
+                <a href="https://github.com/theCiliaHub/theCiliaHub.github.io">github.com/theCiliaHub</a>
+            </p>
+        </div>
+        
+    </div> </body>
 </html>
