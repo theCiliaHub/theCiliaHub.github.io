@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiliAI — CiliaHub</title>
+    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+    
+    <style>
+        :root {
+            --primary-blue: #005b96;
+            --secondary-blue: #b3cde0;
+            --accent-text: #333333;
+            --border-light: #e1e8ed;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { height: 100%; font-family: 'Inter', sans-serif; background: #f1f5f9; overflow-y: auto; }
+
+        /* --- Top Navigation Bar --- */
+        .top-navbar {
+            background: var(--primary-blue);
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            height: 60px;
+            border-bottom: 1px solid var(--primary-blue);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 30px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0 15px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* New Page Layout (Simple Container for Content) */
+        .page-container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            line-height: 1.6;
+            color: var(--accent-text);
+        }
+
+        .page-container h1 {
+            color: var(--primary-blue);
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border-light);
+            padding-bottom: 10px;
+        }
+
+        .page-container h2 {
+            color: var(--accent-text);
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.4em;
+        }
+
+        .page-container ul {
+            margin-left: 20px;
+            padding: 10px 0;
+        }
+
+        .hub-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: var(--primary-blue);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .hub-link:hover {
+            background: #00477a;
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-navbar">
+        <div class="brand">
+            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
+            <div>
+                <div>CiliAI</div>
+                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
+            </div>
+        </div>
+        
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="plots.html">Cilia Analysis</a></li>
+            <li><a href="ciliahub.html" class="active">CiliaHub</a></li>
+            <li><a href="about.html">About</a></li>
+        </ul>
+    </nav>
+
+    <div class="page-container">
+        <h1>Welcome to CiliaHub 🧬</h1>
+        <p>CiliaHub is the central repository for the **CiliAI** project, dedicated to collecting, curating, and sharing comprehensive data related to ciliary and flagellar biology. Our goal is to provide researchers with a unified platform for exploring the **ciliome** across various species and functional contexts.</p>
+        
+        <h2>Key Resources & Datasets</h2>
+        <p>The data driving the CiliAI Explorer is sourced and maintained directly through CiliaHub:</p>
+        <ul>
+            <li>**Master Gene Database:** Over 23,000 genes with detailed functional annotations, orthologs, and human disease links (Ciliopathies, OMIM).</li>
+            <li>**Phylogenetic Matrices:** Conservation matrices based on seminal studies (Li et al., 2014; Nevers et al., 2017) to study gene evolution across taxa.</li>
+            <li>**High-Content Screen Data:** Consolidated results from large-scale CRISPR and RNAi screens detailing effects on ciliation and ciliary length.</li>
+            <li>**Single-Cell RNA-seq (scRNA-seq):** Tissue-specific expression data to localize gene activity to specific cell types (e.g., lung ciliated cells).</li>
+        </ul>
+        
+
+        <h2>Our Mission</h2>
+        <p>We aim to foster collaboration and accelerate discovery in ciliopathy research by making complex genomic and functional datasets easily accessible and searchable through the CiliAI conversational interface. We welcome contributions and feedback to improve our database accuracy and coverage.</p>
+        
+        <a href="https://github.com/theCiliaHub/theCiliaHub.github.io" target="_blank" class="hub-link">Explore CiliaHub on GitHub</a>
+    </div>
+</body>
+</html>
