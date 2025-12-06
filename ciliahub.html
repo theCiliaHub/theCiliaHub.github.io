@@ -187,7 +187,8 @@
         
         // FIX: Define Chart robustly (resolves SyntaxError: Missing initializer in const declaration)
         const Chart = typeof Chart !== 'undefined' ? Chart : { register: () => {} };
-        const window.showErrorMessage = window.showErrorMessage || ((msg) => console.error("Error:", msg));
+        window.showErrorMessage = window.showErrorMessage || ((msg) => console.error("Error:", msg));
+
         
         // Placeholder updateActiveNavLink function (to be defined by index.html or external router)
         window.updateActiveNavLink = (path) => { 
