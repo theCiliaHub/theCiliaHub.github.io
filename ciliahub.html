@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>CiliAI — CiliaHub</title>
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
-    
+
     <style>
         :root {
             --primary-blue: #005b96;
@@ -13,7 +13,7 @@
             --accent-text: #333333;
             --border-light: #e1e8ed;
         }
-        
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { height: 100%; font-family: 'Inter', sans-serif; background: #f1f5f9; overflow-y: auto; }
 
@@ -91,35 +91,35 @@
             margin-left: 20px;
             padding: 10px 0;
         }
-        
+
         /* Stats Styling */
-        .ciliahub-stats { 
-            margin-top: 1rem; 
-            margin-bottom: 2rem; 
-            display: flex; 
-            gap: 1rem; 
-            flex-wrap: wrap; 
+        .ciliahub-stats {
+            margin-top: 1rem;
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
             font-family: 'Arial', sans-serif;
         }
 
         .ciliahub-stats > div {
-            flex: 1; 
-            min-width: 180px; 
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); 
-            color: #1565c0; 
-            padding: 1.25rem; 
-            border-radius: 12px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-            border: 1px solid #90caf9; 
-            text-align: center; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            transition: transform 0.2s, box-shadow 0.2s; 
+            flex: 1;
+            min-width: 180px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            color: #1565c0;
+            padding: 1.25rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #90caf9;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
             cursor: default;
         }
-        
+
         .hub-link {
             display: inline-block;
             margin-top: 15px;
@@ -134,7 +134,7 @@
         .hub-link:hover {
             background: #00477a;
         }
-        
+
         /* Gene Search Styling */
         #single-gene-search { border: 1px solid var(--border-light); padding: 10px 15px; border-radius: 6px; }
         .search-container { display: flex; gap: 10px; margin-top: 15px; }
@@ -158,7 +158,7 @@
                 <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
             </div>
         </div>
-        
+
         <ul class="nav-links">
             <li><a href="index.html">Home</a></li>
             <li><a href="plots.html">Cilia Analysis</a></li>
@@ -167,9 +167,8 @@
         </ul>
     </nav>
 
-    <div class="page-container" id="page-content">
-        </div>
-    
+    <div class="page-container" id="page-content"></div>
+
     <script>
         // ==========================================================
         // 1. GLOBAL VARIABLES AND CACHE DECLARATIONS (CRITICAL)
@@ -180,28 +179,25 @@
         let geneLocalizationData = {};
         const defaultGenesNames = ["IFT88", "CEP290", "ARL13B", "BBS1", "PKD2", "ACE2"];
         const allPartIds = ["ciliary-membrane", "axoneme", "basal-body", "transition-zone", "nucleus", "cell-body"];
-        
+
         window.geneMapCache = new Map();
         let homeSearchInput;
         let homeSuggestionsContainer;
-        
-        // FIX: Define Chart robustly (resolves SyntaxError: Missing initializer in const declaration)
-        const Chart = typeof Chart !== 'undefined' ? Chart : { register: () => {} };
-        window.showErrorMessage = window.showErrorMessage || ((msg) => console.error("Error:", msg));
 
-        
+        // Safe error message helper (fixed; no const window.xyz)
+        window.showErrorMessage = window.showErrorMessage || (msg => console.error("Error:", msg));
+
         // Placeholder updateActiveNavLink function (to be defined by index.html or external router)
-        window.updateActiveNavLink = (path) => { 
+        window.updateActiveNavLink = (path) => {
             document.querySelectorAll('.nav-links a').forEach(link => {
                 link.classList.remove('active');
                 if (link.getAttribute('href').includes(path.split('/')[0])) link.classList.add('active');
             });
         };
-        
+
         // ==========================================================
         // 2. CORE UTILITY FUNCTIONS (SANITIZATION, MAPPING, FALLBACKS)
         // ==========================================================
-        
         function sanitize(input) {
             if (typeof input !== 'string') return '';
             return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
@@ -209,21 +205,7 @@
                         .trim()
                         .toUpperCase();
         }
-
-        // Placeholder for Chart.js plugin
-        if (typeof Chart !== 'undefined') {
-            Chart.register({
-                id: 'customCanvasBackgroundColor',
-                beforeDraw: (chart, args, options) => {
-                    const {ctx} = chart;
-                    ctx.save();
-                    ctx.globalCompositeOperation = 'destination-over';
-                    ctx.fillStyle = options.color || '#ffffff';
-                    ctx.fillRect(0, 0, chart.width, chart.height);
-                    ctx.restore();
-                }
-            });
-        }
+        // Placeholder: no Chart.js usage or plugins in this file (Chart removed)
 
         function mapLocalizationToSVG(localizationArray) {
             const mapping = {
@@ -242,10 +224,10 @@
                 return mapping[normalized] || [];
             }).filter(id => allPartIds.includes(id));
         }
-        
+
         function getDefaultGenes() {
-            return defaultGenesNames.map(gene => ({ 
-                gene: gene, 
+            return defaultGenesNames.map(gene => ({
+                gene: gene,
                 description: `Default gene: ${gene}. Data unavailable.`,
                 ensembl_id: "N/A",
                 ciliopathy: "N/A",
@@ -254,11 +236,9 @@
             }));
         }
 
-
         // ==========================================================
         // 3. DATA LOADING & PREPARATION
         // ==========================================================
-        
         async function loadAndPrepareDatabase() {
             if (window.geneMapCache && window.geneMapCache.size > 0) {
                 console.log("Database already loaded and prepared.");
@@ -270,8 +250,8 @@
                 if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
                 const rawGenes = await resp.json();
 
-                allGenes = rawGenes; 
-                currentData = allGenes; 
+                allGenes = rawGenes;
+                currentData = allGenes;
                 window.geneMapCache = new Map();
                 geneLocalizationData = {};
 
@@ -285,7 +265,7 @@
                     if (g.localization) {
                         geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
                     }
-                    
+
                     // Add Human Synonyms
                     if (g.synonym) {
                         String(g.synonym).split(/[,;]/).forEach(syn => {
@@ -305,7 +285,7 @@
                             }
                         });
                     }
-                    
+
                     // Add Ortholog Symbols
                     const orthologFields = ['ortholog_mouse', 'ortholog_c_elegans', 'ortholog_xenopus', 'ortholog_zebrafish', 'ortholog_drosophila'];
                     orthologFields.forEach(field => {
@@ -329,7 +309,7 @@
                 return false;
             }
         }
-        
+
         function updateHomepageStats() {
             const geneCount = allGenes ? allGenes.length : 0;
             const geneCountEl = document.getElementById('gene-count');
@@ -341,13 +321,13 @@
         // ==========================================================
         // 4. SEARCH AND QUERY FUNCTIONS
         // ==========================================================
-
         function findGenes(queries) {
             const foundGenes = new Map();
             const notFound = [];
 
             queries.forEach(query => {
-                const result = window.geneMapCache.get(query);
+                const key = sanitize(query);
+                const result = window.geneMapCache.get(key);
                 if (result) {
                     if (!foundGenes.has(result.gene)) {
                         foundGenes.set(result.gene, result);
@@ -393,7 +373,6 @@
         // ==========================================================
         // 5. ROUTING & UI MANAGEMENT
         // ==========================================================
-        
         // Define placeholders for functions used in routing (as they may be defined elsewhere)
         function performBatchSearch() { console.log("Batch search triggered."); }
         function displayBatchQueryTool() { console.log("Navigated to Batch Query Tool"); }
@@ -405,16 +384,15 @@
         function showLocalization() {}
         function displayGeneCards() {}
 
-
         function navigateTo(event, path) {
             if (event) event.preventDefault();
             const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
             window.history.pushState({}, '', `#${normalizedPath}`);
             handleRouteChange();
         }
-        
+
         function handleRouteChange() {
-            const hash = window.location.hash.substring(1); 
+            const hash = window.location.hash.substring(1);
             const normalizedPath = hash.startsWith('/') ? hash.substring(1) : hash;
             const pathSegments = normalizedPath.split('/');
             const mainRoute = pathSegments[0] || 'home';
@@ -451,17 +429,15 @@
             pageFunc();
         }
 
-
         // ==========================================================
         // 6. DISPLAY INDIVIDUAL GENE PAGE (Simplified for ciliahub.html)
         // ==========================================================
-        
         function displayIndividualGenePage(gene) {
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
 
             let fullGene = typeof gene === 'string' ? allGenes.find(g => g.gene === gene) : gene;
-            if (!fullGene || fullGene.description === undefined) { 
+            if (!fullGene || fullGene.description === undefined) {
                 contentArea.innerHTML = `<div style="padding: 20px; text-align: center;"><h2>Gene: ${gene.gene || 'Unknown'}</h2><p>Detailed data not loaded or gene not found in the full database.</p></div>`;
                 return;
             }
@@ -493,24 +469,19 @@
                         <button onclick="navigateTo(event, '/')" class="hub-link" style="margin-top: 20px; background: #666;">Back to CiliaHub Home</button>
                     </div>
                 </div>`;
-            
-            // NOTE: Logic for updating gene buttons/diagram is omitted as it requires ciliAI.js
         }
-
-
         // ==========================================================
         // 7. DISPLAY HOME PAGE (CiliHub Content)
         // ==========================================================
-
         function displayHomePage() {
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
-            
+
             // --- Initial render with content and search bar placeholders ---
             contentArea.innerHTML = `
                 <div class="page-section">
                     <h1>Welcome to CiliaHub 🧬</h1>
-                    <p>CiliaHub is the central repository for the **CiliAI** project, dedicated to collecting, curating, and sharing comprehensive data related to ciliary and flagellar biology...</p>
+                    <p>CiliaHub is the central repository for the <strong>CiliAI</strong> project, dedicated to collecting, curating, and sharing comprehensive data related to ciliary and flagellar biology...</p>
 
                     <div class="ciliahub-stats">
                         <div style="flex: 1; min-width: 180px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1565c0; padding: 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #90caf9; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s; cursor: default;">
@@ -526,46 +497,41 @@
                         <button id="single-search-btn" class="search-btn">Search</button>
                     </div>
                     <div id="status-message" style="margin-top: 10px; display: none; font-size: 0.9rem;"></div>
-                    
+
                     <h2>Key Resources & Datasets</h2>
                     <ul>
-                        <li>**Master Gene Database:** Over 23,000 genes with detailed functional annotations...</li>
+                        <li><strong>Master Gene Database:</strong> Over 23,000 genes with detailed functional annotations (subset displayed here).</li>
                     </ul>
                     <a href="https://github.com/theCiliaHub/theCiliaHub.github.io" target="_blank" class="hub-link">Explore CiliaHub on GitHub</a>
-
                 </div>`;
-            
+
             // --- Wire up functionality ---
             const newSearchButton = document.getElementById('single-search-btn');
             const newSearchInput = document.getElementById('single-gene-search');
-            
+
             if (newSearchButton && newSearchInput) {
                 newSearchButton.onclick = performSingleSearch;
                 // Update global references (for external/internal functions)
                 homeSearchInput = newSearchInput;
-                homeSuggestionsContainer = document.getElementById('search-suggestions'); // Assumes this div exists or needs to be added for suggestions
+                homeSuggestionsContainer = document.getElementById('search-suggestions'); // optional
             }
-            
+
             // Update stats immediately if data is already loaded
             if (allGenes.length > 0) {
-                updateHomepageStats(); 
+                updateHomepageStats();
             }
         }
-
 
         // ==========================================================
         // 8. APPLICATION STARTUP
         // ==========================================================
-        
         async function initializeApp() {
             const dataLoaded = await loadAndPrepareDatabase();
-
             // Display the appropriate content based on the initial URL hash
             handleRouteChange();
         }
 
         document.addEventListener('DOMContentLoaded', initializeApp);
-
     </script>
 </body>
 </html>
