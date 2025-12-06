@@ -394,7 +394,10 @@ function extractMultipleGenes(query) {
         'ofd1': 'OFD1',
         'ift52': 'IFT52',
         'pkd1': 'PKD1',
-        'evc2': 'EVC2'
+        'evc2': 'EVC2',
+        // --- ADDED FIXES FOR LOG ERRORS ---
+        'ndr1': 'NDR1', 
+        'slmap3': 'SLMAP3'
     };
 
     let foundGenes = new Set();
@@ -3311,12 +3314,13 @@ if (htmlResult === null && isFollowUp && window.lastQueryContext) {
     }
 }
         // =======================================================
-        // =( 3 )= INTENT: EXPLICIT SCREEN REFERENCES
-        // =======================================================
-        else if (htmlResult === null && (qLower.includes('show screen references') || qLower.includes('show publication details') || qLower.includes('provide the paper'))) {
-            window.log('Routing via: Intent (Explicit Screen References)');
-            htmlResult = window.handleScreenReferenceFollowup(); 
-        }
+    // =( 3 )= INTENT: EXPLICIT SCREEN REFERENCES (FIXED)
+    // =======================================================
+    else if (htmlResult === null && (qLower.includes('show screen reference') || qLower.includes('show publication detail') || qLower.includes('provide the paper'))) {
+    window.log('Routing via: Intent (Explicit Screen References - FIXED)');
+    // Assuming handleScreenReferenceFollowup is defined elsewhere
+    htmlResult = window.handleScreenReferenceFollowup(); 
+    }
 
         // =======================================================
         // =( 4 )= INTENT: SCREENS / PHENOTYPES
