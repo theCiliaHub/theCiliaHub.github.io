@@ -168,6 +168,7 @@
         <ul class="nav-links">
             <li><a href="index.html" class="active">Home</a></li>
             <li><a href="plots.html">Cilia Analysis</a></li>
+            <li><a href="cilihub.html">CiliHub</a></li>
             <li><a href="about.html">About</a></li>
         </ul>
     </nav>
@@ -250,7 +251,8 @@
         };
         
         window.downloadPlot = function(divId, filename) {
-            if (typeof Plotly !== 'undefined') {
+            const plotElement = document.getElementById(divId);
+            if (plotElement && typeof Plotly !== 'undefined') {
                 Plotly.downloadImage(divId, {format: 'png', filename: filename});
             }
         };
@@ -339,7 +341,7 @@
             window.addChatMessage('Loading UMAP visualization for FOXJ1...', false);
             
             if (typeof window.renderUMAPPlot === 'function') {
-                window.renderUMAPPlot('FOXJ1');
+                window.renderUMAPPlot('FOXJ1', ['FOXJ1']); 
             }
         };
         
@@ -380,6 +382,7 @@
         }
     </script>
     
+    <script src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/f2988c77c791d59fbf0e944facbb64eee6730cd5/script.js"></script>
     <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
 </body>
 </html>
