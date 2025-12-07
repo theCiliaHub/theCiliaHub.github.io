@@ -1496,48 +1496,7 @@ function renderScreenSummaryHeatmap(genes, custom) {
         });
     }
     
-// 8. Protein Domain Architecture Heatmap
-// --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
-function getCleanArray(gene, key) {
-    // 1. Initialize data variable using the requested key
-    let data = gene[key];
-    
-    // 1. Handle Complex Key Mismatch
-    if (key === 'Protein.complexes') {
-        data = gene['complex_components'] || gene['Protein.complexes'];
-        if (typeof data === 'object' && !Array.isArray(data)) {
-            return Object.keys(data).map(k => `${k}`);
-        }
-    }
 
-    // 2. Handle Mouse Phenotype Key Mismatch
-    if (key === 'Phenotypes_mouse') {
-        data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
-    }
-
-    // 3. Handle PFAM Domain Key Mismatch
-    if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-        const pfamIds = gene['PFAM_IDs'] || [];
-        const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
-        return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
-    }
-
-    // 4. FIX: Handle Screens Summary (MUST return raw array of objects for heatmap plotting)
-    if (key === 'screens_summary') {
-        data = data || gene['screens']; // Fallback if data key is wrong
-        if (Array.isArray(data)) return data; 
-    }
-    
-    // Check if data is null/undefined before attempting to process it
-    if (!data) return [];
-    
-    // 5. Split and Filter for string fields (This contains the critical regex)
-    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
-    
-    // Final default return for string fields (REGEX IS SAFE HERE)
-    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
-}
-    
     
 // =============================================================================
 // =============================================================================
