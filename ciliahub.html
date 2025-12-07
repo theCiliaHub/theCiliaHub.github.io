@@ -832,18 +832,21 @@ function updateActiveNav(path) {
             }
         }
 
-        function navigateToGenePage(geneName) {
+function navigateToGenePage(geneName) {
             const selectedGene = window.ciliaryGeneMap.get(geneName.toUpperCase());
-            if (selectedGene) {
-                const input = document.getElementById('single-gene-search');
-                if (input) input.value = selectedGene.gene || selectedGene.Gene;
-                document.getElementById('search-suggestions')?.style = 'display:none';
-                window.location.hash = `#${selectedGene.gene || selectedGene.Gene}`;
-                displayIndividualGenePage(selectedGene);
-            } else {
-                console.warn(`Navigation failed: No gene found for "${geneName}"`);
-            }
-        }
+    if (selectedGene) {
+        const input = document.getElementById('single-gene-search');
+        if (input) input.value = selectedGene.gene || selectedGene.Gene;
+
+        const suggestions = document.getElementById('search-suggestions');
+        if (suggestions) suggestions.style.display = 'none';
+
+        window.location.hash = `#${selectedGene.gene || selectedGene.Gene}`;
+        displayIndividualGenePage(selectedGene);
+    } else {
+        console.warn(`Navigation failed: No gene found for "${geneName}"`);
+    }
+}
         
         // --- ALL-INCLUSIVE Gene Detail Page ---
         function displayIndividualGenePage(gene) {
