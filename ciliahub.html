@@ -680,7 +680,7 @@ function displayHomePage() {
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
     
-    // FIX: Use window.allGenes for initial display and limit to 10
+    // Use window.allGenes for initial display and limit to 10
     displayGeneCards(window.allGenes.slice(0, 10));
 
     const hideSuggestions = () => {
