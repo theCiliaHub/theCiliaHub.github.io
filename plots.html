@@ -21,71 +21,68 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { height: 100%; font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); }
         
-        /* MAIN LAYOUT - SIDEBAR ON LEFT */
+        /* --- Main Layout --- */
         .main-container {
             display: flex;
-            min-height: 100vh;
+            min-height: calc(100vh - 60px);
         }
 
-        /* NAVBAR - ON LEFT SIDE */
-        .top-navbar {
-            background: var(--primary);
-            color: white;
-            width: 240px;
-            display: flex;
-            flex-direction: column;
-            padding: 20px 0;
-            box-shadow: 4px 0 12px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            z-index: 1000;
+        .content-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            transition: all 0.3s ease;
         }
-        
+
+        .content-area-full {
+            flex: 1;
+            width: 100%;
+        }
+
+        /* --- Top Navigation Bar --- */
+        .top-navbar {
+            background: var(--primary-blue);  /* <-- This sets the navbar background color */
+            color: white;  /* <-- This sets the text color to white */
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            height: 60px;
+            border-bottom: 1px solid var(--primary-blue);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
         .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
-            font-weight: 600;
-            font-size: 20px;
-            padding: 0 20px 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 20px;
+            gap: 10px;
+            margin-right: 30px;
+            font-size: 24px;   /* <-- This sets the brand text size to 24px */
+            font-weight: 600;  /* <-- This makes the brand text bold */
         }
-        .brand img { 
-            height: 40px; 
-            border-radius: 8px; 
-        }
-        
+
         .nav-links {
             display: flex;
-            flex-direction: column;
             list-style: none;
-            gap: 4px;
-            padding: 0 10px;
-            flex: 1;
+            gap: 20px;
+            height: 100%;
         }
-        
+
         .nav-links a {
             color: white;
             text-decoration: none;
-            padding: 12px 16px;
-            border-radius: 6px;
-            font-weight: 500;
-            transition: all 0.2s;
+            padding: 0 15px;
+            height: 100%;
             display: flex;
             align-items: center;
-        }
-        
-        .nav-links a:hover { 
-            background: rgba(255,255,255,0.15); 
-        }
-        
-        .nav-links a.active { 
-            background: rgba(255,255,255,0.25); 
-            font-weight: 600; 
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
         }
 
+        .nav-links a:hover, .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.1);  /* <-- Adds light background on hover/active */
+        }
+        
         /* CONTENT AREA */
         .content-area {
             flex: 1;
@@ -289,6 +286,7 @@
                 <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo">
                 <div>
                     <div>CiliAI</div>
+                    <!-- In the HTML, this inline style controls the subtitle size -->
                     <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
                 </div>
             </div>
