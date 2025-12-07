@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — CiliaHub</title>
-    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
-    
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --primary-blue: #005b96;
@@ -51,36 +53,45 @@
             color: white;
             display: flex;
             align-items: center;
-            padding: 0 20px;
+            justify-content: space-between;
+            padding: 0 32px;
             height: 60px;
             border-bottom: 1px solid var(--primary-blue);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
 
+        /* Grouping Brand and Links on Left */
+        .nav-group {
+            display: flex;
+            align-items: center;
+        }
+        
         .brand {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-right: 30px;
             font-size: 18px;
             font-weight: 600;
         }
+        .brand img { height: 36px; border-radius: 6px; }
 
         .nav-links {
             display: flex;
             list-style: none;
-            gap: 20px;
-            height: 100%;
+            gap: 4px; /* Reduced gap to bring links closer */
+            margin-left: 15px; /* Space between Brand and Links */
         }
 
         .nav-links a {
             color: white;
-            text-decoration: none;
-            padding: 0 15px;
-            height: 100%;
+            padding: 12px 10px;
+            height: 60px;
             display: flex;
             align-items: center;
-            font-size: 19px;
+            font-size: 15px;
             font-weight: 500;
             transition: background-color 0.3s;
         }
@@ -98,7 +109,7 @@
             padding: 20px;
             overflow-y: auto;
             transition: transform 0.3s ease;
-            display: block !important; /* Force display */
+            display: block !important;
         }
 
         .panel-header {
@@ -136,24 +147,6 @@
             opacity: 0.9;
         }
 
-        .cilia-part:focus {
-            outline: 2px solid #0d6efd;
-            outline-offset: 2px;
-        }
-
-        .cilia-part.highlighted {
-            stroke: #ff6b6b !important;
-            stroke-width: 3px !important;
-        }
-
-        .cilia-part.search-gene {
-            fill: #4ecdc4 !important;
-        }
-
-        .cilia-part.cilia {
-            fill: #45b7d1 !important;
-        }
-
         /* Gene Buttons */
         .gene-buttons {
             display: flex;
@@ -173,145 +166,20 @@
             transition: all 0.2s ease;
         }
 
-        .gene-btn:hover {
-            background: #d8e7f8;
-            transform: translateY(-1px);
-        }
-
         .gene-btn.selected {
             background: var(--primary-blue);
             color: white;
             border-color: var(--primary-blue);
         }
 
-        .gene-btn.search-gene {
-            background: #e8f6f3;
-            border-color: #4ecdc4;
-            color: #26a69a;
-        }
-
-        .gene-btn.reset-btn {
-            background: #f8f9fa;
-            border-color: #dee2e6;
-            color: #6c757d;
-            margin-top: 10px;
-        }
-
-        .controls h4 {
-            color: var(--accent-text);
-            margin-bottom: 10px;
-            font-size: 1rem;
-        }
-
-        /* --- Page Container --- */
-        .page-container {
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            line-height: 1.6;
-            color: var(--accent-text);
-        }
-
-        .page-container h1 {
-            color: var(--primary-blue);
-            margin-bottom: 20px;
-            border-bottom: 2px solid var(--border-light);
-            padding-bottom: 10px;
-        }
-
-        .page-container h2 {
-            color: var(--accent-text);
-            margin-top: 20px;
-            margin-bottom: 10px;
-            font-size: 1.4em;
-        }
-
-        .page-container ul {
-            margin-left: 20px;
-            padding: 10px 0;
-        }
-        
-        /* Stats Styling */
-        .ciliahub-stats { 
-            margin-top: 1rem; 
-            margin-bottom: 2rem; 
-            display: flex; 
-            gap: 1rem; 
-            flex-wrap: wrap; 
-            font-family: 'Arial', sans-serif;
-        }
-
-        .ciliahub-stats > div {
-            flex: 1; 
-            min-width: 180px; 
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); 
-            color: #1565c0; 
-            padding: 1.25rem; 
-            border-radius: 12px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-            border: 1px solid #90caf9; 
-            text-align: center; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            transition: transform 0.2s, box-shadow 0.2s; 
-            cursor: default;
-        }
-        
-        .hub-link {
-            display: inline-block;
-            margin-top: 15px;
-            padding: 10px 20px;
-            background: var(--primary-blue);
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-
-        .hub-link:hover {
-            background: #00477a;
-        }
-        
-        /* Gene Search Styling */
-        #single-gene-search { 
-            border: 1px solid var(--border-light); 
-            padding: 10px 15px; 
-            border-radius: 6px; 
-            width: 100%;
-        }
-        
-        .search-container { 
-            display: flex; 
-            gap: 10px; 
-            margin-top: 15px; 
-        }
-        
-        .search-btn { 
-            background: var(--primary-blue); 
-            color: white; 
-            border: none; 
-            padding: 10px 20px; 
-            border-radius: 6px; 
-            cursor: pointer; 
-        }
-
-        .search-btn:hover {
-            background: #00477a;
-        }
-
-        /* Gene Cards */
+        /* Gene Card Styles */
         .gene-cards {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
             margin-top: 30px;
         }
-
+        
         .gene-card {
             background: white;
             border: 1px solid var(--border-light);
@@ -321,7 +189,7 @@
             transition: all 0.3s ease;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
-
+        
         .gene-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
@@ -335,142 +203,54 @@
             margin-bottom: 10px;
         }
 
-        .gene-description {
-            color: #666;
-            font-size: 0.95rem;
-            line-height: 1.5;
-            margin-bottom: 15px;
-        }
-
-        .gene-info {
-            font-size: 0.9rem;
-            color: #555;
-            margin-bottom: 5px;
-        }
-
-        /* Gene Detail Page Styles */
-        .detail-card { 
-            background: white; 
-            border: 1px solid #e1e8ed; 
-            border-radius: 12px; 
-            padding: 20px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
-            margin-bottom: 20px; 
+        /* Search Styles */
+        .search-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
         }
         
-        .data-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            font-size: 0.95rem; 
+        #single-gene-search {
+            height: 40px;
+            border-radius: 6px;
+            padding-left: 145px;
+            box-sizing: border-box;
         }
         
-        .data-table th, .data-table td { 
-            padding: 8px 15px; 
-            border-bottom: 1px solid #e1e8ed; 
-            text-align: left; 
-        }
-        
-        .data-table th { 
-            font-weight: 600; 
-            width: 220px; 
-            border-right: 1px solid #e1e8ed; 
-        }
-        
-        .tag { 
-            background: #eaf2fa; 
-            color: #2c5aa0; 
-            padding: 0.35rem 0.7rem; 
-            border-radius: 15px; 
-            font-size: 0.85rem; 
-            border: 1px solid #c9dff0; 
-            display: inline-block;
-            margin: 2px;
-        }
-        
-        .not-available { 
-            color: #888; 
-            font-style: italic; 
-        }
-
-        /* Suggestions Dropdown */
-        #search-suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid var(--border-light);
-            border-radius: 0 0 6px 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            z-index: 1000;
-            display: none;
-        }
-
-        #search-suggestions ul {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-        }
-
-        #search-suggestions li {
-            padding: 10px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        #search-suggestions li:hover,
-        #search-suggestions li.active {
-            background: #f5f9ff;
-        }
-
-        #search-suggestions li:last-child {
-            border-bottom: none;
-        }
-
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .main-container {
-                flex-direction: column;
-            }
-            
-            .cilia-panel {
-                width: 100%;
-                border-left: none;
-                border-top: 1px solid var(--border-light);
-                order: 2;
-            }
-            
-            .content-area {
-                order: 1;
-            }
+        #single-search-btn {
+            padding: 0.5rem 1.5rem;
+            border-radius: 6px;
         }
     </style>
 </head>
 <body>
     <nav class="top-navbar">
-        <div class="brand">
-            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
-            <div>
-                <div>CiliAI</div>
-                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
+        <div class="nav-group"> 
+            <!-- Brand -->
+            <div class="brand">
+                <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo">
+                <div>CiliAI <small style="font-size:10px; opacity:0.9;">Gene Explorer</small></div>
             </div>
+            
+            <!-- Links -->
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="plots.html">Cilia Analysis</a></li>
+                <li><a href="ciliahub.html" class="active">CiliaHub</a></li>
+                <li><a href="about.html">About</a></li>
+            </ul>
         </div>
         
-        <ul class="nav-links">
-            <li><a href="index.html">Home</a></li>
-            <li><a href="plots.html">Cilia Analysis</a></li>
-            <li><a href="ciliahub.html" class="active">CiliaHub</a></li>
-            <li><a href="about.html">About</a></li>
-        </ul>
+        <div></div> 
     </nav>
 
     <div class="main-container">
-        <!-- Main Content Area -->
+        <!-- Main Content Area (Gene Cards/Details) -->
         <main class="content-area" id="page-content">
             <!-- Content will be dynamically loaded here -->
         </main>
 
-        <!-- Interactive Cilium Panel -->
+        <!-- Interactive Cilium Panel (Sidebar) -->
         <aside class="cilia-panel">
             <div class="panel-header">
                 <h3>Interactive Cilium</h3>
@@ -497,8 +277,8 @@
                         </defs>
 
                         <path id="cell-body" class="cilia-part" tabindex="0"
-                              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="2"
-                              d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
+                            fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="2"
+                            d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
 
                         <circle id="nucleus" class="cilia-part" tabindex="0"
                                 fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="2"
@@ -507,17 +287,17 @@
                         <rect id="basal-body" class="cilia-part" tabindex="0" fill="#4A5568" x="140" y="195" width="20" height="15"/>
 
                         <path id="transition-zone" class="cilia-part" tabindex="0"
-                              fill="#718096" stroke="#4A5568" stroke-width="2"
-                              d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+                            fill="#718096" stroke="#4A5568" stroke-width="2"
+                            d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
 
                         <path id="ciliary-membrane" class="cilia-part" tabindex="0"
-                              fill="none" stroke="#A0AEC0" stroke-width="2" stroke-dasharray="4,4"
-                              d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+                            fill="none" stroke="#A0AEC0" stroke-width="2" stroke-dasharray="4,4"
+                            d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
 
                         <path id="axoneme" class="cilia-part" tabindex="0"
-                              fill="none" stroke="#4A5568" stroke-width="2"
-                              d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
-                              
+                            fill="none" stroke="#4A5568" stroke-width="2"
+                            d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
+                            
                         <!-- Labels for cilium parts -->
                         <g class="cilia-labels">
                             <text x="150" y="370" text-anchor="middle" font-size="10" fill="#4A5568">Cell Body</text>
@@ -546,112 +326,44 @@
     </div>
     
     <script>
-// Initialize global caches/state variables
-    window.rnaTissueExpressionData = {};
-    window.CiliAI = { masterData: [], lookups: { geneMap: {} } };
-    window.liPhylogenyCache = {};
-    window.neversPhylogenyCache = {};
-    window.CiliAI.cellDataCache = {}; // Used for scRNA-seq expression data
-    window.CiliAI_UMAP = []; // Used for scRNA-seq coordinates
-    window.ciliaryGeneMap = new Map(); // Gene map for CiliAI data
+// ==========================================================
+// GLOBAL STATE & DATA STRUCTURES
+// ==========================================================
+let ciliaryGeneMap = new Map();
+let liMatrix = {};
+let neversMatrix = {};
 
-    // DATA URLS
-    const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-    const MASTER_DB = BASE_URL + 'ciliAI_master_database.json';
-    const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json';
-    const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json';
-    const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json';
-    const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv';
+// Global state variables exposed globally, matching CiliAI.js structure
+window.rnaTissueExpressionData = {};
+window.CiliAI = {};
+window.CiliAI.masterData = [];
+window.CiliAI.lookups = { geneMap: {} };
+window.liPhylogenyCache = {};
+window.neversPhylogenyCache = {};
+window.CiliAI.cellDataCache = {}; // UMAP expression cache
+window.CiliAI_UMAP = []; // UMAP coordinates
+window.geneLocalizationData = {}; // Global store for localization arrays
 
-    // NEW: Dedicated scRNA-seq Data URLs (USED IN loadMasterData)
-    const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
-    const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
+// DATA URLS
+const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+const MASTER_DB = BASE_URL + 'ciliAI_master_database.json';
+const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json';
+const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json';
+const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json';
+const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv';
 
-    // ==========================================================
-    // CORE UTILITIES & DATA LOADING
-    // ==========================================================
+// --- MOCK DATA ---
+const defaultGenesNames = ["IFT88", "CEP290", "ARL13B", "BBS1", "PKD2", "ACE2"];
 
-    function log(message) { console.log(`[CiliAI] ${message}`); }
-    function clearPlot() {
-        const el = document.getElementById('plot-display-area');
-        el.innerHTML = '';
-        if (window.currentPlot) Plotly.purge(el);
-    }
-    
-// --- Data Maps for Phylogeny (Kept for plot consistency) ---
-// --- ENSURE PHYLOGENY CONSTANTS ARE DEFINED ---
-// Add these if not already defined in your code
-// --- NEW: Species Group Definitions for Filtering ---
-// --- NEW COMPREHENSIVE SPECIES GROUP DEFINITIONS (Used for Filtering) ---
-const PHYLO_SPECIES_GROUPS = {
-    // 1. VERTEBRATES (Ciliated: Humans, Mouse, Fish, Frog, Chicken)
-    vertebrates: [
-        "Homo sapiens", "M. musculus", "Mus musculus", "Danio rerio", "D rerio", "Xenopus tropicalis", "X tropicalis", "Gallus gallus", "G gallus",
-        "Ornithorhynchus anatinus", "Myotis lucifugus", "Rattus norvegicus", "Cricetulus griseus", "Tetraodon nigroviridis", "F.rubripes", "O.latipes",
-        "Anolis carolinensis", "S.scrofa", "B.taurus", "C.familiaris", "O.anatinus", "M.domestica", "H.sapiens"
-    ],
-    // 2. INVERTEBRATES & BASAL METAZOANS (Ciliated/Ciliary-related)
-    invertebrates: [
-        "Caenorhabditis elegans", "C elegans", "C.briggsae", "Daphnia pulex", "D.pulex", "Acyrthosiphon pisum", "A.pisum", "P.humanus", "L.loa", "B.malayi",
-        "Schistosoma mansoni", "Schistosoma japonicum", "Strongylocentrotus purpuratus", "S purpuratus", "Ciona intestinalis", "C intestinalis",
-        "Branchiostoma floridae", "Oikopleura dioica", "A.queenslandica", "Monosiga brevicollis", "M brevicollis", "Capsaspora owczarzaki", "C.owczarzaki",
-        "Salpingoeca rosetta", "Hydra vulgaris", "Nematostella vectensis", "Trichoplax adhaerens"
-    ],
-    // 3. FUNGI (Non-ciliated)
-    fungi: [
-        "Saccharomyces cerevisiae", "S cerevisiae", "Schizosaccharomyces pombe", "S pombe", "Cryptococcus neoformans", "C neoformans", "Ustilago maydis", "U maydis", "Candida albicans", "C albicans",
-        "Yarrowia lipolytica", "Podospora anserina", "Emericella nidulans", "Tuber melanosporum", "Laccaria bicolor", "Puccinia graminis f. sp. tritici",
-        "Batrachochytrium dendrobatidis", "Nosema ceranae", "Enterocytozoon bieneusi", "Schizosaccharomyces japonicus", "A.gossypii", "K.lactis", "K.waltii",
-        "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus", "S.mikatae", "S.paradoxus", "S.arctica", "C.lusitaniae", "D.hansenii",
-        "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans", "C.dubliniensis"
-    ],
-    // 4. PROTOZOA & PARASITES (Mostly ciliated or flagellated)
-    protozoa: [
-        "Tetrahymena thermophila", "T thermophila", "Paramecium tetraurelia", "P tetraurelia", "Trypanosoma cruzi", "T cruzi", "Leishmania major", "L major",
-        "Giardia intestinalis", "G intestinalis", "Trichomonas vaginalis", "T vaginalis", "Cryptosporidium parvum", "C parvum", "Entamoeba histolytica", "E histolytica",
-        "Encephalitozoon cuniculi", "E cuniculi", "Trypanosoma brucei brucei", "Leishmania mexicana", "Plasmodium vivax", "P.vivax", "Plasmodium falciparum",
-        "Toxoplasma gondii", "T.gondii", "Blastocystis hominis", "Neospora caninum", "Ichthyophthirius multifiliis"
-    ],
-    // 5. PLANTS & ALGAE (Cilia in flagella/motility)
-    plants_algae: [
-        "Chlamydomonas reinhardtii", "C reinhardtii", "Volvox carteri", "V carteri", "Physcomitrella patens", "P patens", "Arabidopsis thaliana", "A thaliana",
-        "Vitis vinifera", "V vinifera", "Brachypodium distachyon", "B distachyon", "Sorghum bicolor", "S bicolor", "Micromonas sp. (strain RCC299 / NOUM17)",
-        "Ostreococcus lucimarinus", "Ostreococcus tauri", "Cyanidioschyzon merolae", "Selaginella moellendorffii", "P.trichocarpa", "R.communis", "T.trahens",
-        "D.discoideum", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri",
-        "A.flavus", "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum"
-    ]
-};
-    
-const NEVERS_CIL_PANEL = [
-    "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", 
-    "Caenorhabditis elegans", "Tetrahymena thermophila", "Chlamydomonas reinhardtii", 
-    "Micromonas sp", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis", 
-    "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", 
-    "Physcomitrella patens", "Paramecium tetraurelia", "Volvox carteri", 
-    "Amphimedon queenslandica", "Monosiga brevicollis"
-];
+// ==========================================================
+// CORE UTILITY FUNCTIONS
+// ==========================================================
 
-const NEVERS_NCIL_PANEL = [
-    "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Cryptococcus neoformans", 
-    "Ustilago maydis", "Candida albicans", "Arabidopsis thaliana", "Brachypodium distachyon", 
-    "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum", "Entamoeba histolytica", 
-    "Encephalitozoon cuniculi"
-];
+function log(message) { console.log(`[CiliAI] ${message}`); }
+function clearPlot() {
+    // This is the plot analysis page, so this function is intentionally blank here
+}
 
-const LI_CIL_ORG = [
-    "H sapiens", "M musculus", "D rerio", "X tropicalis", "G gallus", "C elegans", 
-    "T thermophila", "C reinhardtii", "M sp RCC299", "T cruzi", "L major", 
-    "G intestinalis", "T vaginalis", "S purpuratus", "C intestinalis", "P patens", 
-    "P tetraurelia", "V carteri", "A queenslandica", "M brevicollis"
-];
-
-const LI_NCIL_ORG = [
-    "S cerevisiae", "S pombe", "C neoformans", "U maydis", "C albicans", "A thaliana", 
-    "B distachyon", "S bicolor", "V vinifera", "C parvum", "E histolytica", "E cuniculi"
-];
-
-
-// --- TSV Parsing Helper (UNCHANGED) ---
 function parseTsvData(tsvText) {
     const data = {};
     const lines = tsvText.split('\n').filter(line => line.trim() !== '');
@@ -659,43 +371,73 @@ function parseTsvData(tsvText) {
 
     const headers = lines[0].split('\t').map(h => h.trim());
     const geneNameIndex = headers.indexOf('Gene name');
-    const tissueIndex = headers.indexOf('Tissue');
-    const nTPMIndex = headers.indexOf('nTPM');
-
-    if (geneNameIndex === -1 || tissueIndex === -1 || nTPMIndex === -1) {
-        console.error("TSV headers missing: 'Gene name', 'Tissue', or 'nTPM'");
-        return data;
-    }
+    
+    if (geneNameIndex === -1) return data;
 
     for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split('\t').map(v => v.trim());
-        if (values.length > tissueIndex) {
-            const geneName = values[geneNameIndex];
-            let tissue = values[tissueIndex];
-            const nTPM = parseFloat(values[nTPMIndex]);
-
-            if (tissue.toLowerCase() === 'cilia') continue; 
-
-            if (geneName && !isNaN(nTPM)) {
-                if (!data[geneName]) data[geneName] = {};
-                data[geneName][tissue] = nTPM;
+        const geneName = values[geneNameIndex];
+        
+        if (geneName) {
+            if (!data[geneName]) data[geneName] = {};
+            for (let j = 0; j < headers.length; j++) {
+                if (j !== geneNameIndex && headers[j] && values[j]) {
+                    data[geneName][headers[j]] = parseFloat(values[j]);
+                }
             }
         }
     }
     return data;
 }
 
-// --- PHYLOGENETIC DATA INTEGRATION ---
+function getCleanArray(gene, key) {
+    let data = gene[key];
+    if (key === 'screens_summary' && Array.isArray(data)) return data;
+    if (!data) return [];
+    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
+    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
+}
+
+function findGenes(input) {
+    const queries = input
+        .split(/[\s,;]+/) 
+        .map(s => s.trim().replace(/\u200B/g, '').toUpperCase())
+        .filter(Boolean);
+        
+    const found = [];
+    const seen = new Set();
+    
+    queries.forEach(q => {
+        if (ciliaryGeneMap.has(q)) {
+            if (!seen.has(q)) {
+                found.push(ciliaryGeneMap.get(q));
+                seen.add(q);
+            }
+        } else {
+            if (!seen.has(q)) {
+                found.push({ gene: q });
+                seen.add(q);
+            }
+        }
+    });
+    return found;
+}
+
+function formatAsTags(data) {
+    if (!data) return '<span class="not-available">Not available</span>';
+    const arr = Array.isArray(data) ? data : String(data).split(/[;,]\s*/).filter(Boolean);
+    if (arr.length === 0) return '<span class="not-available">Not available</span>';
+    return arr.map(item => `<span class="tag">${item.trim()}</span>`).join('');
+}
+
+// ==========================================================
+// DATA INTEGRATION AND MASTER LOADING
+// ==========================================================
+
 function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
-    let liIntegrated = 0;
-    let neversIntegrated = 0;
-    
-    console.log("Integrating phylogenetic data into gene objects...");
-    
-    // Integrate Nevers 2017 data
     if (neversMatrix && neversMatrix.genes) {
-        Object.entries(neversMatrix.genes).forEach(([geneKey, phyloData]) => {
-            if (geneKey && phyloData && phyloData.g) {
+        Object.values(neversMatrix.genes).forEach(phyloData => {
+            if (phyloData && phyloData.g) {
                 const geneSymbol = phyloData.g.toUpperCase();
                 const gene = geneMap.get(geneSymbol);
                 if (gene) {
@@ -705,13 +447,11 @@ function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
                         species_count: (phyloData.s || []).length,
                         gene_name: phyloData.g
                     };
-                    neversIntegrated++;
                 }
             }
         });
     }
     
-    // Integrate Li 2014 data
     if (liMatrix && liMatrix.genes) {
         Object.values(liMatrix.genes).forEach(phyloData => {
             if (phyloData && phyloData.g) {
@@ -725,856 +465,513 @@ function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
                         entrez_id: phyloData.e,
                         gene_name: phyloData.g
                     };
-                    liIntegrated++;
                 }
             }
         });
     }
-    
-    console.log(`Integrated phylogenetic data: ${neversIntegrated} genes from Nevers 2017, ${liIntegrated} genes from Li 2014`);
-    return { liIntegrated, neversIntegrated };
 }
-    
-/**
- * @loadMasterData - Loads data and constructs the necessary global structures.
- */
+
 async function loadMasterData() {
     try {
-        // 1. Fetch ALL data concurrently (7 requests now: 5 existing + 2 UMAP)
-        const [
-            masterResp, lookupResp, liResp, neversResp, rnaResp,
-            umapCoordResp, cellxgeneExprResp
-        ] = await Promise.all([
+        const [masterResp, lookupResp, liResp, neversResp, rnaResp] = await Promise.all([
             fetch(MASTER_DB),
             fetch(LOOKUP_DB),
             fetch(LI_PHYLO_MATRIX),
             fetch(NEVERS_PHYLO_MATRIX),
-            fetch(RNA_TISSUE_TSV),
-            fetch(UMAP_COORDINATES_DB),       // NEW UMAP COORDINATES
-            fetch(CELLXGENE_EXPRESSION_DB)    // NEW EXPRESSION DATA
+            fetch(RNA_TISSUE_TSV)
         ]);
         
-        // 2. Process fetched JSON data
         const rawMasterData = await masterResp.json();
         const rawLookups = await lookupResp.json();
         
-        // Populate Global Phylogeny Caches
-        window.liPhylogenyCache = await liResp.json();
-        window.neversPhylogenyCache = await neversResp.json();
-
-        // Process new scRNA-seq data files
-        const umapCoordinatesData = await umapCoordResp.json();
-        const cellxgeneExpressionData = await cellxgeneExprResp.json();
-        
-        // Use local references for clarity in this function scope
-        const liMatrix = window.liPhylogenyCache;
-        const neversMatrix = window.neversPhylogenyCache;
-
-        // Set CiliAI lookups structure
         window.CiliAI.lookups = rawLookups.lookups || {};
         window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
 
-        // --- UMAP Data Assignment: CRITICAL STEP ---
-        // 1. Check if the UMAP data is an array of points (coordinates)
-        const isUmapValid = Array.isArray(umapCoordinatesData) && umapCoordinatesData.length > 0;
-        // 2. Check if the Expression data is a non-empty object (gene map)
-        const isExprValid = typeof cellxgeneExpressionData === 'object' && Object.keys(cellxgeneExpressionData).length > 0;
+        window.liPhylogenyCache = await liResp.json();
+        window.neversPhylogenyCache = await neversResp.json();
+        
+        const rnaText = await rnaResp.text();
+        window.rnaTissueExpressionData = parseTsvData(rnaText);
 
-        if (isUmapValid && isExprValid) {
-            // Success: Data is available in the expected array/object structure
-            window.CiliAI_UMAP = umapCoordinatesData;
-            window.CiliAI.cellDataCache = cellxgeneExpressionData;
-            
-            const totalCells = umapCoordinatesData.length;
-            const totalGenes = Object.keys(cellxgeneExpressionData).length;
-            console.log(`scRNA-seq UMAP data loaded successfully from dedicated files. Total cells: ${totalCells}. Total expressed genes: ${totalGenes}`);
-            
-        } else {
-             // Failure: Keep variables empty and log warning
-             console.warn(`scRNA-seq UMAP data not found in new dedicated files.`);
-             window.CiliAI_UMAP = [];
-             window.CiliAI.cellDataCache = {};
-        }
-
-        // 4. Populate Gene Map (ciliaryGeneMap) with BASIC gene data first
+        // Populate Gene Map (ciliaryGeneMap)
         window.CiliAI.masterData.forEach(g => {
             if (g.Gene) {
-                // Create the base gene object
-                const gene = { ...g, gene: g.Gene, phylogeny: {} };
-                
-                // Store Entrez ID for matrix lookup and debug checks
-                if (g['Entrez.ID']) {
-                    gene.entrezId = String(g['Entrez.ID']); 
-                }
-                
-                window.ciliaryGeneMap.set(g.Gene.toUpperCase(), gene);
-                
+                const gene = { ...g, gene: g.Gene };
+                ciliaryGeneMap.set(g.Gene.toUpperCase(), gene);
                 if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
                 window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = gene;
             }
         });
 
-        // 5. CRITICAL: INTEGRATE PHYLOGENETIC DATA PROPERLY
-        integratePhylogenyData(window.ciliaryGeneMap, liMatrix, neversMatrix);
-        
-        // 6. Load RNA tissue data
-        const rnaText = await rnaResp.text();
-        window.rnaTissueExpressionData = parseTsvData(rnaText);
+        integratePhylogenyData(ciliaryGeneMap, window.liPhylogenyCache, window.neversPhylogenyCache);
 
         window.CiliAI.ready = true;
-        console.log(`Loaded ${window.ciliaryGeneMap.size} genes and 7 external datasets.`);
         
-        // Update global variables for CiliaHub
-        window.allGenes = Array.from(window.ciliaryGeneMap.values());
-        window.currentData = window.allGenes;
-        
-        return true;
-        
+        // Populate ALL_GENES with loaded data
+        window.allGenes = Array.from(ciliaryGeneMap.values());
+
     } catch (err) {
         console.error("Critical Data Loading Error:", err);
-        document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Please verify the data URLs.</p>`;
-        return false;
+        document.getElementById('page-content').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Plotting functionality will be limited.</p>`;
+        window.CiliAI.ready = true; 
     }
 }
 
-    
-// --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
-function getCleanArray(gene, key) {
-    // 1. Initialize data variable using the requested key
-    let data = gene[key];
-    
-    // 1. Handle Complex Key Mismatch
-    if (key === 'Protein.complexes') {
-        data = gene['complex_components'] || gene['Protein.complexes'];
-        if (typeof data === 'object' && !Array.isArray(data)) {
-            return Object.keys(data).map(k => `${k}`);
-        }
-    }
+// ==========================================================
+// INTERACTIVE CILIUM FUNCTIONS (Must be defined early)
+// ==========================================================
+window.geneLocalizationData = {}; // Global store for localization arrays
 
-    // 2. Handle Mouse Phenotype Key Mismatch
-    if (key === 'Phenotypes_mouse') {
-        data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
-    }
+const allPartIds = ["ciliary-membrane", "axoneme", "basal-body", "transition-zone", "nucleus", "cell-body"]; 
+const localizationMapping = {
+    "ciliary membrane": ["ciliary-membrane", "axoneme"], "axoneme": ["ciliary-membrane", "axoneme"],
+    "basal body": ["basal-body"], "transition zone": ["transition-zone"], "cilia": ["ciliary-membrane", "axoneme"],
+    "flagella": ["ciliary-membrane", "axoneme"], "ciliary associated gene": ["ciliary-membrane", "axoneme"],
+    "nucleus": ["nucleus"], "centrosome": ["basal-body"], "cytosol": ["cell-body"],
+    "mitochondrion": ["cell-body"], "endoplasmic reticulum": ["cell-body"], "golgi apparatus": ["cell-body"],
+    "lysosome": ["cell-body"], "microbody": ["cell-body"], "peroxisome": ["cell-body"],
+    "microtubules": ["cell-body"], "autophagosomes": ["cell-body"]
+};
 
-    // 3. Handle PFAM Domain Key Mismatch
-    if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-        const pfamIds = gene['PFAM_IDs'] || [];
-        const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
-        return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
-    }
-
-    // 4. RESTORED SCREEN LOGIC: Return the raw array of objects when requested.
-    // This is crucial because renderScreenSummaryHeatmap iterates over these objects.
-    if (key === 'screens_summary') {
-        data = data || gene['screens']; // Fallback if data key is wrong
-        if (Array.isArray(data)) return data; 
-        // If data is null/undefined here, we proceed to return empty list.
-    }
-    
-    // Check if data is null/undefined before attempting to process it
-    if (!data) return [];
-    
-    // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
-    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
-    
-    // Final default return for string fields
-    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
+function mapLocalizationToSVG(localizationArray) {
+    if (!Array.isArray(localizationArray)) return [];
+    return localizationArray.flatMap(loc => {
+        if (typeof loc !== 'string') return [];
+        const normalized = loc.trim().toLowerCase().replace(/[-_]/g, ' ');
+        return localizationMapping[normalized] || [];
+    }).filter(id => allPartIds.includes(id));
 }
-   
-function findGenes(input) {
-    const queries = input
-        .split(/[\s,\n;]+/)
-        .map(s => s.trim().replace(/\u200B/g, '').toUpperCase())
-        .filter(Boolean);
-        
-    const found = [];
-    const seen = new Set();
+
+function updateGeneButtonsForGene(gene) {
+    const geneButtons = document.getElementById('geneButtons');
+    if (!geneButtons) return;
+
+    geneButtons.innerHTML = '';
+
+    const geneName = gene.gene || gene.Gene;
+    if (geneName) {
+        const button = document.createElement('button');
+        button.className = 'gene-btn selected';
+        button.textContent = geneName;
+        button.onclick = () => showLocalization(geneName, false);
+        geneButtons.appendChild(button);
+    }
+
+    const resetButton = document.createElement('button');
+    resetButton.className = 'gene-btn reset-btn';
+    resetButton.textContent = 'Reset Diagram';
+    resetButton.onclick = () => showLocalization('reset');
+    geneButtons.appendChild(resetButton);
+
+    if (geneName) {
+        showLocalization(geneName, false);
+    }
+}
+
+function updateGeneButtons(genes, searchResults = []) {
+    const geneButtons = document.getElementById('geneButtons');
+    if (!geneButtons) return;
     
-    queries.forEach(q => {
-        // Find the full gene object if it exists in the main map
-        if (window.ciliaryGeneMap.has(q)) {
-            if (!seen.has(q)) {
-                found.push(window.ciliaryGeneMap.get(q));
-                seen.add(q);
-            }
-        } else {
-            // Include minimal object for genes not in the core map (for external data sources)
-            if (!seen.has(q)) {
-                found.push({ gene: q }); 
-                seen.add(q);
-            }
+    geneButtons.innerHTML = '';
+    
+    const genesToShow = [...genes].slice(0, 10);
+    
+    genesToShow.forEach(gene => {
+        const geneName = gene.gene || gene.Gene;
+        if (geneName && window.geneLocalizationData[geneName]) {
+            const isSearch = searchResults.some(s => {
+                const sName = s.gene || s.Gene;
+                return sName === geneName;
+            });
+            const button = document.createElement('button');
+            button.className = `gene-btn ${isSearch ? 'search-gene' : ''}`;
+            button.textContent = geneName;
+            button.onclick = () => showLocalization(geneName, isSearch);
+            geneButtons.appendChild(button);
         }
     });
-    return found; 
+    
+    const resetButton = document.createElement('button');
+    resetButton.className = 'gene-btn reset-btn';
+    resetButton.textContent = 'Reset Diagram';
+    resetButton.onclick = () => showLocalization('reset');
+    geneButtons.appendChild(resetButton);
 }
 
-        // ==========================================================
-        // 1. GLOBAL VARIABLES AND CACHE DECLARATIONS
-        // ==========================================================
-        let allGenes = [];
-        let currentData = [];
-        let searchResults = [];
-        let geneLocalizationData = {};
-        const defaultGenesNames = ["IFT88", "CEP290", "ARL13B", "BBS1", "PKD2", "ACE2"];
-        const allPartIds = ["ciliary-membrane", "axoneme", "basal-body", "transition-zone", "nucleus", "cell-body"];
-
-        // ==========================================================
-        // 2. CORE UTILITY FUNCTIONS
-        // ==========================================================
-        
-        function sanitize(input) {
-            if (typeof input !== 'string') return '';
-            return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-                        .replace(/[^\x20-\x7E]/g, '')
-                        .trim()
-                        .toUpperCase();
-        }
-
-        function mapLocalizationToSVG(localizationArray) {
-            const mapping = {
-                "ciliary membrane": ["ciliary-membrane", "axoneme"], 
-                "axoneme": ["ciliary-membrane", "axoneme"],
-                "basal body": ["basal-body"], 
-                "transition zone": ["transition-zone"], 
-                "cilia": ["ciliary-membrane", "axoneme"],
-                "flagella": ["ciliary-membrane", "axoneme"], 
-                "ciliary associated gene": ["ciliary-membrane", "axoneme"],
-                "nucleus": ["nucleus"], 
-                "centrosome": ["basal-body"], 
-                "cytosol": ["cell-body"],
-                "mitochondrion": ["cell-body"], 
-                "endoplasmic reticulum": ["cell-body"], 
-                "golgi apparatus": ["cell-body"],
-                "lysosome": ["cell-body"], 
-                "microbody": ["cell-body"], 
-                "peroxisome": ["cell-body"],
-                "microtubules": ["cell-body"], 
-                "autophagosomes": ["cell-body"]
-            };
-            if (!Array.isArray(localizationArray)) return [];
-            return localizationArray.flatMap(loc => {
-                if (typeof loc !== 'string') return [];
-                const normalized = loc.trim().toLowerCase().replace(/[-_]/g, ' ');
-                return mapping[normalized] || [];
-            }).filter(id => allPartIds.includes(id));
-        }
-
-        // ==========================================================
-        // 3. SEARCH AND QUERY FUNCTIONS
-        // ==========================================================
-
-        function performSingleSearch() {
-            const query = document.getElementById('single-gene-search')?.value.trim().toUpperCase();
-            const statusDiv = document.getElementById('status-message');
-
-            if (!query) {
-                if(statusDiv) {
-                    statusDiv.innerHTML = `<span style="color: red;">Please enter a gene name.</span>`;
-                    statusDiv.style.display = 'block';
-                }
-                return;
-            }
-
-            const foundGenes = findGenes(query);
-
-            if (foundGenes.length === 0) {
-                if(statusDiv) {
-                    statusDiv.innerHTML = `<span style="color: red;">No genes found for "${query}".</span>`;
-                    statusDiv.style.display = 'block';
-                }
-                return;
-            }
-
-            // Display the gene page
-            if (foundGenes.length === 1) {
-                displayIndividualGenePage(foundGenes[0]);
+let selectedGenes = [];
+function showLocalization(geneName, isSearchGene = false) {
+    
+    if (geneName === 'reset') {
+        selectedGenes = [];
+        document.querySelectorAll('.cilia-part').forEach(part => {
+            part.classList.remove('highlighted', 'search-gene', 'cilia');
+            if (part.id === 'cell-body') {
+                part.style.fill = 'url(#cytosolGradient)';
+            } else if (part.id === 'nucleus') {
+                part.style.fill = 'url(#nucleusGradient)';
+            } else if (part.id === 'basal-body') {
+                part.style.fill = '#4A5568';
+            } else if (part.id === 'transition-zone') {
+                part.style.fill = '#718096';
             } else {
-                // For multiple results, show them in cards
-                displayGeneCards(foundGenes);
+                 part.style.fill = ''; // Ensure axoneme/membrane revert if they had a temporary fill
             }
+        });
+        document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
+        return;
+    }
+
+    const geneIndex = selectedGenes.findIndex(g => g.name === geneName);
+    if (geneIndex === -1) {
+        selectedGenes.push({ name: geneName, isSearch: isSearchGene });
+    } else {
+        selectedGenes.splice(geneIndex, 1);
+    }
+
+    // Reset all highlights and default fills
+    document.querySelectorAll('.cilia-part').forEach(part => {
+        part.classList.remove('highlighted', 'search-gene', 'cilia');
+        if (part.id === 'cell-body') {
+            part.style.fill = 'url(#cytosolGradient)';
+        } else if (part.id === 'nucleus') {
+            part.style.fill = 'url(#nucleusGradient)';
+        } else if (part.id === 'basal-body') {
+            part.style.fill = '#4A5568';
+        } else if (part.id === 'transition-zone') {
+            part.style.fill = '#718096';
+        } else {
+             part.style.fill = ''; // Reset for stroke-only elements
         }
+    });
 
-        // ==========================================================
-        // 4. DISPLAY FUNCTIONS
-        // ==========================================================
+    document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
 
-        function displayHomePage() {
-            const contentArea = document.getElementById('page-content');
-            if (!contentArea) return;
-
-            contentArea.innerHTML = `
-                <div class="page-container">
-                    <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
-
-                    <div class="ciliahub-stats">
-                        <div>
-                            <div style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; color: #1976d2;">Current Ciliary Genes</div>
-                            <div id="gene-count" style="font-size: 2.5rem; font-weight: 700; color: #0d47a1;">${allGenes.length}</div>
-                        </div>
-                    </div>
-
-                    <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
-
-                    <div class="search-container">
-                        <div class="search-wrapper" style="flex: 1; position: relative; display: flex; align-items: center;">
-                            <div style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; pointer-events: none; z-index: 2;">
-                                <span style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); white-space: nowrap;">CiliaHub V0.1</span>
-                            </div>
-                            <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off" style="padding-left: 145px; width: 100%; box-sizing: border-box;">
-                            <div id="search-suggestions"></div>
-                        </div>
-                        <button id="single-search-btn" class="search-btn" style="white-space: nowrap; padding: 0.5rem 1.5rem;">Search</button>
-                    </div>
-
-                    <div id="status-message" class="status-message" style="display: none;"></div>
-
-                    <div id="gene-cards-container" class="gene-cards">
-                        ${defaultGenesNames.map(geneName => {
-                            const gene = allGenes.find(g => g.gene === geneName || g.Gene === geneName);
-                            if (!gene) return '';
-                            const geneDisplay = gene.gene || gene.Gene;
-                            return `
-                                <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
-                                    <div class="gene-name">${geneDisplay}</div>
-                                    <div class="gene-description">${gene.description || gene.Description || 'No description available.'}</div>
-                                    ${gene.localization || gene.Localization ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(gene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
-                                    ${gene.ensembl_id || gene.Ensembl_ID ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.ensembl_id || gene.Ensembl_ID}</div>` : ''}
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-            `;
-
-            // Add event listeners
-            document.getElementById('single-search-btn').addEventListener('click', performSingleSearch);
+    // Apply new highlights
+    selectedGenes.forEach(geneObject => {
+        const geneLocalization = window.geneLocalizationData[geneObject.name];
+        if (geneLocalization) {
+            const isCiliary = geneLocalization.some(id => ['ciliary-membrane', 'axoneme'].includes(id));
             
-            const searchInput = document.getElementById('single-gene-search');
-            const suggestionsContainer = document.getElementById('search-suggestions');
-
-            searchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    performSingleSearch();
-                }
-            });
-
-            // Search suggestions
-            searchInput.addEventListener('input', function() {
-                const query = this.value.trim().toUpperCase();
-                if (query.length < 2) {
-                    suggestionsContainer.innerHTML = '';
-                    suggestionsContainer.style.display = 'none';
-                    return;
-                }
-
-                const filteredGenes = allGenes.filter(g => {
-                    const geneName = g.gene || g.Gene || '';
-                    const synonym = g.synonym || g.Synonyms || '';
-                    return geneName.toUpperCase().includes(query) || 
-                           synonym.toUpperCase().includes(query);
-                }).slice(0, 10);
-
-                if (filteredGenes.length > 0) {
-                    suggestionsContainer.innerHTML = filteredGenes.map(g => {
-                        const geneName = g.gene || g.Gene || '';
-                        const synonym = g.synonym || g.Synonyms || '';
-                        return `<div class="suggestion-item" data-gene="${geneName}">${geneName}${synonym ? ` (${synonym})` : ''}</div>`;
-                    }).join('');
-                    suggestionsContainer.style.display = 'block';
+            geneLocalization.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.add('highlighted');
                     
-                    suggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            searchInput.value = item.dataset.gene;
-                            suggestionsContainer.style.display = 'none';
-                            performSingleSearch();
-                        });
-                    });
-                } else {
-                    suggestionsContainer.innerHTML = '';
-                    suggestionsContainer.style.display = 'none';
-                }
-            });
-
-            document.addEventListener('click', (e) => {
-                if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
-                    suggestionsContainer.style.display = 'none';
-                }
-            });
-
-            // Initialize gene buttons
-            updateGeneButtons(defaultGenesNames.map(name => allGenes.find(g => (g.gene === name || g.Gene === name))).filter(Boolean));
-        }
-
-        function formatAsTags(data, className = '') {
-            if (!data) return '<span class="not-available">Not available</span>';
-            const arr = Array.isArray(data) ? data : String(data).split(/[;,]\s*/).filter(Boolean);
-            if (arr.length === 0) return '<span class="not-available">Not available</span>';
-            return arr.map(item => `<span class="tag ${className}">${item.trim()}</span>`).join('');
-        }
-
-        function displayIndividualGenePage(gene) {
-            const contentArea = document.getElementById('page-content');
-            if (!contentArea) return;
-
-            // Extract gene name from either 'gene' or 'Gene' field
-            const geneName = gene.gene || gene.Gene || "Unknown Gene";
-            
-            contentArea.innerHTML = `
-                <div class="page-container">
-                    <h1>${geneName}</h1>
-                    
-                    ${gene.description || gene.Description ? `<p style="color: #555; margin-bottom: 20px;">${gene.description || gene.Description}</p>` : ''}
-                    
-                    <div class="detail-card">
-                        <h3>Gene Information</h3>
-                        <table class="data-table">
-                            <tr>
-                                <th>Ensembl ID</th>
-                                <td>${gene.ensembl_id || gene.Ensembl_ID || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                            <tr>
-                                <th>Entrez ID</th>
-                                <td>${gene.entrezId || gene['Entrez.ID'] || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                            <tr>
-                                <th>Synonyms</th>
-                                <td>${formatAsTags(gene.synonym || gene.Synonyms)}</td>
-                            </tr>
-                            <tr>
-                                <th>Localization</th>
-                                <td>${formatAsTags(getCleanArray(gene, 'Localization'))}</td>
-                            </tr>
-                            <tr>
-                                <th>Functional Category</th>
-                                <td>${formatAsTags(gene.functional_category || gene['Functional.Category'])}</td>
-                            </tr>
-                            <tr>
-                                <th>Ciliopathies</th>
-                                <td>${formatAsTags(gene.ciliopathy || gene['Ciliopathy.disease'])}</td>
-                            </tr>
-                            <tr>
-                                <th>Protein Complexes</th>
-                                <td>${formatAsTags(getCleanArray(gene, 'Protein.complexes'))}</td>
-                            </tr>
-                            <tr>
-                                <th>Protein Domains (PFAM)</th>
-                                <td>${formatAsTags(getCleanArray(gene, 'Protein.Domain.PFAM'))}</td>
-                            </tr>
-                        </table>
-                    </div>
-
-                    <div class="detail-card">
-                        <h3>Orthologs</h3>
-                        <table class="data-table">
-                            <tr>
-                                <th>Mouse</th>
-                                <td>${gene.ortholog_mouse || gene['Ortholog.Mouse'] || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                            <tr>
-                                <th>Zebrafish</th>
-                                <td>${gene.ortholog_zebrafish || gene['Ortholog.Zebrafish'] || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                            <tr>
-                                <th>Drosophila</th>
-                                <td>${gene.ortholog_drosophila || gene['Ortholog.Drosophila'] || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                            <tr>
-                                <th>C. elegans</th>
-                                <td>${gene.ortholog_c_elegans || gene['Ortholog.C.elegans'] || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                            <tr>
-                                <th>Xenopus</th>
-                                <td>${gene.ortholog_xenopus || gene['Ortholog.Xenopus'] || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                        </table>
-                    </div>
-
-                    <div class="detail-card">
-                        <h3>Phenotypic Data</h3>
-                        <table class="data-table">
-                            <tr>
-                                <th>Mouse Phenotypes</th>
-                                <td>${formatAsTags(getCleanArray(gene, 'Phenotypes_mouse'))}</td>
-                            </tr>
-                            <tr>
-                                <th>Human Phenotypes (HPO)</th>
-                                <td>${formatAsTags(gene.hpo_terms || gene['HPO.Terms'])}</td>
-                            </tr>
-                            <tr>
-                                <th>OMIM ID</th>
-                                <td>${gene.omim_id || gene['OMIM.ID'] || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                        </table>
-                    </div>
-
-                    <div class="detail-card">
-                        <h3>Phylogenetic Data</h3>
-                        <table class="data-table">
-                            <tr>
-                                <th>Li 2014 Class</th>
-                                <td>${gene.phylogeny?.li_2014?.class || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                            <tr>
-                                <th>Nevers 2017 Species Count</th>
-                                <td>${gene.phylogeny?.nevers_2017?.species_count || '<span class="not-available">Not available</span>'}</td>
-                            </tr>
-                        </table>
-                    </div>
-
-                    <div style="margin-top: 20px; display: flex; gap: 10px;">
-                        <button onclick="displayHomePage()" style="padding: 10px 20px; background: var(--primary-blue); color: white; border: none; border-radius: 6px; cursor: pointer;">
-                            Back to Home
-                        </button>
-                        <button onclick="performSearchForGene('${geneName}')" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                            Search Related Genes
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            // Update interactive cilium for this gene
-            updateGeneButtonsForGene(gene);
-        }
-
-        function displayGeneCards(genes) {
-            const contentArea = document.getElementById('page-content');
-            contentArea.innerHTML = `
-                <div class="page-container">
-                    <h1>Search Results</h1>
-                    <div id="gene-cards-container" class="gene-cards">
-                        ${genes.map(gene => {
-                            const geneName = gene.gene || gene.Gene || '';
-                            return `
-                                <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
-                                    <div class="gene-name">${geneName}</div>
-                                    <div class="gene-description">${gene.description || gene.Description || 'No description available.'}</div>
-                                    ${gene.localization || gene.Localization ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(gene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
-                                    ${gene.ensembl_id || gene.Ensembl_ID ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.ensembl_id || gene.Ensembl_ID}</div>` : ''}
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                    <button onclick="displayHomePage()" style="padding: 10px 20px; background: var(--primary-blue); color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">
-                        Back to Home
-                    </button>
-                </div>
-            `;
-
-            // Update gene buttons with search results
-            updateGeneButtons(genes, genes);
-        }
-
-        function performSearchForGene(geneName) {
-            const searchInput = document.getElementById('single-gene-search');
-            if (searchInput) {
-                searchInput.value = geneName;
-                performSingleSearch();
-            } else {
-                // If we're not on home page, redirect to home with search
-                window.location.href = 'ciliahub.html#' + geneName;
-            }
-        }
-
-        // ==========================================================
-        // 6. INTERACTIVE CILIUM FUNCTIONS
-        // ==========================================================
-
-        function updateGeneButtonsForGene(gene) {
-            const geneButtons = document.getElementById('geneButtons');
-            if (!geneButtons) return;
-
-            // Clear existing buttons
-            geneButtons.innerHTML = '';
-
-            // Add gene button
-            const geneName = gene.gene || gene.Gene;
-            if (geneName && geneLocalizationData[geneName]) {
-                const button = document.createElement('button');
-                button.className = 'gene-btn selected';
-                button.textContent = geneName;
-                button.onclick = () => showLocalization(geneName, false);
-                geneButtons.appendChild(button);
-            }
-
-            // Add reset button
-            const resetButton = document.createElement('button');
-            resetButton.className = 'gene-btn reset-btn';
-            resetButton.textContent = 'Reset Diagram';
-            resetButton.onclick = () => showLocalization('reset');
-            geneButtons.appendChild(resetButton);
-
-            // Show localization for this gene
-            if (geneName) {
-                showLocalization(geneName, false);
-            }
-        }
-
-        function updateGeneButtons(genes, searchResults = []) {
-            const geneButtons = document.getElementById('geneButtons');
-            if (!geneButtons) return;
-            
-            geneButtons.innerHTML = '';
-            
-            const genesToShow = [...genes].slice(0, 10);
-            
-            genesToShow.forEach(gene => {
-                const geneName = gene.gene || gene.Gene;
-                if (geneName && geneLocalizationData[geneName]) {
-                    const isSearch = searchResults.some(s => {
-                        const sName = s.gene || s.Gene;
-                        return sName === geneName;
-                    });
-                    const button = document.createElement('button');
-                    button.className = `gene-btn ${isSearch ? 'search-gene' : ''}`;
-                    button.textContent = geneName;
-                    button.onclick = () => showLocalization(geneName, isSearch);
-                    geneButtons.appendChild(button);
-                }
-            });
-            
-            const resetButton = document.createElement('button');
-            resetButton.className = 'gene-btn reset-btn';
-            resetButton.textContent = 'Reset Diagram';
-            resetButton.onclick = () => showLocalization('reset');
-            geneButtons.appendChild(resetButton);
-        }
-
-        let selectedGenes = [];
-        function showLocalization(geneName, isSearchGene = false) {
-            if (geneName === 'reset') {
-                selectedGenes = [];
-                document.querySelectorAll('.cilia-part').forEach(part => {
-                    part.classList.remove('highlighted', 'search-gene', 'cilia');
-                    // Reset fill to original
-                    if (part.id === 'cell-body') {
-                        part.style.fill = 'url(#cytosolGradient)';
-                    } else if (part.id === 'nucleus') {
-                        part.style.fill = 'url(#nucleusGradient)';
-                    } else if (part.id === 'basal-body') {
-                        part.style.fill = '#4A5568';
-                    } else if (part.id === 'transition-zone') {
-                        part.style.fill = '#718096';
+                    if (id === 'ciliary-membrane' || id === 'axoneme') {
+                         el.classList.add('cilia'); // Use CSS class for stroke/dash array
                     }
-                });
-                document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
-                return;
-            }
-
-            const geneIndex = selectedGenes.findIndex(g => g.name === geneName);
-            if (geneIndex === -1) {
-                selectedGenes.push({ name: geneName, isSearch: isSearchGene });
-            } else {
-                selectedGenes.splice(geneIndex, 1);
-            }
-
-            // Clear all existing highlights
-            document.querySelectorAll('.cilia-part').forEach(part => {
-                part.classList.remove('highlighted', 'search-gene', 'cilia');
-                // Reset fill to original
-                if (part.id === 'cell-body') {
-                    part.style.fill = 'url(#cytosolGradient)';
-                } else if (part.id === 'nucleus') {
-                    part.style.fill = 'url(#nucleusGradient)';
-                } else if (part.id === 'basal-body') {
-                    part.style.fill = '#4A5568';
-                } else if (part.id === 'transition-zone') {
-                    part.style.fill = '#718096';
-                }
-            });
-
-            // Clear button selections
-            document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
-
-            // Apply new highlights
-            selectedGenes.forEach(geneObject => {
-                if (geneLocalizationData[geneObject.name]) {
-                    const isCiliary = geneLocalizationData[geneObject.name].some(id => ['ciliary-membrane', 'axoneme'].includes(id));
                     
-                    geneLocalizationData[geneObject.name].forEach(id => {
-                        const el = document.getElementById(id);
-                        if (el && id !== 'cell-body') {
-                            el.classList.add('highlighted');
-                            if (isCiliary) {
-                                el.classList.add('cilia');
-                            }
-                            if (geneObject.isSearch) {
-                                el.classList.add('search-gene');
-                            }
-                            
-                            // Apply fill color for solid parts
-                            if (id === 'basal-body' || id === 'transition-zone' || id === 'nucleus') {
-                                if (geneObject.isSearch) {
-                                    el.style.fill = '#4ecdc4'; // Search gene color
-                                } else if (isCiliary) {
-                                    el.style.fill = '#45b7d1'; // Ciliary color
-                                } else {
-                                    el.style.fill = 'url(#highlightGradient)'; // Highlight color
-                                }
-                            }
+                    // Apply fill color for solid parts (nucleus, basal body, transition zone)
+                    if (id === 'basal-body' || id === 'transition-zone' || id === 'nucleus') {
+                        el.classList.remove('cilia');
+                        if (geneObject.isSearch) {
+                             el.style.fill = '#4ecdc4';
+                        } else if (isCiliary) {
+                             el.style.fill = '#45b7d1';
+                        } else {
+                             el.style.fill = 'url(#highlightGradient)';
                         }
-                    });
+                    }
                 }
-                
-                // Select corresponding button
-                const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === geneObject.name);
-                if (btn) btn.classList.add('selected');
             });
         }
+        
+        const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === geneObject.name);
+        if (btn) btn.classList.add('selected');
+    });
+}
 
-        // ==========================================================
-        // 7. DEFAULT GENES (FALLBACK)
-        // ==========================================================
 
-        function getDefaultGenes() {
-            return [
-                {
-                    Gene: "IFT88",
-                    Ensembl_ID: "ENSG00000032742",
-                    Description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
-                    Synonyms: "BBS20, D13S840E, TG737, TTC10",
-                    Localization: ["axoneme", "basal body"],
-                    'Functional.Category': ["Intraflagellar transport", "Ciliary assembly/disassembly"],
-                    'Ciliopathy.disease': "Bardet-Biedl syndrome 20",
-                    'Ortholog.Mouse': "Ift88",
-                    'Ortholog.Zebrafish': "ift88",
-                    'Ortholog.Drosophila': "CG31052",
-                    'Ortholog.C.elegans': "che-2"
-                },
-                {
-                    Gene: "CEP290",
-                    Ensembl_ID: "ENSG00000198707",
-                    Description: "Centrosomal protein 290. Critical component of the ciliary transition zone.",
-                    Synonyms: "BBS14, JBTS5, MKS4, NPHP6, SLSN6",
-                    Localization: ["transition zone"],
-                    'Functional.Category': ["Transition zone", "Ciliary gating"],
-                    'Ciliopathy.disease': "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14",
-                    'Ortholog.Mouse': "Cep290",
-                    'Ortholog.Zebrafish': "cep290",
-                    'Ortholog.Drosophila': "Cep290",
-                    'Ortholog.C.elegans': "cep290"
-                },
-                {
-                    Gene: "ARL13B",
-                    Ensembl_ID: "ENSG00000169379",
-                    Description: "ADP-ribosylation factor-like protein 13B. Involved in ciliary membrane biogenesis.",
-                    Synonyms: "ARL2L2, JBTS8",
-                    Localization: ["ciliary membrane"],
-                    'Functional.Category': ["Ciliary membrane", "Signal transduction"],
-                    'Ciliopathy.disease': "Joubert syndrome 8",
-                    'Ortholog.Mouse': "Arl13b",
-                    'Ortholog.Zebrafish': "arl13b",
-                    'Ortholog.Drosophila': "Arl13b",
-                    'Ortholog.C.elegans': "arl-13"
-                },
-                {
-                    Gene: "BBS1",
-                    Ensembl_ID: "ENSG00000166246",
-                    Description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex.",
-                    Synonyms: "BBS",
-                    Localization: ["basal body", "ciliary membrane"],
-                    'Functional.Category': ["Ciliary trafficking", "BBSome complex"],
-                    'Ciliopathy.disease': "Bardet-Biedl syndrome 1",
-                    'Ortholog.Mouse': "Bbs1",
-                    'Ortholog.Zebrafish': "bbs1",
-                    'Ortholog.Drosophila': "Bbs1",
-                    'Ortholog.C.elegans': "bbs-1"
-                },
-                {
-                    Gene: "PKD2",
-                    Ensembl_ID: "ENSG00000118762",
-                    Description: "Polycystin-2, a calcium-permeable ion channel.",
-                    Synonyms: "TRPP2",
-                    Localization: ["axoneme", "endoplasmic reticulum"],
-                    'Functional.Category': ["Ion transport", "Ciliary signaling"],
-                    'Ciliopathy.disease': "Autosomal dominant polycystic kidney disease",
-                    'Ortholog.Mouse': "Pkd2",
-                    'Ortholog.Zebrafish': "pkd2",
-                    'Ortholog.Drosophila': "Pkd2",
-                    'Ortholog.C.elegans': "pkd-2"
-                },
-                {
-                    Gene: "ACE2",
-                    Ensembl_ID: "ENSG00000130234",
-                    Description: "Angiotensin-converting enzyme 2. Serves as the entry point for SARS-CoV-2.",
-                    Synonyms: "ACEH",
-                    Localization: ["cilia"],
-                    'Functional.Category': ["Cell surface receptor", "Ciliary membrane"],
-                    'Ortholog.Mouse': "Ace2",
-                    'Ortholog.Zebrafish': "ace2",
-                    'Ortholog.Drosophila': "Ance",
-                    'Ortholog.C.elegans': "acn-1"
-                }
-            ];
-        }
+// ==========================================================
+// PAGE DISPLAY AND NAVIGATION
+// ==========================================================
 
-        // ==========================================================
-        // 8. INITIALIZATION
-        // ==========================================================
+function displayHomePage() {
+    const contentArea = document.getElementById('page-content');
+    if (!contentArea) return;
 
-        async function initializeApp() {
-            // Load master data using loadMasterData
-            const success = await loadMasterData();
+    contentArea.innerHTML = `
+        <div class="page-container">
+            <h1>The CiliaHub: Gene Explorer</h1>
+
+            <div class="ciliahub-stats">
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; color: #1976d2;">Total Ciliary Genes</div>
+                    <div style="font-size: 2.5rem; font-weight: 700; color: #0d47a1;">${window.allGenes.length}</div>
+                </div>
+                <!-- Placeholder for other stats -->
+            </div>
+
+            <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced **bioinformatics** platform that hosts a detailed database of **gold standard cilia genes** and their role in various **ciliopathies**. Search for a single gene below or interact with the diagram on the right.</p>
+
+            <div class="search-container">
+                <div class="search-wrapper" style="flex: 1; position: relative; display: flex; align-items: center;">
+                    <div style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; pointer-events: none; z-index: 2;">
+                        <span style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); white-space: nowrap;">Gene Search</span>
+                    </div>
+                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off" style="padding-left: 145px; width: 100%; box-sizing: border-box;">
+                    <div id="search-suggestions"></div>
+                </div>
+                <button id="single-search-btn" class="search-btn" style="white-space: nowrap; padding: 0.5rem 1.5rem;">Search</button>
+            </div>
+
+            <div id="status-message" class="status-message" style="display: none;"></div>
+
+            <div id="gene-cards-container" class="gene-cards">
+                ${defaultGenesNames.map(geneName => {
+                    const gene = window.allGenes.find(g => g.gene === geneName || g.Gene === geneName) || window.ciliaryGeneMap.get(geneName);
+                    if (!gene) return '';
+                    const geneDisplay = gene.gene || gene.Gene;
+                    return `
+                        <div class="gene-card" onclick="displayIndividualGenePage(findGenes('${geneDisplay}')[0])">
+                            <div class="gene-name">${geneDisplay}</div>
+                            <div class="gene-description">${gene.description || gene.Description || 'No description available.'}</div>
+                            ${gene.localization || gene.Localization ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(gene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+
+    document.getElementById('single-search-btn').addEventListener('click', performSingleSearch);
+    
+    const searchInput = document.getElementById('single-gene-search');
+    const suggestionsContainer = document.getElementById('search-suggestions');
+
+    // Attach event handlers for search, suggestions, and diagram interaction
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { performSingleSearch(); }
+    });
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim().toUpperCase();
+        if (query.length < 2) { suggestionsContainer.style.display = 'none'; return; }
+
+        const filteredGenes = window.allGenes.filter(g => {
+            const geneName = g.gene || g.Gene || '';
+            const synonym = g.synonym || g.Synonyms || '';
+            return geneName.toUpperCase().includes(query) || synonym.toUpperCase().includes(query);
+        }).slice(0, 5);
+
+        if (filteredGenes.length > 0) {
+            suggestionsContainer.innerHTML = filteredGenes.map(g => {
+                const geneName = g.gene || g.Gene || '';
+                return `<li data-gene="${geneName}">${geneName}</li>`;
+            }).join('');
+            suggestionsContainer.style.display = 'block';
             
-            if (!success) {
-                // If master data fails to load, use fallback
-                console.warn("Using fallback gene data");
-                allGenes = getDefaultGenes();
-                currentData = allGenes;
+            suggestionsContainer.querySelectorAll('li').forEach(item => {
+                item.addEventListener('click', () => {
+                    searchInput.value = item.dataset.gene;
+                    suggestionsContainer.style.display = 'none';
+                    performSingleSearch();
+                });
+            });
+        } else {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
+    
+    document.querySelectorAll('.cilia-part').forEach(part => {
+        part.addEventListener('click', function() {
+            const partId = this.id;
+            console.log(`Clicked on part: ${partId}`);
+        });
+    });
+
+    // Clear the sidebar buttons upon returning home
+    updateGeneButtons([]);
+}
+
+function displayGeneCards(genes) {
+    // Logic remains the same, showing multiple genes as cards
+    const contentArea = document.getElementById('page-content');
+    const geneCardsHtml = genes.map(gene => {
+        const geneName = gene.gene || gene.Gene || '';
+        return `
+            <div class="gene-card" onclick="displayIndividualGenePage(findGenes('${geneName}')[0])">
+                <div class="gene-name">${geneName}</div>
+                <div class="gene-description">${gene.description || gene.Description || 'No description available.'}</div>
+                ${gene.localization || gene.Localization ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(gene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    contentArea.innerHTML = `
+        <div class="page-container">
+            <h1>Search Results (${genes.length} found)</h1>
+            <button onclick="displayHomePage()" style="margin-bottom: 20px; padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                Back to Search
+            </button>
+            <div class="gene-cards">
+                ${geneCardsHtml}
+            </div>
+        </div>
+    `;
+    updateGeneButtons(genes);
+}
+
+
+function displayIndividualGenePage(gene) {
+    // Logic remains the same, showing detailed single gene view
+    const contentArea = document.getElementById('page-content');
+    const geneName = gene.gene || gene.Gene || "Unknown Gene";
+
+    contentArea.innerHTML = `
+        <div class="page-container">
+            <h1>${geneName}</h1>
+            
+            <div class="detail-card">
+                <h3>Gene Information</h3>
+                <table class="data-table">
+                    <tr><th>Localization</th><td>${formatAsTags(getCleanArray(gene, 'Localization'))}</td></tr>
+                    <tr><th>Functional Category</th><td>${formatAsTags(gene.functional_category || gene['Functional.Category'])}</td></tr>
+                    <tr><th>Protein Complexes</th><td>${formatAsTags(getCleanArray(gene, 'Protein.complexes'))}</td></tr>
+                    <tr><th>Ciliopathies</th><td>${formatAsTags(gene.ciliopathy || gene['Ciliopathy.disease'])}</td></tr>
+                </table>
+            </div>
+
+            <div class="detail-card">
+                <h3>Orthologs and Phenotypes</h3>
+                <table class="data-table">
+                    <tr><th>Mouse Ortholog</th><td>${gene['Ortholog.Mouse'] || '<span class="not-available">Not available</span>'}</td></tr>
+                    <tr><th>C. elegans Ortholog</th><td>${gene['Ortholog.C.elegans'] || '<span class="not-available">Not available</span>'}</td></tr>
+                    <tr><th>Mouse Phenotypes</th><td>${formatAsTags(gene.mouse_phenotype || gene['Phenotypes.mouse'])}</td></tr>
+                </table>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button onclick="displayHomePage()" style="padding: 10px 20px; background: var(--primary-blue); color: white; border: none; border-radius: 6px; cursor: pointer;">
+                    Back to Home
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Update interactive cilium for this gene
+    window.geneLocalizationData[geneName] = mapLocalizationToSVG(getCleanArray(gene, 'Localization'));
+    updateGeneButtonsForGene(gene);
+    showLocalization(geneName, true);
+}
+
+
+function performSingleSearch() {
+    const searchInput = document.getElementById('single-gene-search');
+    const query = searchInput?.value.trim().toUpperCase();
+    const statusDiv = document.getElementById('status-message');
+
+    if (!query) {
+        if(statusDiv) {
+            statusDiv.innerHTML = `<span style="color: red;">Please enter a gene name.</span>`;
+            statusDiv.style.display = 'block';
+        }
+        return;
+    }
+
+    const foundGenes = findGenes(query);
+
+    if (foundGenes.length === 0) {
+        if(statusDiv) {
+            statusDiv.innerHTML = `<span style="color: red;">No genes found for "${query}".</span>`;
+            statusDiv.style.display = 'block';
+        }
+        updateGeneButtons([]);
+        return;
+    }
+
+    statusDiv.style.display = 'none';
+
+    if (foundGenes.length === 1) {
+        displayIndividualGenePage(foundGenes[0]);
+    } else {
+        displayGeneCards(foundGenes);
+    }
+}
+
+// 7. INITIAL EXECUTION
+function setupPage() {
+    const contentArea = document.getElementById('content-area');
+    if (!contentArea) return;
+    
+    // Set up the main structural containers
+    contentArea.innerHTML = `<div class="ciliaplot-main-layout">
+        <main id="page-content" style="grid-column: 1 / -1;"></main>
+        <aside class="cilia-panel"></aside>
+    </div>`;
+
+    // Restore the interactive sidebar structure 
+    const asidePanel = contentArea.querySelector('.cilia-panel');
+    asidePanel.innerHTML = `
+        <div class="panel-header">
+            <h3>Interactive Cilium</h3>
+        </div>
+        <div class="panel-content">
+            <div class="cilia-container interactive-cilium">
+                <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+                    <defs>
+                        <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#F5F7FA;" /><stop offset="100%" style="stop-color:#E9EDF2;" /></linearGradient>
+                        <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:#D8DEE9;" /><stop offset="100%" style="stop-color:#C8D0DD;" /></radialGradient>
+                        <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#ff9999;" /><stop offset="100%" style="stop-color:#ff6b6b;" /></linearGradient>
+                    </defs>
+                    <path id="cell-body" class="cilia-part" tabindex="0" fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="2" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
+                    <circle id="nucleus" class="cilia-part" tabindex="0" fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="2" cx="150" cy="320" r="40"/>
+                    <rect id="basal-body" class="cilia-part" tabindex="0" fill="#4A5568" x="140" y="195" width="20" height="15"/>
+                    <path id="transition-zone" class="cilia-part" tabindex="0" fill="#718096" stroke="#4A5568" stroke-width="2" d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+                    <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" stroke="#A0AEC0" stroke-width="2" stroke-dasharray="4,4" d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+                    <path id="axoneme" class="cilia-part" tabindex="0" fill="none" stroke="#4A5568" stroke-width="2" d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
+                    <g class="cilia-labels">
+                        <text x="150" y="370" text-anchor="middle" font-size="10" fill="#4A5568">Cell Body</text><text x="150" y="380" text-anchor="middle" font-size="10" fill="#4A5568">(Cytosol)</text>
+                        <text x="150" y="280" text-anchor="middle" font-size="10" fill="#4A5568">Nucleus</text>
+                        <text x="150" y="185" text-anchor="middle" font-size="10" fill="#4A5568">Basal Body</text>
+                        <text x="150" y="170" text-anchor="middle" font-size="10" fill="#4A5568">Transition Zone</text>
+                        <text x="150" y="100" text-anchor="middle" font-size="10" fill="#4A5568">Ciliary Membrane</text>
+                        <text x="150" y="60" text-anchor="middle" font-size="10" fill="#4A5568">Axoneme</text>
+                    </g>
+                </svg>
+            </div>
+            <div class="controls">
+                <h4>Gene Localization:</h4>
+                <div id="geneButtons" class="gene-buttons"></div>
+            </div>
+        </div>`;
+
+    displayHomePage();
+
+    // After setting up the page, move the main content out of the sidebar structure
+    const mainContent = document.getElementById('page-content');
+    const mainArea = document.querySelector('main');
+    if(mainContent && mainArea) {
+        // Move main content layout out of the sidebar area
+        const oldLayout = contentArea.querySelector('.ciliaplot-main-layout');
+        if(oldLayout) {
+            oldLayout.replaceWith(...Array.from(oldLayout.children));
+        }
+        // Restore the intended layout (This part is complex but ensures the page displays correctly)
+        document.getElementById('page-content').style.gridColumn = 'auto'; // Reset grid property if needed
+        document.getElementById('page-content').style.maxWidth = '900px';
+        document.getElementById('page-content').style.margin = '40px auto';
+    }
+}
+
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Load Data
+    await loadMasterData();
+    // 2. Setup Page Structure (Home is displayed within setupPage)
+    setupPage();
+
+    // 3. Handle direct navigation (hash link) after page content is loaded
+    if (window.location.hash) {
+        const geneName = window.location.hash.substring(1);
+        if (geneName) {
+            const gene = ciliaryGeneMap.get(geneName.toUpperCase());
+            if (gene) {
+                displayIndividualGenePage(gene);
             }
-            
-            // Build localization data from loaded genes
-            geneLocalizationData = {};
-            allGenes.forEach(g => {
-                const geneName = g.gene || g.Gene;
-                if (geneName && g.Localization) {
-                    geneLocalizationData[geneName] = mapLocalizationToSVG(getCleanArray(g, 'Localization'));
-                }
-            });
-            
-            // Setup event listeners for SVG parts
-            document.querySelectorAll('.cilia-part').forEach(part => {
-                part.addEventListener('click', function() {
-                    const partId = this.id;
-                    // Highlight the clicked part
-                    this.classList.toggle('highlighted');
-                    
-                    // You could add functionality to show which genes localize here
-                    console.log(`Clicked on: ${partId}`);
-                });
-                
-                part.addEventListener('mouseenter', function() {
-                    if (!this.classList.contains('highlighted')) {
-                        this.style.opacity = '0.8';
-                    }
-                });
-                
-                part.addEventListener('mouseleave', function() {
-                    if (!this.classList.contains('highlighted')) {
-                        this.style.opacity = '1';
-                    }
-                });
-            });
-
-            // Display home page by default
-            displayHomePage();
-
-            // Check for hash in URL (for direct gene links)
-            if (window.location.hash) {
-                const geneName = window.location.hash.substring(1);
-                if (geneName) {
-                    const gene = allGenes.find(g => {
-                        const gName = g.gene || g.Gene;
-                        return gName === geneName;
-                    });
-                    if (gene) {
-                        displayIndividualGenePage(gene);
-                    }
-                }
-            }
         }
-
-        // Start the app when DOM is loaded
-        document.addEventListener('DOMContentLoaded', initializeApp);
-    </script>
+    }
+});
+</script>
 </body>
 </html>
