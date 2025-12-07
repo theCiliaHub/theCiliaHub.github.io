@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — CiliaHub</title>
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
-   
+    
     <style>
         :root {
             --primary-blue: #005b96;
@@ -23,7 +23,7 @@
             --radius-full: 9999px;
             --shadow-subtle: 0 2px 4px rgba(0,0,0,0.05);
         }
-       
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { height: 100%; font-family: 'Inter', sans-serif; background: #f1f5f9; overflow-y: auto; }
         /* --- Main Layout --- */
@@ -203,7 +203,7 @@
             margin-left: 20px;
             padding: 10px 0;
         }
-       
+        
         /* Stats Styling */
         .ciliahub-stats {
             margin-top: 1rem;
@@ -230,7 +230,7 @@
             transition: transform 0.2s, box-shadow 0.2s;
             cursor: default;
         }
-       
+        
         .hub-link {
             display: inline-block;
             margin-top: 15px;
@@ -244,7 +244,7 @@
         .hub-link:hover {
             background: #00477a;
         }
-       
+        
         /* Gene Search Styling */
         #single-gene-search {
             border: 1px solid var(--border-light);
@@ -252,13 +252,13 @@
             border-radius: 6px;
             width: 100%;
         }
-       
+        
         .search-container {
             display: flex;
             gap: 10px;
             margin-top: 15px;
         }
-       
+        
         .search-btn {
             background: var(--primary-blue);
             color: white;
@@ -317,25 +317,25 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             margin-bottom: 20px;
         }
-       
+        
         .data-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.95rem;
         }
-       
+        
         .data-table th, .data-table td {
             padding: 8px 15px;
             border-bottom: 1px solid #e1e8ed;
             text-align: left;
         }
-       
+        
         .data-table th {
             font-weight: 600;
             width: 220px;
             border-right: 1px solid #e1e8ed;
         }
-       
+        
         .tag {
             background: #eaf2fa;
             color: #2c5aa0;
@@ -346,7 +346,7 @@
             display: inline-block;
             margin: 2px;
         }
-       
+        
         .not-available {
             color: #888;
             font-style: italic;
@@ -386,14 +386,14 @@
             .main-container {
                 flex-direction: column;
             }
-           
+            
             .cilia-panel {
                 width: 100%;
                 border-left: none;
                 border-top: 1px solid var(--border-light);
                 order: 2;
             }
-           
+            
             .content-area {
                 order: 1;
             }
@@ -409,7 +409,7 @@
                 <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
             </div>
         </div>
-       
+        
         <ul class="nav-links">
             <li><a href="index.html">Home</a></li>
             <li><a href="plots.html">Cilia Analysis</a></li>
@@ -418,11 +418,8 @@
         </ul>
     </nav>
     <div class="main-container">
-        <!-- Main Content Area -->
         <main class="content-area" id="page-content">
-            <!-- Content will be dynamically loaded here -->
-        </main>
-        <!-- Interactive Cilium Panel -->
+            </main>
         <aside class="cilia-panel">
             <div class="panel-header">
                 <h3>Interactive Cilium</h3>
@@ -439,8 +436,7 @@
                                 <stop offset="0%" style="stop-color:#D8DEE9;" />
                                 <stop offset="100%" style="stop-color:#C8D0DD;" />
                             </radialGradient>
-                           
-                            <!-- Gradient for highlighted parts -->
+                            
                             <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                                 <stop offset="0%" style="stop-color:#ff9999;" />
                                 <stop offset="100%" style="stop-color:#ff6b6b;" />
@@ -462,20 +458,19 @@
                         <path id="axoneme" class="cilia-part" tabindex="0"
                               fill="none" stroke="#4A5568" stroke-width="2"
                               d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
-                             
-                        <!-- Labels for cilium parts -->
+                              
                         <g class="cilia-labels">
                             <text x="150" y="370" text-anchor="middle" font-size="10" fill="#4A5568">Cell Body</text>
                             <text x="150" y="380" text-anchor="middle" font-size="10" fill="#4A5568">(Cytosol)</text>
-                           
+                            
                             <text x="150" y="280" text-anchor="middle" font-size="10" fill="#4A5568">Nucleus</text>
-                           
+                            
                             <text x="150" y="185" text-anchor="middle" font-size="10" fill="#4A5568">Basal Body</text>
-                           
+                            
                             <text x="150" y="170" text-anchor="middle" font-size="10" fill="#4A5568">Transition Zone</text>
-                           
+                            
                             <text x="150" y="100" text-anchor="middle" font-size="10" fill="#4A5568">Ciliary Membrane</text>
-                           
+                            
                             <text x="150" y="60" text-anchor="middle" font-size="10" fill="#4A5568">Axoneme</text>
                         </g>
                     </svg>
@@ -483,13 +478,12 @@
                 <div class="controls">
                     <h4>Gene Localization:</h4>
                     <div id="geneButtons" class="gene-buttons">
-                        <!-- Gene buttons will be dynamically added here -->
-                    </div>
+                        </div>
                 </div>
             </div>
         </aside>
     </div>
-   
+    
     <script>
         // ==========================================================
         // GLOBAL STATE
@@ -500,9 +494,9 @@
         window.neversPhylogenyCache = {};
         window.CiliAI.cellDataCache = {};
         window.CiliAI_UMAP = [];
-        window.ciliaryGeneMap = new Map();          // Main gene map (uppercase → full object)
-        window.allGenes = [];                       // Array of all gene objects (used everywhere)
-        window.geneLocalizationData = {};           // geneName → array of SVG part ids
+        window.ciliaryGeneMap = new Map();          // Main gene map (uppercase → full object)
+        window.allGenes = [];                       // Array of all gene objects (used everywhere)
+        window.geneLocalizationData = {};           // geneName → array of SVG part ids
 
         const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
         const MASTER_DB = BASE_URL + 'ciliAI_master_database.json';
@@ -512,6 +506,8 @@
         const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv';
         const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
         const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
+        const defaultGenesNames = ["IFT88", "CEP290", "WDR31", "ARL13B", "BBS1", "ACE2", "PKD2"];
+
 
         // ==========================================================
         // CORE UTILITIES
@@ -658,7 +654,7 @@ function displayHomePage() {
                 
                 <div style="flex: 1; min-width: 180px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1565c0; padding: 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #90caf9; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s; cursor: default;">
                     <div style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; color: #1976d2;">Current Ciliary Genes</div>
-                    <div id="gene-count" style="font-size: 2.5rem; font-weight: 700; color: #0d47a1;">...</div>
+                    <div id="gene-count" style="font-size: 2.5rem; font-weight: 700; color: #0d47a1;">${window.allGenes.length > 0 ? window.allGenes.length : '...'}</div>
                 </div>
             </div>
 
@@ -683,7 +679,9 @@ function displayHomePage() {
     document.getElementById('single-search-btn').onclick = performSingleSearch;
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
-    displayGeneCards(currentData, [], 1, 10);
+    
+    // FIX: Use window.allGenes for initial display and limit to 10
+    displayGeneCards(window.allGenes.slice(0, 10));
 
     const hideSuggestions = () => {
         suggestionsContainer.innerHTML = '';
@@ -698,7 +696,7 @@ function displayHomePage() {
             return;
         }
 
-        const filteredGenes = allGenes.filter(g =>
+        const filteredGenes = window.allGenes.filter(g =>
             (g.gene && g.gene.toUpperCase().startsWith(query)) ||
             (g.synonym && g.synonym.toUpperCase().includes(query)) ||
             (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
@@ -763,13 +761,8 @@ function displayHomePage() {
         }
     });
 
-    // --- Display gene cards immediately (empty or with placeholder) ---
-    displayGeneCards(currentData, [], 1, 10);
-
     // --- Update stats immediately if data is already loaded ---
-    if (typeof updateHomepageStats === 'function') {
-        updateHomepageStats();
-    }
+    updateHomepageStats();
     
     // Add hover effect to stats card
     const statsCard = document.querySelector('.ciliahub-stats > div');
@@ -782,6 +775,13 @@ function displayHomePage() {
             this.style.transform = 'translateY(0)';
             this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
         });
+    }
+}
+
+function updateHomepageStats() {
+    const geneCountElement = document.getElementById('gene-count');
+    if (geneCountElement) {
+        geneCountElement.textContent = window.allGenes.length > 0 ? window.allGenes.length : '...';
     }
 }
 
@@ -807,12 +807,14 @@ function displayGeneCards(genes) {
                     <div id="gene-cards-container" class="gene-cards">
                         ${genes.map(gene => {
                             const geneName = gene.gene || gene.Gene || '';
+                            // To pass the object safely, we look up the full object from the map if only partial data was passed.
+                            const fullGene = window.ciliaryGeneMap.get(geneName.toUpperCase()) || gene;
                             return `
-                                <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
+                                <div class="gene-card" onclick="navigateToGenePage('${geneName}')">
                                     <div class="gene-name">${geneName}</div>
-                                    <div class="gene-description">${gene.description || gene.Description || 'No description available.'}</div>
-                                    ${gene.localization || gene.Localization ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(gene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
-                                    ${gene.ensembl_id || gene.Ensembl_ID ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.ensembl_id || gene.Ensembl_ID}</div>` : ''}
+                                    <div class="gene-description">${fullGene.description || fullGene.Description || 'No description available.'}</div>
+                                    ${fullGene.localization || fullGene.Localization ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(fullGene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
+                                    ${fullGene.ensembl_id || fullGene.Ensembl_ID ? `<div class="gene-info"><strong>Ensembl:</strong> ${fullGene.ensembl_id || fullGene.Ensembl_ID}</div>` : ''}
                                 </div>
                             `;
                         }).join('')}
@@ -980,7 +982,7 @@ function displayIndividualGenePage(gene) {
         }).filter(Boolean).join(' ');
     };
 
-     const formatScreenDataTable = (screens) => {
+      const formatScreenDataTable = (screens) => {
         if (!Array.isArray(screens) || screens.length === 0) {
             return '<p style="margin-top: 1rem; color: #555;">No detailed genome-wide screen data available for this gene.</p>';
         }
@@ -1114,7 +1116,7 @@ function displayIndividualGenePage(gene) {
                                 <th>Ensembl ID(s)</th>
                                 <td>${gene.ensembl_id ? String(gene.ensembl_id).split(/[;,]\s*/).filter(Boolean).map(id => `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id.trim()}" target="_blank" rel="noopener noreferrer">${id.trim()}</a>`).join('<br>') : '<span class="not-available">Not available</span>'}</td>
                             </tr>
-                             ${gene.omim_id ? `
+                            ${gene.omim_id ? `
                             <tr>
                                 <th>OMIM ID</th>
                                 <td><a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" rel="noopener noreferrer">${gene.omim_id}</a></td>
@@ -1179,7 +1181,7 @@ function displayIndividualGenePage(gene) {
                 <h3 class="card-title">${icons.effects} Effects on Cilia</h3>
                 <div class="table-wrapper">
                     <table class="data-table">
-                         <tbody>
+                          <tbody>
                             <tr>
                                 <th>Overexpression Effects (Cilia Length)</th>
                                 <td>${gene.overexpression_effects || '<span class="not-available">Not Reported</span>'}</td>
@@ -1201,9 +1203,9 @@ function displayIndividualGenePage(gene) {
         </div> `;
 
     // Update buttons and localization map (if functions exist)
-    if (typeof updateGeneButtons === "function") updateGeneButtons([gene], [gene]);
-    if (typeof showLocalization === "function") showLocalization(gene.gene, true);
-}        
+    updateGeneButtonsForGene(gene);
+    showLocalization(gene.gene, true);
+}      
         
 // --- Updated getCleanArray exactly as requested ---
 function getCleanArray(gene, key) {
@@ -1238,20 +1240,23 @@ function getCleanArray(gene, key) {
             const found = [];
             const seen = new Set();
             queries.forEach(q => {
-                if (window.ciliaryGeneMap.has(q) && !seen.has(q)) {
-                    found.push(window.ciliaryGeneMap.get(q));
-                    seen.add(q);
-                } else if (!seen.has(q)) {
-                    found.push({ gene: q });
-                    seen.add(q);
+                const upperQ = q.toUpperCase();
+                // Check in master map (case-insensitive due to toUpperCase())
+                if (window.ciliaryGeneMap.has(upperQ) && !seen.has(upperQ)) {
+                    found.push(window.ciliaryGeneMap.get(upperQ));
+                    seen.add(upperQ);
+                } else if (!seen.has(upperQ)) {
+                    // For genes not found in the map (e.g., placeholder for non-ciliary genes)
+                    found.push({ gene: q }); 
+                    seen.add(upperQ);
                 }
             });
-            return found;
+            return found.filter(g => g.gene); // Ensure only objects with a gene name are returned
         }
 
-        function formatAsTags(arr) {
+        function formatAsTags(arr, className = '') {
             if (!arr || arr.length === 0) return '<span class="not-available">Not available</span>';
-            return arr.map(item => `<span class="tag">${item.trim()}</span>`).join('');
+            return arr.map(item => `<span class="tag ${className}">${item.trim()}</span>`).join('');
         }
 
 // === YOUR REQUESTED FUNCTIONS (exact) ===
@@ -1260,27 +1265,46 @@ function getCleanArray(gene, key) {
             if (!container) return;
             container.innerHTML = '';
 
-            const defaultGenesButtons = defaultGenesNames
-                .map(geneName => genesToDisplay.find(g => (g.gene || g.Gene) === geneName))
+            // Filter for genes that have localization data
+            const genesWithLocalization = genesToDisplay.filter(g => 
+                window.geneLocalizationData[g.gene || g.Gene]
+            );
+
+            // Filter out genes already covered by defaultGenesNames
+            const nonDefaultGenes = genesWithLocalization.filter(g => 
+                !defaultGenesNames.includes(g.gene || g.Gene)
+            );
+
+            // Prioritize: 1. Default Genes 2. Searched Genes (that aren't defaults) 3. Other initial genes
+            const defaultButtons = defaultGenesNames
+                .map(name => genesWithLocalization.find(g => (g.gene || g.Gene) === name))
                 .filter(Boolean);
 
-            const searchGenes = searchResults
-                .map(s => genesToDisplay.find(g => (g.gene || g.Gene) === (s.gene || s.Gene)))
+            const searchButtons = searchResults
+                .map(s => genesWithLocalization.find(g => (g.gene || g.Gene) === (s.gene || s.Gene)))
                 .filter(g => g && !defaultGenesNames.includes(g.gene || g.Gene));
 
-            const genesToShow = [...defaultGenesButtons, ...searchGenes].slice(0, 10);
+            // Combine and ensure uniqueness based on gene name
+            const geneSet = new Set();
+            const genesToShow = [];
 
-            genesToShow.forEach(gene => {
-                const geneName = gene.gene || gene.Gene;
-                if (window.geneLocalizationData[geneName]) {
-                    const isSearch = searchResults.some(s => (s.gene || s.Gene) === geneName);
-                    const button = document.createElement('button');
-                    button.className = `gene-btn ${isSearch ? 'search-gene' : ''}`;
-                    button.textContent = geneName;
-                    button.setAttribute('aria-label', `Highlight localization of ${geneName} in the cilium diagram`);
-                    button.onclick = () => showLocalization(geneName, isSearch);
-                    container.appendChild(button);
+            [...defaultButtons, ...searchButtons].forEach(gene => {
+                const name = gene.gene || gene.Gene;
+                if (!geneSet.has(name)) {
+                    geneSet.add(name);
+                    genesToShow.push(gene);
                 }
+            });
+
+            genesToShow.slice(0, 10).forEach(gene => {
+                const geneName = gene.gene || gene.Gene;
+                const isSearch = searchResults.some(s => (s.gene || s.Gene) === geneName);
+                const button = document.createElement('button');
+                button.className = `gene-btn ${isSearch ? 'search-gene' : ''}`;
+                button.textContent = geneName;
+                button.setAttribute('aria-label', `Highlight localization of ${geneName} in the cilium diagram`);
+                button.onclick = () => showLocalization(geneName, isSearch);
+                container.appendChild(button);
             });
 
             const resetButton = document.createElement('button');
@@ -1290,24 +1314,24 @@ function getCleanArray(gene, key) {
             resetButton.onclick = () => showLocalization('reset');
             container.appendChild(resetButton);
         }
-
-function updateActiveNav(path) {
-            document.querySelectorAll('.nav-links a').forEach(link => {
-                link.classList.remove('active');
-                const linkPath = link.getAttribute('href').toLowerCase();
-                if (linkPath.includes(path) || (path === 'ciliahub.html' && linkPath === 'ciliahub.html')) {
-                    link.classList.add('active');
-                }
-            });
-        }
-
-        function handleStickySearch() {
-            const searchContainer = document.querySelector('.search-container');
-            if (searchContainer && window.scrollY > 100) {
-                searchContainer.classList.add('sticky');
-            } else if (searchContainer) {
-                searchContainer.classList.remove('sticky');
+        
+        function updateGeneButtonsForGene(gene) {
+            const btns = document.getElementById('geneButtons');
+            if (!btns) return;
+            btns.innerHTML = '';
+            const name = gene.gene || gene.Gene;
+            if (window.geneLocalizationData[name]) {
+                const b = document.createElement('button');
+                b.className = 'gene-btn selected search-gene';
+                b.textContent = name;
+                b.onclick = () => showLocalization(name);
+                btns.appendChild(b);
             }
+            const reset = document.createElement('button');
+            reset.className = 'gene-btn reset-btn';
+            reset.textContent = 'Reset Diagram';
+            reset.onclick = () => showLocalization('reset');
+            btns.appendChild(reset);
         }
 
 function navigateToGenePage(geneName) {
@@ -1340,46 +1364,8 @@ function buildLocalizationMap() {
             });
         }
 
-        function updateGeneButtonsForGene(gene) {
-            const btns = document.getElementById('geneButtons');
-            btns.innerHTML = '';
-            const name = gene.gene || gene.Gene;
-            if (window.geneLocalizationData[name]) {
-                const b = document.createElement('button');
-                b.className = 'gene-btn selected';
-                b.textContent = name;
-                b.onclick = () => showLocalization(name);
-                btns.appendChild(b);
-            }
-            const reset = document.createElement('button');
-            reset.className = 'gene-btn reset-btn';
-            reset.textContent = 'Reset Diagram';
-            reset.onclick = () => showLocalization('reset');
-            btns.appendChild(reset);
-        }
-
-        function updateGeneButtons(genes) {
-            const btns = document.getElementById('geneButtons');
-            btns.innerHTML = '';
-            genes.slice(0,10).forEach(g => {
-                const name = g.gene || g.Gene;
-                if (window.geneLocalizationData[name]) {
-                    const b = document.createElement('button');
-                    b.className = 'gene-btn';
-                    b.textContent = name;
-                    b.onclick = () => showLocalization(name);
-                    btns.appendChild(b);
-                }
-            });
-            const reset = document.createElement('button');
-            reset.className = 'gene-btn reset-btn';
-            reset.textContent = 'Reset Diagram';
-            reset.onclick = () => showLocalization('reset');
-            btns.appendChild(reset);
-        }
-
         let selectedGenes = [];
-     function showLocalization(geneName, isSearch = false) {
+      function showLocalization(geneName, isSearch = false) {
             if (geneName === 'reset') {
                 selectedGenes = [];
                 document.querySelectorAll('.cilia-part').forEach(p => {
@@ -1389,30 +1375,53 @@ function buildLocalizationMap() {
                 document.querySelectorAll('.gene-btn').forEach(b => b.classList.remove('selected'));
                 return;
             }
+            
+            // Toggle selection logic
             const idx = selectedGenes.findIndex(o => o.name === geneName);
-            if (idx === -1) selectedGenes.push({name: geneName, isSearch});
-            else selectedGenes.splice(idx,1);
+            const button = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === geneName);
 
+            if (idx === -1) {
+                // Select gene
+                selectedGenes = [{name: geneName, isSearch}]; // Only allow one gene to be selected at a time on click
+                if (button) button.classList.add('selected');
+            } else {
+                // Deselect gene (not used because we reset on click, but good practice)
+                selectedGenes = [];
+                if (button) button.classList.remove('selected');
+            }
+
+
+            // Reset all highlights
             document.querySelectorAll('.cilia-part').forEach(p => {
                 p.classList.remove('highlighted','search-gene','cilia');
-                p.style.fill = '';
+                // Reset fill for specific parts that have default fill (like cell-body or nucleus)
+                if (p.id === 'cell-body') p.style.fill = 'url(#cytosolGradient)';
+                else if (p.id === 'nucleus') p.style.fill = 'url(#nucleusGradient)';
+                else p.style.fill = '';
             });
             document.querySelectorAll('.gene-btn').forEach(b => b.classList.remove('selected'));
 
-            selectedGenes.forEach(obj => {
-                const parts = window.geneLocalizationData[obj.name] || [];
-                const isCiliary = parts.some(id => ['ciliary-membrane','axoneme'].includes(id));
-                parts.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        el.classList.add('highlighted');
-                        if (isCiliary) el.classList.add('cilia');
-                        if (obj.isSearch) el.classList.add('search-gene');
-                    }
-                });
-                const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === obj.name);
-                if (btn) btn.classList.add('selected');
-            });
+
+            // Apply highlights for the current selected gene
+            if (selectedGenes.length > 0) {
+                 const obj = selectedGenes[0]; // Get the single selected gene
+                 const parts = window.geneLocalizationData[obj.name] || [];
+                 const isCiliary = parts.some(id => ['ciliary-membrane','axoneme'].includes(id));
+                 
+                 parts.forEach(id => {
+                     const el = document.getElementById(id);
+                     if (el) {
+                         el.classList.add('highlighted');
+                         // Override default fill for highlighting
+                         el.style.fill = isCiliary ? 'var(--primary-blue)' : '#ff6b6b'; 
+                         if (id === 'axoneme' || id === 'ciliary-membrane') {
+                              el.classList.add('cilia');
+                         }
+                         if (obj.isSearch) el.classList.add('search-gene');
+                     }
+                 });
+                 if (button) button.classList.add('selected'); // Re-select the clicked button
+            }
         }
 
         // ==========================================================
@@ -1421,8 +1430,9 @@ function buildLocalizationMap() {
         async function initializeApp() {
             const ok = await loadMasterData();
             if (!ok) {
-                document.getElementById('page-content').innerHTML = `<p style="color:red;">Failed to load data – check network / GitHub URLs.</p>`;
-                return;
+                document.getElementById('page-content').innerHTML = `<p style="color:red;">Failed to load data – check network / GitHub URLs. Displaying fallback data.</p>`;
+                // Fallback to default genes if data loading fails completely
+                window.allGenes = getDefaultGenes();
             }
 
             // ---- CRITICAL: build localization map AFTER real data is loaded ----
