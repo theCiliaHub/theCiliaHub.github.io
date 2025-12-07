@@ -9,162 +9,88 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-    /* ==================== CSS VARIABLES ==================== */
-    /* Define reusable color variables for consistent theming */
-    :root {
-        --primary: #005b96;        /* Primary blue color for main elements */
-        --primary-light: #1976d2;  /* Lighter blue for hover states */
-        --accent: #4CAF50;         /* Green accent color for buttons/actions */
-        --text: #333;              /* Main text color */
-        --bg: #f8fafc;             /* Page background color */
-        --card: #ffffff;           /* Card/container background */
-        --border: #e2e8f0;         /* Border color for elements */
-    }
-    
-    /* ==================== RESET & BASE STYLES ==================== */
-    /* Reset all margins/paddings and use border-box for consistent sizing */
-    * { 
-        margin: 0; 
-        padding: 0; 
-        box-sizing: border-box; 
-    }
-    
-    /* Base styles for body and html */
-    body, html { 
-        height: 100%; 
-        font-family: 'Segoe UI', Arial, sans-serif;  /* Font family for all text */
-        background: var(--bg);  /* Use background color from variables */
-        color: var(--text);     /* Use text color from variables */
-    }
-    
-    /* ==================== MAIN LAYOUT ==================== */
-    /* Container for the entire page layout */
-    .main-container {
-        display: flex;
-        flex-direction: column;  /* Stack navbar on top, content below */
-        min-height: 100vh;       /* Full viewport height */
-    }
-
-    /* ==================== TOP NAVIGATION BAR ==================== */
-    /* Horizontal navigation bar at the top of the page */
-    .top-navbar {
-        background: var(--primary);  /* Primary blue background */
-        color: white;                /* White text color */
-        width: 100%;                 /* Full width of the page */
-        display: flex;               /* Flexbox for horizontal layout */
-        align-items: center;         /* Center items vertically */
-        padding: 0 24px;             /* Horizontal padding only */
-        height: 64px;                /* Fixed height for top navbar */
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);  /* Shadow below navbar */
-        position: sticky;            /* Sticks to top when scrolling */
-        top: 0;                      /* Position at top of viewport */
-        z-index: 1000;               /* High z-index to stay above content */
-    }
-    
-    /* ==================== BRAND/LOGO SECTION ==================== */
-    /* Container for logo and brand name */
-    .brand {
-        display: flex;              /* Flexbox for logo and text alignment */
-        align-items: center;        /* Center items vertically */
-        gap: 12px;                  /* Space between logo and text */
-        font-weight: 600;           /* Bold text for brand name */
-        font-size: 20px;            /* Font size for "CiliAI" text */
-        margin-right: 40px;         /* Space between brand and nav links */
-    }
-    
-    /* Logo image styling */
-    .brand img { 
-        height: 40px;               /* Fixed height for logo */
-        border-radius: 8px;         /* Rounded corners for logo */
-    }
-    
-    /* ==================== NAVIGATION LINKS ==================== */
-    /* Container for navigation links (Home, Cilia Analysis, etc.) */
-    .nav-links {
-        display: flex;              /* Horizontal layout for links */
-        flex-direction: row;        /* Links in a row (horizontal) */
-        list-style: none;           /* Remove default list bullets */
-        gap: 20px;                  /* Space between navigation items */
-        height: 100%;               /* Full height of navbar */
-    }
-    
-    /* Individual navigation link styling */
-    .nav-links a {
-        color: white;               /* White text color */
-        text-decoration: none;      /* Remove underline from links */
-        padding: 0 16px;            /* Horizontal padding only */
-        height: 100%;               /* Full height of navbar */
-        display: flex;              /* Flexbox for centering */
-        align-items: center;        /* Center text vertically */
-        font-size: 20px;            /* Font size for nav items (Home, Cilia Analysis, etc.) */
-        font-weight: 500;           /* Medium font weight */
-        transition: all 0.2s;       /* Smooth transition for hover effects */
-        border-radius: 4px;         /* Slightly rounded corners */
-    }
-    
-    /* Hover state for navigation links */
-    .nav-links a:hover { 
-        background: rgba(255,255,255,0.15);  /* Light white background on hover */
-    }
-    
-    /* Active state for current page link */
-    .nav-links a.active { 
-        background: rgba(255,255,255,0.25);  /* More opaque white background */
-        font-weight: 600;                     /* Bold text for active link */
-    }
-    
-    /* ==================== RESPONSIVE DESIGN ==================== */
-    /* Media query for tablets and smaller screens */
-    @media (max-width: 768px) {
+        :root {
+            --primary: #005b96;
+            --primary-light: #1976d2;
+            --accent: #4CAF50;
+            --text: #333;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { height: 100%; font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); }
+        
+        /* NAVBAR */
         .top-navbar {
-            padding: 0 16px;        /* Reduce padding on smaller screens */
-            height: 56px;           /* Slightly smaller height on mobile */
+            background: var(--primary);
+            color: white;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            /* CRITICAL FIX: Ensure brand and nav-links are in the same flex container for top-left grouping */
+            justify-content: space-between; 
+            padding: 0 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+        
+        /* NEW FLEX CONTAINER FOR BRAND + NAV LINKS */
+        .nav-container {
+            display: flex;
+            align-items: center;
+            gap: 20px; /* Space between brand and links */
         }
         
         .brand {
-            font-size: 18px;        /* Smaller brand text on mobile */
-            margin-right: 20px;     /* Less space between brand and links */
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            font-size: 20px;
         }
-        
-        .brand img {
-            height: 36px;           /* Smaller logo on mobile */
-        }
-        
-        .nav-links {
-            gap: 12px;              /* Less space between nav items */
-        }
-        
-        .nav-links a {
-            padding: 0 12px;        /* Less padding on mobile */
-            font-size: 13px;        /* Slightly smaller font on mobile */
-        }
-    }
-    /* Media query for very small screens */
-    @media (max-width: 480px) {
-        .brand {
-            font-size: 16px;        /* Even smaller brand text */
-        }
-        
-        .brand img {
-            height: 32px;           /* Smaller logo */
+        .brand img { 
+            height: 40px; 
+            border-radius: 8px; 
         }
         
         .nav-links {
-            gap: 8px;               /* Minimal gap between items */
+            display: flex;
+            list-style: none;
+            gap: 4px;
         }
-    
+        
         .nav-links a {
-            padding: 0 8px;         /* Minimal padding */
-            font-size: 12px;        /* Smallest readable font size */
+            color: white;
+            text-decoration: none;
+            padding: 12px 10px; /* Reduced padding for tighter grouping */
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            font-size: 20px; /* Slightly smaller font */
         }
-        /* CONTENT AREA */
-        .content-area {
-            flex: 1;
-            padding: 24px;
-            overflow-y: auto;
+        
+        .nav-links a:hover { 
+            background: rgba(255,255,255,0.15); 
+        }
+        
+        .nav-links a.active { 
+            background: rgba(255,255,255,0.25); 
+            font-weight: 600; 
         }
 
-        /* CILIA ANALYSIS LAYOUT */
+        /* MAIN CONTENT LAYOUT */
+        #plot-page-container { 
+            padding: 24px; 
+            min-height: calc(100vh - 64px); /* Account for fixed top navbar */
+        }
+        
+        /* RESTORED: TWO-COLUMN ANALYSIS LAYOUT */
         .ciliaplot-main-layout {
             display: grid;
             grid-template-columns: 320px 1fr;
@@ -304,64 +230,22 @@
             margin-top: 12px; 
         }
         
-        #phy-filter-group { 
-            display: none; 
-            margin-top: 12px; 
-        }
-
         /* RESPONSIVE */
         @media (max-width: 1024px) {
-            .main-container {
-                flex-direction: column;
-            }
-            
-            .top-navbar {
-                width: 100%;
-                height: auto;
-                flex-direction: row;
-                padding: 0 20px;
-            }
-            
-            .brand {
-                padding: 10px 0;
-                border-bottom: none;
-                margin-bottom: 0;
-            }
-            
-            .nav-links {
-                flex-direction: row;
-                padding: 0;
-                flex: 1;
-                justify-content: flex-end;
-            }
-            
             .ciliaplot-main-layout {
                 grid-template-columns: 1fr;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .customization-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .nav-links {
-                flex-wrap: wrap;
-                justify-content: center;
             }
         }
     </style>
 </head>
 <body>
-    <div class="main-container">
-        <!-- NAVIGATION ON LEFT -->
-        <nav class="top-navbar">
+
+    <nav class="top-navbar">
+        <!-- CRITICAL FIX: Grouping the brand and navigation links together on the left -->
+        <div class="nav-container"> 
             <div class="brand">
-                <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo">
-                <div>
-                    <div>CiliAI</div>
-                    <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
-                </div>
+                <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI">
+                <div>CiliAI <small style="font-size:10px; opacity:0.9;">Gene Explorer</small></div>
             </div>
             
             <ul class="nav-links">
@@ -370,12 +254,14 @@
                 <li><a href="ciliahub.html">CiliaHub</a></li>
                 <li><a href="about.html">About</a></li>
             </ul>
-        </nav>
+        </div>
         
-        <!-- MAIN CONTENT AREA -->
-        <main class="content-area" id="content-area">
-            <!-- Content will be loaded here by JavaScript -->
-        </main>
+        <!-- Placeholder for potential top-right user elements (kept blank for now) -->
+        <div></div> 
+    </nav>
+
+    <div class="content-wrapper" id="plot-page-container">
+        <div id="content-area">Loading CiliAI...</div>
     </div>
 
 <script>
