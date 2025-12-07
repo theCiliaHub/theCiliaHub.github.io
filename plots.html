@@ -21,30 +21,20 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { height: 100%; font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); }
         
-        /* NAVBAR */
+        /* NAVBAR - Identical to index.html */
         .top-navbar {
             background: var(--primary);
             color: white;
             height: 64px;
             display: flex;
             align-items: center;
-            /* CRITICAL FIX: Ensure brand and nav-links are in the same flex container for top-left grouping */
-            justify-content: space-between; 
+            justify-content: flex-start;
             padding: 0 32px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             position: sticky;
             top: 0;
-            width: 100%;
             z-index: 1000;
         }
-        
-        /* NEW FLEX CONTAINER FOR BRAND + NAV LINKS */
-        .nav-container {
-            display: flex;
-            align-items: center;
-            gap: 20px; /* Space between brand and links */
-        }
-        
         .brand {
             display: flex;
             align-items: center;
@@ -52,45 +42,26 @@
             font-weight: 600;
             font-size: 20px;
         }
-        .brand img { 
-            height: 40px; 
-            border-radius: 8px; 
-        }
-        
+        .brand img { height: 40px; border-radius: 8px; }
         .nav-links {
             display: flex;
             list-style: none;
             gap: 4px;
         }
-        
         .nav-links a {
-            color: white;
-            text-decoration: none;
-            padding: 12px 10px; /* Reduced padding for tighter grouping */
-            border-radius: 6px;
-            font-weight: 500;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            font-size: 20px; /* Slightly smaller font */
+        color: white;
+        text-decoration: none;
+        padding: 12px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 20px;               /* ← CHANGED: bigger text */
+        transition: all 0.2s;
         }
-        
-        .nav-links a:hover { 
-            background: rgba(255,255,255,0.15); 
-        }
-        
-        .nav-links a.active { 
-            background: rgba(255,255,255,0.25); 
-            font-weight: 600; 
-        }
+        .nav-links a:hover { background: rgba(255,255,255,0.15); }
+        .nav-links a.active { background: rgba(255,255,255,0.25); font-weight: 600; }
 
-        /* MAIN CONTENT LAYOUT */
-        #plot-page-container { 
-            padding: 24px; 
-            min-height: calc(100vh - 64px); /* Account for fixed top navbar */
-        }
-        
-        /* RESTORED: TWO-COLUMN ANALYSIS LAYOUT */
+        /* MAIN LAYOUT */
+        #plot-page-container { padding: 24px; min-height: calc(100vh - 64px); }
         .ciliaplot-main-layout {
             display: grid;
             grid-template-columns: 320px 1fr;
@@ -98,7 +69,6 @@
             max-width: 1600px;
             margin: 0 auto;
         }
-        
         .control-card {
             background: var(--card);
             border-radius: 12px;
@@ -106,7 +76,6 @@
             box-shadow: 0 4px 16px rgba(0,0,0,0.08);
             margin-bottom: 16px;
         }
-        
         .control-card h3 {
             margin: 0 0 16px;
             padding-bottom: 10px;
@@ -115,7 +84,7 @@
             font-size: 1.3em;
         }
 
-        /* PLOT TYPES */
+        /* PLOT TYPES (Kept hidden as dropdown is now primary) */
         .plot-type-list { display: none; } 
         
         /* INPUT & BUTTONS */
@@ -130,7 +99,6 @@
             resize: vertical;
             margin-bottom: 12px;
         }
-        
         #generate-ciliaplot-btn {
             width: 100%;
             padding: 14px;
@@ -143,10 +111,7 @@
             cursor: pointer;
             transition: 0.2s;
         }
-        
-        #generate-ciliaplot-btn:hover { 
-            background: #43a047; 
-        }
+        #generate-ciliaplot-btn:hover { background: #43a047; }
 
         /* CUSTOMIZATION GRID */
         .customization-grid {
@@ -155,38 +120,27 @@
             gap: 14px;
             margin-top: 12px;
         }
-        
-        .form-group label { 
-            font-weight: 600; 
-            font-size: 0.9em; 
-            margin-bottom: 4px; 
-            display: block; 
-        }
-        
+        .form-group label { font-weight: 600; font-size: 0.9em; margin-bottom: 4px; display: block; }
         .form-group input, .form-group select {
             width: 100%;
             padding: 8px;
             border: 1px solid var(--border);
             border-radius: 6px;
         }
-        
-        .form-group.full-width {
-            grid-column: 1 / -1;
-        }
-        
-        /* DROPDOWN */
+        /* ADDED STYLE FOR DROPDOWN */
         #analysis-dropdown {
             width: 100%;
             padding: 10px;
             border: 1px solid var(--border);
             border-radius: 6px;
-            margin-bottom: 16px;
+            margin-bottom: 16px; /* Space above search box */
             background-color: #f1f5f9;
             font-size: 1em;
             font-weight: 500;
             color: var(--text);
             cursor: pointer;
         }
+
 
         /* VISUALIZATION */
         #plot-display-area {
@@ -198,16 +152,8 @@
             overflow: hidden;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
-        
-        #cilia-svg { 
-            width: 100%; 
-            height: 100%; 
-        }
-        
-        #plot-display-area > div { 
-            width: 100% !important; 
-            height: 100% !important; 
-        }
+        #cilia-svg { width: 100%; height: 100%; } 
+        #plot-display-area > div { width: 100% !important; height: 100% !important; }
 
         .download-controls {
             display: flex;
@@ -215,7 +161,6 @@
             margin-bottom: 12px;
             justify-content: flex-end;
         }
-        
         #download-plot-btn {
             background: var(--primary);
             color: white;
@@ -225,42 +170,24 @@
             cursor: pointer;
         }
 
-        #phy-source-group { 
-            display: none; 
-            margin-top: 12px; 
-        }
-        
-        /* RESPONSIVE */
-        @media (max-width: 1024px) {
-            .ciliaplot-main-layout {
-                grid-template-columns: 1fr;
-            }
-        }
+        #phy-source-group { display: none; margin-top: 12px; }
     </style>
 </head>
 <body>
 
     <nav class="top-navbar">
-        <!-- CRITICAL FIX: Grouping the brand and navigation links together on the left -->
-        <div class="nav-container"> 
-            <div class="brand">
-                <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI">
-                <div>CiliAI <small style="font-size:10px; opacity:0.9;">Gene Explorer</small></div>
-            </div>
-            
-            <ul class="nav-links">
-                <li><a href="index.html">Home</a></li>
-                <li><a href="plots.html" class="active">Cilia Analysis</a></li>
-                <li><a href="ciliahub.html">CiliaHub</a></li>
-                <li><a href="about.html">About</a></li>
-            </ul>
+        <div class="brand">
+            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI">
+            <div>CiliAI <small style="font-size:11px; opacity:0.9;">Cilia Analysis Tool</small></div>
         </div>
-        
-        <!-- Placeholder for potential top-right user elements (kept blank for now) -->
-        <div></div> 
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="plots.html" class="active">Cilia Analysis</a></li>
+            <li><a href="about.html">About</a></li>
+        </ul>
     </nav>
 
-    <div class="content-wrapper" id="plot-page-container">
+    <div id="plot-page-container">
         <div id="content-area">Loading CiliAI...</div>
     </div>
 
@@ -295,7 +222,6 @@
     // ==========================================================
 
     function log(message) { console.log(`[CiliAI] ${message}`); }
-    
     function clearPlot() {
         const el = document.getElementById('plot-display-area');
         el.innerHTML = '';
@@ -462,6 +388,9 @@ function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
 /**
  * @loadMasterData - Loads data and constructs the necessary global structures.
  */
+/**
+ * @loadMasterData - Loads data and constructs the necessary global structures.
+ */
 async function loadMasterData() {
     try {
         // 1. Fetch ALL data concurrently (7 requests now: 5 existing + 2 UMAP)
@@ -487,6 +416,7 @@ async function loadMasterData() {
         window.neversPhylogenyCache = await neversResp.json();
 
         // Process new scRNA-seq data files
+        // NOTE: These files are large and processing them may cause the reported delay/failure.
         const umapCoordinatesData = await umapCoordResp.json();
         const cellxgeneExpressionData = await cellxgeneExprResp.json();
         
@@ -498,11 +428,14 @@ async function loadMasterData() {
         window.CiliAI.lookups = rawLookups.lookups || {};
         window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
 
-        // --- UMAP Data Assignment ---
+        // --- UMAP Data Assignment: CRITICAL STEP ---
+        // 1. Check if the UMAP data is an array of points (coordinates)
         const isUmapValid = Array.isArray(umapCoordinatesData) && umapCoordinatesData.length > 0;
+        // 2. Check if the Expression data is a non-empty object (gene map)
         const isExprValid = typeof cellxgeneExpressionData === 'object' && Object.keys(cellxgeneExpressionData).length > 0;
 
         if (isUmapValid && isExprValid) {
+            // Success: Data is available in the expected array/object structure
             window.CiliAI_UMAP = umapCoordinatesData;
             window.CiliAI.cellDataCache = cellxgeneExpressionData;
             
@@ -511,6 +444,7 @@ async function loadMasterData() {
             console.log(`scRNA-seq UMAP data loaded successfully from dedicated files. Total cells: ${totalCells}. Total expressed genes: ${totalGenes}`);
             
         } else {
+             // Failure: Keep variables empty and log warning
              console.warn(`scRNA-seq UMAP data not found in new dedicated files.`);
              window.CiliAI_UMAP = [];
              window.CiliAI.cellDataCache = {};
@@ -549,7 +483,9 @@ async function loadMasterData() {
         document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Please verify the data URLs.</p>`;
     }
 }
+
     
+// --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
 // --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
 function getCleanArray(gene, key) {
     // 1. Initialize data variable using the requested key
@@ -633,8 +569,23 @@ function getCustom() {
         speciesFilters: Array.from(document.getElementById('custom-species-filter')?.selectedOptions || []).map(opt => opt.value)
     };
 }
+function clearPlot() {
+    // Clears the main plot area, but typically relies on the parent function
+    // to correctly manage the inner HTML structure later.
+    const el = document.getElementById('plot-display-area');
+    el.innerHTML = '';
+    if (window.currentPlot) Plotly.purge(el);
+}
+    
 
-// --- UMAP Cluster Annotation Coordinates (Estimate based on lung cell types) ---
+/**
+ * UMAP PLOT (Expression Mapping Mode)
+ * Renders a UMAP visualization based on single gene expression or gene ratio.
+ * @param {string} gene1 - The primary gene symbol (always derived from main input).
+ * @param {string | null} gene2 - The secondary gene symbol (from custom input field).
+ * @param {object} custom - Customization settings.
+ */
+ // --- UMAP Cluster Annotation Coordinates (Estimate based on lung cell types) ---
 const UMAP_CELL_ANNOTATIONS = {
     'ciliated cell': { x: 10, y: 0.5, label: 'Ciliated Cells' },
     'club cell': { x: 12, y: 14, label: 'Club Cells' },
@@ -646,10 +597,17 @@ const UMAP_CELL_ANNOTATIONS = {
     'neuroendocrine cell': { x: 15, y: -3, label: 'Neuroendocrine' },
     'stem cell': { x: 8, y: 7, label: 'Stem/Progenitor' }
 };   
-
 // ==========================================================
 // III. UMAP Rendering Function (renderScrnaUMAPPlot)
 // ==========================================================
+
+/**
+ * UMAP PLOT (Expression Mapping Mode)
+ * Renders a UMAP visualization based on single gene expression or gene ratio, with cluster annotations.
+ * @param {string} gene1 - The primary gene symbol (always derived from main input).
+ * @param {string | null} gene2 - The secondary gene symbol (from custom input field).
+ * @param {object} custom - Customization settings.
+ */
 async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) { 
     const plotDivId = 'plot-display-area'; 
     const umapData = window.CiliAI_UMAP;
@@ -760,6 +718,7 @@ async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) {
         borderwidth: 1,
         borderpad: 4
     }));
+    // --- END NEW: Generate UMAP Annotations ---
 
     const plotData = [{
         x: sampledData.map(p => p.x),
@@ -797,6 +756,7 @@ async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) {
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 }
 window.renderScrnaUMAPPlot = renderScrnaUMAPPlot;
+
     
 function debugUMAPData(genes) {
         const umapData = window.CiliAI_UMAP;
@@ -816,6 +776,8 @@ function debugUMAPData(genes) {
         } else {
             console.error("[Status] cellDataCache: FAILED TO LOAD/MOCK.");
         }
+
+        // NOTE: MOCK_SC_DATA check is removed as the object is not exposed globally by default, avoiding the warning.
         
         if (cellDataCache && cellDataCache[geneSymbol]) {
             const exprData = cellDataCache[geneSymbol];
@@ -829,23 +791,59 @@ function debugUMAPData(genes) {
         console.log("=============================");
     }
 
+    
+// 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
+// --- FIXED PHYLOGENY DATA ACCESS IN OTHER PLOTS ---
+/**
+ * Utility to classify a gene's conservation based on Li/Nevers data.
+ * @param {object} gene - The gene object.
+ * @returns {string} Classification ('Ciliated', 'Non-Ciliated', 'Mixed/Other').
+ */
+function classifyPhylo(gene) {
+    // We prioritize Nevers data as it's the default source.
+    const neversData = gene.phylogeny?.nevers_2017;
+    const liData = gene.phylogeny?.li_2014;
+
+    if (!neversData && !liData) {
+        return 'No Data';
+    }
+
+    // Using simplified presence logic for the plot: 
+    // Is the gene conserved in a majority of ciliated model organisms vs non-ciliated ones listed in the study?
+    // Since we lack normalized scores here, we'll use a simple threshold approach based on the calculated percentage score.
+    const neversScore = calculatePhyloScores(gene).nevers_2017?.conservationPct || 0;
+    const liScore = calculatePhyloScores(gene).li_2014?.conservationPct || 0;
+
+    // Classification Thresholds (These are estimates and may need tuning based on actual data)
+    if (neversScore > 30 || liScore > 35) {
+        return 'Highly Conserved (Ciliated)';
+    } else if (neversScore > 10 || liScore > 15) {
+        return 'Intermediate/Mixed';
+    } else {
+        return 'Low Conservation (Non-Ciliated)';
+    }
+}
+
+/**
+ * Utility to assign color based on whether the localization includes "Cilia".
+ * @param {string} localizationValue - The raw localization string (e.g., "Cilium, Golgi").
+ * @returns {string} Hex color code.
+ */
+function getLocalizationColor(localizationValue) {
+    const value = (localizationValue || '').toLowerCase();
+    // Prioritize Ciliary locations
+    if (value.includes('cilia') || value.includes('cilium') || value.includes('axoneme') || value.includes('basal body')) {
+        return '#005b96'; // Primary Blue for Cilia
+    } else {
+        return '#ff9f00'; // Accent Orange for Other/Non-Ciliary
+    }
+}
+    
 // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION
+// GLOBAL COLOR SYSTEM (You already have this — perfect!)
 const CATEGORY_COLOR_MAP = new Map();
 let COLOR_INDEX_COUNTER = 0;
 
-// --- Extended Color Palette ---
-const EXTENDED_PALETTE = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-    '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5', '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5',
-    '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173', '#6b6ecf', '#9c9ede', '#cedb9c', '#6b4c3e', '#396b79',
-    '#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac',
-    '#332288', '#6699cc', '#88ccee', '#44aa99', '#117733', '#999933', '#ddcc55', '#cc6677', '#882255', '#aa4466',
-    '#003f5c', '#58508d', '#bc5090', '#ff6361', '#ff853a', '#ffa600', '#f95d6a', '#ffc75f', '#f9f871', '#007901',
-    '#a2cffe', '#70a3ff', '#3e64ff', '#1f3d8f', '#ffc0cb', '#f26522', '#009440', '#00a3e0', '#8d46ff', '#e03a3e',
-    '#006400', '#008b8b', '#483d8b', '#b03060', '#ff4500', '#ffd700', '#adff2f', '#4682b4', '#d2691e', '#a0522d',
-    '#005b8f', '#5e94be', '#9ecae1', '#c6dbef', '#33a02c', '#b2df8a', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00',
-    '#cab2d6', '#6a3d9a', '#ffff99', '#b15928', '#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f'
-];
 
 function getUniqueColor(value) {
     if (CATEGORY_COLOR_MAP.has(value)) {
@@ -1038,6 +1036,7 @@ function renderMultiCategoryManhattan(genes, custom = {}) {
     }
 }    
 
+    
 /**
  * Utility to classify a gene's conservation based on Li/Nevers data.
  * @param {object} gene - The gene object.
@@ -1063,6 +1062,8 @@ function classifyPhylo(gene) {
         return 'Low Conservation (Non-Ciliated)';
     }
 }
+
+
 
 // 3. Phylogenetic Conservation Heatmap
 /**
@@ -1284,6 +1285,7 @@ function renderPhylogenyHeatmap(genes, custom) {
 }
     
 // --- ENHANCED ORGANISM NAME SHORTENER ---
+// --- ENHANCED ORGANISM NAME SHORTENER ---
 function shortenOrganismName(name) {
     if (!name) return 'Unknown';
     
@@ -1388,113 +1390,184 @@ function debugPhylogenyData(genes) {
 
 // 4. CRISPR & siRNA Screens Summary Heatmap
 function renderScreenSummaryHeatmap(genes, custom) {
-    clearPlot();
-    const screens = ["Kim2016", "Wheway2015", "Roosing2015", "Basu2023", "Breslow2018"];
-    
-    const z = genes.map(g => screens.map(s => {
+    clearPlot();
+    const screens = ["Kim2016", "Wheway2015", "Roosing2015", "Basu2023", "Breslow2018"];
+    
+    const z = genes.map(g => screens.map(s => {
         // Use getCleanArray to retrieve the array of objects, ensuring we check for the correct key.
         const screenArray = getCleanArray(g, 'screens_summary');
         
         // Find if the screen source exists in the array
-        const screen = screenArray.find(x => x.source && String(x.source).includes(s));
+        const screen = screenArray.find(x => x.source && String(x.source).includes(s));
+        
+        // If screens_summary entry is found, return 1 (present), else 0 (absent/no data).
+        return screen ? 1 : 0; 
+    }));
+
+    Plotly.newPlot('plot-display-area', [{
+        type: 'heatmap', z, x: screens, y: genes.map(g=>g.gene),
+        colorscale: [[0,'#f0f0f0'],[1,'#2ca02c']], 
+        showscale: false
+    }], { 
+        title: { text: custom.title || "CRISPR & siRNA Screens Summary" }, 
+        xaxis: { tickangle: -45, automargin: true },
+        height: custom.height 
+    });
+}
+    // 5. Mouse Phenotype Enrichment Heatmap
+    function renderMousePhenotypeHeatmap(genes, custom) {
+        clearPlot();
+        const allPhenotypes = genes.flatMap(g => getCleanArray(g, 'Phenotypes_mouse') || getCleanArray(g, 'mouse_phenotype')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
         
-        // If screens_summary entry is found, return 1 (present), else 0 (absent/no data).
-        return screen ? 1 : 0; 
-    }));
+        // This array will be empty if the relevant data fields are missing or empty in the Master DB,
+        // triggering the 'No Mouse Phenotype data available' message.
+        if (allPhenotypes.length === 0) {
+             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">🚫 No Mouse Phenotype data available for the selected gene(s).</div>`;
+             return;
+        }
 
-    Plotly.newPlot('plot-display-area', [{
-        type: 'heatmap', z, x: screens, y: genes.map(g=>g.gene),
-        colorscale: [[0,'#f0f0f0'],[1,'#2ca02c']], 
-        showscale: false
-    }], { 
-        title: { text: custom.title || "CRISPR & siRNA Screens Summary" }, 
-        xaxis: { tickangle: -45, automargin: true },
-        height: custom.height 
-    });
-}
+        const z = genes.map(g => {
+            const genePhenotypes = new Set(getCleanArray(g, 'Phenotypes_mouse') || getCleanArray(g, 'mouse_phenotype'));
+            return allPhenotypes.map(p => genePhenotypes.has(p) ? 1 : 0);
+        });
 
-// 5. Mouse Phenotype Enrichment Heatmap
-function renderMousePhenotypeHeatmap(genes, custom) {
-    clearPlot();
-    const allPhenotypes = genes.flatMap(g => getCleanArray(g, 'Phenotypes_mouse') || getCleanArray(g, 'mouse_phenotype')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+        Plotly.newPlot('plot-display-area', [{
+            type: 'heatmap', z, x: allPhenotypes, y: genes.map(g=>g.gene),
+            colorscale: [[0,'#f0f0f0'],[1,'#9467bd']], 
+            showscale: false
+        }], { 
+            title: { text: custom.title || "Mouse Phenotype Enrichment Heatmap" }, 
+            xaxis: { tickangle: -45, automargin: true },
+            height: custom.height 
+        });
+    }
     
-    // This array will be empty if the relevant data fields are missing or empty in the Master DB,
-    // triggering the 'No Mouse Phenotype data available' message.
-    if (allPhenotypes.length === 0) {
-         document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">🚫 No Mouse Phenotype data available for the selected gene(s).</div>`;
-         return;
+    // 6. Ciliopathy & Disease Associations Heatmap
+    function renderCiliopathyPlot(genes, custom) {
+        clearPlot();
+        
+        const allDiseases = genes.flatMap(g => getCleanArray(g, 'Ciliopathy')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+
+        if (allDiseases.length === 0) {
+             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Ciliopathy/Disease Association data found for these genes.</div>`;
+             return;
+        }
+
+        const z = genes.map(g => {
+            const geneDiseases = new Set(getCleanArray(g, 'Ciliopathy'));
+            return allDiseases.map(d => geneDiseases.has(d) ? 1 : 0);
+        });
+        
+        Plotly.newPlot('plot-display-area', [{
+            type: 'heatmap', z, x: allDiseases, y: genes.map(g=>g.gene),
+            colorscale: [[0,'#f0f0f0'],[1,'#d62728']], 
+            showscale: false
+        }], { 
+            title: { text: custom.title || "Ciliopathy & Disease Association Heatmap" }, 
+            xaxis: { tickangle: -45, automargin: true },
+            height: custom.height 
+        });
     }
 
-    const z = genes.map(g => {
-        const genePhenotypes = new Set(getCleanArray(g, 'Phenotypes_mouse') || getCleanArray(g, 'mouse_phenotype'));
-        return allPhenotypes.map(p => genePhenotypes.has(p) ? 1 : 0);
-    });
+    // 7. Localization Heatmap
+    function renderLocalizationHeatmap(genes, custom) {
+        clearPlot();
+        const allLocations = genes.flatMap(g => getCleanArray(g, 'Localization')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
 
-    Plotly.newPlot('plot-display-area', [{
-        type: 'heatmap', z, x: allPhenotypes, y: genes.map(g=>g.gene),
-        colorscale: [[0,'#f0f0f0'],[1,'#9467bd']], 
-        showscale: false
-    }], { 
-        title: { text: custom.title || "Mouse Phenotype Enrichment Heatmap" }, 
-        xaxis: { tickangle: -45, automargin: true },
-        height: custom.height 
-    });
-}
+        if (allLocations.length === 0) {
+             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Localization data found for these genes.</div>`;
+             return;
+        }
 
-// 6. Ciliopathy & Disease Associations Heatmap
-function renderCiliopathyPlot(genes, custom) {
-    clearPlot();
-    
-    const allDiseases = genes.flatMap(g => getCleanArray(g, 'Ciliopathy')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
-
-    if (allDiseases.length === 0) {
-         document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Ciliopathy/Disease Association data found for these genes.</div>`;
-         return;
+        const z = genes.map(g => {
+            const geneLocations = new Set(getCleanArray(g, 'Localization'));
+            return allLocations.map(loc => geneLocations.has(loc) ? 1 : 0);
+        });
+        
+        Plotly.newPlot('plot-display-area', [{
+            type: 'heatmap', z, x: allLocations, y: genes.map(g=>g.gene),
+            colorscale: [[0,'#f0f0f0'],[1,'#1f77b4']], 
+            showscale: false
+        }], { 
+            title: { text: custom.title || "Localization Heatmap" }, 
+            xaxis: { tickangle: -45, automargin: true },
+            height: custom.height 
+        });
     }
-
-    const z = genes.map(g => {
-        const geneDiseases = new Set(getCleanArray(g, 'Ciliopathy'));
-        return allDiseases.map(d => geneDiseases.has(d) ? 1 : 0);
-    });
-    
-    Plotly.newPlot('plot-display-area', [{
-        type: 'heatmap', z, x: allDiseases, y: genes.map(g=>g.gene),
-        colorscale: [[0,'#f0f0f0'],[1,'#d62728']], 
-        showscale: false
-    }], { 
-        title: { text: custom.title || "Ciliopathy & Disease Association Heatmap" }, 
-        xaxis: { tickangle: -45, automargin: true },
-        height: custom.height 
-    });
-}
-
-// 7. Localization Heatmap
-function renderLocalizationHeatmap(genes, custom) {
-    clearPlot();
-    const allLocations = genes.flatMap(g => getCleanArray(g, 'Localization')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
-
-    if (allLocations.length === 0) {
-         document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Localization data found for these genes.</div>`;
-         return;
-    }
-
-    const z = genes.map(g => {
-        const geneLocations = new Set(getCleanArray(g, 'Localization'));
-        return allLocations.map(loc => geneLocations.has(loc) ? 1 : 0);
-    });
-    
-    Plotly.newPlot('plot-display-area', [{
-        type: 'heatmap', z, x: allLocations, y: genes.map(g=>g.gene),
-        colorscale: [[0,'#f0f0f0'],[1,'#1f77b4']], 
-        showscale: false
-    }], { 
-        title: { text: custom.title || "Localization Heatmap" }, 
-        xaxis: { tickangle: -45, automargin: true },
-        height: custom.height 
-    });
-}
     
 // 8. Protein Domain Architecture Heatmap
+// --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
+function getCleanArray(gene, key) {
+    // 1. Initialize data variable using the requested key
+    let data = gene[key];
+    
+    // 1. Handle Complex Key Mismatch
+    if (key === 'Protein.complexes') {
+        data = gene['complex_components'] || gene['Protein.complexes'];
+        if (typeof data === 'object' && !Array.isArray(data)) {
+            return Object.keys(data).map(k => `${k}`);
+        }
+    }
+
+    // 2. Handle Mouse Phenotype Key Mismatch
+    if (key === 'Phenotypes_mouse') {
+        data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
+    }
+
+    // 3. Handle PFAM Domain Key Mismatch
+    if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
+        const pfamIds = gene['PFAM_IDs'] || [];
+        const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
+        return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
+    }
+
+    // 4. FIX: Handle Screens Summary (MUST return raw array of objects for heatmap plotting)
+    if (key === 'screens_summary') {
+        data = data || gene['screens']; // Fallback if data key is wrong
+        if (Array.isArray(data)) return data; 
+    }
+    
+    // Check if data is null/undefined before attempting to process it
+    if (!data) return [];
+    
+    // 5. Split and Filter for string fields (This contains the critical regex)
+    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
+    
+    // Final default return for string fields (REGEX IS SAFE HERE)
+    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
+}
+    
+    
+// =============================================================================
+// =============================================================================
+// NEW PLOT FUNCTION: Protein Domain Dot Plot (Final Title & Color Fixes)
+
+   // --- 1. Define Extended Color Palette (100 distinct colors for non-overlapping legend) ---
+const EXTENDED_PALETTE = [
+    // 1-10: Bright, Primary Colors (D3 Categorical Schemes)
+    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+    // 11-20: Light/Pastel Tones
+    '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5', '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5',
+    // 21-30: Dark/Muted Tones
+    '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173', '#6b6ecf', '#9c9ede', '#cedb9c', '#6b4c3e', '#396b79',
+    // 31-40: Tableau / Vibrant Colors
+    '#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac',
+    // 41-50: Plotly / Sequential Red-Yellow-Blue
+    '#332288', '#6699cc', '#88ccee', '#44aa99', '#117733', '#999933', '#ddcc55', '#cc6677', '#882255', '#aa4466',
+    // 51-60: High Contrast / Custom Selection
+    '#003f5c', '#58508d', '#bc5090', '#ff6361', '#ff853a', '#ffa600', '#f95d6a', '#ffc75f', '#f9f871', '#007901',
+    // 61-70: Light, Clean Hues
+    '#a2cffe', '#70a3ff', '#3e64ff', '#1f3d8f', '#ffc0cb', '#f26522', '#009440', '#00a3e0', '#8d46ff', '#e03a3e',
+    // 71-80: Deep, Saturated Colors
+    '#006400', '#008b8b', '#483d8b', '#b03060', '#ff4500', '#ffd700', '#adff2f', '#4682b4', '#d2691e', '#a0522d',
+    // 81-90: Earth Tones and Greens
+    '#005b8f', '#5e94be', '#9ecae1', '#c6dbef', '#33a02c', '#b2df8a', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00',
+    // 91-100: Secondary Bright Tones
+    '#cab2d6', '#6a3d9a', '#ffff99', '#b15928', '#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f'
+];
+// =============================================================================
+// UPDATED PLOT FUNCTION: Protein Domain Dot Plot (Definitive X-Axis Fix)
+// =============================================================================
 function renderDomainArchitecture(genes, custom) {
     clearPlot();
     
@@ -1602,126 +1675,128 @@ function renderDomainArchitecture(genes, custom) {
     
     Plotly.newPlot(plotDivId, traces, layout, { responsive: true });
 }
-
+    
 // 9. Protein Complex Network (Heatmap View)
 function renderComplexNetwork(genes, custom) {
-    clearPlot();
-    
-    const allComplexes = genes.flatMap(g => getCleanArray(g, 'Protein.complexes')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
-
-    // This will correctly show the 'No data' message if the field is empty.
-    if (allComplexes.length === 0) {
-         document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">🚫 No Protein Complex data found for the selected gene(s).</div>`;
-         return;
-    }
-    
-    const z = genes.map(g => {
-        const geneComplexes = new Set(getCleanArray(g, 'Protein.complexes'));
-        return allComplexes.map(c => geneComplexes.has(c) ? 1 : 0);
-    });
-
-    Plotly.newPlot('plot-display-area', [{
-        type: 'heatmap', z, x: allComplexes, y: genes.map(g=>g.gene),
-        colorscale: [[0,'#f0f0f0'],[1,'#ff7f0e']], 
-        showscale: false
-    }], { 
-        title: { text: custom.title || "Complex Membership Heatmap (Static View)" }, 
-        xaxis: { tickangle: -45, automargin: true },
-        height: custom.height 
-    });
-}
-
-// 10. Expression Heatmap (Uses rnaTissueExpressionData)
-function renderExpressionHeatmap(genes, custom) {
-    clearPlot();
-    
-    // Use global variable
-    if (Object.keys(window.rnaTissueExpressionData).length === 0) {
-        document.getElementById('plot-display-area').innerHTML = 
-            `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
-                Tissue expression data is not available.
-            </div>`;
-        return;
-    }
-
-    const geneSymbols = genes.map(g => g.gene);
-    
-    // Get all tissues from the data
-    const allTissues = new Set();
-    geneSymbols.forEach(symbol => {
-        const exprData = window.rnaTissueExpressionData[symbol];
-        if (exprData) {
-            Object.keys(exprData).forEach(tissue => allTissues.add(tissue));
-        }
-    });
-    
-    const tissueArray = Array.from(allTissues).sort();
-    
-    if (tissueArray.length === 0) {
-        document.getElementById('plot-display-area').innerHTML = 
-            `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
-                No expression data found for the selected genes.
-            </div>`;
-        return;
-    }
-
-    const z = [];
-    let maxNTPM = 0;
-    
-    geneSymbols.forEach(symbol => {
-        const row = [];
-        const exprData = window.rnaTissueExpressionData[symbol] || {};
+        clearPlot();
         
-        tissueArray.forEach(tissue => {
-            const nTPM = exprData[tissue] || 0;
-            row.push(nTPM);
-            if (nTPM > maxNTPM) maxNTPM = nTPM;
+        const allComplexes = genes.flatMap(g => getCleanArray(g, 'Protein.complexes')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+
+        // This will correctly show the 'No data' message if the field is empty.
+        if (allComplexes.length === 0) {
+             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">🚫 No Protein Complex data found for the selected gene(s).</div>`;
+             return;
+        }
+        
+        const z = genes.map(g => {
+            const geneComplexes = new Set(getCleanArray(g, 'Protein.complexes'));
+            return allComplexes.map(c => geneComplexes.has(c) ? 1 : 0);
+        });
+
+        Plotly.newPlot('plot-display-area', [{
+            type: 'heatmap', z, x: allComplexes, y: genes.map(g=>g.gene),
+            colorscale: [[0,'#f0f0f0'],[1,'#ff7f0e']], 
+            showscale: false
+        }], { 
+            title: { text: custom.title || "Complex Membership Heatmap (Static View)" }, 
+            xaxis: { tickangle: -45, automargin: true },
+            height: custom.height 
+        });
+    }
+
+
+    // 10. Expression Heatmap (Uses rnaTissueExpressionData)
+    function renderExpressionHeatmap(genes, custom) {
+        clearPlot();
+        
+        // Use global variable
+        if (Object.keys(window.rnaTissueExpressionData).length === 0) {
+            document.getElementById('plot-display-area').innerHTML = 
+                `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
+                    Tissue expression data is not available.
+                </div>`;
+            return;
+        }
+
+        const geneSymbols = genes.map(g => g.gene);
+        
+        // Get all tissues from the data
+        const allTissues = new Set();
+        geneSymbols.forEach(symbol => {
+            const exprData = window.rnaTissueExpressionData[symbol];
+            if (exprData) {
+                Object.keys(exprData).forEach(tissue => allTissues.add(tissue));
+            }
         });
         
-        z.push(row);
-    });
+        const tissueArray = Array.from(allTissues).sort();
+        
+        if (tissueArray.length === 0) {
+            document.getElementById('plot-display-area').innerHTML = 
+                `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#666; font-size:16px;">
+                    No expression data found for the selected genes.
+                </div>`;
+            return;
+        }
 
-    const data = [{
-        type: 'heatmap', 
-        z: z, 
-        x: tissueArray, 
-        y: geneSymbols,
-        colorscale: [
-            [0, '#f7fbff'],
-            [0.2, '#c6dbef'],
-            [0.4, '#6baed6'],
-            [0.6, '#3182bd'],
-            [0.8, '#08519c'],
-            [1, '#08306b']
-        ],
-        colorbar: { 
-            title: 'nTPM',
-            titleside: 'right'
-        },
-        hovertemplate: 'Gene: %{y}<br>Tissue: %{x}<br>nTPM: %{z:.2f}<extra></extra>'
-    }];
+        const z = [];
+        let maxNTPM = 0;
+        
+        geneSymbols.forEach(symbol => {
+            const row = [];
+            const exprData = window.rnaTissueExpressionData[symbol] || {};
+            
+            tissueArray.forEach(tissue => {
+                const nTPM = exprData[tissue] || 0;
+                row.push(nTPM);
+                if (nTPM > maxNTPM) maxNTPM = nTPM;
+            });
+            
+            z.push(row);
+        });
 
-    const layout = {
-        title: { 
-            text: custom.title || "Tissue Expression Profile (nTPM)",
-            font: { size: custom.titleSize }
-        },
-        xaxis: { 
-            tickangle: -45, 
-            automargin: true,
-            tickfont: { size: 10 }
-        },
-        yaxis: { 
-            automargin: true,
-            tickfont: { size: 11 }
-        },
-        height: custom.height,
-        width: custom.width,
-        margin: { t: 80, l: 120, r: 80, b: 120 }
-    };
-    
-    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
-}
+        const data = [{
+            type: 'heatmap', 
+            z: z, 
+            x: tissueArray, 
+            y: geneSymbols,
+            colorscale: [
+                [0, '#f7fbff'],
+                [0.2, '#c6dbef'],
+                [0.4, '#6baed6'],
+                [0.6, '#3182bd'],
+                [0.8, '#08519c'],
+                [1, '#08306b']
+            ],
+            colorbar: { 
+                title: 'nTPM',
+                titleside: 'right'
+            },
+            hovertemplate: 'Gene: %{y}<br>Tissue: %{x}<br>nTPM: %{z:.2f}<extra></extra>'
+        }];
+
+        const layout = {
+            title: { 
+                text: custom.title || "Tissue Expression Profile (nTPM)",
+                font: { size: custom.titleSize }
+            },
+            xaxis: { 
+                tickangle: -45, 
+                automargin: true,
+                tickfont: { size: 10 }
+            },
+            yaxis: { 
+                automargin: true,
+                tickfont: { size: 11 }
+            },
+            height: custom.height,
+            width: custom.width,
+            margin: { t: 80, l: 120, r: 80, b: 120 }
+        };
+        
+        Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+    }
+
 
 // MAIN GENERATOR 
 function generatePlot() {
@@ -1819,7 +1894,61 @@ function generatePlot() {
             </div>`;
     }
 }
+
     
+// --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
+function debugPhylogenyData(genes) {
+    console.log("=== PHYLOGENY DATA DEBUG ===");
+    console.log("Checking phylogenetic data for genes:", genes.map(g => g.gene).join(', '));
+    
+    genes.forEach(gene => {
+        console.log(`\nGene: ${gene.gene}`);
+        
+        // Check integrated data
+        const neversData = gene.phylogeny?.nevers_2017;
+        const liData = gene.phylogeny?.li_2014;
+        
+        console.log(`  Integrated Nevers 2017:`, neversData ? 
+            `PRESENT (${neversData.species_count} species, ${neversData.species_data?.length} indices)` : 'NO DATA');
+        console.log(`  Integrated Li 2014:`, liData ? 
+            `PRESENT (${liData.species_data?.length} species)` : 'NO DATA');
+        
+        // Check direct matrix access
+        const neversDirect = window.neversPhylogenyCache?.genes?.[gene.gene.toUpperCase()];
+        const liDirect = Object.values(window.liPhylogenyCache?.genes || {}).find(g => g.g && g.g.toUpperCase() === gene.gene.toUpperCase());
+        
+        console.log(`  Direct Nevers matrix:`, neversDirect ? 
+            `PRESENT (${neversDirect.s?.length} indices)` : 'NOT FOUND');
+        console.log(`  Direct Li matrix:`, liDirect ? 
+            `PRESENT (${liDirect.s?.length} indices)` : 'NOT FOUND');
+        
+        // Sample data for verification
+        if (neversData && neversData.species_data) {
+            console.log(`  Nevers sample indices:`, neversData.species_data.slice(0, 5));
+        }
+        if (liData && liData.species_data) {
+            console.log(`  Li sample indices:`, liData.species_data.slice(0, 5));
+        }
+    });
+    
+    // Check if phylogenetic caches are loaded
+    console.log("\nPhylogeny Cache Status:");
+    console.log("Nevers cache loaded:", !!window.neversPhylogenyCache);
+    console.log("Li cache loaded:", !!window.liPhylogenyCache);
+    
+    if (window.neversPhylogenyCache) {
+        console.log("Nevers organisms count:", window.neversPhylogenyCache.organism_groups?.all_organisms_list?.length);
+        console.log("Nevers genes count:", Object.keys(window.neversPhylogenyCache.genes || {}).length);
+    }
+    if (window.liPhylogenyCache) {
+        console.log("Li organisms count:", window.liPhylogenyCache.summary?.organisms_list?.length);
+        console.log("Li genes count:", Object.keys(window.liPhylogenyCache.genes || {}).length);
+    }
+    
+    console.log("=============================");
+}
+
+
 // -----------------------------------------------------------------------------
 // Handles plot type selection via dropdown
 function handlePlotSelection(value) {
@@ -1871,7 +2000,7 @@ function setupPage() {
                         <option value="protein_domains">Protein Domain Architecture</option>
                         <option value="protein_complex">Complex Membership Map</option>
                         <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
-                        <option value="phylogeny" selected>Phylogenetic Conservation Heatmap</option>
+                        <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
                     </select>
                     <h3 style="margin-top:20px;">Gene Input</h3>
                     <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">IFT88
@@ -1909,18 +2038,19 @@ KIF17</textarea>
                                 <label>Second Gene (For Co-expression/Ratio UMAP)</label>
                                 <input type="text" id="second-gene-input" placeholder="Optional, e.g., BBS1, FOXJ1">
                             </div>
-                            <div class="form-group full-width" id="phy-filter-group">
+                            <div class="form-group full-width" id="phy-filter-group" style="display: none;">
                                 <label>Filter Species Groups (Ctrl+Click to select multiple)</label>
                                 <select id="custom-species-filter" multiple size="6">
                                     <option value="all" selected>-- Show All Species --</option>
                                     <option value="vertebrates">Vertebrates</option>
                                     <option value="invertebrates">Invertebrates & Basal Metazoans</option>
+                                    <option value="ciliates">Ciliates (T. thermophila, etc.)</option>
                                     <option value="protozoa">Protozoa & Parasites</option>
                                     <option value="plants_algae">Plants & Algae</option>
                                     <option value="fungi">Non-Ciliary Fungi</option>
                                 </select>
                             </div>
-                        </div>
+                            </div>
                     </div>
                 </div>
             </aside>
@@ -1955,11 +2085,13 @@ KIF17</textarea>
     generatePlot();
 }
 
-// 7. INITIAL EXECUTION
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadMasterData();
-    setupPage();
-});
+    
+    // 7. INITIAL EXECUTION
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadMasterData();
+        setupPage();
+    });
 </script>
+
 </body>
 </html>
