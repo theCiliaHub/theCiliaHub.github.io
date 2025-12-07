@@ -546,6 +546,368 @@
     </div>
     
     <script>
+// Initialize global caches/state variables
+    window.rnaTissueExpressionData = {};
+    window.CiliAI = { masterData: [], lookups: { geneMap: {} } };
+    window.liPhylogenyCache = {};
+    window.neversPhylogenyCache = {};
+    window.CiliAI.cellDataCache = {}; // Used for scRNA-seq expression data
+    window.CiliAI_UMAP = []; // Used for scRNA-seq coordinates
+    window.ciliaryGeneMap = new Map(); // Gene map for CiliAI data
+
+    // DATA URLS
+    const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+    const MASTER_DB = BASE_URL + 'ciliAI_master_database.json';
+    const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json';
+    const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json';
+    const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json';
+    const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv';
+
+    // NEW: Dedicated scRNA-seq Data URLs (USED IN loadMasterData)
+    const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
+    const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
+
+    // ==========================================================
+    // CORE UTILITIES & DATA LOADING
+    // ==========================================================
+
+    function log(message) { console.log(`[CiliAI] ${message}`); }
+    function clearPlot() {
+        const el = document.getElementById('plot-display-area');
+        el.innerHTML = '';
+        if (window.currentPlot) Plotly.purge(el);
+    }
+    
+// --- Data Maps for Phylogeny (Kept for plot consistency) ---
+// --- ENSURE PHYLOGENY CONSTANTS ARE DEFINED ---
+// Add these if not already defined in your code
+// --- NEW: Species Group Definitions for Filtering ---
+// --- NEW COMPREHENSIVE SPECIES GROUP DEFINITIONS (Used for Filtering) ---
+const PHYLO_SPECIES_GROUPS = {
+    // 1. VERTEBRATES (Ciliated: Humans, Mouse, Fish, Frog, Chicken)
+    vertebrates: [
+        "Homo sapiens", "M. musculus", "Mus musculus", "Danio rerio", "D rerio", "Xenopus tropicalis", "X tropicalis", "Gallus gallus", "G gallus",
+        "Ornithorhynchus anatinus", "Myotis lucifugus", "Rattus norvegicus", "Cricetulus griseus", "Tetraodon nigroviridis", "F.rubripes", "O.latipes",
+        "Anolis carolinensis", "S.scrofa", "B.taurus", "C.familiaris", "O.anatinus", "M.domestica", "H.sapiens"
+    ],
+    // 2. INVERTEBRATES & BASAL METAZOANS (Ciliated/Ciliary-related)
+    invertebrates: [
+        "Caenorhabditis elegans", "C elegans", "C.briggsae", "Daphnia pulex", "D.pulex", "Acyrthosiphon pisum", "A.pisum", "P.humanus", "L.loa", "B.malayi",
+        "Schistosoma mansoni", "Schistosoma japonicum", "Strongylocentrotus purpuratus", "S purpuratus", "Ciona intestinalis", "C intestinalis",
+        "Branchiostoma floridae", "Oikopleura dioica", "A.queenslandica", "Monosiga brevicollis", "M brevicollis", "Capsaspora owczarzaki", "C.owczarzaki",
+        "Salpingoeca rosetta", "Hydra vulgaris", "Nematostella vectensis", "Trichoplax adhaerens"
+    ],
+    // 3. FUNGI (Non-ciliated)
+    fungi: [
+        "Saccharomyces cerevisiae", "S cerevisiae", "Schizosaccharomyces pombe", "S pombe", "Cryptococcus neoformans", "C neoformans", "Ustilago maydis", "U maydis", "Candida albicans", "C albicans",
+        "Yarrowia lipolytica", "Podospora anserina", "Emericella nidulans", "Tuber melanosporum", "Laccaria bicolor", "Puccinia graminis f. sp. tritici",
+        "Batrachochytrium dendrobatidis", "Nosema ceranae", "Enterocytozoon bieneusi", "Schizosaccharomyces japonicus", "A.gossypii", "K.lactis", "K.waltii",
+        "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus", "S.mikatae", "S.paradoxus", "S.arctica", "C.lusitaniae", "D.hansenii",
+        "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans", "C.dubliniensis"
+    ],
+    // 4. PROTOZOA & PARASITES (Mostly ciliated or flagellated)
+    protozoa: [
+        "Tetrahymena thermophila", "T thermophila", "Paramecium tetraurelia", "P tetraurelia", "Trypanosoma cruzi", "T cruzi", "Leishmania major", "L major",
+        "Giardia intestinalis", "G intestinalis", "Trichomonas vaginalis", "T vaginalis", "Cryptosporidium parvum", "C parvum", "Entamoeba histolytica", "E histolytica",
+        "Encephalitozoon cuniculi", "E cuniculi", "Trypanosoma brucei brucei", "Leishmania mexicana", "Plasmodium vivax", "P.vivax", "Plasmodium falciparum",
+        "Toxoplasma gondii", "T.gondii", "Blastocystis hominis", "Neospora caninum", "Ichthyophthirius multifiliis"
+    ],
+    // 5. PLANTS & ALGAE (Cilia in flagella/motility)
+    plants_algae: [
+        "Chlamydomonas reinhardtii", "C reinhardtii", "Volvox carteri", "V carteri", "Physcomitrella patens", "P patens", "Arabidopsis thaliana", "A thaliana",
+        "Vitis vinifera", "V vinifera", "Brachypodium distachyon", "B distachyon", "Sorghum bicolor", "S bicolor", "Micromonas sp. (strain RCC299 / NOUM17)",
+        "Ostreococcus lucimarinus", "Ostreococcus tauri", "Cyanidioschyzon merolae", "Selaginella moellendorffii", "P.trichocarpa", "R.communis", "T.trahens",
+        "D.discoideum", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri",
+        "A.flavus", "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum"
+    ]
+};
+    
+const NEVERS_CIL_PANEL = [
+    "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", 
+    "Caenorhabditis elegans", "Tetrahymena thermophila", "Chlamydomonas reinhardtii", 
+    "Micromonas sp", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis", 
+    "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", 
+    "Physcomitrella patens", "Paramecium tetraurelia", "Volvox carteri", 
+    "Amphimedon queenslandica", "Monosiga brevicollis"
+];
+
+const NEVERS_NCIL_PANEL = [
+    "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Cryptococcus neoformans", 
+    "Ustilago maydis", "Candida albicans", "Arabidopsis thaliana", "Brachypodium distachyon", 
+    "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum", "Entamoeba histolytica", 
+    "Encephalitozoon cuniculi"
+];
+
+const LI_CIL_ORG = [
+    "H sapiens", "M musculus", "D rerio", "X tropicalis", "G gallus", "C elegans", 
+    "T thermophila", "C reinhardtii", "M sp RCC299", "T cruzi", "L major", 
+    "G intestinalis", "T vaginalis", "S purpuratus", "C intestinalis", "P patens", 
+    "P tetraurelia", "V carteri", "A queenslandica", "M brevicollis"
+];
+
+const LI_NCIL_ORG = [
+    "S cerevisiae", "S pombe", "C neoformans", "U maydis", "C albicans", "A thaliana", 
+    "B distachyon", "S bicolor", "V vinifera", "C parvum", "E histolytica", "E cuniculi"
+];
+
+
+// --- TSV Parsing Helper (UNCHANGED) ---
+function parseTsvData(tsvText) {
+    const data = {};
+    const lines = tsvText.split('\n').filter(line => line.trim() !== '');
+    if (lines.length <= 1) return data;
+
+    const headers = lines[0].split('\t').map(h => h.trim());
+    const geneNameIndex = headers.indexOf('Gene name');
+    const tissueIndex = headers.indexOf('Tissue');
+    const nTPMIndex = headers.indexOf('nTPM');
+
+    if (geneNameIndex === -1 || tissueIndex === -1 || nTPMIndex === -1) {
+        console.error("TSV headers missing: 'Gene name', 'Tissue', or 'nTPM'");
+        return data;
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split('\t').map(v => v.trim());
+        if (values.length > tissueIndex) {
+            const geneName = values[geneNameIndex];
+            let tissue = values[tissueIndex];
+            const nTPM = parseFloat(values[nTPMIndex]);
+
+            if (tissue.toLowerCase() === 'cilia') continue; 
+
+            if (geneName && !isNaN(nTPM)) {
+                if (!data[geneName]) data[geneName] = {};
+                data[geneName][tissue] = nTPM;
+            }
+        }
+    }
+    return data;
+}
+
+// --- PHYLOGENETIC DATA INTEGRATION ---
+function integratePhylogenyData(geneMap, liMatrix, neversMatrix) {
+    let liIntegrated = 0;
+    let neversIntegrated = 0;
+    
+    console.log("Integrating phylogenetic data into gene objects...");
+    
+    // Integrate Nevers 2017 data
+    if (neversMatrix && neversMatrix.genes) {
+        Object.entries(neversMatrix.genes).forEach(([geneKey, phyloData]) => {
+            if (geneKey && phyloData && phyloData.g) {
+                const geneSymbol = phyloData.g.toUpperCase();
+                const gene = geneMap.get(geneSymbol);
+                if (gene) {
+                    if (!gene.phylogeny) gene.phylogeny = {};
+                    gene.phylogeny.nevers_2017 = {
+                        species_data: phyloData.s || [],
+                        species_count: (phyloData.s || []).length,
+                        gene_name: phyloData.g
+                    };
+                    neversIntegrated++;
+                }
+            }
+        });
+    }
+    
+    // Integrate Li 2014 data
+    if (liMatrix && liMatrix.genes) {
+        Object.values(liMatrix.genes).forEach(phyloData => {
+            if (phyloData && phyloData.g) {
+                const geneSymbol = phyloData.g.toUpperCase();
+                const gene = geneMap.get(geneSymbol);
+                if (gene) {
+                    if (!gene.phylogeny) gene.phylogeny = {};
+                    gene.phylogeny.li_2014 = {
+                        species_data: phyloData.s || [],
+                        class: phyloData.c,
+                        entrez_id: phyloData.e,
+                        gene_name: phyloData.g
+                    };
+                    liIntegrated++;
+                }
+            }
+        });
+    }
+    
+    console.log(`Integrated phylogenetic data: ${neversIntegrated} genes from Nevers 2017, ${liIntegrated} genes from Li 2014`);
+    return { liIntegrated, neversIntegrated };
+}
+    
+/**
+ * @loadMasterData - Loads data and constructs the necessary global structures.
+ */
+async function loadMasterData() {
+    try {
+        // 1. Fetch ALL data concurrently (7 requests now: 5 existing + 2 UMAP)
+        const [
+            masterResp, lookupResp, liResp, neversResp, rnaResp,
+            umapCoordResp, cellxgeneExprResp
+        ] = await Promise.all([
+            fetch(MASTER_DB),
+            fetch(LOOKUP_DB),
+            fetch(LI_PHYLO_MATRIX),
+            fetch(NEVERS_PHYLO_MATRIX),
+            fetch(RNA_TISSUE_TSV),
+            fetch(UMAP_COORDINATES_DB),       // NEW UMAP COORDINATES
+            fetch(CELLXGENE_EXPRESSION_DB)    // NEW EXPRESSION DATA
+        ]);
+        
+        // 2. Process fetched JSON data
+        const rawMasterData = await masterResp.json();
+        const rawLookups = await lookupResp.json();
+        
+        // Populate Global Phylogeny Caches
+        window.liPhylogenyCache = await liResp.json();
+        window.neversPhylogenyCache = await neversResp.json();
+
+        // Process new scRNA-seq data files
+        const umapCoordinatesData = await umapCoordResp.json();
+        const cellxgeneExpressionData = await cellxgeneExprResp.json();
+        
+        // Use local references for clarity in this function scope
+        const liMatrix = window.liPhylogenyCache;
+        const neversMatrix = window.neversPhylogenyCache;
+
+        // Set CiliAI lookups structure
+        window.CiliAI.lookups = rawLookups.lookups || {};
+        window.CiliAI.masterData = Array.isArray(rawMasterData.masterData) ? rawMasterData.masterData : rawMasterData;
+
+        // --- UMAP Data Assignment: CRITICAL STEP ---
+        // 1. Check if the UMAP data is an array of points (coordinates)
+        const isUmapValid = Array.isArray(umapCoordinatesData) && umapCoordinatesData.length > 0;
+        // 2. Check if the Expression data is a non-empty object (gene map)
+        const isExprValid = typeof cellxgeneExpressionData === 'object' && Object.keys(cellxgeneExpressionData).length > 0;
+
+        if (isUmapValid && isExprValid) {
+            // Success: Data is available in the expected array/object structure
+            window.CiliAI_UMAP = umapCoordinatesData;
+            window.CiliAI.cellDataCache = cellxgeneExpressionData;
+            
+            const totalCells = umapCoordinatesData.length;
+            const totalGenes = Object.keys(cellxgeneExpressionData).length;
+            console.log(`scRNA-seq UMAP data loaded successfully from dedicated files. Total cells: ${totalCells}. Total expressed genes: ${totalGenes}`);
+            
+        } else {
+             // Failure: Keep variables empty and log warning
+             console.warn(`scRNA-seq UMAP data not found in new dedicated files.`);
+             window.CiliAI_UMAP = [];
+             window.CiliAI.cellDataCache = {};
+        }
+
+        // 4. Populate Gene Map (ciliaryGeneMap) with BASIC gene data first
+        window.CiliAI.masterData.forEach(g => {
+            if (g.Gene) {
+                // Create the base gene object
+                const gene = { ...g, gene: g.Gene, phylogeny: {} };
+                
+                // Store Entrez ID for matrix lookup and debug checks
+                if (g['Entrez.ID']) {
+                    gene.entrezId = String(g['Entrez.ID']); 
+                }
+                
+                window.ciliaryGeneMap.set(g.Gene.toUpperCase(), gene);
+                
+                if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
+                window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = gene;
+            }
+        });
+
+        // 5. CRITICAL: INTEGRATE PHYLOGENETIC DATA PROPERLY
+        integratePhylogenyData(window.ciliaryGeneMap, liMatrix, neversMatrix);
+        
+        // 6. Load RNA tissue data
+        const rnaText = await rnaResp.text();
+        window.rnaTissueExpressionData = parseTsvData(rnaText);
+
+        window.CiliAI.ready = true;
+        console.log(`Loaded ${window.ciliaryGeneMap.size} genes and 7 external datasets.`);
+        
+        // Update global variables for CiliaHub
+        window.allGenes = Array.from(window.ciliaryGeneMap.values());
+        window.currentData = window.allGenes;
+        
+        return true;
+        
+    } catch (err) {
+        console.error("Critical Data Loading Error:", err);
+        document.getElementById('content-area').innerHTML = `<p style="color:red;padding:20px;">Error loading core data: ${err.message}. Please verify the data URLs.</p>`;
+        return false;
+    }
+}
+
+    
+// --- Data retrieval utility (CRITICAL FIXES FOR DATA KEY MISMATCH) ---
+function getCleanArray(gene, key) {
+    // 1. Initialize data variable using the requested key
+    let data = gene[key];
+    
+    // 1. Handle Complex Key Mismatch
+    if (key === 'Protein.complexes') {
+        data = gene['complex_components'] || gene['Protein.complexes'];
+        if (typeof data === 'object' && !Array.isArray(data)) {
+            return Object.keys(data).map(k => `${k}`);
+        }
+    }
+
+    // 2. Handle Mouse Phenotype Key Mismatch
+    if (key === 'Phenotypes_mouse') {
+        data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
+    }
+
+    // 3. Handle PFAM Domain Key Mismatch
+    if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
+        const pfamIds = gene['PFAM_IDs'] || [];
+        const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
+        return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
+    }
+
+    // 4. RESTORED SCREEN LOGIC: Return the raw array of objects when requested.
+    // This is crucial because renderScreenSummaryHeatmap iterates over these objects.
+    if (key === 'screens_summary') {
+        data = data || gene['screens']; // Fallback if data key is wrong
+        if (Array.isArray(data)) return data; 
+        // If data is null/undefined here, we proceed to return empty list.
+    }
+    
+    // Check if data is null/undefined before attempting to process it
+    if (!data) return [];
+    
+    // 5. Split and Filter (for string fields like Localization, Phenotypes_mouse)
+    if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
+    
+    // Final default return for string fields
+    return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
+}
+   
+function findGenes(input) {
+    const queries = input
+        .split(/[\s,\n;]+/)
+        .map(s => s.trim().replace(/\u200B/g, '').toUpperCase())
+        .filter(Boolean);
+        
+    const found = [];
+    const seen = new Set();
+    
+    queries.forEach(q => {
+        // Find the full gene object if it exists in the main map
+        if (window.ciliaryGeneMap.has(q)) {
+            if (!seen.has(q)) {
+                found.push(window.ciliaryGeneMap.get(q));
+                seen.add(q);
+            }
+        } else {
+            // Include minimal object for genes not in the core map (for external data sources)
+            if (!seen.has(q)) {
+                found.push({ gene: q }); 
+                seen.add(q);
+            }
+        }
+    });
+    return found; 
+}
+
         // ==========================================================
         // 1. GLOBAL VARIABLES AND CACHE DECLARATIONS
         // ==========================================================
@@ -555,8 +917,6 @@
         let geneLocalizationData = {};
         const defaultGenesNames = ["IFT88", "CEP290", "ARL13B", "BBS1", "PKD2", "ACE2"];
         const allPartIds = ["ciliary-membrane", "axoneme", "basal-body", "transition-zone", "nucleus", "cell-body"];
-        
-        window.geneMapCache = new Map();
 
         // ==========================================================
         // 2. CORE UTILITY FUNCTIONS
@@ -600,101 +960,8 @@
         }
 
         // ==========================================================
-        // 3. DATA LOADING & PREPARATION
+        // 3. SEARCH AND QUERY FUNCTIONS
         // ==========================================================
-        
-        async function loadAndPrepareDatabase() {
-            if (window.geneMapCache && window.geneMapCache.size > 0) {
-                console.log("Database already loaded and prepared.");
-                return true;
-            }
-
-            try {
-                const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-                if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
-                const rawGenes = await resp.json();
-
-                allGenes = rawGenes; 
-                currentData = allGenes; 
-                window.geneMapCache = new Map();
-                geneLocalizationData = {};
-
-                rawGenes.forEach(g => {
-                    if (!g || !g.gene) return;
-                    const humanGeneObject = g;
-                    const nameKey = sanitize(g.gene);
-                    if (nameKey && !window.geneMapCache.has(nameKey)) {
-                        window.geneMapCache.set(nameKey, humanGeneObject);
-                    }
-                    if (g.localization) {
-                        geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
-                    }
-                    
-                    // Add Human Synonyms
-                    if (g.synonym) {
-                        String(g.synonym).split(/[,;]/).forEach(syn => {
-                            const key = sanitize(syn);
-                            if (key && !window.geneMapCache.has(key)) {
-                                window.geneMapCache.set(key, humanGeneObject);
-                            }
-                        });
-                    }
-
-                    // Add Human Ensembl IDs
-                    if (g.ensembl_id) {
-                        String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                            const key = sanitize(id);
-                            if (key && !window.geneMapCache.has(key)) {
-                                window.geneMapCache.set(key, humanGeneObject);
-                            }
-                        });
-                    }
-                    
-                    // Add Ortholog Symbols
-                    const orthologFields = ['ortholog_mouse', 'ortholog_c_elegans', 'ortholog_xenopus', 'ortholog_zebrafish', 'ortholog_drosophila'];
-                    orthologFields.forEach(field => {
-                        if (g[field]) {
-                            String(g[field]).split(/[,;\s]+/).forEach(orthoSymbol => {
-                                const key = sanitize(orthoSymbol);
-                                if (key && !window.geneMapCache.has(key)) {
-                                    window.geneMapCache.set(key, humanGeneObject);
-                                }
-                            });
-                        }
-                    });
-                });
-
-                console.log(`Loaded ${allGenes.length} genes into cache`);
-                return true;
-            } catch (e) {
-                console.error('Data load or preparation error (CiliHub):', e);
-                allGenes = getDefaultGenes();
-                currentData = allGenes;
-                window.geneMapCache = new Map(allGenes.map(g => [sanitize(g.gene), g]));
-                return false;
-            }
-        }
-
-        // ==========================================================
-        // 4. SEARCH AND QUERY FUNCTIONS
-        // ==========================================================
-
-        function findGenes(queries) {
-            const foundGenes = new Map();
-            const notFound = [];
-
-            queries.forEach(query => {
-                const result = window.geneMapCache.get(query);
-                if (result) {
-                    if (!foundGenes.has(result.gene)) {
-                        foundGenes.set(result.gene, result);
-                    }
-                } else {
-                    notFound.push(query);
-                }
-            });
-            return { foundGenes: Array.from(foundGenes.values()), notFoundGenes: notFound };
-        }
 
         function performSingleSearch() {
             const query = document.getElementById('single-gene-search')?.value.trim().toUpperCase();
@@ -708,7 +975,7 @@
                 return;
             }
 
-            const { foundGenes } = findGenes([query]);
+            const foundGenes = findGenes(query);
 
             if (foundGenes.length === 0) {
                 if(statusDiv) {
@@ -728,7 +995,7 @@
         }
 
         // ==========================================================
-        // 5. DISPLAY FUNCTIONS
+        // 4. DISPLAY FUNCTIONS
         // ==========================================================
 
         function displayHomePage() {
@@ -763,14 +1030,15 @@
 
                     <div id="gene-cards-container" class="gene-cards">
                         ${defaultGenesNames.map(geneName => {
-                            const gene = allGenes.find(g => g.gene === geneName);
+                            const gene = allGenes.find(g => g.gene === geneName || g.Gene === geneName);
                             if (!gene) return '';
+                            const geneDisplay = gene.gene || gene.Gene;
                             return `
                                 <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
-                                    <div class="gene-name">${gene.gene}</div>
-                                    <div class="gene-description">${gene.description || 'No description available.'}</div>
-                                    ${gene.localization ? `<div class="gene-info"><strong>Localization:</strong> ${Array.isArray(gene.localization) ? gene.localization.join(', ') : gene.localization}</div>` : ''}
-                                    ${gene.ensembl_id ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.ensembl_id}</div>` : ''}
+                                    <div class="gene-name">${geneDisplay}</div>
+                                    <div class="gene-description">${gene.description || gene.Description || 'No description available.'}</div>
+                                    ${gene.localization || gene.Localization ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(gene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
+                                    ${gene.ensembl_id || gene.Ensembl_ID ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.ensembl_id || gene.Ensembl_ID}</div>` : ''}
                                 </div>
                             `;
                         }).join('')}
@@ -799,15 +1067,19 @@
                     return;
                 }
 
-                const filteredGenes = allGenes.filter(g =>
-                    (g.gene && g.gene.toUpperCase().includes(query)) ||
-                    (g.synonym && g.synonym.toUpperCase().includes(query))
-                ).slice(0, 10);
+                const filteredGenes = allGenes.filter(g => {
+                    const geneName = g.gene || g.Gene || '';
+                    const synonym = g.synonym || g.Synonyms || '';
+                    return geneName.toUpperCase().includes(query) || 
+                           synonym.toUpperCase().includes(query);
+                }).slice(0, 10);
 
                 if (filteredGenes.length > 0) {
-                    suggestionsContainer.innerHTML = filteredGenes.map(g => 
-                        `<div class="suggestion-item" data-gene="${g.gene}">${g.gene}${g.synonym ? ` (${g.synonym})` : ''}</div>`
-                    ).join('');
+                    suggestionsContainer.innerHTML = filteredGenes.map(g => {
+                        const geneName = g.gene || g.Gene || '';
+                        const synonym = g.synonym || g.Synonyms || '';
+                        return `<div class="suggestion-item" data-gene="${geneName}">${geneName}${synonym ? ` (${synonym})` : ''}</div>`;
+                    }).join('');
                     suggestionsContainer.style.display = 'block';
                     
                     suggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
@@ -830,48 +1102,63 @@
             });
 
             // Initialize gene buttons
-            updateGeneButtons(defaultGenesNames.map(name => allGenes.find(g => g.gene === name)).filter(Boolean));
+            updateGeneButtons(defaultGenesNames.map(name => allGenes.find(g => (g.gene === name || g.Gene === name))).filter(Boolean));
+        }
+
+        function formatAsTags(data, className = '') {
+            if (!data) return '<span class="not-available">Not available</span>';
+            const arr = Array.isArray(data) ? data : String(data).split(/[;,]\s*/).filter(Boolean);
+            if (arr.length === 0) return '<span class="not-available">Not available</span>';
+            return arr.map(item => `<span class="tag ${className}">${item.trim()}</span>`).join('');
         }
 
         function displayIndividualGenePage(gene) {
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
 
-            const formatAsTags = (data, className = '') => {
-                if (!data) return '<span class="not-available">Not available</span>';
-                const arr = Array.isArray(data) ? data : String(data).split(/[;,]\s*/).filter(Boolean);
-                if (arr.length === 0) return '<span class="not-available">Not available</span>';
-                return arr.map(item => `<span class="tag ${className}">${item.trim()}</span>`).join('');
-            };
-
+            // Extract gene name from either 'gene' or 'Gene' field
+            const geneName = gene.gene || gene.Gene || "Unknown Gene";
+            
             contentArea.innerHTML = `
                 <div class="page-container">
-                    <h1>${gene.gene || "Unknown Gene"}</h1>
+                    <h1>${geneName}</h1>
                     
-                    ${gene.description ? `<p style="color: #555; margin-bottom: 20px;">${gene.description}</p>` : ''}
+                    ${gene.description || gene.Description ? `<p style="color: #555; margin-bottom: 20px;">${gene.description || gene.Description}</p>` : ''}
                     
                     <div class="detail-card">
                         <h3>Gene Information</h3>
                         <table class="data-table">
                             <tr>
                                 <th>Ensembl ID</th>
-                                <td>${gene.ensembl_id || '<span class="not-available">Not available</span>'}</td>
+                                <td>${gene.ensembl_id || gene.Ensembl_ID || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Entrez ID</th>
+                                <td>${gene.entrezId || gene['Entrez.ID'] || '<span class="not-available">Not available</span>'}</td>
                             </tr>
                             <tr>
                                 <th>Synonyms</th>
-                                <td>${formatAsTags(gene.synonym)}</td>
+                                <td>${formatAsTags(gene.synonym || gene.Synonyms)}</td>
                             </tr>
                             <tr>
                                 <th>Localization</th>
-                                <td>${formatAsTags(gene.localization)}</td>
+                                <td>${formatAsTags(getCleanArray(gene, 'Localization'))}</td>
                             </tr>
                             <tr>
                                 <th>Functional Category</th>
-                                <td>${formatAsTags(gene.functional_category)}</td>
+                                <td>${formatAsTags(gene.functional_category || gene['Functional.Category'])}</td>
                             </tr>
                             <tr>
                                 <th>Ciliopathies</th>
-                                <td>${formatAsTags(gene.ciliopathy)}</td>
+                                <td>${formatAsTags(gene.ciliopathy || gene['Ciliopathy.disease'])}</td>
+                            </tr>
+                            <tr>
+                                <th>Protein Complexes</th>
+                                <td>${formatAsTags(getCleanArray(gene, 'Protein.complexes'))}</td>
+                            </tr>
+                            <tr>
+                                <th>Protein Domains (PFAM)</th>
+                                <td>${formatAsTags(getCleanArray(gene, 'Protein.Domain.PFAM'))}</td>
                             </tr>
                         </table>
                     </div>
@@ -881,19 +1168,55 @@
                         <table class="data-table">
                             <tr>
                                 <th>Mouse</th>
-                                <td>${gene.ortholog_mouse || '<span class="not-available">Not available</span>'}</td>
+                                <td>${gene.ortholog_mouse || gene['Ortholog.Mouse'] || '<span class="not-available">Not available</span>'}</td>
                             </tr>
                             <tr>
                                 <th>Zebrafish</th>
-                                <td>${gene.ortholog_zebrafish || '<span class="not-available">Not available</span>'}</td>
+                                <td>${gene.ortholog_zebrafish || gene['Ortholog.Zebrafish'] || '<span class="not-available">Not available</span>'}</td>
                             </tr>
                             <tr>
                                 <th>Drosophila</th>
-                                <td>${gene.ortholog_drosophila || '<span class="not-available">Not available</span>'}</td>
+                                <td>${gene.ortholog_drosophila || gene['Ortholog.Drosophila'] || '<span class="not-available">Not available</span>'}</td>
                             </tr>
                             <tr>
                                 <th>C. elegans</th>
-                                <td>${gene.ortholog_c_elegans || '<span class="not-available">Not available</span>'}</td>
+                                <td>${gene.ortholog_c_elegans || gene['Ortholog.C.elegans'] || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Xenopus</th>
+                                <td>${gene.ortholog_xenopus || gene['Ortholog.Xenopus'] || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="detail-card">
+                        <h3>Phenotypic Data</h3>
+                        <table class="data-table">
+                            <tr>
+                                <th>Mouse Phenotypes</th>
+                                <td>${formatAsTags(getCleanArray(gene, 'Phenotypes_mouse'))}</td>
+                            </tr>
+                            <tr>
+                                <th>Human Phenotypes (HPO)</th>
+                                <td>${formatAsTags(gene.hpo_terms || gene['HPO.Terms'])}</td>
+                            </tr>
+                            <tr>
+                                <th>OMIM ID</th>
+                                <td>${gene.omim_id || gene['OMIM.ID'] || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="detail-card">
+                        <h3>Phylogenetic Data</h3>
+                        <table class="data-table">
+                            <tr>
+                                <th>Li 2014 Class</th>
+                                <td>${gene.phylogeny?.li_2014?.class || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Nevers 2017 Species Count</th>
+                                <td>${gene.phylogeny?.nevers_2017?.species_count || '<span class="not-available">Not available</span>'}</td>
                             </tr>
                         </table>
                     </div>
@@ -902,7 +1225,7 @@
                         <button onclick="displayHomePage()" style="padding: 10px 20px; background: var(--primary-blue); color: white; border: none; border-radius: 6px; cursor: pointer;">
                             Back to Home
                         </button>
-                        <button onclick="performSearchForGene('${gene.gene}')" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        <button onclick="performSearchForGene('${geneName}')" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer;">
                             Search Related Genes
                         </button>
                     </div>
@@ -919,14 +1242,17 @@
                 <div class="page-container">
                     <h1>Search Results</h1>
                     <div id="gene-cards-container" class="gene-cards">
-                        ${genes.map(gene => `
-                            <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
-                                <div class="gene-name">${gene.gene}</div>
-                                <div class="gene-description">${gene.description || 'No description available.'}</div>
-                                ${gene.localization ? `<div class="gene-info"><strong>Localization:</strong> ${Array.isArray(gene.localization) ? gene.localization.join(', ') : gene.localization}</div>` : ''}
-                                ${gene.ensembl_id ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.ensembl_id}</div>` : ''}
-                            </div>
-                        `).join('')}
+                        ${genes.map(gene => {
+                            const geneName = gene.gene || gene.Gene || '';
+                            return `
+                                <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
+                                    <div class="gene-name">${geneName}</div>
+                                    <div class="gene-description">${gene.description || gene.Description || 'No description available.'}</div>
+                                    ${gene.localization || gene.Localization ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(gene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
+                                    ${gene.ensembl_id || gene.Ensembl_ID ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.ensembl_id || gene.Ensembl_ID}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                     <button onclick="displayHomePage()" style="padding: 10px 20px; background: var(--primary-blue); color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">
                         Back to Home
@@ -961,11 +1287,12 @@
             geneButtons.innerHTML = '';
 
             // Add gene button
-            if (gene.gene && geneLocalizationData[gene.gene]) {
+            const geneName = gene.gene || gene.Gene;
+            if (geneName && geneLocalizationData[geneName]) {
                 const button = document.createElement('button');
                 button.className = 'gene-btn selected';
-                button.textContent = gene.gene;
-                button.onclick = () => showLocalization(gene.gene, false);
+                button.textContent = geneName;
+                button.onclick = () => showLocalization(geneName, false);
                 geneButtons.appendChild(button);
             }
 
@@ -977,8 +1304,8 @@
             geneButtons.appendChild(resetButton);
 
             // Show localization for this gene
-            if (gene.gene) {
-                showLocalization(gene.gene, false);
+            if (geneName) {
+                showLocalization(geneName, false);
             }
         }
 
@@ -991,12 +1318,16 @@
             const genesToShow = [...genes].slice(0, 10);
             
             genesToShow.forEach(gene => {
-                if (geneLocalizationData[gene.gene]) {
-                    const isSearch = searchResults.some(s => s.gene === gene.gene);
+                const geneName = gene.gene || gene.Gene;
+                if (geneName && geneLocalizationData[geneName]) {
+                    const isSearch = searchResults.some(s => {
+                        const sName = s.gene || s.Gene;
+                        return sName === geneName;
+                    });
                     const button = document.createElement('button');
                     button.className = `gene-btn ${isSearch ? 'search-gene' : ''}`;
-                    button.textContent = gene.gene;
-                    button.onclick = () => showLocalization(gene.gene, isSearch);
+                    button.textContent = geneName;
+                    button.onclick = () => showLocalization(geneName, isSearch);
                     geneButtons.appendChild(button);
                 }
             });
@@ -1097,81 +1428,81 @@
         function getDefaultGenes() {
             return [
                 {
-                    gene: "IFT88",
-                    ensembl_id: "ENSG00000032742",
-                    description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
-                    synonym: "BBS20, D13S840E, TG737, TTC10",
-                    localization: ["axoneme", "basal body"],
-                    functional_category: ["Intraflagellar transport", "Ciliary assembly/disassembly"],
-                    ciliopathy: "Bardet-Biedl syndrome 20",
-                    ortholog_mouse: "Ift88",
-                    ortholog_zebrafish: "ift88",
-                    ortholog_drosophila: "CG31052",
-                    ortholog_c_elegans: "che-2"
+                    Gene: "IFT88",
+                    Ensembl_ID: "ENSG00000032742",
+                    Description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
+                    Synonyms: "BBS20, D13S840E, TG737, TTC10",
+                    Localization: ["axoneme", "basal body"],
+                    'Functional.Category': ["Intraflagellar transport", "Ciliary assembly/disassembly"],
+                    'Ciliopathy.disease': "Bardet-Biedl syndrome 20",
+                    'Ortholog.Mouse': "Ift88",
+                    'Ortholog.Zebrafish': "ift88",
+                    'Ortholog.Drosophila': "CG31052",
+                    'Ortholog.C.elegans': "che-2"
                 },
                 {
-                    gene: "CEP290",
-                    ensembl_id: "ENSG00000198707",
-                    description: "Centrosomal protein 290. Critical component of the ciliary transition zone.",
-                    synonym: "BBS14, JBTS5, MKS4, NPHP6, SLSN6",
-                    localization: ["transition zone"],
-                    functional_category: ["Transition zone", "Ciliary gating"],
-                    ciliopathy: "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14",
-                    ortholog_mouse: "Cep290",
-                    ortholog_zebrafish: "cep290",
-                    ortholog_drosophila: "Cep290",
-                    ortholog_c_elegans: "cep290"
+                    Gene: "CEP290",
+                    Ensembl_ID: "ENSG00000198707",
+                    Description: "Centrosomal protein 290. Critical component of the ciliary transition zone.",
+                    Synonyms: "BBS14, JBTS5, MKS4, NPHP6, SLSN6",
+                    Localization: ["transition zone"],
+                    'Functional.Category': ["Transition zone", "Ciliary gating"],
+                    'Ciliopathy.disease': "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14",
+                    'Ortholog.Mouse': "Cep290",
+                    'Ortholog.Zebrafish': "cep290",
+                    'Ortholog.Drosophila': "Cep290",
+                    'Ortholog.C.elegans': "cep290"
                 },
                 {
-                    gene: "ARL13B",
-                    ensembl_id: "ENSG00000169379",
-                    description: "ADP-ribosylation factor-like protein 13B. Involved in ciliary membrane biogenesis.",
-                    synonym: "ARL2L2, JBTS8",
-                    localization: ["ciliary membrane"],
-                    functional_category: ["Ciliary membrane", "Signal transduction"],
-                    ciliopathy: "Joubert syndrome 8",
-                    ortholog_mouse: "Arl13b",
-                    ortholog_zebrafish: "arl13b",
-                    ortholog_drosophila: "Arl13b",
-                    ortholog_c_elegans: "arl-13"
+                    Gene: "ARL13B",
+                    Ensembl_ID: "ENSG00000169379",
+                    Description: "ADP-ribosylation factor-like protein 13B. Involved in ciliary membrane biogenesis.",
+                    Synonyms: "ARL2L2, JBTS8",
+                    Localization: ["ciliary membrane"],
+                    'Functional.Category': ["Ciliary membrane", "Signal transduction"],
+                    'Ciliopathy.disease': "Joubert syndrome 8",
+                    'Ortholog.Mouse': "Arl13b",
+                    'Ortholog.Zebrafish': "arl13b",
+                    'Ortholog.Drosophila': "Arl13b",
+                    'Ortholog.C.elegans': "arl-13"
                 },
                 {
-                    gene: "BBS1",
-                    ensembl_id: "ENSG00000166246",
-                    description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex.",
-                    synonym: "BBS",
-                    localization: ["basal body", "ciliary membrane"],
-                    functional_category: ["Ciliary trafficking", "BBSome complex"],
-                    ciliopathy: "Bardet-Biedl syndrome 1",
-                    ortholog_mouse: "Bbs1",
-                    ortholog_zebrafish: "bbs1",
-                    ortholog_drosophila: "Bbs1",
-                    ortholog_c_elegans: "bbs-1"
+                    Gene: "BBS1",
+                    Ensembl_ID: "ENSG00000166246",
+                    Description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex.",
+                    Synonyms: "BBS",
+                    Localization: ["basal body", "ciliary membrane"],
+                    'Functional.Category': ["Ciliary trafficking", "BBSome complex"],
+                    'Ciliopathy.disease': "Bardet-Biedl syndrome 1",
+                    'Ortholog.Mouse': "Bbs1",
+                    'Ortholog.Zebrafish': "bbs1",
+                    'Ortholog.Drosophila': "Bbs1",
+                    'Ortholog.C.elegans': "bbs-1"
                 },
                 {
-                    gene: "PKD2",
-                    ensembl_id: "ENSG00000118762",
-                    description: "Polycystin-2, a calcium-permeable ion channel.",
-                    synonym: "TRPP2",
-                    localization: ["axoneme", "endoplasmic reticulum"],
-                    functional_category: ["Ion transport", "Ciliary signaling"],
-                    ciliopathy: "Autosomal dominant polycystic kidney disease",
-                    ortholog_mouse: "Pkd2",
-                    ortholog_zebrafish: "pkd2",
-                    ortholog_drosophila: "Pkd2",
-                    ortholog_c_elegans: "pkd-2"
+                    Gene: "PKD2",
+                    Ensembl_ID: "ENSG00000118762",
+                    Description: "Polycystin-2, a calcium-permeable ion channel.",
+                    Synonyms: "TRPP2",
+                    Localization: ["axoneme", "endoplasmic reticulum"],
+                    'Functional.Category': ["Ion transport", "Ciliary signaling"],
+                    'Ciliopathy.disease': "Autosomal dominant polycystic kidney disease",
+                    'Ortholog.Mouse': "Pkd2",
+                    'Ortholog.Zebrafish': "pkd2",
+                    'Ortholog.Drosophila': "Pkd2",
+                    'Ortholog.C.elegans': "pkd-2"
                 },
                 {
-                    gene: "ACE2",
-                    ensembl_id: "ENSG00000130234",
-                    description: "Angiotensin-converting enzyme 2. Serves as the entry point for SARS-CoV-2.",
-                    synonym: "ACEH",
-                    localization: ["cilia"],
-                    functional_category: ["Cell surface receptor", "Ciliary membrane"],
-                    ortholog_mouse: "Ace2",
-                    ortholog_zebrafish: "ace2",
-                    ortholog_drosophila: "Ance",
-                    ortholog_c_elegans: "acn-1"
+                    Gene: "ACE2",
+                    Ensembl_ID: "ENSG00000130234",
+                    Description: "Angiotensin-converting enzyme 2. Serves as the entry point for SARS-CoV-2.",
+                    Synonyms: "ACEH",
+                    Localization: ["cilia"],
+                    'Functional.Category': ["Cell surface receptor", "Ciliary membrane"],
+                    'Ortholog.Mouse': "Ace2",
+                    'Ortholog.Zebrafish': "ace2",
+                    'Ortholog.Drosophila': "Ance",
+                    'Ortholog.C.elegans': "acn-1"
                 }
             ];
         }
@@ -1181,8 +1512,24 @@
         // ==========================================================
 
         async function initializeApp() {
-            // Load data
-            await loadAndPrepareDatabase();
+            // Load master data using loadMasterData
+            const success = await loadMasterData();
+            
+            if (!success) {
+                // If master data fails to load, use fallback
+                console.warn("Using fallback gene data");
+                allGenes = getDefaultGenes();
+                currentData = allGenes;
+            }
+            
+            // Build localization data from loaded genes
+            geneLocalizationData = {};
+            allGenes.forEach(g => {
+                const geneName = g.gene || g.Gene;
+                if (geneName && g.Localization) {
+                    geneLocalizationData[geneName] = mapLocalizationToSVG(getCleanArray(g, 'Localization'));
+                }
+            });
             
             // Setup event listeners for SVG parts
             document.querySelectorAll('.cilia-part').forEach(part => {
@@ -1215,7 +1562,10 @@
             if (window.location.hash) {
                 const geneName = window.location.hash.substring(1);
                 if (geneName) {
-                    const gene = allGenes.find(g => g.gene === geneName);
+                    const gene = allGenes.find(g => {
+                        const gName = g.gene || g.Gene;
+                        return gName === geneName;
+                    });
                     if (gene) {
                         displayIndividualGenePage(gene);
                     }
