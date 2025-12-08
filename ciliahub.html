@@ -645,7 +645,7 @@
         window.CiliAI_UMAP = [];
         window.ciliaryGeneMap = new Map();          // Main gene map (uppercase → full object)
         window.allGenes = [];                       // Array of all gene objects (used everywhere)
-        window.currentData = [];                    // FIXED: Added currentData initialization
+        window.currentData = [];                    
         window.geneLocalizationData = {};           // geneName → array of SVG part ids
 
         const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -712,7 +712,7 @@
                         if (gene) {
                             if (!gene.phylogeny) gene.phylogeny = {};
                             gene.phylogeny.li_2014 = { 
-                                class: liMatrix.summary.class_list[d.c] || d.c,  // Map class ID to readable name
+                                class: liMatrix.summary.class_list[d.c] || d.c,  
                                 species_data: d.s || [],
                                 entrez_id: d.e,
                                 gene_name: d.g 
@@ -834,7 +834,6 @@
                     ensembl_id: "ENSG00000032742",
                     Description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
                     Synonym_: "BBS20, D13S840E, TG737, TTC10",
-                    OMIM_ID: "605484",
                     Functional_Summary_from_Literature: "Essential for intraflagellar transport and ciliary assembly. It is a component of the IFT complex B and is required for cilium biogenesis.",
                     Localization: "axoneme, basal body",
                     Protein_complexes: "IFT-B",
@@ -926,7 +925,7 @@
                             return `
                                 <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
                                     <div class="gene-name">${geneDisplay}</div>
-                                    <div class="gene-description">${gene.Description || gene.description || 'No description available.'}</div>
+                                    <div class="gene-description">${getGeneValue(gene, 'gene_description_full', 'Description') || 'No description available.'}</div>
                                     ${getGeneValue(gene, 'localization', 'Localization') ? `<div class="gene-info"><strong>Localization:</strong> ${getCleanArray(gene, 'Localization').join(', ') || 'Not available'}</div>` : ''}
                                     ${getGeneValue(gene, 'ensembl_id', 'Ensembl_ID') ? `<div class="gene-info"><strong>Ensembl:</strong> ${getGeneValue(gene, 'ensembl_id', 'Ensembl_ID')}</div>` : ''}
                                     ${getGeneValue(gene, 'ciliopathy', 'Ciliopathy_disease') ? `<div class="gene-info"><strong>Ciliopathy:</strong> ${getGeneValue(gene, 'ciliopathy', 'Ciliopathy_disease')}</div>` : ''}
@@ -1000,11 +999,13 @@
             const query = document.getElementById('single-gene-search')?.value.trim().toUpperCase() || '';
             if (!query) return;
             const results = findGenes(query);
-            if (results.length === 0) {
+            if (results.length === 0 || (results.length === 1 && !results[0].ensembl_id && !results[0].Description)) {
                 document.getElementById('status-message').innerHTML = `<span style="color:red;">Gene "${query}" not found</span>`;
                 document.getElementById('status-message').style.display = 'block';
                 return;
             }
+            document.getElementById('status-message').style.display = 'none';
+
             if (results.length === 1) displayIndividualGenePage(results[0]);
             else displayGeneCards(results);
         }
@@ -1041,7 +1042,7 @@
         function getGeneValue(gene, ...keys) {
             for (const key of keys) {
                 const value = gene[key];
-                if (value !== null && value !== undefined && value !== '' && String(value).toLowerCase() !== 'not available' && String(value).toLowerCase() !== 'na' && String(value).toLowerCase() !== 'n/a' && String(value).toLowerCase() !== 'nan') {
+                if (value !== null && value !== undefined && value !== '' && String(value).toLowerCase() !== 'not available' && String(value).toLowerCase() !== 'na' && String(value).toLowerCase() !== 'n/a' && String(value).toLowerCase() !== 'nan' && String(value).toLowerCase() !== 'null') {
                     return value;
                 }
             }
@@ -1342,7 +1343,7 @@
             } else if (originalKey === 'Synonym.') {
                 data = getGeneValue(gene, 'synonym', 'Synonym_');
             } else if (originalKey === 'Protein.Domain.PFAM') {
-                const pfamIds = getGeneValue(gene, 'PFAM_IDs');
+                const pfamIds = getGeneValue(gene, 'pfam_ids', 'PFAM_IDs');
                 const descriptions = getGeneValue(gene, 'Domain_Descriptions');
                 if (Array.isArray(descriptions) && descriptions.length > 0) {
                     const combined = descriptions.map((desc, i) => {
@@ -1351,7 +1352,7 @@
                     });
                     data = combined.filter(s => !s.toUpperCase().includes('NULL/MISSING') && !s.toUpperCase().includes('NO DESCRIPTION'));
                 }
-                data = data || getGeneValue(gene, 'pfam_ids');
+                data = data || getGeneValue(gene, 'pfam_ids', 'PFAM_IDs');
             } else {
                 data = gene[originalKey];
             }
@@ -1379,11 +1380,11 @@
                     seen.add(q);
                 } else if (!seen.has(q)) {
                     // Placeholder for not-found genes
-                    found.push({ gene: q, Description: 'Gene not found in the CiliAI database.' });
+                    found.push({ gene: q, Gene: q, Description: 'Gene not found in the CiliAI database.' });
                     seen.add(q);
                 }
             });
-            return found;
+            return found.filter(g => (g.gene || g.Gene));
         }
 
         // ==========================================================
@@ -1427,21 +1428,19 @@
             if (!btns) return;
             btns.innerHTML = '';
             
-            const genesToShow = [...genes].slice(0, 10);
+            const genesToShow = [...genes].filter(g => window.geneLocalizationData[g.gene || g.Gene]).slice(0, 10);
             
             genesToShow.forEach(g => {
                 const name = g.gene || g.Gene;
-                if (window.geneLocalizationData[name]) {
-                    const isSearch = searchResults.some(s => {
-                        const sName = s.gene || s.Gene;
-                        return sName === name;
-                    });
-                    const b = document.createElement('button');
-                    b.className = `gene-btn ${isSearch ? 'search-gene' : ''}`;
-                    b.textContent = name;
-                    b.onclick = () => showLocalization(name, isSearch);
-                    btns.appendChild(b);
-                }
+                const isSearch = searchResults.some(s => {
+                    const sName = s.gene || s.Gene;
+                    return sName === name;
+                });
+                const b = document.createElement('button');
+                b.className = `gene-btn ${isSearch ? 'search-gene' : ''}`;
+                b.textContent = name;
+                b.onclick = () => showLocalization(name, isSearch);
+                btns.appendChild(b);
             });
             
             const reset = document.createElement('button');
