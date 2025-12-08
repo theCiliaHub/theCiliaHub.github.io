@@ -9,45 +9,66 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
+       /* --- Root and Base Styles --- */
         :root {
-            --primary: #005b96;
-            --primary-light: #1976d2;
-            --accent: #4CAF50;
-            --text: #333;
-            --bg: #f8fafc;
-            --card: #ffffff;
-            --border: #e2e8f0;
+            --primary-blue: #005b96;
+            --secondary-blue: #b3cde0;
+            --accent-text: #2d3748;
+            --light-bg: #f7fbff;
+            --code-bg: #f1f8ff;
+            --link-color: #6c8aa3;
         }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { height: 100%; font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--light-bg);
+            color: var(--accent-text);
+            margin: 0;
+            padding-top: 60px; /* Space for fixed navbar */
+            min-height: 100vh;
+        }
         
-        /* NAVBAR - Identical to index.html */
+        .content-wrapper {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        /* --- Navigation Bar Styles (Copied from index.html) --- */
         .top-navbar {
-            background: var(--primary);
+            background: var(--primary-blue);
             color: white;
-            height: 64px;
             display: flex;
             align-items: center;
-            justify-content: flex-start;
-            padding: 0 32px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            position: sticky;
+            padding: 0 20px;
+            height: 60px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: fixed;
+            width: 100%;
             top: 0;
             z-index: 1000;
         }
+
         .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            margin-right: 30px;
+            font-size: 18px;
             font-weight: 600;
-            font-size: 20px;
         }
-        .brand img { height: 40px; border-radius: 8px; }
+
         .nav-links {
             display: flex;
             list-style: none;
-            gap: 4px;
+            gap: 20px;
+            height: 100%;
         }
+
         .nav-links a {
             color: white;
             text-decoration: none;
@@ -60,8 +81,12 @@
             transition: background-color 0.3s;
         }
 
-        .nav-links a.active {background-color: rgba(255, 255, 255, 0.15);}
-        /* MAIN LAYOUT */
+        .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        
+      /* MAIN LAYOUT */
         #plot-page-container { padding: 24px; min-height: calc(100vh - 64px); }
         .ciliaplot-main-layout {
             display: grid;
