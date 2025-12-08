@@ -49,17 +49,18 @@
             gap: 4px;
         }
         .nav-links a {
-        color: white;
-        text-decoration: none;
-        padding: 12px 20px;
-        border-radius: 6px;
-        font-weight: 500;
-        font-size: 19px;               /* ← CHANGED: bigger text */
-        transition: all 0.2s;
+            color: white;
+            text-decoration: none;
+            padding: 0 15px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-size: 19px;
+            font-weight: 500;
+            transition: background-color 0.3s;
         }
-        .nav-links a:hover { background: rgba(255,255,255,0.15); }
-        .nav-links a.active { background: rgba(255,255,255,0.25); font-weight: 600; }
 
+        .nav-links a.active {background-color: rgba(255, 255, 255, 0.15);}
         /* MAIN LAYOUT */
         #plot-page-container { padding: 24px; min-height: calc(100vh - 64px); }
         .ciliaplot-main-layout {
