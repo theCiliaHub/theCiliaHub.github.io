@@ -1301,89 +1301,99 @@ function formatScreenDataTable(screens) {
             // Update gene buttons with search results
             updateGeneButtons(genes, genes);
         }
+// ==========================================================
+// DISPLAY INDIVIDUAL GENE PAGE (FINAL VERSION)
+// ==========================================================
+
 function displayIndividualGenePage(gene) {
-    const contentArea = document.getElementById('page-content');
-    if (!contentArea) return;
+    if (!gene) return;
 
-    const geneName = gene.Gene || gene.gene || "Unknown Gene";
+    const container = document.getElementById("mainContent");
+    if (!container) return;
 
-    // Safe data extraction
-    const description = getGeneValue(gene, 'Gene.Description', 'gene_description', 'description') || 'No description available';
-    const ensembl = getGeneValue(gene, 'ensembl_gene_id.x.x', 'ensembl_id', 'Ensembl_ID');
-    const omim = getGeneValue(gene, 'OMIM.ID', 'omim_id');
-    const synonyms = getCleanArray(gene, 'Synonym.').join(', ');
-    const complexes = getCleanArray(gene, 'Protein.complexes');
-    const localization = getCleanArray(gene, 'Localization');
-    const ciliopathies = getCleanArray(gene, 'Ciliopathy');
-    const mousePheno = getGeneValue(gene, 'mouse_ciliopathy_phenotype', 'mouse_phenotype');
-    const overExpr = getGeneValue(gene, 'Overexpression effects on cilia length', 'Overexpression effects on cilia length (increase/decrease/no effect)');
-    const lof = getGeneValue(gene, 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)');
-    const ciliationPct = getGeneValue(gene, 'Percentage of ciliated cells (increase/decrease/no effect)');
+    const geneName = gene.gene || "Unknown Gene";
+    const longName = gene.long_name || gene.description || "";
+    const synonyms = gene.synonyms || [];
+    const omim = gene.OMIM || gene.omim || "";
+    const ensg = gene.ENSG || gene.ensg || "";
 
-    contentArea.innerHTML = `
-        <div class="gene-page-container">
-            <!-- Header -->
-            <div class="gene-header-box">
-                <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-                    <h1 class="gene-title">${geneName}</h1>
-                    ${ciliopathies.length ? '<span class="tag tag-ciliopathy" style="font-size:1rem;padding:6px 12px;">Ciliopathy Gene</span>' : ''}
+    // Right column data
+    const complexes = gene.complex || gene.complexes || [];
+    const localization = gene.localization || [];
+    const ciliopathy = gene.ciliopathy_terms || [];
+    const mousePheno = gene.mouse_phenotype || "";
+    const overexp = gene.overexpression || "";
+    const lof = gene.lof_effect || gene.loss_of_function || "";
+    const percentCiliated = gene.percent_ciliated || "";
+    const screenResults = gene.screens || [];
+
+    // Build screen results table (if you have formatScreenDataTable)
+    const screenTableHTML = formatScreenDataTable
+        ? formatScreenDataTable(screenResults)
+        : `<p class="not-available">Screen data not available</p>`;
+
+    container.innerHTML = `
+        <div class="gene-detail-container">
+
+            <!-- GENE NAME HEADER -->
+            <h1 class="gene-detail-title" style="color:#1976d2;">${escapeHtml(geneName)}</h1>
+
+            <div class="gene-columns">
+
+                <!-- LEFT COLUMN -->
+                <div class="gene-col">
+                    ${buildInfoRow("Gene Name", geneName)}
+                    ${buildInfoRow("Description", longName)}
+                    ${buildInfoRow("ENSG", ensg)}
+                    ${buildTagInfoRow("Synonyms", synonyms)}
+                    ${buildInfoRow("OMIM", omim)}
                 </div>
-                <p style="margin:10px 0 0; opacity:0.9; font-size:1.1rem;">${escapeHtml(description)}</p>
+
+                <!-- RIGHT COLUMN -->
+                <div class="gene-col">
+                    ${buildTagInfoRow("Protein Complexes", complexes)}
+                    ${buildTagInfoRow("Subcellular Localization", localization)}
+                    ${buildTagInfoRow("Ciliopathy", ciliopathy, true)}
+                    ${buildInfoRow("Mouse Ciliopathy Phenotype", mousePheno)}
+                    ${buildInfoRow("Overexpression: Effect on Cilia Length", overexp)}
+                    ${buildInfoRow("Loss-of-Function: Effect on Cilia Length", lof)}
+                    ${buildInfoRow("Percentage of Ciliated Cells", percentCiliated)}
+                </div>
+
             </div>
 
-            <div class="gene-columns" style="padding:0 40px; margin-bottom:40px;">
-                <!-- Left Column -->
-                <div class="gene-col gene-col-left">
-                    <h3 class="section-title">Gene Identifiers</h3>
-                    ${buildInfoRow('Official Symbol', geneName)}
-                    ${ensembl ? buildInfoRow('Ensembl ID(s)', ensembl) : ''}
-                    ${omim ? buildInfoRow('OMIM', `<a href="https://omim.org/entry/${omim}" target="_blank" class="external-link">${omim}</a>`) : ''}
-                    ${synonyms ? buildInfoRow('Synonyms', synonyms) : ''}
+            <!-- SCREEN RESULTS -->
+            <h2 class="section-title">Screen Results</h2>
+            <div class="screen-section">${screenTableHTML}</div>
 
-                    <h3 class="section-title" style="margin-top:2rem;">Functional Annotation</h3>
-                    ${complexes.length ? buildTagInfoRow('Protein Complexes', complexes) : ''}
-                    ${localization.length ? buildTagInfoRow('Subcellular Localization', localization) : ''}
-                </div>
+            <!-- BIG BOTTOM BUTTONS -->
+            <div class="big-button-section">
 
-                <!-- Right Column -->
-                <div class="gene-col gene-col-right">
-                    <h3 class="section-title">Phenotype & Functional Impact</h3>
-                    ${ciliopathies.length ? buildTagInfoRow('Associated Ciliopathies', ciliopathies, true) : ''}
-                    ${mousePheno ? buildInfoRow('Mouse Phenotype', mousePheno) : ''}
-                    ${overExpr ? buildInfoRow('Overexpression → Cilia Length', overExpr) : ''}
-                    ${lof ? buildInfoRow('Loss-of-Function → Cilia Length', lof) : ''}
-                    ${ciliationPct ? buildInfoRow('Effect on % Ciliated Cells', ciliationPct) : ''}
+                <button class="big-link-button" onclick="openPhylogenyView('${escapeHtml(geneName)}')">
+                    📊 Phylogenetic Data
+                </button>
 
-                    ${gene.screens && gene.screens.length ? `
-                        <h3 class="section-title" style="margin-top:2rem;">Genome-wide Screens</h3>
-                        ${formatScreenDataTable(gene.screens)}
-                    ` : ''}
-                </div>
+                <button class="big-link-button" onclick="openScRNAView('${escapeHtml(geneName)}')">
+                    🧬 scRNA-seq Expression
+                </button>
+
+                <button class="big-link-button" onclick="openTissueExpression('${escapeHtml(geneName)}')">
+                    🔬 Tissue Expression
+                </button>
+
             </div>
 
-            <!-- Explore More -->
-            <div class="gene-data-section">
-                <h3 style="text-align:center; color:#1565c0; margin-bottom:1.5rem;">Explore Expression & Evolution</h3>
-                <div class="gene-links">
-                    <button class="link-button" onclick="showPhylogeneticData('${geneName}')">Phylogenetic Conservation</button>
-                    <button class="link-button" onclick="showScRNASeqData('${geneName}')">scRNA-seq in Ciliated Cells</button>
-                    <button class="link-button" onclick="showTissueExpressionData('${geneName}')">Bulk Tissue Expression</button>
-                </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="gene-actions">
-                <button onclick="displayHomePage()" class="btn-secondary">Back to Home</button>
-                <button onclick="performSearchForGene('${geneName}')" class="btn-primary">Search Related Genes</button>
+            <!-- ACTION BUTTONS -->
+            <div class="action-buttons">
+                <button class="action-btn" onclick="displayHomePage()">⬅ Back to Home</button>
+                <button class="action-btn" onclick="searchRelatedGenes('${escapeHtml(geneName)}')">
+                    🔍 Search Related Genes
+                </button>
             </div>
         </div>
     `;
-
-    // Update interactive cilium
-    if (typeof updateGeneButtonsForGene === 'function') {
-        updateGeneButtonsForGene(gene);
-    }
 }
+
         
         
  function performSearchForGene(geneName) {
