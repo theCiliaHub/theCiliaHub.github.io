@@ -456,156 +456,147 @@
             .content-area {
                 order: 1;
             }
-            /* --------------------------------------------- */
-/* Gene Page – Two-Column Detail Layout Styles   */
-/* --------------------------------------------- */
-
-.gene-page {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    margin-top: 20px;
-}
-
-.gene-title {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #1976d2;
-    margin-bottom: 1.5rem;
-}
-
-/* Two-column responsive layout */
-.gene-columns {
-    display: flex;
-    gap: 2rem;
-    flex-wrap: wrap;
-}
-
-.gene-col {
-    flex: 1;
-    min-width: 340px;
-}
-
-/* Label + value rows */
-.info-row {
-    margin-bottom: 0.9rem;
-}
-
-.info-label {
-    font-weight: 600;
-    color: #333;
-    margin-right: 6px;
-}
-
-.info-value {
-    color: #444;
-}
-
-/* Tag rows */
-.info-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 5px;
-}
-
-.tag {
-    background: #eaf2fa;
-    color: #2c5aa0;
-    padding: 5px 10px;
-    border-radius: 12px;
-    font-size: 0.85rem;
-    border: 1px solid #c9dff0;
-    display: inline-block;
-}
-
-.tag-ciliopathy {
-    background: #fdecea;
-    color: #c0392b;
-    border-color: #f7cac9;
-    font-weight: 600;
-}
-
-/* Screens */
-.screen-item {
-    background: #f8f9fa;
-    border: 1px solid #e1e8ed;
-    padding: 8px 12px;
-    border-radius: 8px;
-    margin-bottom: 6px;
-    font-size: 0.9rem;
-}
-
-/* Bottom link buttons */
-.gene-links {
-    margin-top: 2rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.link-button {
-    background: var(--primary-blue);
-    color: white;
-    padding: 10px 18px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    transition: background 0.2s ease;
-}
-
-.link-button:hover {
-    background: #00477a;
-}
-
-/* Action buttons */
-.gene-actions {
-    margin-top: 2rem;
-    display: flex;
-    gap: 1rem;
-}
-
-.btn-primary {
-    background: var(--primary-blue);
-    color: white;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.btn-secondary {
-    background: #f0f0f0;
-    color: #333;
-    border: 1px solid #ccc;
-    padding: 10px 18px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.btn-primary:hover {
-    background: #00477a;
-}
-
-.btn-secondary:hover {
-    background: #e6e6e6;
-}
-
-/* Responsive layout */
-@media (max-width: 768px) {
-    .gene-columns {
-        flex-direction: column;
-    }
-
-    .gene-page {
-        padding: 20px;
-    }
-
-}
+            /* --- NEW ENHANCED GENE PAGE STYLES --- */
+        .gene-page-container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            padding: 0; /* Remove padding from container to allow header to stretch */
+        }
+        .gene-header-box {
+            background: linear-gradient(135deg, var(--design-blue) 0%, #1565c0 100%);
+            padding: 1.5rem 2.5rem;
+            border-radius: 12px 12px 0 0;
+            margin-bottom: 2rem;
+        }
+        .gene-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+        .gene-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            padding: 0 20px; 
+            margin-bottom: 3rem;
+        }
+        @media (max-width: 768px) {
+            .gene-columns {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+        }
+        .gene-col {
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+        .gene-col-left {
+            border-left: 4px solid var(--design-blue);
+        }
+        .gene-col-right {
+            border-left: 4px solid #ff9800; /* Amber for distinction */
+        }
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--design-blue);
+            margin: 0 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e3f2fd;
+        }
+        .info-row {
+            padding: 8px 0;
+            border-bottom: 1px dashed #e9ecef;
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            align-items: flex-start;
+            margin-bottom: 0;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #424242; /* Darker grey for labels */
+            font-size: 0.9rem;
+        }
+        .info-value {
+            color: var(--accent-text);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        .info-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding-top: 5px; 
+        }
+        .tag {
+            background: #eaf2fa;
+            color: #2c5aa0;
+            padding: 0.35rem 0.7rem;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            border: 1px solid #c9dff0;
+            display: inline-block;
+        }
+        .tag-ciliopathy {
+            background: #fce4ec;
+            color: #c2185b;
+            border-color: #f8bbd0;
+            font-weight: 600;
+        }
+        /* Bottom Links */
+        .gene-data-section {
+            padding: 2rem 20px;
+            border-top: 1px solid var(--border-light);
+            background: #f5f5f5;
+        }
+        .gene-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .link-button {
+            background: #ffffff;
+            color: var(--design-blue);
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 2px solid var(--design-blue);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .link-button:hover {
+            background: var(--design-blue);
+            color: #ffffff;
+        }
+        .gene-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            padding: 1.5rem 20px;
+            border-top: 1px solid var(--border-light);
+            margin-top: 0;
+            border-radius: 0 0 12px 12px;
+        }
+        /* Default button styling kept consistent */
+        .btn-primary { background: var(--primary-blue); color: white; border: 1px solid var(--primary-blue); }
+        .btn-secondary { background: #fff; color: var(--primary-blue); border: 1px solid var(--primary-blue); }
+        .btn-primary:hover, .btn-secondary:hover { background: #00477a; color: white; }
+        
+        /* Other Styles */
+        .ciliahub-stats { /* kept here for displayHomePage */
+            margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;
+        }
     </style>
 </head>
 <body>
@@ -1209,8 +1200,7 @@
             // Update gene buttons with search results
             updateGeneButtons(genes, genes);
         }
-
-   function displayIndividualGenePage(gene) {
+function displayIndividualGenePage(gene) {
     const contentArea = document.getElementById('page-content');
     if (!contentArea) return;
 
@@ -1233,52 +1223,65 @@
 
     contentArea.innerHTML = `
         <div class="gene-page">
+            <!-- Gene Title -->
+            <div class="gene-header-box">
+                <h1 class="gene-title">${geneName}</h1>
+            </div>
 
-            <!-- Title -->
-            <h1 class="gene-title" 
-                style="color:#1976d2; font-size:2rem; font-weight:700; margin-bottom:1.5rem;">
-                ${geneName}
-            </h1>
-
-            <!-- Two Columns -->
+            <!-- Two Column Layout -->
             <div class="gene-columns">
-
                 <!-- LEFT COLUMN -->
-                <div class="gene-col">
-                    ${buildRow("Gene Name", geneName)}
-                    ${geneDescription ? buildRow("Gene Description", geneDescription) : ""}
-                    ${ensemblId ? buildRow("ENSG ID", ensemblId) : ""}
-                    ${synonyms ? buildRow("Synonyms", synonyms) : ""}
-                    ${omimId ? buildRow("OMIM", omimId) : ""}
+                <div class="gene-col gene-col-left">
+                    <h3 class="section-title">Gene Information</h3>
+                    ${buildInfoRow("Gene Name", geneName)}
+                    ${geneDescription ? buildInfoRow("Gene Description", geneDescription) : ""}
+                    ${ensemblId ? buildInfoRow("ENSG ID", ensemblId) : ""}
+                    ${synonyms ? buildInfoRow("Synonyms", synonyms) : ""}
+                    ${omimId ? buildInfoRow("OMIM", omimId) : ""}
                 </div>
 
                 <!-- RIGHT COLUMN -->
-                <div class="gene-col">
-                    ${proteinComplexes?.length ? buildTagRow("Protein Complexes", proteinComplexes) : ""}
-                    ${localization?.length ? buildTagRow("Subcellular Localization", localization) : ""}
-                    ${ciliopathy?.length ? buildTagRow("Ciliopathy", ciliopathy, true) : ""}
-                    ${mouseCiliopathyPhenotype ? buildRow("Mouse Ciliopathy Phenotype", mouseCiliopathyPhenotype) : ""}
-                    ${overexpressionEffect ? buildRow("Overexpression Effects on Cilia Length", overexpressionEffect) : ""}
-                    ${lofEffect ? buildRow("Loss-of-Function Effects on Cilia Length", lofEffect) : ""}
-                    ${ciliatedCellsEffect ? buildRow("Percentage of Ciliated Cells", ciliatedCellsEffect) : ""}
-                    ${screens.length ? buildScreenRow(screens) : ""}
+                <div class="gene-col gene-col-right">
+                    <h3 class="section-title">Functional & Disease Information</h3>
+                    ${proteinComplexes?.length ? buildTagInfoRow("Protein Complexes", proteinComplexes) : ""}
+                    ${localization?.length ? buildTagInfoRow("Subcellular Localization", localization) : ""}
+                    ${ciliopathy?.length ? buildTagInfoRow("Ciliopathy", ciliopathy, true) : ""}
+                    ${mouseCiliopathyPhenotype ? buildInfoRow("Mouse Ciliopathy Phenotype", mouseCiliopathyPhenotype) : ""}
+                    ${overexpressionEffect ? buildInfoRow("Overexpression Effects on Cilia Length", overexpressionEffect) : ""}
+                    ${lofEffect ? buildInfoRow("Loss-of-Function Effects on Cilia Length", lofEffect) : ""}
+                    ${ciliatedCellsEffect ? buildInfoRow("Percentage of Ciliated Cells", ciliatedCellsEffect) : ""}
+                    ${screens.length ? buildScreenInfoRow(screens) : ""}
                 </div>
-
             </div>
 
-            <!-- Data Buttons -->
-            <div class="gene-links">
-                <button class="link-button" onclick="showPhylogeneticData('${geneName}')">📊 Phylogenetic Data</button>
-                <button class="link-button" onclick="showScRNASeqData('${geneName}')">🧬 scRNA-seq Expression</button>
-                <button class="link-button" onclick="showTissueExpressionData('${geneName}')">🔬 Tissue Expression</button>
+            <!-- Bottom Section: Data Links -->
+            <div class="gene-data-section">
+                <h3 class="section-title-bottom">Explore More Data</h3>
+                <div class="gene-links">
+                    <button class="link-button" onclick="showPhylogeneticData('${geneName}')">
+                        <span class="link-icon">📊</span>
+                        <span>Phylogenetic Data</span>
+                    </button>
+                    <button class="link-button" onclick="showScRNASeqData('${geneName}')">
+                        <span class="link-icon">🧬</span>
+                        <span>scRNA-seq Expression</span>
+                    </button>
+                    <button class="link-button" onclick="showTissueExpressionData('${geneName}')">
+                        <span class="link-icon">🔬</span>
+                        <span>Tissue Expression</span>
+                    </button>
+                </div>
             </div>
 
-            <!-- Actions -->
+            <!-- Action Buttons -->
             <div class="gene-actions">
-                <button onclick="displayHomePage()" class="btn-secondary">← Back to Home</button>
-                <button onclick="performSearchForGene('${geneName}')" class="btn-primary">Search Related Genes</button>
+                <button onclick="displayHomePage()" class="btn-secondary">
+                    <span>←</span> Back to Home
+                </button>
+                <button onclick="performSearchForGene('${geneName}')" class="btn-primary">
+                    Search Related Genes
+                </button>
             </div>
-
         </div>
     `;
 
@@ -1286,45 +1289,6 @@
         updateGeneButtonsForGene(gene);
     }
 }
-
-/* Utility for clean label/value rows */
-function buildRow(label, value) {
-    return `
-        <div class="info-row">
-            <span class="info-label">${label}:</span>
-            <span class="info-value">${value}</span>
-        </div>
-    `;
-}
-
-/* Utility for tag-based rows */
-function buildTagRow(label, arr, isPink = false) {
-    return `
-        <div class="info-row">
-            <span class="info-label">${label}:</span>
-            <div class="info-tags">
-                ${arr.map(x => `<span class="tag ${isPink ? 'tag-ciliopathy' : ''}">${x}</span>`).join('')}
-            </div>
-        </div>
-    `;
-}
-
-/* Screen table row */
-function buildScreenRow(screens) {
-    return `
-        <div class="info-row">
-            <span class="info-label">Screen Results:</span>
-            <div class="info-screens">
-                ${screens.map(s => `
-                    <div class="screen-item">
-                        <strong>${s.source || 'Dataset'}</strong>: ${s.result || ''}
-                    </div>`).join('')}
-            </div>
-        </div>
-    `;
-}
-
-
         
         function formatScreenDataTable(screens) {
             if (!Array.isArray(screens) || screens.length === 0) {
