@@ -9,6 +9,7 @@
     <style>
         :root {
             --primary-blue: #005b96;
+            -design-blue: #1565c0;
             --secondary-blue: #b3cde0;
             --accent-text: #333333;
             --border-light: #e1e8ed;
@@ -805,8 +806,58 @@
 
         function log(message) { console.log(`[CiliAI] ${message}`); }
 
-        
-        function log(message) { console.log(`[CiliAI] ${message}`); }
+        // ==========================================================
+// NEW: HTML BUILDER FUNCTIONS FOR GENE DETAIL PAGE
+// ==========================================================
+
+function buildInfoRow(label, value) {
+    if (!value || value === '' || String(value).toLowerCase() === 'not available') {
+        return '';
+    }
+    return `
+        <div class="info-row">
+            <div class="info-label">${label}</div>
+            <div class="info-value">${escapeHtml(value)}</div>
+        </div>
+    `;
+}
+
+function buildTagInfoRow(label, items, isCiliopathy = false) {
+    if (!items || items.length === 0) return '';
+    const tagClass = isCiliopathy ? 'tag-ciliopathy' : 'tag-complex';
+    const tagsHTML = items.map(item => `<span class="tag ${tagClass}">${escapeHtml(item)}</span>`).join(' ');
+    return `
+        <div class="info-row">
+            <div class="info-label">${label}</div>
+            <div class="info-value">
+                <div class="info-tags">${tagsHTML}</div>
+            </div>
+        </div>
+    `;
+}
+
+function buildScreenInfoRow(screens) {
+    return `
+        <div class="info-row">
+            <div class="info-label">Genome-wide Screens</div>
+            <div class="info-value">
+                ${formatScreenDataTable(screens)}
+            </div>
+        </div>
+    `;
+}
+
+// Simple HTML escape to prevent XSS if data ever contains < > &
+function escapeHtml(text) {
+    if (typeof text !== 'string') text = String(text);
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+    
 
         function parseTsvData(tsvText) {
             const data = {};
@@ -1233,7 +1284,6 @@ function displayIndividualGenePage(gene) {
                 <!-- LEFT COLUMN -->
                 <div class="gene-col gene-col-left">
                     <h3 class="section-title">Gene Information</h3>
-                    ${buildInfoRow("Gene Name", geneName)}
                     ${geneDescription ? buildInfoRow("Gene Description", geneDescription) : ""}
                     ${ensemblId ? buildInfoRow("ENSG ID", ensemblId) : ""}
                     ${synonyms ? buildInfoRow("Synonyms", synonyms) : ""}
