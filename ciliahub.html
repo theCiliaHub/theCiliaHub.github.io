@@ -976,6 +976,7 @@
         }
 
 // Helper function to format data as tags (works with getCleanArray)
+// Helper function to format data as tags (works with getCleanArray)
         function formatAsTags(data) {
             if (!data || data === '' || data === 'NA' || data === 'N/A') {
                 return '<span class="not-available">Not available</span>';
@@ -995,7 +996,7 @@
             return items.map(item => `<span class="tag">${item}</span>`).join(' ');
         }
 
-function displayIndividualGenePage(gene) {
+        function displayIndividualGenePage(gene) {
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
 
@@ -1004,6 +1005,24 @@ function displayIndividualGenePage(gene) {
             const ensemblId = gene.ensembl_id || gene.Ensembl_ID || '';
             const entrezId = gene.entrezId || gene['Entrez.ID'] || '';
             
+            // Helper to format localization data
+            const localizationData = getCleanArray(gene, 'Localization');
+            const localizationTags = Array.isArray(localizationData) && localizationData.length > 0 
+                ? localizationData.map(item => `<span class="tag">${item}</span>`).join(' ')
+                : '<span class="not-available">Not available</span>';
+            
+            // Helper to format functional category
+            const functionalCategory = getCleanArray(gene, 'Functional.Category');
+            const functionalCategoryTags = Array.isArray(functionalCategory) && functionalCategory.length > 0
+                ? functionalCategory.map(item => `<span class="tag">${item}</span>`).join(' ')
+                : '<span class="not-available">Not available</span>';
+            
+            // Helper to format ciliopathy
+            const ciliopathy = getCleanArray(gene, 'Ciliopathy.disease');
+            const ciliopathyTags = Array.isArray(ciliopathy) && ciliopathy.length > 0
+                ? ciliopathy.map(item => `<span class="tag">${item}</span>`).join(' ')
+                : '<span class="not-available">Not available</span>';
+
             contentArea.innerHTML = `
                 <div class="page-container">
                     <!-- Gene Header -->
@@ -1018,31 +1037,25 @@ function displayIndividualGenePage(gene) {
                         
                         <!-- Key Attributes -->
                         <div class="gene-key-info">
-                            ${formatAsTags(getCleanArray(gene, 'Localization')) !== '<span class="not-available">Not available</span>' ? 
+                            ${localizationTags !== '<span class="not-available">Not available</span>' ? 
                                 `<div class="key-info-item">
-                                    <span class="key-info-label">Localization</span>
-                                    <div class="key-info-value">${formatAsTags(getCleanArray(gene, 'Localization'))}</div>
+                                    <span class="key-info-label">Subcellular Localization</span>
+                                    <div class="key-info-value">${localizationTags}</div>
                                 </div>` : ''}
                             
-                            ${formatAsTags(gene.functional_category || gene['Functional.Category']) !== '<span class="not-available">Not available</span>' ? 
+                            ${functionalCategoryTags !== '<span class="not-available">Not available</span>' ? 
                                 `<div class="key-info-item">
                                     <span class="key-info-label">Functional Category</span>
-                                    <div class="key-info-value">${formatAsTags(gene.functional_category || gene['Functional.Category'])}</div>
+                                    <div class="key-info-value">${functionalCategoryTags}</div>
                                 </div>` : ''}
                             
-                            ${formatAsTags(gene.ciliopathy || gene['Ciliopathy.disease']) !== '<span class="not-available">Not available</span>' ? 
+                            ${ciliopathyTags !== '<span class="not-available">Not available</span>' ? 
                                 `<div class="key-info-item">
                                     <span class="key-info-label">Ciliopathies</span>
-                                    <div class="key-info-value">${formatAsTags(gene.ciliopathy || gene['Ciliopathy.disease'])}</div>
+                                    <div class="key-info-value">${ciliopathyTags}</div>
                                 </div>` : ''}
                         </div>
                     </div>
-
-                    ${gene.description || gene.Description ? 
-                        `<div class="gene-description">
-                            <h3>Functional Summary</h3>
-                            <p>${gene.description || gene.Description}</p>
-                        </div>` : ''}
 
                     <!-- Two Column Layout -->
                     <div class="gene-content-grid">
@@ -1144,6 +1157,7 @@ function displayIndividualGenePage(gene) {
             // Update interactive cilium for this gene
             updateGeneButtonsForGene(gene);
         }
+        
         function formatScreenDataTable(screens) {
             if (!Array.isArray(screens) || screens.length === 0) {
                 return '<p style="margin-top: 1rem; color: #555;">No detailed genome-wide screen data available for this gene.</p>';
