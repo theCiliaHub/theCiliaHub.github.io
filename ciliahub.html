@@ -875,11 +875,14 @@ function formatScreenDataTable(screens) {
     let rows = '';
     screens.forEach(s => {
         const dataset = s.dataset || s.screen_name || 'Unknown Screen';
-        const mean = s.mean_percent_ciliated != null ? Number(s.mean_percent_ciliated).toFixed(1) + '%') : '—';
+        const mean = s.mean_percent_ciliated != null
+            ? Number(s.mean_percent_ciliated).toFixed(1) + '%'
+            : '—';
         const z = s.z_score != null ? s.z_score.toFixed(2) : '—';
         const cls = s.classification || '—';
-        const link = s.paper_link ? 
-            `<a href="${s.paper_link}" target="_blank" class="external-link">${dataset}</a>` : dataset;
+        const link = s.paper_link
+            ? `<a href="${s.paper_link}" target="_blank" class="external-link">${dataset}</a>`
+            : dataset;
 
         rows += `
             <tr>
