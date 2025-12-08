@@ -580,6 +580,92 @@
         // ==========================================================
         // CORE UTILITIES
         // ==========================================================
+// ==========================================================
+        // CORE UTILITY FUNCTIONS (Defined First)
+        // ==========================================================
+        
+        // 1. Helper function to retrieve a value from the gene object using multiple possible keys
+        function getGeneValue(gene, ...keys) {
+            for (const key of keys) {
+                const value = gene[key];
+                if (value !== null && value !== undefined && value !== '' && String(value).toLowerCase() !== 'not available' && String(value).toLowerCase() !== 'na' && String(value).toLowerCase() !== 'n/a' && String(value).toLowerCase() !== 'nan' && String(value).toLowerCase() !== 'null') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // 2. Helper function to clean and flatten string/array data into an array
+        function getCleanArray(gene, key) {
+            let data = getGeneValue(gene, key);
+            
+            // Handle Complex/Multiple Keys that need specific lookup logic
+            if (key === 'Protein.complexes') {
+                data = getGeneValue(gene, 'complex_components', 'Protein.complexes');
+                if (typeof data === 'object' && !Array.isArray(data) && data !== null) {
+                    return Object.keys(data).filter(k => getGeneValue(data, k));
+                }
+            } else if (key === 'Protein.Domain.PFAM') {
+                const pfamIds = getGeneValue(gene, 'pfam_ids', 'PFAM_IDs');
+                const descriptions = getGeneValue(gene, 'Domain_Descriptions');
+                
+                if (Array.isArray(descriptions) && descriptions.length > 0) {
+                    const combined = descriptions.map((desc, i) => {
+                        const id = (Array.isArray(pfamIds) ? pfamIds[i] : null) || 'PFAM ID';
+                        return `${id}: ${desc}`;
+                    });
+                    data = combined.filter(s => !s.toUpperCase().includes('NULL/MISSING') && !s.toUpperCase().includes('NO DESCRIPTION'));
+                }
+                data = data || getGeneValue(gene, 'pfam_ids', 'PFAM_IDs');
+            } else if (key === 'Localization') {
+                data = getGeneValue(gene, 'localization', 'Localization');
+            } else if (key === 'Functional.category') {
+                data = getGeneValue(gene, 'functional_category', 'Functional.category');
+            } else if (key === 'Ciliopathy') {
+                data = getGeneValue(gene, 'ciliopathy', 'Ciliopathy');
+            } else if (key === 'Synonym.') {
+                data = getGeneValue(gene, 'synonym', 'Synonym_');
+            } else if (key === 'mouse_phenotype') {
+                data = getGeneValue(gene, 'mouse_phenotype', 'Phenotypes_mouse');
+            } else if (key === 'HPO.Terms') {
+                data = getGeneValue(gene, 'hpo_terms', 'HPO_Terms', 'HPO.Terms');
+            } else {
+                data = getGeneValue(gene, key);
+            }
+
+
+            if (!data) return [];
+            
+            // Process Data
+            if (Array.isArray(data)) {
+                return data.map(i => String(i).trim()).filter(Boolean);
+            }
+            
+            // Split string data by common delimiters
+            return String(data).split(/[,;]/)
+                .map(i => i.trim())
+                .filter(i => i && i.toLowerCase() !== 'not available' && i.toLowerCase() !== 'na' && i.toLowerCase() !== 'n/a' && i.toLowerCase() !== 'null');
+        }
+
+        // 3. Helper function to format clean array data into HTML tags
+        function formatAsTags(data, tagClass = '') {
+            let items = [];
+            if (typeof data === 'string') {
+                items = data.split(/[;,|]/).map(item => item.trim()).filter(item => item && item.toLowerCase() !== 'not available' && item.toLowerCase() !== 'na' && item.toLowerCase() !== 'n/a');
+            } else if (Array.isArray(data)) {
+                items = data.map(item => String(item).trim()).filter(item => item && item.toLowerCase() !== 'not available' && item.toLowerCase() !== 'na' && item.toLowerCase() !== 'n/a');
+            }
+            
+            if (items.length === 0) {
+                return '<span class="not-available">Not available</span>';
+            }
+            
+            return items.map(item => `<span class="tag ${tagClass}">${item}</span>`).join(' ');
+        }
+
+        function log(message) { console.log(`[CiliAI] ${message}`); }
+
+        
         function log(message) { console.log(`[CiliAI] ${message}`); }
 
         function parseTsvData(tsvText) {
@@ -975,26 +1061,6 @@
             updateGeneButtons(genes, genes);
         }
 
-// Helper function to format data as tags
-        function formatAsTags(data, tagClass = '') {
-            if (!data) {
-                return '<span class="not-available">Not available</span>';
-            }
-            
-            let items = [];
-            if (typeof data === 'string') {
-                items = data.split(/[;,|]/).map(item => item.trim()).filter(item => item && item.toLowerCase() !== 'not available' && item.toLowerCase() !== 'na' && item.toLowerCase() !== 'n/a');
-            } else if (Array.isArray(data)) {
-                items = data.map(item => String(item).trim()).filter(item => item && item.toLowerCase() !== 'not available' && item.toLowerCase() !== 'na' && item.toLowerCase() !== 'n/a');
-            }
-            
-            if (items.length === 0) {
-                return '<span class="not-available">Not available</span>';
-            }
-            
-            return items.map(item => `<span class="tag ${tagClass}">${item}</span>`).join(' ');
-        }
-
         function displayIndividualGenePage(gene) {
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
@@ -1245,36 +1311,7 @@
             }
         }
 
-        // ==========================================================
-        // UTILITY FUNCTIONS
-        // ==========================================================
-        function getCleanArray(gene, key) {
-            let data = gene[key];
-
-            if (key === 'Protein.complexes') {
-                data = gene['complex_components'] || gene['Protein.complexes'];
-                if (typeof data === 'object' && !Array.isArray(data)) {
-                    return Object.keys(data).map(k => `${k}`);
-                }
-            }
-            if (key === 'Phenotypes_mouse') {
-                data = gene['Phenotypes_mouse'] || gene['mouse_phenotype'];
-            }
-            if (key === 'Protein.Domain.PFAM' && Array.isArray(gene['Domain_Descriptions'])) {
-                const pfamIds = gene['PFAM_IDs'] || [];
-                const combined = gene['Domain_Descriptions'].map((desc, i) => `${pfamIds[i] || 'PFAM_ID'}: ${desc}`);
-                return combined.filter(s => s.trim() !== 'PFAM_ID: NULL/MISSING' && s.trim() !== 'PFAM_ID: No description');
-            }
-            if (key === 'screens_summary') {
-                data = data || gene['screens'];
-                if (Array.isArray(data)) return data;
-            }
-
-            if (!data) return [];
-            if (Array.isArray(data)) return data.map(i => String(i).trim()).filter(Boolean);
-            return String(data).split(/[,;]/).map(i => i.trim()).filter(Boolean);
-        }
-
+        
         function findGenes(input) {
             const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
             const found = [];
