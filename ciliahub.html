@@ -976,7 +976,6 @@
         }
 
 // Helper function to format data as tags (works with getCleanArray)
-// Helper function to format data as tags (works with getCleanArray)
         function formatAsTags(data) {
             if (!data || data === '' || data === 'NA' || data === 'N/A') {
                 return '<span class="not-available">Not available</span>';
@@ -1000,10 +999,14 @@
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
 
+            // DEBUG: Log the gene object to see all available fields
+            console.log('Gene object:', gene);
+            console.log('All gene keys:', Object.keys(gene));
+            
             // Extract gene name from either 'gene' or 'Gene' field
             const geneName = gene.gene || gene.Gene || "Unknown Gene";
-            const ensemblId = gene.ensembl_id || gene.Ensembl_ID || '';
-            const entrezId = gene.entrezId || gene['Entrez.ID'] || '';
+            const ensemblId = gene.ensembl_id || gene.Ensembl_ID || gene['Ensembl.ID'] || '';
+            const entrezId = gene.entrezId || gene['Entrez.ID'] || gene.entrez_id || '';
             
             // Helper to format localization data
             const localizationData = getCleanArray(gene, 'Localization');
@@ -1012,15 +1015,15 @@
                 : '<span class="not-available">Not available</span>';
             
             // Helper to format functional category
-            const functionalCategory = getCleanArray(gene, 'Functional.Category');
-            const functionalCategoryTags = Array.isArray(functionalCategory) && functionalCategory.length > 0
-                ? functionalCategory.map(item => `<span class="tag">${item}</span>`).join(' ')
+            const functionalCategoryData = getCleanArray(gene, 'Functional.category');
+            const functionalCategoryTags = Array.isArray(functionalCategoryData) && functionalCategoryData.length > 0
+                ? functionalCategoryData.map(item => `<span class="tag">${item}</span>`).join(' ')
                 : '<span class="not-available">Not available</span>';
             
             // Helper to format ciliopathy
-            const ciliopathy = getCleanArray(gene, 'Ciliopathy.disease');
-            const ciliopathyTags = Array.isArray(ciliopathy) && ciliopathy.length > 0
-                ? ciliopathy.map(item => `<span class="tag">${item}</span>`).join(' ')
+            const ciliopathyData = getCleanArray(gene, 'Ciliopathy');
+            const ciliopathyTags = Array.isArray(ciliopathyData) && ciliopathyData.length > 0
+                ? ciliopathyData.map(item => `<span class="tag">${item}</span>`).join(' ')
                 : '<span class="not-available">Not available</span>';
 
             contentArea.innerHTML = `
@@ -1066,7 +1069,7 @@
                                 <table class="data-table">
                                     <tr>
                                         <th>Synonyms</th>
-                                        <td>${formatAsTags(gene.synonym || gene.Synonyms)}</td>
+                                        <td>${formatAsTags(getCleanArray(gene, 'Synonym.'))}</td>
                                     </tr>
                                     <tr>
                                         <th>Protein Complexes</th>
@@ -1079,28 +1082,36 @@
                                 </table>
                             </div>
 
+                            ${gene.Description ? 
+                                `<div class="detail-card">
+                                    <h3>Functional Summary</h3>
+                                    <div style="line-height: 1.6; color: #444;">
+                                        ${gene.Description}
+                                    </div>
+                                </div>` : ''}
+
                             <div class="detail-card">
                                 <h3>Orthologs</h3>
                                 <table class="data-table">
                                     <tr>
                                         <th>Mouse</th>
-                                        <td>${gene.ortholog_mouse || gene['Ortholog.Mouse'] || '<span class="not-available">Not available</span>'}</td>
+                                        <td>${gene['Ortholog_Mouse'] || '<span class="not-available">Not available</span>'}</td>
                                     </tr>
                                     <tr>
                                         <th>Zebrafish</th>
-                                        <td>${gene.ortholog_zebrafish || gene['Ortholog.Zebrafish'] || '<span class="not-available">Not available</span>'}</td>
+                                        <td>${gene['Ortholog_Zebrafish'] || '<span class="not-available">Not available</span>'}</td>
                                     </tr>
                                     <tr>
                                         <th>Drosophila</th>
-                                        <td>${gene.ortholog_drosophila || gene['Ortholog.Drosophila'] || '<span class="not-available">Not available</span>'}</td>
+                                        <td>${gene['Ortholog_Drosophila'] || '<span class="not-available">Not available</span>'}</td>
                                     </tr>
                                     <tr>
                                         <th>C. elegans</th>
-                                        <td>${gene.ortholog_c_elegans || gene['Ortholog.C.elegans'] || '<span class="not-available">Not available</span>'}</td>
+                                        <td>${gene['Ortholog_C_elegans'] || '<span class="not-available">Not available</span>'}</td>
                                     </tr>
                                     <tr>
                                         <th>Xenopus</th>
-                                        <td>${gene.ortholog_xenopus || gene['Ortholog.Xenopus'] || '<span class="not-available">Not available</span>'}</td>
+                                        <td>${gene['Ortholog_Xenopus'] || '<span class="not-available">Not available</span>'}</td>
                                     </tr>
                                 </table>
                             </div>
@@ -1123,19 +1134,55 @@
                         <!-- Right Column -->
                         <div class="gene-content-right">
                             <div class="detail-card">
-                                <h3>Phenotypic Data</h3>
+                                <h3>Cilia Functional Studies</h3>
                                 <table class="data-table">
                                     <tr>
-                                        <th>Mouse Phenotypes</th>
-                                        <td>${formatAsTags(getCleanArray(gene, 'Phenotypes_mouse'))}</td>
+                                        <th>Overexpression Effects on Cilia Length</th>
+                                        <td>${gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || '<span class="not-available">Not Reported</span>'}</td>
                                     </tr>
                                     <tr>
-                                        <th>Human Phenotypes (HPO)</th>
-                                        <td>${formatAsTags(gene.hpo_terms || gene['HPO.Terms'])}</td>
+                                        <th>Loss-of-Function Effects on Cilia Length</th>
+                                        <td>${gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '<span class="not-available">Not Reported</span>'}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Percentage of Ciliated Cells</th>
+                                        <td>${gene['Percentage of ciliated cells (increase/decrease/no effect)'] || '<span class="not-available">Not Reported</span>'}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <div class="detail-card">
+                                <h3>Disease Association</h3>
+                                <table class="data-table">
+                                    <tr>
+                                        <th>Ciliopathy</th>
+                                        <td>${formatAsTags(getCleanArray(gene, 'Ciliopathy'))}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Ciliopathy Classification</th>
+                                        <td>${gene['ciliopathy_classification'] || '<span class="not-available">Not available</span>'}</td>
                                     </tr>
                                     <tr>
                                         <th>OMIM ID</th>
-                                        <td>${gene.omim_id || gene['OMIM.ID'] || '<span class="not-available">Not available</span>'}</td>
+                                        <td>${gene['OMIM.ID'] || '<span class="not-available">Not available</span>'}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <div class="detail-card">
+                                <h3>Phenotypic Data</h3>
+                                <table class="data-table">
+                                    <tr>
+                                        <th>Mouse Ciliopathy Phenotype</th>
+                                        <td>${gene['mouse_ciliopathy_phenotype'] || '<span class="not-available">Not available</span>'}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Mouse Phenotypes</th>
+                                        <td>${formatAsTags(getCleanArray(gene, 'mouse_phenotype'))}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Human Phenotypes (HPO)</th>
+                                        <td>${formatAsTags(getCleanArray(gene, 'HPO.Terms'))}</td>
                                     </tr>
                                 </table>
                             </div>
