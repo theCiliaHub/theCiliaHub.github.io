@@ -829,12 +829,12 @@
 
 
 // ==========================================================
-// HTML BUILDER FUNCTIONS FOR GENE DETAIL PAGE (FIXED & BEAUTIFUL)
+// HTML BUILDER FUNCTIONS FOR GENE DETAIL PAGE (FINAL VERSION)
 // ==========================================================
 
 function escapeHtml(text) {
-    if (typeof text !== 'string') text = String(text || '');
-    return text
+    if (text == null) return '';
+    return String(text)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -843,8 +843,13 @@ function escapeHtml(text) {
 }
 
 function buildInfoRow(label, value) {
-    if (!value || value === '' || String(value).trim().toLowerCase().includes('not available') || String(value).trim().toLowerCase() === 'na') {
-        return '';
+    if (value == null || String(value).trim() === '' || value === 'NA') {
+        return `
+            <div class="info-row">
+                <span class="info-label">${escapeHtml(label)}</span>
+                <span class="not-available">Not available</span>
+            </div>
+        `;
     }
     return `
         <div class="info-row">
@@ -855,10 +860,25 @@ function buildInfoRow(label, value) {
 }
 
 function buildTagInfoRow(label, items, isCiliopathy = false) {
-    if (!items || items.length === 0) return '';
-    const tagClass = isCiliopathy ? 'tag tag-ciliopathy' : 
-                    label.toLowerCase().includes('localization') ? 'tag tag-localization' : 'tag tag-complex';
-    const tagsHTML = items.map(item => `<span class="${tagClass}">${escapeHtml(item.trim())}</span>`).join('');
+    if (!Array.isArray(items) || items.length === 0) {
+        return `
+            <div class="info-row">
+                <span class="info-label">${escapeHtml(label)}</span>
+                <span class="not-available">Not available</span>
+            </div>
+        `;
+    }
+
+    const tagClass = isCiliopathy
+        ? 'tag tag-ciliopathy'
+        : label.toLowerCase().includes('localization')
+            ? 'tag tag-localization'
+            : 'tag tag-complex';
+
+    const tagsHTML = items
+        .map(item => `<span class="${tagClass}">${escapeHtml(item)}</span>`)
+        .join('');
+
     return `
         <div class="info-row">
             <span class="info-label">${escapeHtml(label)}</span>
@@ -866,6 +886,7 @@ function buildTagInfoRow(label, items, isCiliopathy = false) {
         </div>
     `;
 }
+
 
 function formatScreenDataTable(screens) {
     if (!Array.isArray(screens) || screens.length === 0) {
