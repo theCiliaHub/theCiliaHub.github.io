@@ -975,9 +975,26 @@
             updateGeneButtons(genes, genes);
         }
 
- // ==========================================================
- // COMPREHENSIVE GENE DETAIL PAGE
- // ==========================================================
+// Helper function to format data as tags (works with getCleanArray)
+        function formatAsTags(data) {
+            if (!data || data === '' || data === 'NA' || data === 'N/A') {
+                return '<span class="not-available">Not available</span>';
+            }
+            
+            let items = [];
+            if (typeof data === 'string') {
+                items = data.split(/[;,|]/).map(item => item.trim()).filter(item => item && item !== 'NA' && item !== 'N/A');
+            } else if (Array.isArray(data)) {
+                items = data.filter(item => item && item !== 'NA' && item !== 'N/A');
+            }
+            
+            if (items.length === 0) {
+                return '<span class="not-available">Not available</span>';
+            }
+            
+            return items.map(item => `<span class="tag">${item}</span>`).join(' ');
+        }
+
 function displayIndividualGenePage(gene) {
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
@@ -1127,7 +1144,6 @@ function displayIndividualGenePage(gene) {
             // Update interactive cilium for this gene
             updateGeneButtonsForGene(gene);
         }
-        
         function formatScreenDataTable(screens) {
             if (!Array.isArray(screens) || screens.length === 0) {
                 return '<p style="margin-top: 1rem; color: #555;">No detailed genome-wide screen data available for this gene.</p>';
