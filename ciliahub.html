@@ -791,11 +791,8 @@
         </ul>
     </nav>
     <div class="main-container">
-        <!-- Main Content Area -->
         <main class="content-area" id="page-content">
-            <!-- Content will be dynamically loaded here -->
-        </main>
-        <!-- Interactive Cilium Panel -->
+            </main>
         <aside class="cilia-panel">
             <div class="panel-header">
                 <h3>Interactive Cilium</h3>
@@ -813,7 +810,6 @@
                                 <stop offset="100%" style="stop-color:#C8D0DD;" />
                             </radialGradient>
                             
-                            <!-- Gradient for highlighted parts -->
                             <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                                 <stop offset="0%" style="stop-color:#ff9999;" />
                                 <stop offset="100%" style="stop-color:#ff6b6b;" />
@@ -836,7 +832,6 @@
                               fill="none" stroke="#4A5568" stroke-width="2"
                               d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
                               
-                        <!-- Labels for cilium parts -->
                         <g class="cilia-labels">
                             <text x="150" y="370" text-anchor="middle" font-size="10" fill="#4A5568">Cell Body</text>
                             <text x="150" y="380" text-anchor="middle" font-size="10" fill="#4A5568">(Cytosol)</text>
@@ -856,14 +851,12 @@
                 <div class="controls">
                     <h4>Gene Localization:</h4>
                     <div id="geneButtons" class="gene-buttons">
-                        <!-- Gene buttons will be dynamically added here -->
-                    </div>
+                        </div>
                 </div>
             </div>
         </aside>
     </div>
     
-    <!-- Citation Info Modal -->
     <div id="citationModal" class="citation-modal">
         <div class="citation-modal-content">
             <div class="citation-modal-header">
@@ -871,8 +864,7 @@
                 <button class="citation-close" onclick="closeCitationModal()">&times;</button>
             </div>
             <div id="citationModalBody">
-                <!-- Citation content will be dynamically loaded here -->
-            </div>
+                </div>
         </div>
     </div>
     
@@ -887,7 +879,8 @@
         window.CiliAI.cellDataCache = {};
         window.CiliAI_UMAP = [];
         window.ciliaryGeneMap = new Map();
-        window.allGenes = [];
+        window.allGenes = []; // Stores unique ciliary gene objects
+        window.uniqueGeneNames = new Set(); // Stores unique gene names for count/filtering
         window.currentData = [];
         window.geneLocalizationData = {};
 
@@ -1022,9 +1015,9 @@
             return String(data).split(/[,;]/)
                 .map(i => i.trim())
                 .filter(i => i && i.toLowerCase() !== 'not available' && 
-                          i.toLowerCase() !== 'na' && 
-                          i.toLowerCase() !== 'n/a' && 
-                          i.toLowerCase() !== 'null');
+                            i.toLowerCase() !== 'na' && 
+                            i.toLowerCase() !== 'n/a' && 
+                            i.toLowerCase() !== 'null');
         }
 
         // ==========================================================
@@ -1053,8 +1046,8 @@
         }
 
         function getCiliaryGeneCount() {
-            if (!window.allGenes || window.allGenes.length === 0) return 0;
-            return window.allGenes.filter(isCiliaryGene).length;
+             // FIX: Return the size of the Set containing unique gene names, which is calculated during data loading.
+            return window.uniqueGeneNames.size;
         }
 
         // ==========================================================
@@ -1082,23 +1075,36 @@
         }
 
         function updateURLForGene(geneName) {
-            const baseUrl = window.location.origin + window.location.pathname;
-            const urlSegments = baseUrl.split('/');
+            // FIX: Ensure only the base path is used before appending the gene name
+            const currentPath = window.location.pathname;
+            let baseUrl = currentPath.split('/');
             
-            // Remove any existing gene from URL
-            const cleanSegments = urlSegments.filter(segment => 
-                !segment.match(/^[A-Z0-9]+$/i) && 
-                segment !== 'index.html' && 
-                segment !== 'ciliahub.html'
+            // Filter out existing gene segments or non-page segments
+            let baseSegments = baseUrl.filter(segment => 
+                ['', 'index.html', 'ciliahub.html', 'ciliahub', 'plots', 'about'].includes(segment.toLowerCase())
             );
-            
-            // Add gene to URL
-            const newUrl = cleanSegments.join('/') + '/' + geneName;
-            window.history.pushState({ gene: geneName }, '', newUrl);
+
+            // Ensure the base path ends with 'ciliahub' or an empty string for the root
+            if (baseSegments.length === 0 || baseSegments[baseSegments.length - 1].toLowerCase() !== 'ciliahub') {
+                // If we're not explicitly on /ciliahub, navigate to /ciliahub/GENE
+                const origin = window.location.origin;
+                const pathRoot = window.location.pathname.includes('/ciliahub') ? window.location.pathname.split('/ciliahub')[0] : '/';
+                const newUrl = origin + pathRoot.replace(/\/$/, '') + '/ciliahub/' + geneName;
+                window.history.pushState({ gene: geneName }, '', newUrl.replace(/\/\//g, '/')); // Use replace to handle double slashes if pathRoot is '/'
+            } else {
+                // If we are on /ciliahub/something, update the "something" part
+                const cleanPath = baseUrl.slice(0, baseUrl.length - 1).join('/');
+                const newUrl = window.location.origin + (cleanPath.startsWith('/') ? '' : '/') + cleanPath + '/' + geneName;
+                window.history.pushState({ gene: geneName }, '', newUrl.replace(/\/\//g, '/'));
+            }
         }
 
         function copyGeneLinkToClipboard(geneName) {
-            const geneUrl = window.location.origin + '/ciliahub/' + geneName;
+            // FIX: Construct the correct shareable URL using the proper base.
+            // Assuming the target application structure is always /ciliahub/GENE on the host.
+            const baseHref = window.location.href.split('/ciliahub')[0] + '/ciliahub/';
+            const geneUrl = baseHref.replace(/\/\//g, '/') + geneName;
+
             navigator.clipboard.writeText(geneUrl).then(() => {
                 alert(`Link copied to clipboard: ${geneUrl}`);
             }).catch(err => {
@@ -1333,13 +1339,17 @@
 
                 // Build comprehensive gene map with synonyms
                 window.ciliaryGeneMap.clear();
+                window.uniqueGeneNames.clear();
+                const uniqueGeneObjects = [];
+
                 window.CiliAI.masterData.forEach(g => {
                     if (g.Gene) {
-                        const geneObj = { ...g, gene: g.Gene };
+                        const geneName = g.Gene;
+                        const geneObj = { ...g, gene: geneName };
                         if (g['Entrez.ID']) geneObj.entrezId = String(g['Entrez.ID']);
                         
                         // Store in main map with uppercase gene name
-                        window.ciliaryGeneMap.set(g.Gene.toUpperCase(), geneObj);
+                        window.ciliaryGeneMap.set(geneName.toUpperCase(), geneObj);
                         
                         // Also store with Ensembl IDs
                         const ensemblIds = getCleanArray(g, 'ensembl_gene_id.x.x');
@@ -1363,7 +1373,15 @@
                         });
                         
                         if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
-                        window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = geneObj;
+                        window.CiliAI.lookups.geneMap[geneName.toUpperCase()] = geneObj;
+
+                        if (isCiliaryGene(g)) {
+                            // Collect unique gene names/objects for the filtered list and count
+                            if (!window.uniqueGeneNames.has(geneName)) {
+                                window.uniqueGeneNames.add(geneName);
+                                uniqueGeneObjects.push(geneObj);
+                            }
+                        }
                     }
                 });
 
@@ -1391,12 +1409,8 @@
                     }
                 }
 
-                // Filter to only ciliary genes for display
-                window.allGenes = Array.from(new Set(
-                    Array.from(window.ciliaryGeneMap.values())
-                        .filter(g => g.Gene && isCiliaryGene(g))
-                        .map(g => ({...g, gene: g.Gene}))
-                ));
+                // Set the final filtered list of unique ciliary genes
+                window.allGenes = uniqueGeneObjects;
                 window.currentData = window.allGenes;
 
                 console.log(`Loaded ${window.allGenes.length} ciliary genes (filtered from ${window.CiliAI.masterData.length} total genes) with comprehensive search index`);
@@ -1442,7 +1456,6 @@
 
             contentArea.innerHTML = `
                 <div class="gene-page-container">
-                    <!-- 1. Header Section -->
                     <div class="gene-header">
                         <div class="share-link-container">
                             <button class="share-link-btn" onclick="copyGeneLinkToClipboard('${escapeHtml(geneName)}')">
@@ -1453,9 +1466,7 @@
                         <p class="gene-description-subtitle">${escapeHtml(description)}</p>
                     </div>
 
-                    <!-- 2. Two-Column Information Layout -->
                     <div class="gene-columns">
-                        <!-- Left Column - Identity & Metadata -->
                         <div class="gene-col gene-col-left">
                             <h3 class="section-title">Gene Identity & Metadata</h3>
                             ${buildInfoRow('Official Symbol', geneName, EXTERNAL_DATABASES.NCBI_GENE(geneName), 'Open in NCBI Gene database')}
@@ -1508,12 +1519,10 @@
                             ` : ''}
                         </div>
 
-                        <!-- Right Column - Biological Behavior & Ciliopathy Information -->
                         <div class="gene-col">
                             <h3 class="section-title">Ciliopathy & Phenotype Data</h3>
                             ${ciliopathies.length ? buildTagInfoRow('Ciliopathy Associations', ciliopathies, true) : buildInfoRow('Ciliopathy Associations', 'Not associated with known ciliopathies')}
                             
-                            <!-- FIXED: Corrected Ciliogenics link and replaced SyndromeB with Malacards -->
                             <div style="margin-top: 1rem;">
                                 <a href="${EXTERNAL_DATABASES.CILIOGENICS(geneName)}" target="_blank" class="external-link with-icon">Search in Ciliogenics</a> |
                                 <a href="${EXTERNAL_DATABASES.MALACARDS(geneName)}" target="_blank" class="external-link with-icon">Search in Malacards</a>
@@ -1563,7 +1572,6 @@
                         </div>
                     </div>
 
-                    <!-- 3. Screen Results Section -->
                     ${screens.length > 0 ? `
                     <div class="screen-results-section">
                         <h3 class="section-title">Genome-wide Screen Results</h3>
@@ -1575,7 +1583,6 @@
                     </div>
                     ` : ''}
 
-                    <!-- 4. Bottom Navigation Buttons -->
                     <div class="bottom-navigation">
                         <button class="nav-button" onclick="showPhylogeneticData('${geneName}')">
                             📊 Phylogenetic Data
@@ -1588,7 +1595,6 @@
                         </button>
                     </div>
 
-                    <!-- 5. Action Buttons -->
                     <div class="action-buttons">
                         <button onclick="displayHomePage()" class="btn-secondary">
                             ← Back to Home
@@ -1613,8 +1619,12 @@
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
 
-            // Clear URL for home page
-            window.history.pushState({}, '', window.location.pathname);
+            // Clear URL for home page (back to /ciliahub/)
+            const currentPath = window.location.pathname;
+            const cleanPath = currentPath.replace(/\/([A-Z0-9]+)$/i, '');
+            const finalPath = cleanPath.endsWith('/ciliahub') ? cleanPath : cleanPath.replace(/\/$/, '') + '/ciliahub';
+
+            window.history.pushState({}, '', finalPath);
 
             const defaultGenes = getDefaultGenes();
             const ciliaryGeneCount = getCiliaryGeneCount();
@@ -1982,12 +1992,12 @@
         // ==========================================================
         function mapLocalizationToSVG(locArray) {
             const mapping = {
-                "ciliary membrane": ["ciliary-membrane","axoneme"],
-                "axoneme": ["ciliary-membrane","axoneme"],
+                "ciliary membrane": ["ciliary-membrane", "axoneme"],
+                "axoneme": ["ciliary-membrane", "axoneme"],
                 "basal body": ["basal-body"],
                 "transition zone": ["transition-zone"],
-                "cilia": ["ciliary-membrane","axoneme"],
-                "flagella": ["ciliary-membrane","axoneme"],
+                "cilia": ["ciliary-membrane", "axoneme"],
+                "flagella": ["ciliary-membrane", "axoneme"],
                 "nucleus": ["nucleus"],
                 "centrosome": ["basal-body"],
                 "cytosol": ["cell-body"]
