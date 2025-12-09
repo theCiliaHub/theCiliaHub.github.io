@@ -8,7 +8,7 @@
     
     <style>
         :root {
-            --primary-blue: #1976d2;
+            --primary-blue: #005b96; /* FIXED: Changed from #1976d2 to #005b96 */
             --design-blue: #1565c0;
             --secondary-blue: #b3cde0;
             --accent-text: #333333;
@@ -46,7 +46,7 @@
         
         /* --- Top Navigation Bar --- */
         .top-navbar {
-            background: var(--primary-blue);
+            background: var(--primary-blue); /* FIXED: Now uses #005b96 */
             color: white;
             display: flex;
             align-items: center;
@@ -923,12 +923,12 @@
             // Protein complexes
             CORUM: () => `https://mips.helmholtz-muenchen.de/corum/`,
             
-            // Ciliopathy databases
-            CILIOGENICS: (gene) => `http://ciliogenics.org/search?q=${gene}`,
-            SYNDROMEB: (gene) => `https://syndromeb.org/search?q=${gene}`,
+            // Ciliopathy databases - FIXED: Corrected Ciliogenics and replaced SyndromeB with Malacards
+            CILIOGENICS: (gene) => `https://ciliogenics.com/?page=General%20info&query=${gene}`,
+            MALACARDS: (gene) => `https://www.malacards.org/search/results?q=${gene}`,
             
             // Expression databases
-            PROTEIN_ATLAS: (gene) => `https://www.proteinatlas.org/ENSG00000130234-${gene}`,
+            PROTEIN_ATLAS: (gene) => `https://www.proteinatlas.org/search/${gene}`,
             GTEX: (gene) => `https://gtexportal.org/home/gene/${gene}`,
             
             // OMIM
@@ -1025,6 +1025,36 @@
                           i.toLowerCase() !== 'na' && 
                           i.toLowerCase() !== 'n/a' && 
                           i.toLowerCase() !== 'null');
+        }
+
+        // ==========================================================
+        // CILIARY GENE FILTERING
+        // ==========================================================
+        function isCiliaryGene(gene) {
+            // Check if gene has ciliary localization
+            const localization = getCleanArray(gene, 'Localization');
+            const ciliaryTerms = ['cilia', 'ciliary', 'flagella', 'axoneme', 'basal body', 'transition zone'];
+            const hasCiliaryLocalization = localization.some(loc => 
+                ciliaryTerms.some(term => loc.toLowerCase().includes(term))
+            );
+            
+            // Check if gene is in ciliary phylogenetic classes
+            const hasPhylogeny = gene.phylogeny && 
+                (gene.phylogeny.li_2014 || gene.phylogeny.nevers_2017);
+            
+            // Check if gene has ciliopathy associations
+            const hasCiliopathy = getCleanArray(gene, 'Ciliopathy').length > 0;
+            
+            // Check if gene has screen data showing ciliary effects
+            const hasCiliaryScreens = gene.screens && gene.screens.length > 0;
+            
+            // A gene is considered ciliary if it meets any of these criteria
+            return hasCiliaryLocalization || hasPhylogeny || hasCiliopathy || hasCiliaryScreens;
+        }
+
+        function getCiliaryGeneCount() {
+            if (!window.allGenes || window.allGenes.length === 0) return 0;
+            return window.allGenes.filter(isCiliaryGene).length;
         }
 
         // ==========================================================
@@ -1361,15 +1391,15 @@
                     }
                 }
 
-                // Populate global arrays
+                // Filter to only ciliary genes for display
                 window.allGenes = Array.from(new Set(
                     Array.from(window.ciliaryGeneMap.values())
-                        .filter(g => g.Gene)
+                        .filter(g => g.Gene && isCiliaryGene(g))
                         .map(g => ({...g, gene: g.Gene}))
                 ));
                 window.currentData = window.allGenes;
 
-                console.log(`Loaded ${window.allGenes.length} unique ciliary genes with comprehensive search index`);
+                console.log(`Loaded ${window.allGenes.length} ciliary genes (filtered from ${window.CiliAI.masterData.length} total genes) with comprehensive search index`);
                 return true;
             } catch (err) {
                 console.error("Data loading failed:", err);
@@ -1483,9 +1513,10 @@
                             <h3 class="section-title">Ciliopathy & Phenotype Data</h3>
                             ${ciliopathies.length ? buildTagInfoRow('Ciliopathy Associations', ciliopathies, true) : buildInfoRow('Ciliopathy Associations', 'Not associated with known ciliopathies')}
                             
+                            <!-- FIXED: Corrected Ciliogenics link and replaced SyndromeB with Malacards -->
                             <div style="margin-top: 1rem;">
                                 <a href="${EXTERNAL_DATABASES.CILIOGENICS(geneName)}" target="_blank" class="external-link with-icon">Search in Ciliogenics</a> |
-                                <a href="${EXTERNAL_DATABASES.SYNDROMEB(geneName)}" target="_blank" class="external-link with-icon">Search in SyndromeB</a>
+                                <a href="${EXTERNAL_DATABASES.MALACARDS(geneName)}" target="_blank" class="external-link with-icon">Search in Malacards</a>
                             </div>
                             
                             ${Object.keys(scRNA).length > 0 ? `
@@ -1586,6 +1617,7 @@
             window.history.pushState({}, '', window.location.pathname);
 
             const defaultGenes = getDefaultGenes();
+            const ciliaryGeneCount = getCiliaryGeneCount();
             
             contentArea.innerHTML = `
                 <div class="page-container">
@@ -1594,7 +1626,7 @@
                     <div class="ciliahub-stats" style="margin: 2rem 0; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
                         <div style="flex: 1; min-width: 180px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1976d2; padding: 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #90caf9; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s; cursor: default;">
                             <div style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; color: #1976d2;">Current Ciliary Genes</div>
-                            <div id="gene-count" style="font-size: 2.5rem; font-weight: 700; color: #0d47a1;">${window.allGenes.length}</div>
+                            <div id="gene-count" style="font-size: 2.5rem; font-weight: 700; color: #0d47a1;">${ciliaryGeneCount}</div>
                         </div>
                     </div>
 
