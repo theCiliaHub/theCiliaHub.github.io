@@ -1050,54 +1050,46 @@
             return window.uniqueGeneNames.size;
         }
 
-        // ==========================================================
-        // URL ROUTING FUNCTIONS
-        // ==========================================================
-        function getCurrentGeneFromURL() {
-            const path = window.location.pathname;
-            const segments = path.split('/').filter(segment => segment.trim() !== '');
-            
-            // Look for gene name in the last segment
-            if (segments.length > 0) {
-                const lastSegment = segments[segments.length - 1];
-                // Check if it's not a common page name
-                if (!['', 'index.html', 'ciliahub.html', 'ciliahub', 'plots', 'about'].includes(lastSegment.toLowerCase())) {
-                    return decodeURIComponent(lastSegment).toUpperCase();
-                }
-            }
-            
-            // Also check hash
-            if (window.location.hash) {
-                return decodeURIComponent(window.location.hash.slice(1)).toUpperCase();
-            }
-            
-            return null;
-        }
+// ==========================================================
+// URL ROUTING FUNCTIONS
+// ==========================================================
+function getCurrentGeneFromURL() {
+    // Only use hash for routing - this is the reliable SPA method
+    if (window.location.hash.length > 1) {
+        return decodeURIComponent(window.location.hash.slice(1)).toUpperCase();
+    }
+    return null;
+}
 
-        function updateURLForGene(geneName) {
-            // FIX: Use a simple, canonical absolute path /ciliahub/[GENE] for SPA routing.
-            const newUrl = '/ciliahub/' + geneName;
-            window.history.pushState({ gene: geneName }, '', newUrl.replace(/\/\//g, '/'));
-        }
+function updateURLForGene(geneName) {
+    // Create consistent URL: https://theciliahub.github.io/ciliahub/#GENENAME
+    const cleanPath = window.location.pathname.split('#')[0];
+    const newUrl = `${cleanPath}#${geneName}`;
+    window.history.pushState({ gene: geneName }, '', newUrl);
+}
 
-        function copyGeneLinkToClipboard(geneName) {
-            // FIX: Always construct the canonical link using the origin and the absolute base path '/ciliahub/'.
-            const geneUrl = window.location.origin + '/ciliahub/' + geneName;
-            
-            navigator.clipboard.writeText(geneUrl).then(() => {
-                alert(`Link copied to clipboard: ${geneUrl}`);
-            }).catch(err => {
-                console.error('Failed to copy link: ', err);
-                // Fallback method
-                const textArea = document.createElement('textarea');
-                textArea.value = geneUrl;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                alert(`Link copied to clipboard: ${geneUrl}`);
-            });
-        }
+function copyGeneLinkToClipboard(geneName) {
+    // Always create canonical link: https://theciliahub.github.io/ciliahub/#GENENAME
+    const baseUrl = `${window.location.origin}${window.location.pathname.split('#')[0]}`;
+    const geneUrl = `${baseUrl}#${geneName}`;
+    
+    navigator.clipboard.writeText(geneUrl).then(() => {
+        alert(`Link copied to clipboard:\n${geneUrl}`);
+    }).catch(err => {
+        console.error('Failed to copy link: ', err);
+        // Fallback method
+        const textArea = document.createElement('textarea');
+        textArea.value = geneUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert(`Link copied to clipboard:\n${geneUrl}`);
+    });
+}
+    
 
         // ==========================================================
         // REQUIRED HELPER FUNCTIONS
@@ -1594,13 +1586,14 @@
         // ==========================================================
         // HOME PAGE FUNCTIONS
         // ==========================================================
-        function displayHomePage() {
-            const contentArea = document.getElementById('page-content');
-            if (!contentArea) return;
+function displayHomePage() {
+    const contentArea = document.getElementById('page-content');
+    if (!contentArea) return;
 
-            // FIX: Clear URL for home page, forcing the browser history state to the canonical home page URL.
-            window.history.pushState({}, '', '/ciliahub');
-
+    // Clear hash when going home
+    const cleanPath = window.location.pathname.split('#')[0];
+    window.history.pushState({}, '', cleanPath);
+    
             const defaultGenes = getDefaultGenes();
             const ciliaryGeneCount = getCiliaryGeneCount();
             
@@ -2116,82 +2109,73 @@
             alert(`Tissue expression data for ${geneName} will be displayed here in a future update.`);
         }
 
-        // ==========================================================
-        // INITIALISATION AND URL ROUTING
-        // ==========================================================
-        async function initializeApp() {
-            const ok = await loadMasterData();
-            if (!ok) {
-                document.getElementById('page-content').innerHTML = `
-                    <div class="page-container">
-                        <h1 style="color: #d32f2f;">Data Loading Error</h1>
-                        <p>Failed to load data from GitHub. Please check your network connection and ensure the data files are available at the specified URLs.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Build localization map
-            buildLocalizationMap();
-
-            // Add SVG click handlers
-            document.querySelectorAll('.cilia-part').forEach(p => {
-                p.addEventListener('click', () => console.log('Clicked cilium part:', p.id));
-            });
-
-            // Check URL for gene-specific routing
-            const geneFromURL = getCurrentGeneFromURL();
-            
-            if (geneFromURL) {
-                // Try to find the gene
-                const gene = window.allGenes.find(g => 
-                    (g.gene || g.Gene)?.toUpperCase() === geneFromURL ||
-                    getCleanArray(g, 'Synonym.').some(syn => syn.toUpperCase() === geneFromURL) ||
-                    getCleanArray(g, 'ensembl_gene_id.x.x').some(id => id.toUpperCase() === geneFromURL)
-                );
-                
-                if (gene) {
-                    displayIndividualGenePage(gene);
-                } else {
-                    // Gene not found, show home page with error
-                    displayHomePage();
-                    setTimeout(() => {
-                        const statusMsg = document.getElementById('status-message');
-                        if (statusMsg) {
-                            statusMsg.innerHTML = `<span style="color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 6px; display: block;">Gene "${geneFromURL}" not found in database</span>`;
-                            statusMsg.style.display = 'block';
-                        }
-                    }, 100);
+// ==========================================================
+// NAVIGATION HANDLER
+// ==========================================================
+function handleNavigation() {
+    const geneFromURL = getCurrentGeneFromURL();
+    
+    if (geneFromURL) {
+        // Try to find the gene
+        const gene = window.allGenes.find(g => 
+            (g.gene || g.Gene)?.toUpperCase() === geneFromURL ||
+            getCleanArray(g, 'Synonym.').some(syn => syn.toUpperCase() === geneFromURL) ||
+            getCleanArray(g, 'ensembl_gene_id.x.x').some(id => id.toUpperCase() === geneFromURL)
+        );
+        
+        if (gene) {
+            displayIndividualGenePage(gene);
+        } else {
+            // Gene not found, show home page with error
+            displayHomePage();
+            setTimeout(() => {
+                const statusMsg = document.getElementById('status-message');
+                if (statusMsg) {
+                    statusMsg.innerHTML = `<span style="color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 6px; display: block;">Gene "${geneFromURL}" not found in database</span>`;
+                    statusMsg.style.display = 'block';
                 }
-            } else {
-                // No gene in URL, show home page
-                displayHomePage();
-            }
-
-            // Handle browser back/forward buttons
-            window.addEventListener('popstate', () => {
-                const geneFromURL = getCurrentGeneFromURL();
-                
-                if (geneFromURL) {
-                    const gene = window.allGenes.find(g => 
-                        (g.gene || g.Gene)?.toUpperCase() === geneFromURL ||
-                        getCleanArray(g, 'Synonym.').some(syn => syn.toUpperCase() === geneFromURL) ||
-                        getCleanArray(g, 'ensembl_gene_id.x.x').some(id => id.toUpperCase() === geneFromURL)
-                    );
-                    
-                    if (gene) {
-                        displayIndividualGenePage(gene);
-                    } else {
-                        displayHomePage();
-                    }
-                } else {
-                    displayHomePage();
-                }
-            });
+            }, 100);
         }
+    } else {
+        // No gene in URL, show home page
+        displayHomePage();
+    }
+}
 
-        // Start the application
-        document.addEventListener('DOMContentLoaded', initializeApp);
+// ==========================================================
+// INITIALIZATION
+// ==========================================================
+async function initializeApp() {
+    const ok = await loadMasterData();
+    if (!ok) {
+        document.getElementById('page-content').innerHTML = `
+            <div class="page-container">
+                <h1 style="color: #d32f2f;">Data Loading Error</h1>
+                <p>Failed to load data from GitHub. Please check your network connection and ensure the data files are available at the specified URLs.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Build localization map
+    buildLocalizationMap();
+
+    // Add SVG click handlers
+    document.querySelectorAll('.cilia-part').forEach(p => {
+        p.addEventListener('click', () => console.log('Clicked cilium part:', p.id));
+    });
+
+    // Handle initial page load
+    handleNavigation();
+
+    // Handle browser back/forward buttons and hash changes
+    window.addEventListener('popstate', handleNavigation);
+    window.addEventListener('hashchange', handleNavigation);
+}
+
+// Start the application
+document.addEventListener('DOMContentLoaded', initializeApp);
+
     </script>
 </body>
 </html>
