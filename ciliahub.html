@@ -308,6 +308,88 @@
             background-color: #f8fafc;
         }
         
+        .screen-result-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .screen-result-up {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        
+        .screen-result-down {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        
+        .screen-result-neutral {
+            background: #f5f5f5;
+            color: #616161;
+            border: 1px solid #e0e0e0;
+        }
+        
+        /* Screen Citation Info Modal */
+        .citation-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .citation-modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .citation-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e3f2fd;
+        }
+        
+        .citation-modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1976d2;
+        }
+        
+        .citation-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .citation-summary {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid #1976d2;
+        }
+        
         /* 4. Bottom Navigation Buttons */
         .bottom-navigation {
             padding: 2.5rem 3rem;
@@ -397,6 +479,20 @@
         }
         
         .external-link:hover {
+            text-decoration: underline;
+        }
+        
+        .citation-link {
+            color: #1976d2;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        
+        .citation-link:hover {
             text-decoration: underline;
         }
         
@@ -689,6 +785,19 @@
         </aside>
     </div>
     
+    <!-- Citation Info Modal -->
+    <div id="citationModal" class="citation-modal">
+        <div class="citation-modal-content">
+            <div class="citation-modal-header">
+                <h3 class="citation-modal-title" id="citationModalTitle"></h3>
+                <button class="citation-close" onclick="closeCitationModal()">&times;</button>
+            </div>
+            <div id="citationModalBody">
+                <!-- Citation content will be dynamically loaded here -->
+            </div>
+        </div>
+    </div>
+    
     <script>
         // ==========================================================
         // GLOBAL STATE
@@ -715,6 +824,44 @@
 
         const defaultGenesNames = ["IFT88", "CEP290", "ARL13B", "BBS1", "PKD2", "ACE2"];
         const allPartIds = ["ciliary-membrane", "axoneme", "basal-body", "transition-zone", "nucleus", "cell-body"];
+
+        // ==========================================================
+        // SCREEN CITATION MAP
+        // ==========================================================
+        function getScreenCitationMap() {
+            return {
+                "Kim2016": { 
+                    name: 'Kim et al. (2016) IMCD3 RNAi', 
+                    link: 'https://www.sciencedirect.com/science/article/pii/S016748891630074X', 
+                    citation: 'Kim et al., FEBS Lett, 2016', 
+                    summary: "This is a genome-wide high-content siRNA screen for ciliogenesis. The authors identified roles for mRNA processing (spliceosome) and ubiquitin-proteasome system (UPS) in both cilia formation and cell cycle arrest..." 
+                },
+                "Wheway2015": { 
+                    name: 'Wheway et al. (2015) RPE1 RNAi', 
+                    link: 'https://www.nature.com/articles/ncb3201#Abs1', 
+                    citation: 'Wheway et al., Nat Cell Biol, 2015', 
+                    summary: "This is a whole-genome siRNA screen in mIMCD3 cells (mouse kidney line) to identify genes required for ciliogenesis. They identified 112 candidate ciliogenesis/ciliopathy genes..." 
+                },
+                "Roosing2015": { 
+                    name: 'Roosing et al. (2015) hTERT-RPE1', 
+                    link: 'https://elifesciences.org/articles/06602/figures#SD2-data', 
+                    citation: 'Roosing et al., eLife, 2015', 
+                    summary: "Roosing et al. performed a genome-wide siRNA knockdown screen in human hTERT-RPE1 cells engineered with a dual reporter (Smo-EGFP for cilia + mCherry-Geminin for cell-cycle state)..." 
+                },
+                "Basu2023": { 
+                    name: 'Basu et al. (2023) MDCK CRISPR', 
+                    link: 'https://onlinelibrary.wiley.com/doi/10.1111/ahg.12529', 
+                    citation: 'Basu et al., Ann Hum Genet, 2023', 
+                    summary: "This reference links to a 2023 paper from Basu et al. Manual curation from the full text is recommended to extract cell-line, screening design, and main findings." 
+                },
+                "Breslow2018": { 
+                    name: 'Breslow et al. (2018) Hedgehog Signaling', 
+                    link: 'https://www.nature.com/articles/s41588-018-0054-7#Abs1', 
+                    citation: 'Breslow et al., Nat Genet, 2018', 
+                    summary: "This is a CRISPR-Cas9 screen focused on Hedgehog (Hh) signaling, which relies on the primary cilium. They engineered a Hedgehog-responsive cell line with a selectable reporter and used a genome-wide CRISPR sgRNA library..." 
+                }
+            };
+        }
 
         // ==========================================================
         // CORE UTILITIES
@@ -812,29 +959,69 @@
             `;
         }
 
+        // ==========================================================
+        // SCREEN DATA FUNCTIONS
+        // ==========================================================
+        function getResultClass(result) {
+            if (!result) return 'screen-result-neutral';
+            
+            const lowerResult = result.toLowerCase();
+            if (lowerResult.includes('increase') || lowerResult.includes('up') || lowerResult.includes('positive')) {
+                return 'screen-result-up';
+            } else if (lowerResult.includes('decrease') || lowerResult.includes('down') || lowerResult.includes('negative')) {
+                return 'screen-result-down';
+            } else if (lowerResult.includes('no effect') || lowerResult.includes('neutral') || lowerResult.includes('no significant')) {
+                return 'screen-result-neutral';
+            }
+            return 'screen-result-neutral';
+        }
+
+        function getResultText(result) {
+            if (!result) return 'Not Reported';
+            
+            const lowerResult = result.toLowerCase();
+            if (lowerResult.includes('increase') || lowerResult.includes('up') || lowerResult.includes('positive')) {
+                return 'Increase';
+            } else if (lowerResult.includes('decrease') || lowerResult.includes('down') || lowerResult.includes('negative')) {
+                return 'Decrease';
+            } else if (lowerResult.includes('no effect') || lowerResult.includes('neutral') || lowerResult.includes('no significant')) {
+                return 'No Effect';
+            }
+            return result;
+        }
+
         function formatScreenDataTable(screens) {
             if (!Array.isArray(screens) || screens.length === 0) {
                 return '<p class="not-available">No screen data available</p>';
             }
 
+            const citationMap = getScreenCitationMap();
+            
             let rows = '';
             screens.forEach(s => {
-                const dataset = s.dataset || s.screen_name || 'Unknown Screen';
-                const mean = s.mean_percent_ciliated != null
-                    ? Number(s.mean_percent_ciliated).toFixed(1) + '%'
-                    : '—';
-                const z = s.z_score != null ? s.z_score.toFixed(2) : '—';
-                const cls = s.classification || '—';
-                const link = s.paper_link
-                    ? `<a href="${s.paper_link}" target="_blank" class="external-link">${dataset}</a>`
-                    : dataset;
-
+                const source = s.source || '';
+                const result = s.result || 'Not Reported';
+                const citation = citationMap[source] || { name: source, link: '', citation: source, summary: '' };
+                
+                const resultClass = getResultClass(result);
+                const resultText = getResultText(result);
+                
+                const screenName = citation.name || source;
+                const screenLink = citation.link ? 
+                    `<a href="${citation.link}" target="_blank" class="external-link">${screenName}</a>` : 
+                    screenName;
+                
                 rows += `
                     <tr>
-                        <td>${link}</td>
-                        <td>${mean}</td>
-                        <td>${z}</td>
-                        <td><strong>${cls}</strong></td>
+                        <td>
+                            <span class="citation-link" onclick="showCitationInfo('${escapeHtml(source)}')">
+                                ${screenLink}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="screen-result-badge ${resultClass}">${resultText}</span>
+                        </td>
+                        <td>${citation.citation}</td>
                     </tr>
                 `;
             });
@@ -844,15 +1031,58 @@
                     <thead>
                         <tr>
                             <th>Screen Dataset</th>
-                            <th>Mean % Ciliated</th>
-                            <th>Z-Score</th>
-                            <th>Effect</th>
+                            <th>Effect on Ciliogenesis</th>
+                            <th>Citation</th>
                         </tr>
                     </thead>
                     <tbody>${rows}</tbody>
                 </table>
             `;
         }
+
+        function showCitationInfo(source) {
+            const citationMap = getScreenCitationMap();
+            const citation = citationMap[source] || { 
+                name: source, 
+                link: '', 
+                citation: source, 
+                summary: 'No summary available for this screen.' 
+            };
+            
+            const modal = document.getElementById('citationModal');
+            const title = document.getElementById('citationModalTitle');
+            const body = document.getElementById('citationModalBody');
+            
+            title.textContent = citation.name;
+            body.innerHTML = `
+                <div style="margin-bottom: 1.5rem;">
+                    <strong>Citation:</strong> ${citation.citation}
+                </div>
+                ${citation.link ? `
+                <div style="margin-bottom: 1.5rem;">
+                    <strong>Link:</strong> <a href="${citation.link}" target="_blank" class="external-link">${citation.link}</a>
+                </div>
+                ` : ''}
+                <div class="citation-summary">
+                    <strong>Summary:</strong><br>
+                    ${citation.summary}
+                </div>
+            `;
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeCitationModal() {
+            document.getElementById('citationModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('citationModal');
+            if (e.target === modal) {
+                closeCitationModal();
+            }
+        });
 
         // ==========================================================
         // DATA LOADING FUNCTIONS
@@ -922,7 +1152,7 @@
                 window.allGenes = Array.from(window.ciliaryGeneMap.values());
                 window.currentData = window.allGenes;
 
-                console.log(`Loaded ${window.allGenes.length} ciliary genes`);
+                console.log(`Loaded ${window.allGenes.length} ciliary genes with screen data`);
                 return true;
             } catch (err) {
                 console.error("Data loading failed:", err);
@@ -945,8 +1175,9 @@
                     Protein_Complexes: "IFT-B",
                     Ciliopathy_disease: "Bardet-Biedl syndrome 20",
                     screens: [
-                        { dataset: "Screen A", mean_percent_ciliated: 85.5, z_score: 2.34, classification: "Up" },
-                        { dataset: "Screen B", mean_percent_ciliated: 78.2, z_score: 1.89, classification: "Up" }
+                        { source: "Kim2016", result: "Increased cilia length" },
+                        { source: "Wheway2015", result: "Decreased cilia numbers" },
+                        { source: "Breslow2018", result: "No Significant Effect" }
                     ]
                 },
                 {
@@ -959,7 +1190,8 @@
                     Protein_Complexes: "NPHP-MKS-JBTS complex",
                     Ciliopathy_disease: "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14",
                     screens: [
-                        { dataset: "Screen A", mean_percent_ciliated: 45.2, z_score: -3.12, classification: "Down" }
+                        { source: "Wheway2015", result: "Decreased cilia numbers" },
+                        { source: "Roosing2015", result: "No effect" }
                     ]
                 },
                 {
@@ -971,7 +1203,8 @@
                     Localization: ["ciliary membrane"],
                     Ciliopathy_disease: "Joubert syndrome 8",
                     screens: [
-                        { dataset: "Screen A", mean_percent_ciliated: 65.8, z_score: 0.45, classification: "Neutral" }
+                        { source: "Kim2016", result: "Not Reported" },
+                        { source: "Wheway2015", result: "Decreased cilia numbers" }
                     ]
                 },
                 {
@@ -984,7 +1217,8 @@
                     Protein_Complexes: "BBSome",
                     Ciliopathy_disease: "Bardet-Biedl syndrome 1",
                     screens: [
-                        { dataset: "Screen A", mean_percent_ciliated: 72.1, z_score: 1.23, classification: "Up" }
+                        { source: "Wheway2015", result: "Decreased cilia numbers" },
+                        { source: "Roosing2015", result: "No effect" }
                     ]
                 },
                 {
@@ -997,7 +1231,8 @@
                     Protein_Complexes: ["Polycystin complex"],
                     Ciliopathy_disease: "Autosomal dominant polycystic kidney disease",
                     screens: [
-                        { dataset: "Screen A", mean_percent_ciliated: 58.4, z_score: -0.67, classification: "Down" }
+                        { source: "Kim2016", result: "Not Reported" },
+                        { source: "Breslow2018", result: "No Significant Effect" }
                     ]
                 },
                 {
@@ -1009,14 +1244,14 @@
                     Localization: ["cilia"],
                     Ciliopathy_disease: "",
                     screens: [
-                        { dataset: "Screen A", mean_percent_ciliated: 91.2, z_score: 3.45, classification: "Up" }
+                        { source: "Basu2023", result: "Not Reported" }
                     ]
                 }
             ];
         }
 
         // ==========================================================
-        // GENE DETAIL PAGE FUNCTION (ENHANCED DESIGN)
+        // GENE DETAIL PAGE FUNCTION (WITH SCREEN DATA)
         // ==========================================================
         function displayIndividualGenePage(gene) {
             const contentArea = document.getElementById('page-content');
@@ -1036,9 +1271,15 @@
             const overExpr = getGeneValue(gene, 'Overexpression effects on cilia length', 'Overexpression effects on cilia length (increase/decrease/no effect)');
             const lof = getGeneValue(gene, 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)');
             const ciliationPct = getGeneValue(gene, 'Percentage of ciliated cells (increase/decrease/no effect)');
+            
+            // Get screen data from gene object
             const screens = gene.screens || [];
+            
+            // Get additional data from expression
+            const expression = gene.expression || {};
+            const scRNA = expression.scRNA || {};
+            const tissue = expression.tissue || {};
 
-            // Build the enhanced page
             contentArea.innerHTML = `
                 <div class="gene-page-container">
                     <!-- 1. Header Section -->
@@ -1060,23 +1301,58 @@
                             <h3 class="section-title" style="margin-top: 1.5rem;">Protein Information</h3>
                             ${complexes.length ? buildTagInfoRow('Protein Complexes', complexes) : buildInfoRow('Protein Complexes', 'Not available')}
                             ${localization.length ? buildTagInfoRow('Subcellular Localization', localization) : buildInfoRow('Subcellular Localization', 'Not available')}
+                            
+                            ${mousePheno ? `
+                                <h3 class="section-title" style="margin-top: 1.5rem;">Functional Impact</h3>
+                                ${buildInfoRow('Mouse Ciliopathy Phenotype', mousePheno)}
+                                ${overExpr ? buildInfoRow('Overexpression → Cilia Length', overExpr) : ''}
+                                ${lof ? buildInfoRow('Loss-of-Function → Cilia Length', lof) : ''}
+                                ${ciliationPct ? buildInfoRow('Effect on % Ciliated Cells', ciliationPct) : ''}
+                            ` : ''}
                         </div>
 
                         <!-- Right Column - Biological Behavior & Ciliopathy Information -->
                         <div class="gene-col">
                             <h3 class="section-title">Ciliopathy & Phenotype Data</h3>
                             ${ciliopathies.length ? buildTagInfoRow('Ciliopathy Associations', ciliopathies, true) : buildInfoRow('Ciliopathy Associations', 'Not associated with known ciliopathies')}
-                            ${mousePheno ? buildInfoRow('Mouse Ciliopathy Phenotype', mousePheno) : ''}
-                            ${overExpr ? buildInfoRow('Overexpression Effect on Cilia Length', overExpr) : ''}
-                            ${lof ? buildInfoRow('Loss-of-Function Effect on Cilia Length', lof) : ''}
-                            ${ciliationPct ? buildInfoRow('Percentage of Ciliated Cells', ciliationPct) : ''}
+                            
+                            ${Object.keys(scRNA).length > 0 ? `
+                                <h3 class="section-title" style="margin-top: 1.5rem;">Single-Cell Expression</h3>
+                                <div class="info-row">
+                                    <span class="info-label">scRNA-seq in Lung Cells</span>
+                                    <span class="info-value">
+                                        ${Object.entries(scRNA).map(([cellType, value]) => 
+                                            `${cellType}: ${typeof value === 'number' ? value.toFixed(2) : value}`
+                                        ).join('; ')}
+                                    </span>
+                                </div>
+                            ` : ''}
+                            
+                            ${Object.keys(tissue).length > 0 ? `
+                                <h3 class="section-title" style="margin-top: 1.5rem;">Tissue Expression</h3>
+                                <div class="info-row">
+                                    <span class="info-label">Bulk RNA-seq (nTPM)</span>
+                                    <span class="info-value">
+                                        Top tissues: ${Object.entries(tissue)
+                                            .sort((a, b) => b[1] - a[1])
+                                            .slice(0, 3)
+                                            .map(([tissueName, value]) => 
+                                                `${tissueName}: ${typeof value === 'number' ? value.toFixed(1) : value}`
+                                            ).join('; ')}
+                                    </span>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
 
                     <!-- 3. Screen Results Section -->
                     ${screens.length > 0 ? `
                     <div class="screen-results-section">
-                        <h3 class="section-title">Screen Results</h3>
+                        <h3 class="section-title">Genome-wide Screen Results</h3>
+                        <p style="margin-bottom: 1rem; color: #666; font-size: 0.95rem;">
+                            Results from published high-throughput screens assessing ciliogenesis phenotypes. 
+                            Click on screen names for detailed citation information.
+                        </p>
                         ${formatScreenDataTable(screens)}
                     </div>
                     ` : ''}
@@ -1152,6 +1428,7 @@
                             const description = gene.Description || 'No description available.';
                             const localization = gene.Localization ? (Array.isArray(gene.Localization) ? gene.Localization.join(', ') : gene.Localization) : '';
                             const ciliopathy = gene.Ciliopathy_disease || '';
+                            const screenCount = gene.screens ? gene.screens.length : 0;
                             
                             return `
                                 <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
@@ -1160,6 +1437,7 @@
                                     ${localization ? `<div class="gene-info"><strong>Localization:</strong> ${localization}</div>` : ''}
                                     ${gene.Ensembl_ID ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.Ensembl_ID}</div>` : ''}
                                     ${ciliopathy ? `<div class="gene-info"><strong>Ciliopathy:</strong> ${ciliopathy}</div>` : ''}
+                                    ${screenCount > 0 ? `<div class="gene-info"><strong>Screens:</strong> ${screenCount} dataset(s)</div>` : ''}
                                 </div>
                             `;
                         }).join('')}
@@ -1199,9 +1477,11 @@
                     suggestionsContainer.innerHTML = filteredGenes.map(g => {
                         const geneName = g.gene || g.Gene || '';
                         const synonym = getCleanArray(g, 'Synonym.').join(', ');
+                        const screenCount = g.screens ? g.screens.length : 0;
                         return `<div class="suggestion-item" data-gene="${geneName}" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background 0.2s;">
                             <div style="font-weight: 600;">${geneName}</div>
                             ${synonym ? `<div style="font-size: 0.9rem; color: #666;">${synonym}</div>` : ''}
+                            ${screenCount > 0 ? `<div style="font-size: 0.8rem; color: #1976d2; margin-top: 0.25rem;">${screenCount} screen(s)</div>` : ''}
                         </div>`;
                     }).join('');
                     suggestionsContainer.style.display = 'block';
@@ -1281,6 +1561,7 @@
                             const geneName = gene.gene || gene.Gene || '';
                             const description = gene.description || gene.Description || 'No description available.';
                             const localization = getCleanArray(gene, 'Localization').join(', ') || '';
+                            const screenCount = gene.screens ? gene.screens.length : 0;
                             
                             return `
                                 <div class="gene-card" onclick="displayIndividualGenePage(${JSON.stringify(gene).replace(/"/g, '&quot;')})">
@@ -1288,6 +1569,7 @@
                                     <div class="gene-description">${description}</div>
                                     ${localization ? `<div class="gene-info"><strong>Localization:</strong> ${localization}</div>` : ''}
                                     ${gene.ensembl_id || gene.Ensembl_ID ? `<div class="gene-info"><strong>Ensembl:</strong> ${gene.ensembl_id || gene.Ensembl_ID}</div>` : ''}
+                                    ${screenCount > 0 ? `<div class="gene-info"><strong>Screens:</strong> ${screenCount} dataset(s)</div>` : ''}
                                 </div>
                             `;
                         }).join('')}
