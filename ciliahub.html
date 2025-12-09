@@ -1075,36 +1075,15 @@
         }
 
         function updateURLForGene(geneName) {
-            // FIX: Ensure only the base path is used before appending the gene name
-            const currentPath = window.location.pathname;
-            let baseUrl = currentPath.split('/');
-            
-            // Filter out existing gene segments or non-page segments
-            let baseSegments = baseUrl.filter(segment => 
-                ['', 'index.html', 'ciliahub.html', 'ciliahub', 'plots', 'about'].includes(segment.toLowerCase())
-            );
-
-            // Ensure the base path ends with 'ciliahub' or an empty string for the root
-            if (baseSegments.length === 0 || baseSegments[baseSegments.length - 1].toLowerCase() !== 'ciliahub') {
-                // If we're not explicitly on /ciliahub, navigate to /ciliahub/GENE
-                const origin = window.location.origin;
-                const pathRoot = window.location.pathname.includes('/ciliahub') ? window.location.pathname.split('/ciliahub')[0] : '/';
-                const newUrl = origin + pathRoot.replace(/\/$/, '') + '/ciliahub/' + geneName;
-                window.history.pushState({ gene: geneName }, '', newUrl.replace(/\/\//g, '/')); // Use replace to handle double slashes if pathRoot is '/'
-            } else {
-                // If we are on /ciliahub/something, update the "something" part
-                const cleanPath = baseUrl.slice(0, baseUrl.length - 1).join('/');
-                const newUrl = window.location.origin + (cleanPath.startsWith('/') ? '' : '/') + cleanPath + '/' + geneName;
-                window.history.pushState({ gene: geneName }, '', newUrl.replace(/\/\//g, '/'));
-            }
+            // FIX: Use a simple, canonical absolute path /ciliahub/[GENE] for SPA routing.
+            const newUrl = '/ciliahub/' + geneName;
+            window.history.pushState({ gene: geneName }, '', newUrl.replace(/\/\//g, '/'));
         }
 
         function copyGeneLinkToClipboard(geneName) {
-            // FIX: Construct the correct shareable URL using the proper base.
-            // Assuming the target application structure is always /ciliahub/GENE on the host.
-            const baseHref = window.location.href.split('/ciliahub')[0] + '/ciliahub/';
-            const geneUrl = baseHref.replace(/\/\//g, '/') + geneName;
-
+            // FIX: Always construct the canonical link using the origin and the absolute base path '/ciliahub/'.
+            const geneUrl = window.location.origin + '/ciliahub/' + geneName;
+            
             navigator.clipboard.writeText(geneUrl).then(() => {
                 alert(`Link copied to clipboard: ${geneUrl}`);
             }).catch(err => {
@@ -1619,12 +1598,8 @@
             const contentArea = document.getElementById('page-content');
             if (!contentArea) return;
 
-            // Clear URL for home page (back to /ciliahub/)
-            const currentPath = window.location.pathname;
-            const cleanPath = currentPath.replace(/\/([A-Z0-9]+)$/i, '');
-            const finalPath = cleanPath.endsWith('/ciliahub') ? cleanPath : cleanPath.replace(/\/$/, '') + '/ciliahub';
-
-            window.history.pushState({}, '', finalPath);
+            // FIX: Clear URL for home page, forcing the browser history state to the canonical home page URL.
+            window.history.pushState({}, '', '/ciliahub');
 
             const defaultGenes = getDefaultGenes();
             const ciliaryGeneCount = getCiliaryGeneCount();
