@@ -1583,17 +1583,18 @@ function copyGeneLinkToClipboard(geneName) {
             }
         }
 
-        // ==========================================================
-        // HOME PAGE FUNCTIONS
-        // ==========================================================
+// ==========================================================
+// HOME PAGE FUNCTIONS
+// ==========================================================
 function displayHomePage() {
     const contentArea = document.getElementById('page-content');
     if (!contentArea) return;
 
-    // Clear hash when going home
-    const cleanPath = window.location.pathname.split('#')[0];
-    window.history.pushState({}, '', cleanPath);
-    
+    // Only clear hash if explicitly going home (not via back button)
+    if (!window.location.hash) {
+        const cleanPath = window.location.pathname.split('#')[0];
+        window.history.replaceState({}, '', cleanPath);
+    }
             const defaultGenes = getDefaultGenes();
             const ciliaryGeneCount = getCiliaryGeneCount();
             
