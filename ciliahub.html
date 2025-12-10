@@ -470,22 +470,24 @@
             transform: translateY(-1px);
         }
         
-        .btn-primary {
-            background: #1976d2;
-            color: white;
-            padding: 0.8rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary:hover {
-            background: #1565c0;
-            transform: translateY(-1px);
-        }
+       .btn-primary {
+    /* Base Button Color: Match --primary-blue (#005b96) */
+    background: #005b96;
+    color: white; 
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+ 
+.btn-primary:hover {
+    /* Hover Color: A darker blue (#004b7a) for visual feedback */
+    background: #004b7a;
+    transform: translateY(-1px);
+}
         
         /* External Links */
         .external-link {
