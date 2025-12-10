@@ -9,31 +9,36 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        /* Root Variables - Matching index.html */
+       /* --- Root and Base Styles --- */
         :root {
             --primary-blue: #005b96;
-            --design-blue: #1565c0;
             --secondary-blue: #b3cde0;
-            --accent-text: #333333;
-            --border-light: #e1e8ed;
-            --light-blue: #eaf2fa;
-            --white: #ffffff;
-            --accent: #4caf50;
-            --card: #ffffff;
-            --border: #e1e8ed;
+            --accent-text: #2d3748;
+            --light-bg: #f7fbff;
+            --code-bg: #f1f8ff;
+            --link-color: #6c8aa3;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            background: var(--light-bg);
             color: var(--accent-text);
-            padding-top: 60px;
+            margin: 0;
+            padding-top: 60px; /* Space for fixed navbar */
             min-height: 100vh;
         }
+        
+        .content-wrapper {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
 
-        /* Top Navigation Bar - Matching index.html exactly */
+        /* --- Navigation Bar Styles (Copied from index.html) --- */
         .top-navbar {
             background: var(--primary-blue);
             color: white;
@@ -41,7 +46,6 @@
             align-items: center;
             padding: 0 20px;
             height: 60px;
-            border-bottom: 1px solid var(--primary-blue);
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: fixed;
             width: 100%;
@@ -77,16 +81,13 @@
             transition: background-color 0.3s;
         }
 
-        .nav-links a:hover, .nav-links a.active {
-            background-color: rgba(255, 255, 255, 0.1);
+        .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.15);
         }
 
-        /* Main Layout */
-        #plot-page-container {
-            padding: 24px;
-            min-height: calc(100vh - 84px);
-        }
-
+        
+      /* MAIN LAYOUT */
+        #plot-page-container { padding: 24px; min-height: calc(100vh - 64px); }
         .ciliaplot-main-layout {
             display: grid;
             grid-template-columns: 320px 1fr;
@@ -94,149 +95,80 @@
             max-width: 1600px;
             margin: 0 auto;
         }
-
-        @media (max-width: 1024px) {
-            .ciliaplot-main-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Control Panel Cards */
         .control-card {
             background: var(--card);
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.08);
             margin-bottom: 16px;
-            border: 1px solid var(--border-light);
         }
-
         .control-card h3 {
             margin: 0 0 16px;
             padding-bottom: 10px;
-            border-bottom: 2px solid var(--primary-blue);
-            color: var(--primary-blue);
+            border-bottom: 2px solid var(--border);
+            color: var(--primary);
             font-size: 1.3em;
-            font-weight: 700;
         }
 
-        /* Analysis Dropdown */
-        #analysis-dropdown {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            margin-bottom: 16px;
-            background-color: white;
-            font-size: 1em;
-            font-weight: 500;
-            color: var(--accent-text);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        #analysis-dropdown:hover {
-            border-color: var(--primary-blue);
-            box-shadow: 0 2px 8px rgba(0, 91, 150, 0.1);
-        }
-
-        #analysis-dropdown:focus {
-            outline: none;
-            border-color: var(--primary-blue);
-            box-shadow: 0 0 0 3px rgba(0, 91, 150, 0.1);
-        }
-
-        /* Gene Input */
+        /* PLOT TYPES (Kept hidden as dropdown is now primary) */
+        .plot-type-list { display: none; } 
+        
+        /* INPUT & BUTTONS */
         #ciliaplot-genes-input {
             width: 100%;
             min-height: 200px;
             padding: 12px;
             font-family: 'Courier New', monospace;
             font-size: 14px;
-            border: 1px solid var(--border-light);
+            border: 1px solid var(--border);
             border-radius: 8px;
             resize: vertical;
             margin-bottom: 12px;
-            transition: all 0.2s ease;
         }
-
-        #ciliaplot-genes-input:focus {
-            outline: none;
-            border-color: var(--primary-blue);
-            box-shadow: 0 0 0 3px rgba(0, 91, 150, 0.1);
-        }
-
-        /* Generate Button */
         #generate-ciliaplot-btn {
             width: 100%;
             padding: 14px;
-            background: var(--primary-blue);
+            background: var(--accent);
             color: white;
             border: none;
             border-radius: 8px;
             font-size: 1.1em;
-            font-weight: 600;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 6px rgba(0, 91, 150, 0.2);
+            transition: 0.2s;
         }
+        #generate-ciliaplot-btn:hover { background: #43a047; }
 
-        #generate-ciliaplot-btn:hover {
-            background: #004577;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 91, 150, 0.3);
-        }
-
-        #generate-ciliaplot-btn:active {
-            transform: translateY(0);
-        }
-
-        /* Customization Grid */
+        /* CUSTOMIZATION GRID */
         .customization-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 14px;
-            margin-top: 16px;
+            margin-top: 12px;
         }
-
-        .form-group {
-            margin-bottom: 8px;
+        .form-group label { font-weight: 600; font-size: 0.9em; margin-bottom: 4px; display: block; }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
         }
-
-        .form-group label {
-            font-weight: 600;
-            font-size: 0.9em;
-            margin-bottom: 6px;
-            display: block;
-            color: var(--accent-text);
-        }
-
-        .form-group input, 
-        .form-group select {
+        /* ADDED STYLE FOR DROPDOWN */
+        #analysis-dropdown {
             width: 100%;
             padding: 10px;
-            border: 1px solid var(--border-light);
+            border: 1px solid var(--border);
             border-radius: 6px;
-            font-size: 0.95em;
-            transition: all 0.2s ease;
+            margin-bottom: 16px; /* Space above search box */
+            background-color: #f1f5f9;
+            font-size: 1em;
+            font-weight: 500;
+            color: var(--text);
+            cursor: pointer;
         }
 
-        .form-group input:focus, 
-        .form-group select:focus {
-            outline: none;
-            border-color: var(--primary-blue);
-            box-shadow: 0 0 0 3px rgba(0, 91, 150, 0.1);
-        }
 
-        /* Visualization Area */
-        .visualization-container {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-            border: 1px solid var(--border-light);
-        }
-
+        /* VISUALIZATION */
         #plot-display-area {
             width: 100%;
             height: 80vh;
@@ -244,220 +176,52 @@
             border: 2px dashed #cbd5e0;
             border-radius: 12px;
             overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
+        #cilia-svg { width: 100%; height: 100%; } 
+        #plot-display-area > div { width: 100% !important; height: 100% !important; }
 
-        #plot-display-area.has-plot {
-            border: none;
-        }
-
-        #cilia-svg {
-            width: 100%;
-            height: 100%;
-        }
-
-        #plot-display-area > div {
-            width: 100% !important;
-            height: 100% !important;
-        }
-
-        /* Download Controls */
         .download-controls {
             display: flex;
             gap: 10px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             justify-content: flex-end;
         }
-
         #download-plot-btn {
-            background: var(--primary-blue);
+            background: var(--primary);
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 10px 16px;
             border-radius: 6px;
             cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0, 91, 150, 0.2);
         }
 
-        #download-plot-btn:hover {
-            background: #004577;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 91, 150, 0.3);
-        }
-
-        /* Phylogeny Source Group */
-        #phy-source-group {
-            display: none;
-            margin-top: 12px;
-        }
-
-        /* Empty State */
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #94a3b8;
-            text-align: center;
-            padding: 40px;
-        }
-
-        .empty-state-icon {
-            font-size: 4rem;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
-
-        .empty-state-text {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .empty-state-subtext {
-            font-size: 0.95rem;
-            opacity: 0.8;
-        }
-
-        /* Loading State */
-        .loading-spinner {
-            border: 4px solid #f3f4f6;
-            border-top: 4px solid var(--primary-blue);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .customization-grid {
-                grid-template-columns: 1fr;
-            }
-
-            #plot-page-container {
-                padding: 12px;
-            }
-
-            .control-card {
-                padding: 16px;
-            }
-        }
+        #phy-source-group { display: none; margin-top: 12px; }
     </style>
 </head>
 <body>
-    <!-- Navigation Bar -->
-    <nav class="top-navbar">
+
+  <nav class="top-navbar">
         <div class="brand">
-            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" 
-                 alt="CiliAI Logo" 
-                 style="height: 36px; border-radius: 6px;">
+            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
             <div>
                 <div>CiliAI</div>
                 <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
             </div>
         </div>
         <ul class="nav-links">
-            <li><a href="https://theciliahub.github.io">Home</a></li>
-            <li><a href="https://theciliahub.github.io/plots" class="active">Cilia Analysis</a></li>
-            <li><a href="https://theciliahub.github.io/ciliahub">CiliaHub</a></li>
-            <li><a href="https://theciliahub.github.io/about">About</a></li>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="plots.html" class="active">Cilia Analysis</a></li>
+            <li><a href="ciliahub.html">CiliaHub</a></li>
+            <li><a href="about.html">About</a></li>
         </ul>
     </nav>
 
-    <!-- Main Content -->
     <div id="plot-page-container">
-        <div class="ciliaplot-main-layout">
-            <!-- Left Sidebar - Controls -->
-            <div class="sidebar-controls">
-                <div class="control-card">
-                    <h3>Analysis Type</h3>
-                    <select id="analysis-dropdown">
-                        <option value="phylogeny">Phylogenetic Distribution</option>
-                        <option value="expression">Expression Analysis</option>
-                        <option value="localization">Subcellular Localization</option>
-                        <option value="network">Protein-Protein Network</option>
-                    </select>
-                </div>
-
-                <div class="control-card">
-                    <h3>Gene Input</h3>
-                    <textarea 
-                        id="ciliaplot-genes-input" 
-                        placeholder="Enter gene symbols, one per line:&#10;&#10;IFT88&#10;CEP290&#10;ARL13B&#10;BBS1"></textarea>
-                    <button id="generate-ciliaplot-btn">Generate Visualization</button>
-                </div>
-
-                <div class="control-card">
-                    <h3>Customization</h3>
-                    <div class="customization-grid">
-                        <div class="form-group">
-                            <label for="plot-title">Plot Title</label>
-                            <input type="text" id="plot-title" value="Cilia Gene Analysis">
-                        </div>
-                        <div class="form-group">
-                            <label for="plot-height">Height (px)</label>
-                            <input type="number" id="plot-height" value="600" min="400" max="1200">
-                        </div>
-                        <div class="form-group">
-                            <label for="color-scheme">Color Scheme</label>
-                            <select id="color-scheme">
-                                <option value="default">Default</option>
-                                <option value="viridis">Viridis</option>
-                                <option value="plasma">Plasma</option>
-                                <option value="cool">Cool</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="font-size">Font Size</label>
-                            <input type="number" id="font-size" value="12" min="8" max="20">
-                        </div>
-                    </div>
-
-                    <div id="phy-source-group">
-                        <div class="form-group">
-                            <label for="phy-source">Phylogeny Source</label>
-                            <select id="phy-source">
-                                <option value="li2014">Li et al. 2014</option>
-                                <option value="nevers2017">Nevers et al. 2017</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Side - Visualization -->
-            <div class="visualization-container">
-                <div class="download-controls">
-                    <button id="download-plot-btn" style="display: none;">
-                        📥 Download Plot
-                    </button>
-                </div>
-                <div id="plot-display-area">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📊</div>
-                        <div class="empty-state-text">No Visualization Yet</div>
-                        <div class="empty-state-subtext">
-                            Select an analysis type, enter gene symbols, and click "Generate Visualization"
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div id="content-area">Loading CiliAI...</div>
     </div>
 
-    <script>
+<script>
    // ==========================================================
     // GLOBAL STATE & CONSTANTS
     // ==========================================================
