@@ -87,17 +87,18 @@
             background-color: rgba(255, 255, 255, 0.1);
         }
         
-        /* Cilia Panel (Sidebar) */
-        .cilia-panel {
-            width: 320px;
-            background: white;
-            border-left: 1px solid var(--border-light);
-            box-shadow: -2px 0 10px rgba(0,0,0,0.05);
-            padding: 20px;
-            overflow-y: auto;
-            transition: transform 0.3s ease;
-            display: block !important;
-        }
+    
+       /* Cilia Panel (Sidebar) */
+    .cilia-panel {
+    width: 420px; /* MODIFIED: Increased width from 320px to 420px */
+    background: white;
+    border-left: 1px solid var(--border-light);
+    box-shadow: -2px 0 10px rgba(0,0,0,0.05);
+    padding: 20px;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+    display: block !important;
+}
         .panel-header {
             margin-bottom: 20px;
             padding-bottom: 10px;
@@ -110,14 +111,14 @@
         
         /* --- Enhanced Gene Page Design --- */
         .gene-page-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            margin-bottom: 40px;
-        }
+    max-width: 1100px; /* MODIFIED: Set to 1100px */
+    margin: 0 auto;
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    margin-bottom: 40px;
+    }
         
         /* 1. Header Section */
         .gene-header {
@@ -550,17 +551,17 @@
         }
         
         /* Interactive Cilium Styles */
-        .interactive-cilium {
-            background: white;
-            border-radius: 12px;
-            padding: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
+.interactive-cilium {
+    background: white;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
         .cilia-container {
-            width: 100%;
-            margin-bottom: 20px;
-        }
+    width: 100%; /* Ensures the nested SVG utilizes the new 420px panel width */
+    margin-bottom: 20px;
+}
         .cilia-part {
             transition: all 0.3s ease;
         }
@@ -645,17 +646,17 @@
             }
         }
         
-        /* Page Container (for home page) */
-        .page-container {
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            line-height: 1.6;
-            color: var(--accent-text);
-        }
+       /* Page Container (for home page) */
+.page-container {
+    max-width: 1100px; /* MODIFIED: Set to 1100px */
+    margin: 40px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    line-height: 1.6;
+    color: var(--accent-text);
+}
         
         .page-container h1 {
             color: var(--primary-blue);
