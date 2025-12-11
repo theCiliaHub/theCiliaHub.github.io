@@ -2026,6 +2026,178 @@ function renderComplexNetwork(genes, custom) {
         Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
     }
 
+/**
+ * Normal Cumulative Distribution Function (CDF) for p-value calculation
+ * Uses Abramowitz and Stegun approximation
+ * @param {number} x - The z-score (square root of Chi-square statistic)
+ * @returns {number} - Cumulative probability
+ */
+function normalCDF(x) {
+    const t = 1 / (1 + 0.2316419 * Math.abs(x));
+    const d = 0.3989423 * Math.exp(-x * x / 2);
+    const prob = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+    return x > 0 ? 1 - prob : prob;
+}
+
+/**
+ * Creates a pie chart showing ciliary vs non-ciliary gene distribution
+ * @param {number} ciliary - Count of ciliary genes
+ * @param {number} nonCiliary - Count of non-ciliary genes
+ */
+function createPieChart(ciliary, nonCiliary) {
+    const data = [{
+        values: [ciliary, nonCiliary],
+        labels: ['Ciliary Genes', 'Non-Ciliary Genes'],
+        type: 'pie',
+        marker: {
+            colors: ['#2ca02c', '#d3d3d3']
+        },
+        textinfo: 'label+percent',
+        textposition: 'inside',
+        hovertemplate: '%{label}<br>Count: %{value}<br>Percentage: %{percent}<extra></extra>'
+    }];
+
+    const layout = {
+        margin: { t: 0, b: 0, l: 0, r: 0 },
+        showlegend: true,
+        legend: { orientation: 'h', y: -0.1 }
+    };
+
+    Plotly.newPlot('pie-chart-container', data, layout, { responsive: true });
+}
+
+
+/**
+ * Creates a horizontal bar chart of top functional categories
+ * @param {Object} categoryBreakdown - Object mapping categories to counts
+ */
+function createCategoryBarChart(categoryBreakdown) {
+    const sortedCategories = Object.entries(categoryBreakdown)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+    const data = [{
+        x: sortedCategories.map(c => c[1]),
+        y: sortedCategories.map(c => c[0]),
+        type: 'bar',
+        orientation: 'h',
+        marker: {
+            color: '#1565c0',
+            line: { color: '#005b96', width: 1 }
+        },
+        hovertemplate: '%{y}<br>Count: %{x}<extra></extra>'
+    }];
+
+    const layout = {
+        margin: { t: 20, b: 40, l: 180, r: 20 },
+        xaxis: { title: 'Number of Genes' },
+        yaxis: { automargin: true }
+    };
+
+    Plotly.newPlot('category-chart-container', data, layout, { responsive: true });
+}
+
+/**
+ * Downloads the list of ciliary genes found in the screen as CSV
+ * Includes functional annotations for each gene
+ */
+function downloadCiliaryGeneList() {
+    const data = window.enrichmentData;
+    if (!data) {
+        alert('No enrichment data available. Please run the analysis first.');
+        return;
+    }
+
+    let csv = 'Gene Symbol,Functional Category,Localization,Ciliopathy Association,Description\n';
+
+    data.ciliaryHits.forEach(symbol => {
+        const gene = ciliaryGeneMap.get(symbol);
+        const categories = getCleanArray(gene, 'Functional.category').join('; ');
+        const locs = getCleanArray(gene, 'Localization').join('; ');
+        const diseases = getCleanArray(gene, 'Ciliopathy').join('; ');
+        const desc = gene['Gene.description'] || gene['Description'] || 'N/A';
+
+        // Escape quotes in descriptions for proper CSV formatting
+        csv += `${symbol},"${categories}","${locs}","${diseases}","${desc.replace(/"/g, '""')}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ciliary_genes_from_screen.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads the complete enrichment analysis report as CSV
+ * Includes statistics and categorical breakdowns
+ */
+function downloadFullReport() {
+    const data = window.enrichmentData;
+    if (!data) {
+        alert('No enrichment data available. Please run the analysis first.');
+        return;
+    }
+
+    let csv = 'CRISPR Screen Enrichment Analysis Report\n';
+    csv += 'Generated: ' + new Date().toLocaleString() + '\n\n';
+
+    csv += '=== SUMMARY STATISTICS ===\n';
+    csv += `Total Input Genes,${data.statistics.totalInput}\n`;
+    csv += `Ciliary Genes Found,${data.statistics.observedCiliary}\n`;
+    csv += `Expected Ciliary Genes,${data.statistics.expectedCiliary.toFixed(2)}\n`;
+    csv += `Fold Enrichment,${data.statistics.foldEnrichment.toFixed(3)}\n`;
+    csv += `Chi-Square Statistic,${data.statistics.chiSquare.toFixed(4)}\n`;
+    csv += `P-value,${data.statistics.pValue.toExponential(4)}\n`;
+    csv += `Statistical Significance,${data.statistics.pValue < 0.05 ? 'YES (p < 0.05)' : 'NO (p >= 0.05)'}\n\n`;
+
+    csv += '=== FUNCTIONAL CATEGORY BREAKDOWN ===\n';
+    csv += 'Category,Count,Percentage\n';
+    Object.entries(data.categoryBreakdown)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([cat, count]) => {
+            const pct = ((count / data.statistics.observedCiliary) * 100).toFixed(1);
+            csv += `"${cat}",${count},${pct}%\n`;
+        });
+
+    csv += '\n=== LOCALIZATION BREAKDOWN ===\n';
+    csv += 'Localization,Count,Percentage\n';
+    Object.entries(data.localizationBreakdown)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([loc, count]) => {
+            const pct = ((count / data.statistics.observedCiliary) * 100).toFixed(1);
+            csv += `"${loc}",${count},${pct}%\n`;
+        });
+
+    csv += '\n=== CILIOPATHY-ASSOCIATED GENES ===\n';
+    csv += 'Gene,Associated Diseases\n';
+    data.ciliopathyGenes.forEach(item => {
+        csv += `${item.gene},"${item.diseases}"\n`;
+    });
+
+    csv += '\n=== COMPLETE CILIARY GENE LIST ===\n';
+    csv += 'Gene Symbol,Functional Category,Localization,Ciliopathy\n';
+    data.ciliaryHits.forEach(symbol => {
+        const gene = ciliaryGeneMap.get(symbol);
+        const cats = getCleanArray(gene, 'Functional.category').join('; ');
+        const locs = getCleanArray(gene, 'Localization').join('; ');
+        const diseases = getCleanArray(gene, 'Ciliopathy').join('; ');
+        csv += `${symbol},"${cats}","${locs}","${diseases}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'screen_enrichment_report.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+        
+
+        
 
 // MAIN GENERATOR 
 function generatePlot() {
