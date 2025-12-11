@@ -286,7 +286,45 @@
         #phy-source-group {
             display: none;
             margin-top: 12px;
-        }
+        } 
+        /* New styles for Gene Screen Results */
+        #gene-screen-results {
+            padding: 20px;
+            background-color: var(--light-blue);
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid var(--border-light);
+            max-height: 40vh; /* Make the table container scrollable */
+            overflow-y: auto;
+        }
+
+        #gene-screen-results h4 {
+            margin-top: 0;
+            color: var(--primary-blue);
+        }
+
+        #gene-screen-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        #gene-screen-table th, #gene-screen-table td {
+            border: 1px solid var(--border-light);
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        #gene-screen-table th {
+            background-color: var(--secondary-blue);
+            color: var(--primary-blue);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+    
 
         /* Responsive */
         @media (max-width: 768px) {
@@ -695,18 +733,112 @@ function findGenes(input) {
 }
 
 function getCustom() {
-    return {
-        title: document.getElementById('custom-title')?.value || 'CiliAI Analysis',
-        titleSize: parseInt(document.getElementById('title-size')?.value) || 24,
-        width: parseInt(document.getElementById('fig-width')?.value) || 1100,
-        height: parseInt(document.getElementById('fig-height')?.value) || 700,
-        source: document.getElementById('phy-source')?.value || 'nevers_2017', // Default to Nevers 2017
-        // NEW: Retrieve the second gene input for UMAP
-        gene2: document.getElementById('second-gene-input')?.value.trim().toUpperCase() || null,
-        // NEW: Retrieve selected species filter groups
-        speciesFilters: Array.from(document.getElementById('custom-species-filter')?.selectedOptions || []).map(opt => opt.value)
-    };
+    return {
+        title: document.getElementById('custom-title')?.value || 'CiliAI Analysis',
+        titleSize: parseInt(document.getElementById('title-size')?.value) || 24,
+        width: parseInt(document.getElementById('fig-width')?.value) || 1100,
+        height: parseInt(document.getElementById('fig-height')?.value) || 700,
+        source: document.getElementById('phy-source')?.value || 'nevers_2017', // Default to Nevers 2017
+        // NEW: Retrieve the second gene input for UMAP
+        gene2: document.getElementById('second-gene-input')?.value.trim().toUpperCase() || null,
+        // NEW: Retrieve selected species filter groups
+        speciesFilters: Array.from(document.getElementById('custom-species-filter')?.selectedOptions || []).map(opt => opt.value)
+    };
 }
+
+// -----------------------------------------------------------------------------
+// NEW FUNCTION: Ciliary Gene Screen and Enrichment Analysis
+// -----------------------------------------------------------------------------
+function renderCiliaryGeneScreen(genes, custom) {
+    clearPlot();
+    
+    const plotDivId = 'plot-display-area';
+    const plotDiv = document.getElementById(plotDivId);
+    const totalInputGenes = genes.length;
+    const totalCiliaryGenes = ciliaryGeneMap.size;
+    
+    // 1. Filter for Ciliary Hits
+    const ciliaryHits = genes.filter(g => ciliaryGeneMap.has(g.gene));
+    const numHits = ciliaryHits.length;
+    const hitRate = totalInputGenes > 0 ? (numHits / totalInputGenes) * 100 : 0;
+    const backgroundRate = totalCiliaryGenes > 0 ? (totalCiliaryGenes / 20000) * 100 : 0; // Assuming ~20k human genes total for background
+    
+    // 2. Enrichment Calculation (Simple Fold Enrichment)
+    const foldEnrichment = backgroundRate > 0 ? hitRate / backgroundRate : 'N/A';
+    
+    // 3. Prepare Data for Bar Plot
+    const plotData = [{
+        x: ['Your Screen Hits', 'Total Input', 'CiliaHub Total'],
+        y: [numHits, totalInputGenes, totalCiliaryGenes],
+        type: 'bar',
+        marker: {
+            color: ['#005b96', '#7f7f7f', '#2ca02c'], // Blue for hits, Gray for total, Green for database size
+            opacity: [1.0, 0.6, 0.4]
+        }
+    }];
+
+    const plotLayout = {
+        title: {
+            text: custom.title || 'Ciliary Gene Screen Enrichment Summary',
+            font: { size: custom.titleSize }
+        },
+        yaxis: { title: 'Number of Genes', rangemode: 'tozero' },
+        margin: { t: 80, l: 60, r: 20, b: 60 },
+        showlegend: false
+    };
+
+    // Plot the bar chart in the main plot area
+    Plotly.newPlot(plotDivId, plotData, plotLayout, { responsive: true });
+    
+    // 4. Generate Results Table (HTML)
+    const tableHtml = `
+        <h4>Enrichment Statistics</h4>
+        <p style="font-size: 1.1em; font-weight: 500;">
+            Total Genes Input: <strong>${totalInputGenes}</strong> | 
+            Ciliary Hits Found: <strong style="color:var(--primary-blue);">${numHits}</strong> | 
+            Hit Rate: <strong>${hitRate.toFixed(2)}%</strong>
+            ${foldEnrichment !== 'N/A' ? `| Fold Enrichment: <strong>${foldEnrichment.toFixed(2)}</strong>` : ''}
+        </p>
+        
+        ${numHits > 0 ? `
+            <h4>Ciliary Hits Details (${numHits} Genes)</h4>
+            <div id="gene-screen-results">
+                <table id="gene-screen-table">
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Description</th>
+                            <th>Localization</th>
+                            <th>Ciliopathy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${ciliaryHits.map(gene => `
+                            <tr>
+                                <td><strong>${gene.gene}</strong></td>
+                                <td>${gene.Description || 'N/A'}</td>
+                                <td>${getCleanArray(gene, 'Localization').join('; ') || 'N/A'}</td>
+                                <td>${getCleanArray(gene, 'Ciliopathy').join('; ') || 'None'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        ` : `<p style="color:#d62728; margin-top:15px; font-weight: bold;">No Ciliary Genes found in your input list.</p>`}
+    `;
+
+    // 5. Inject the table and stats below the plot area
+    let resultContainer = document.getElementById('gene-screen-results-container');
+    if (!resultContainer) {
+        resultContainer = document.createElement('div');
+        resultContainer.id = 'gene-screen-results-container';
+        plotDiv.after(resultContainer);
+    }
+    resultContainer.innerHTML = tableHtml;
+    resultContainer.style.cssText = "margin-top: 20px; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.08);";
+}
+
+        
 function clearPlot() {
     // Clears the main plot area, but typically relies on the parent function
     // to correctly manage the inner HTML structure later.
@@ -1895,103 +2027,80 @@ function renderComplexNetwork(genes, custom) {
     }
 
 
-// MAIN GENERATOR 
+// MAIN GENERATOR 
 function generatePlot() {
-    const input = document.getElementById('ciliaplot-genes-input').value.trim();
-    if (!input) {
-        alert("Please enter at least one gene symbol.");
-        return;
-    }
+    const input = document.getElementById('ciliaplot-genes-input').value.trim();
+    const type = document.getElementById('analysis-dropdown').value; 
 
-    const type = document.getElementById('analysis-dropdown').value; 
+    if (!input) {
+        alert("Please enter at least one gene symbol.");
+        return;
+    }
+    if (!type) {
+        alert("Please select a plot type.");
+        return;
+    }
 
-    if (!type) {
-        alert("Please select a plot type.");
-        return;
-    }
+    const plotArea = document.getElementById('plot-display-area');
+    plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:18px;">Searching genes and generating plot...</div>';
+    
+    // Get all unique gene queries (uppercase strings)
+    const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
+    
+    // If the user is running the gene screen, we need the raw list of queries, not the filtered 'found' list.
+    // For all other plots, we continue to use the found gene objects.
+    let genes = findGenes(input); 
+    
+    // For the screen analysis, we intentionally treat all validly formatted inputs as 'genes'
+    // because we want the denominator to be the entire input list.
+    if (type === 'gene_screen') {
+        // Create a pseudo-gene object list where all gene symbols are unique and uppercase.
+        const uniqueQueries = Array.from(new Set(queries));
+        genes = uniqueQueries.map(q => ({ gene: q, ...ciliaryGeneMap.get(q) }));
+    }
 
-    const plotArea = document.getElementById('plot-display-area');
-    plotArea.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:18px;">Searching genes and generating plot...</div>';
+    const custom = getCustom();
 
-    const queries = input.split(/[\s,\n;]+/).map(s => s.trim().replace(/\u200B/g, '').toUpperCase()).filter(Boolean);
-    
-    // IMPORTANT: findGenes returns an object for every query (found or not)
-    let genes = findGenes(input); 
+    if (genes.length === 0 && type !== 'gene_screen') {
+        plotArea.innerHTML = `<div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;"><strong>No valid gene symbols found in input or CiliaHub database.</strong><br><br><small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small></div>`;
+        return;
+    }
+    
+    const renderers = {
+        'gene_overview': renderMultiCategoryManhattan, 
+        'expression_heatmap': renderExpressionHeatmap,
+        'scrna_dot': window.renderScrnaUMAPPlot, 
+        'ciliopathy': renderCiliopathyPlot,
+        'localization_heatmap': renderLocalizationHeatmap,
+        'crispr_screens': renderScreenSummaryHeatmap,
+        'protein_domains': renderDomainArchitecture,
+        'protein_complex': renderComplexNetwork, 
+        'mouse_phenotypes': renderMousePhenotypeHeatmap,
+        'phylogeny': renderPhylogenyHeatmap,
+        'gene_screen': renderCiliaryGeneScreen // NEW RENDERER
+    };
 
-    const custom = getCustom();
+    const renderer = renderers[type];
 
-    // --- Safety Check: Ensure at least one gene/default is available for UMAP/scrna_dot ---
-    if (genes.length === 0 && type === 'scrna_dot' && queries.length > 0) {
-        const defaultGene = { gene: queries[0] };
-        genes = [defaultGene];
-    }
-    
-    if (genes.length === 0) {
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#d62728; font-size:18px; text-align:center; padding:40px;">
-                <strong>No valid gene symbols found in input or CiliaHub database.</strong><br><br>
-                <small>Entered: ${queries.slice(0, 10).join(', ')}${queries.length > 10 ? '...' : ''}</small>
-            </div>`;
-        return;
-    }
-    // --- END Safety Check ---
+    if (!renderer) {
+        plotArea.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">Plot type "${type}" not implemented or mapped yet.</div>`;
+        return;
+    }
 
-    // DEBUG: Check phylogenetic data for troubleshooting
-    if (type === 'phylogeny') {
-        debugPhylogenyData(genes);
-    }
-    
-    // --- UMAP DEBUGGING INTEGRATION ---
-    if (type === 'scrna_dot') {
-        debugUMAPData(genes); 
-    }
-    // --- END UMAP DEBUGGING INTEGRATION ---
-
-    const renderers = {
-        'gene_overview': renderMultiCategoryManhattan, 
-        'expression_heatmap': renderExpressionHeatmap,
-        'scrna_dot': window.renderScrnaUMAPPlot, 
-        'ciliopathy': renderCiliopathyPlot,
-        'localization_heatmap': renderLocalizationHeatmap,
-        'crispr_screens': renderScreenSummaryHeatmap,
-        'protein_domains': renderDomainArchitecture,
-        'protein_complex': renderComplexNetwork, 
-        'mouse_phenotypes': renderMousePhenotypeHeatmap,
-        'phylogeny': renderPhylogenyHeatmap 
-    };
-
-    const renderer = renderers[type];
-
-    if (!renderer) {
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:20px;">
-                Plot type "${type}" not implemented or mapped yet.
-            </div>`;
-        return;
-    }
-
-    try {
-        // CRITICAL UPDATE: Pass BOTH genes (or gene1, gene2) to the UMAP renderer
-        if (type === 'scrna_dot') {
-            const gene1 = genes[0].gene; // Primary gene (from textarea)
-            const gene2 = custom.gene2;  // Secondary gene (from new input field)
-            renderer(gene1, gene2, custom); // Pass both genes and custom settings
-        } else {
-            renderer(genes, custom); // Pass the array of gene objects and customization
-        }
-    } catch (error) {
-        console.error("Plot rendering error:", error);
-        plotArea.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;">
-                <strong>Plot failed to render</strong><br><br>
-                <small>${error.message}</small><br><br>
-                <button onclick="generatePlot()" style="padding:10px 20px; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer;">
-                    Try Again
-                </button>
-            </div>`;
-    }
+    try {
+        // CRITICAL UPDATE: Pass BOTH genes (or gene1, gene2) to the UMAP renderer
+        if (type === 'scrna_dot') {
+            const gene1 = genes[0].gene;
+            const gene2 = custom.gene2; 
+            renderer(gene1, gene2, custom);
+        } else {
+            renderer(genes, custom);
+        }
+    } catch (error) {
+        console.error("Plot rendering error:", error);
+        plotArea.innerHTML = `<div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#e74c3c; font-size:18px; text-align:center;"><strong>Plot failed to render</strong><br><br><small>${error.message}</small><br><br><button onclick="generatePlot()" style="padding:10px 20px; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer;">Try Again</button></div>`;
+    }
 }
-
     
 // --- ADD DEBUG FUNCTION TO CHECK PHYLOGENY DATA ---
 function debugPhylogenyData(genes) {
@@ -2080,27 +2189,30 @@ const PLOT_TITLES = {
 };
     
 // PAGE SETUP
+// PAGE SETUP
 function setupPage() {
-    document.getElementById('content-area').innerHTML = `
-        <div class="ciliaplot-main-layout">
-            <aside>
-                <div class="control-card">
-                    <h3>Select Analysis Type</h3>
-                    <select id="analysis-dropdown" onchange="handlePlotSelection(this.value)">
-                        <option value="">-- Choose Plot Type --</option>
-                        <option value="gene_overview">Gene Overview / Summary</option>
-                        <option value="expression_heatmap">Expression Heatmap</option>
-                        <option value="scrna_dot">scRNA-seq (Lung)</option>
-                        <option value="ciliopathy">Ciliopathy & Disease Associations</option>
-                        <option value="localization_heatmap">Localization Heatmap</option>
-                        <option value="crispr_screens">CRISPR & siRNA Screens Summary</option>
-                        <option value="protein_domains">Protein Domain Architecture</option>
-                        <option value="protein_complex">Complex Membership Map</option>
-                        <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
-                        <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
-                    </select>
-                    <h3 style="margin-top:20px;">Gene Input</h3>
-                    <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">IFT88
+    // The primary setup function to render the UI components
+    document.getElementById('content-area').innerHTML = `
+        <div class="ciliaplot-main-layout">
+            <aside>
+                <div class="control-card">
+                    <h3>Select Analysis Type</h3>
+                    <select id="analysis-dropdown" onchange="handlePlotSelection(this.value)">
+                        <option value="">-- Choose Plot Type --</option>
+                        <option value="gene_screen">Ciliary Gene Screen/Enrichment (NEW)</option>
+                        <option value="gene_overview">Gene Overview / Summary</option>
+                        <option value="expression_heatmap">Expression Heatmap</option>
+                        <option value="scrna_dot">scRNA-seq (Lung)</option>
+                        <option value="ciliopathy">Ciliopathy & Disease Associations</option>
+                        <option value="localization_heatmap">Localization Heatmap</option>
+                        <option value="crispr_screens">CRISPR & siRNA Screens Summary</option>
+                        <option value="protein_domains">Protein Domain Architecture</option>
+                        <option value="protein_complex">Complex Membership Map</option>
+                        <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
+                        <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
+                    </select>
+                    <h3 style="margin-top:20px;">Gene Input</h3>
+                    <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">IFT88
 BBS1
 CEP290
 ARL13B
@@ -2111,83 +2223,85 @@ IFT81
 CEP41
 WDR27
 WDR60
-WDR90
-KIF19A
+CEP41
+KIF19
 KIF17</textarea>
-                    <button id="generate-ciliaplot-btn">Generate Plot</button>
-                    <div id="customization-panel">
-                        <h3 style="margin-top:20px;">Customization</h3>
-                        <div class="customization-grid">
-                            <div class="form-group"><label>Title</label><input id="custom-title" value="Phylogenetic Conservation Heatmap"></div>
-                            <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
-                            <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
-                            <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="700"></div>
-                            
-                            <div class="form-group" id="phy-source-group">
-                                <label>Source</label>
-                                <select id="phy-source">
-                                    <option value="nevers_2017">Nevers et al. 2017</option>
-                                    <option value="li_2014">Li et al. 2014</option>
-                                </select>
-                            </div>
+                    <button id="generate-ciliaplot-btn">Generate Plot</button>
+                    <div id="customization-panel">
+                        <h3 style="margin-top:20px;">Customization</h3>
+                        <div class="customization-grid">
+                            <div class="form-group"><label>Title</label><input id="custom-title" value="Ciliary Gene Screen Enrichment Summary"></div>
+                            <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
+                            <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
+                            <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="700"></div>
+                            
+                            <div class="form-group" id="phy-source-group" style="display: none;">
+                                <label>Source</label>
+                                <select id="phy-source">
+                                    <option value="nevers_2017">Nevers et al. 2017</option>
+                                    <option value="li_2014">Li et al. 2014</option>
+                                </select>
+                            </div>
 
-                            <div class="form-group full-width">
-                                <label>Second Gene (For Co-expression/Ratio UMAP)</label>
-                                <input type="text" id="second-gene-input" placeholder="Optional, e.g., BBS1, FOXJ1">
-                            </div>
-                            <div class="form-group full-width" id="phy-filter-group" style="display: none;">
-                                <label>Filter Species Groups (Ctrl+Click to select multiple)</label>
-                                <select id="custom-species-filter" multiple size="6">
-                                    <option value="all" selected>-- Show All Species --</option>
-                                    <option value="vertebrates">Vertebrates</option>
-                                    <option value="invertebrates">Invertebrates & Basal Metazoans</option>
-                                    <option value="ciliates">Ciliates (T. thermophila, etc.)</option>
-                                    <option value="protozoa">Protozoa & Parasites</option>
-                                    <option value="plants_algae">Plants & Algae</option>
-                                    <option value="fungi">Non-Ciliary Fungi</option>
-                                </select>
-                            </div>
-                            </div>
-                    </div>
-                </div>
-            </aside>
+                            <div class="form-group full-width">
+                                <label>Second Gene (For Co-expression/Ratio UMAP)</label>
+                                <input type="text" id="second-gene-input" placeholder="Optional, e.g., BBS1, FOXJ1">
+                            </div>
+                            <div class="form-group full-width" id="phy-filter-group" style="display: none;">
+                                <label>Filter Species Groups (Ctrl+Click to select multiple)</label>
+                                <select id="custom-species-filter" multiple size="6">
+                                    <option value="all" selected>-- Show All Species --</option>
+                                    <option value="vertebrates">Vertebrates</option>
+                                    <option value="invertebrates">Invertebrates & Basal Metazoans</option>
+                                    <option value="ciliates">Ciliates (T. thermophila, etc.)</option>
+                                    <option value="protozoa">Protozoa & Parasites</option>
+                                    <option value="plants_algae">Plants & Algae</option>
+                                    <option value="fungi">Non-Ciliary Fungi</option>
+                                </select>
+                            </div>
+                            </div>
+                    </div>
+                </div>
+            </aside>
 
-            <main>
-                <div class="control-card">
-                    <div class="download-controls">
-                        <select id="download-format"><option>png</option><option>pdf</option></select>
-                        <button id="download-plot-btn">Download</button>
-                    </div>
-                    <div id="plot-display-area">
-                        <div id="cilia-svg" style="width: 100%; height: 100%;">Your plot will appear here</div>
-                    </div>
-                </div>
-            </main>
-        </div>`;
+            <main>
+                <div class="control-card">
+                    <div class="download-controls">
+                        <select id="download-format"><option>png</option><option>pdf</option></select>
+                        <button id="download-plot-btn">Download</button>
+                    </div>
+                    <div id="plot-display-area">
+                        <div id="cilia-svg" style="width: 100%; height: 100%;">Your plot will appear here</div>
+                    </div>
+                                        <div id="gene-screen-results-container"></div>
+                </div>
+            </main>
+        </div>`;
 
-    document.getElementById('generate-ciliaplot-btn').onclick = generatePlot;
-    document.getElementById('download-plot-btn').onclick = () => Plotly.downloadImage('plot-display-area', {format: 'png', filename: 'CiliAI_Plot'});
-    document.getElementById('analysis-dropdown').onchange = (e) => handlePlotSelection(e.target.value);
-    
-    const dropdown = document.getElementById('analysis-dropdown');
-    const initialType = 'phylogeny'; // Set default plot type to phylogeny
-    dropdown.value = initialType;
-    
-    // Call handler to show source and filter dropdowns initially
-    handlePlotSelection(initialType); 
-    
-    // Ensure Nevers is selected by default for the source dropdown
-    document.getElementById('phy-source').value = 'nevers_2017';
-    
-    generatePlot();
+    document.getElementById('generate-ciliaplot-btn').onclick = generatePlot;
+    document.getElementById('download-plot-btn').onclick = () => Plotly.downloadImage('plot-display-area', {format: 'png', filename: 'CiliAI_Plot'});
+    document.getElementById('analysis-dropdown').onchange = (e) => handlePlotSelection(e.target.value);
+    
+    const dropdown = document.getElementById('analysis-dropdown');
+    // NEW DEFAULT: Set default plot type to the new Gene Screen
+    const initialType = 'gene_screen';
+    dropdown.value = initialType;
+    
+    // Call handler to ensure correct initial UI state
+    handlePlotSelection(initialType); 
+    
+    // Placeholder gene input (small list for testing, user can paste 2000 genes)
+    document.getElementById('ciliaplot-genes-input').value = `IFT88\nBBS1\nCEP290\nARL13B\nAHI1\nBBS2\nNONGENE1\nNONGENE2`;
+    
+    generatePlot();
 }
 
-    
-    // 7. INITIAL EXECUTION
-    document.addEventListener('DOMContentLoaded', async () => {
-        await loadMasterData();
-        setupPage();
-    });
+    
+    // 7. INITIAL EXECUTION
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadMasterData();
+        setupPage();
+    });
 </script>
 
 </body>
