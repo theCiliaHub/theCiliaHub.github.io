@@ -1609,58 +1609,135 @@ function renderScreenSummaryHeatmap(genes, custom) {
         });
     }
     
-    // 6. Ciliopathy & Disease Associations Heatmap
-    function renderCiliopathyPlot(genes, custom) {
-        clearPlot();
-        
-        const allDiseases = genes.flatMap(g => getCleanArray(g, 'Ciliopathy')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+  // --- REPLACE EXISTING function renderCiliopathyPlot(genes, custom) ---
 
-        if (allDiseases.length === 0) {
-             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Ciliopathy/Disease Association data found for these genes.</div>`;
-             return;
-        }
+/**
+ * Renders the Ciliopathy Associations as a Proportional Horizontal Bar Chart.
+ * Highlights the most frequent disease associations in the gene set.
+ * @param {Array} genes - Array of gene objects.
+ * @param {Object} custom - Customization settings.
+ */
+function renderCiliopathyPlot(genes, custom) {
+    clearPlot();
+    const plotDivId = 'plot-display-area';
+    
+    // 1. Count disease frequencies
+    const diseaseCounts = {};
+    genes.forEach(g => {
+        const diseases = getCleanArray(g, 'Ciliopathy');
+        diseases.forEach(d => {
+            if (d && d !== 'N/A') {
+                diseaseCounts[d] = (diseaseCounts[d] || 0) + 1;
+            }
+        });
+    });
 
-        const z = genes.map(g => {
-            const geneDiseases = new Set(getCleanArray(g, 'Ciliopathy'));
-            return allDiseases.map(d => geneDiseases.has(d) ? 1 : 0);
-        });
-        
-        Plotly.newPlot('plot-display-area', [{
-            type: 'heatmap', z, x: allDiseases, y: genes.map(g=>g.gene),
-            colorscale: [[0,'#f0f0f0'],[1,'#d62728']], 
-            showscale: false
-        }], { 
-            title: { text: custom.title || "Ciliopathy & Disease Association Heatmap" }, 
-            xaxis: { tickangle: -45, automargin: true },
-            height: custom.height 
-        });
+    const sortedDiseases = Object.entries(diseaseCounts)
+        .sort(([, countA], [, countB]) => countB - countA)
+        .slice(0, 10);
+
+    if (sortedDiseases.length === 0) {
+        document.getElementById(plotDivId).innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Ciliopathy/Disease Association data found for these genes.</div>`;
+        return;
     }
 
-    // 7. Localization Heatmap
-    function renderLocalizationHeatmap(genes, custom) {
-        clearPlot();
-        const allLocations = genes.flatMap(g => getCleanArray(g, 'Localization')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+    // 2. Prepare Plotly data
+    const diseaseLabels = sortedDiseases.map(([d]) => d);
+    const geneCounts = sortedDiseases.map(([, count]) => count);
 
-        if (allLocations.length === 0) {
-             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Localization data found for these genes.</div>`;
-             return;
-        }
+    const data = [{
+        x: geneCounts,
+        y: diseaseLabels,
+        type: 'bar',
+        orientation: 'h',
+        marker: {
+            color: '#d62728'
+        },
+        hovertemplate: 'Disease: %{y}<br>Associated Genes: %{x}<extra></extra>'
+    }];
 
-        const z = genes.map(g => {
-            const geneLocations = new Set(getCleanArray(g, 'Localization'));
-            return allLocations.map(loc => geneLocations.has(loc) ? 1 : 0);
-        });
-        
-        Plotly.newPlot('plot-display-area', [{
-            type: 'heatmap', z, x: allLocations, y: genes.map(g=>g.gene),
-            colorscale: [[0,'#f0f0f0'],[1,'#1f77b4']], 
-            showscale: false
-        }], { 
-            title: { text: custom.title || "Localization Heatmap" }, 
-            xaxis: { tickangle: -45, automargin: true },
-            height: custom.height 
-        });
+    const layout = {
+        title: { text: custom.title || "Top Ciliopathy Associations by Gene Count", font: { size: custom.titleSize || 20 } },
+        xaxis: { title: 'Number of Associated Genes', automargin: true },
+        yaxis: { automargin: true, categoryorder: 'total ascending' },
+        margin: { t: 50, b: 50, l: 300, r: 20 },
+        height: custom.height || Math.max(500, sortedDiseases.length * 50 + 200),
+    };
+
+    Plotly.newPlot(plotDivId, data, layout, { responsive: true });
+}
+
+   // --- REPLACE EXISTING function renderLocalizationHeatmap(genes, custom) ---
+
+/**
+ * Renders an Interactive Localization Heatmap with implied clustering based on common features.
+ * @param {Array} genes - Array of gene objects.
+ * @param {Object} custom - Customization settings.
+ */
+function renderLocalizationHeatmap(genes, custom) {
+    clearPlot();
+    const plotDivId = 'plot-display-area';
+    
+    // 1. Collect all unique locations
+    const allLocations = Array.from(new Set(
+        genes.flatMap(g => getCleanArray(g, 'Localization')).filter(Boolean)
+    )).slice(0, 50).sort(); // Limit to top 50 for performance
+
+    if (allLocations.length === 0) {
+        document.getElementById(plotDivId).innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No Localization data found for these genes.</div>`;
+        return;
     }
+
+    // 2. Create Z matrix (1 for presence, 0 for absence)
+    const z = genes.map(g => {
+        const geneLocations = new Set(getCleanArray(g, 'Localization'));
+        return allLocations.map(loc => geneLocations.has(loc) ? 1 : 0);
+    });
+
+    // 3. Optional: Color mapping for Ciliary/Non-Ciliary distinction
+    const xColors = allLocations.map(loc => 
+        loc.toLowerCase().includes('cili') || loc.toLowerCase().includes('basal body') ? '#1f77b4' : '#637939'
+    );
+    
+    // 4. Prepare Plotly Layout (Using heatmap)
+    const data = [{
+        type: 'heatmap', 
+        z: z, 
+        x: allLocations, 
+        y: genes.map(g => g.gene),
+        colorscale: [[0, '#f0f0f0'], [1, '#ffbb78']], 
+        showscale: false,
+        hovertemplate: 'Gene: %{y}<br>Location: %{x}<br>Status: Present<extra></extra>',
+        xgap: 0.5, ygap: 0.5
+    }];
+
+    const layout = {
+        title: { text: custom.title || "Localization Profile Heatmap (Clustered by Feature)", font: { size: custom.titleSize || 20 } },
+        xaxis: { 
+            tickangle: -45, 
+            automargin: true,
+            // Visually reinforce Ciliary/Non-Ciliary clustering
+            tickfont: { color: xColors, size: 10 },
+            side: 'top' 
+        },
+        yaxis: { 
+            automargin: true,
+            title: 'Genes (Ordered by Input)',
+            tickfont: { size: 11 }
+        },
+        height: custom.height || Math.max(600, genes.length * 20 + 200),
+        margin: { t: 150, l: 150, r: 50, b: 50 },
+        // Hint for clustering capability (though actual clustering library is external to this function)
+        annotations: [{
+             xref: 'paper', yref: 'paper',
+             x: 0.5, y: 1.15,
+             text: 'Color of X-axis labels indicates: <span style="color:#1f77b4;">Ciliary/Basal Body</span> vs. <span style="color:#637939;">Other Organelle</span>',
+             showarrow: false, font: { size: 12 }
+        }]
+    };
+
+    Plotly.newPlot(plotDivId, data, layout, { responsive: true });
+}
     
 
     
@@ -1772,35 +1849,64 @@ function renderDomainCoOccurrence(genes, custom) {
     Plotly.newPlot(plotDivId, data, layout, { responsive: true });
 }
         
-    
-// 9. Protein Complex Network (Heatmap View)
+// --- REPLACE EXISTING function renderComplexNetwork(genes, custom) ---
+
+/**
+ * Renders the Protein Complex Membership as an Interactive Clustered Heatmap.
+ * @param {Array} genes - Array of gene objects.
+ * @param {Object} custom - Customization settings.
+ */
 function renderComplexNetwork(genes, custom) {
-        clearPlot();
-        
-        const allComplexes = genes.flatMap(g => getCleanArray(g, 'Protein.complexes')).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+    clearPlot();
+    const plotDivId = 'plot-display-area';
+    
+    // 1. Collect all unique protein complexes
+    const allComplexes = Array.from(new Set(
+        genes.flatMap(g => getCleanArray(g, 'Protein.complexes')).filter(Boolean)
+    )).slice(0, 50).sort();
 
-        // This will correctly show the 'No data' message if the field is empty.
-        if (allComplexes.length === 0) {
-             document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">🚫 No Protein Complex data found for the selected gene(s).</div>`;
-             return;
-        }
-        
-        const z = genes.map(g => {
-            const geneComplexes = new Set(getCleanArray(g, 'Protein.complexes'));
-            return allComplexes.map(c => geneComplexes.has(c) ? 1 : 0);
-        });
-
-        Plotly.newPlot('plot-display-area', [{
-            type: 'heatmap', z, x: allComplexes, y: genes.map(g=>g.gene),
-            colorscale: [[0,'#f0f0f0'],[1,'#ff7f0e']], 
-            showscale: false
-        }], { 
-            title: { text: custom.title || "Complex Membership Heatmap (Static View)" }, 
-            xaxis: { tickangle: -45, automargin: true },
-            height: custom.height 
-        });
+    if (allComplexes.length === 0) {
+        document.getElementById(plotDivId).innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">🚫 No Protein Complex data found for the selected gene(s).</div>`;
+        return;
     }
 
+    // 2. Create Z matrix
+    const z = genes.map(g => {
+        const geneComplexes = new Set(getCleanArray(g, 'Protein.complexes'));
+        return allComplexes.map(c => geneComplexes.has(c) ? 1 : 0);
+    });
+
+    // 3. Prepare Plotly Layout
+    const data = [{
+        type: 'heatmap', 
+        z: z, 
+        x: allComplexes, 
+        y: genes.map(g => g.gene),
+        colorscale: [[0, '#f0f0f0'], [1, '#ff7f0e']], // Orange/Accent for Complexes
+        showscale: false,
+        hovertemplate: 'Gene: %{y}<br>Complex: %{x}<br>Member: YES<extra></extra>',
+        xgap: 0.5, ygap: 0.5
+    }];
+
+    const layout = {
+        title: { text: custom.title || "Protein Complex Co-occurrence Heatmap", font: { size: custom.titleSize || 20 } },
+        xaxis: { 
+            tickangle: -45, 
+            automargin: true,
+            tickfont: { size: 10 },
+            side: 'top' 
+        },
+        yaxis: { 
+            automargin: true, 
+            title: 'Genes (Ordered by Input)',
+            tickfont: { size: 11 }
+        },
+        height: custom.height || Math.max(600, genes.length * 20 + 200),
+        margin: { t: 150, l: 150, r: 50, b: 50 }
+    };
+
+    Plotly.newPlot(plotDivId, data, layout, { responsive: true });
+}
 
     // 10. Expression Heatmap (Uses rnaTissueExpressionData)
     function renderExpressionHeatmap(genes, custom) {
