@@ -728,72 +728,206 @@ const UMAP_CELL_ANNOTATIONS = {
     'stem cell': { x: 8, y: 7, label: 'Stem/Progenitor' }
 };
 
+/**
+ * Renders the Phylogenetic Conservation Heatmap, handling both Li and Nevers data.
+ * FIX: Standardizes all axis and label fonts to size 18 and bold.
+ * @param {Array} genes - Array of gene objects from main input.
+ * @param {Object} custom - Customization settings (including source and gene2).
+ */
+function renderPhylogenyHeatmap(genes, custom) {
+    clearPlot();
+    
+    // --- 1. Consolidate Gene List ---
+    const primaryGeneSymbols = new Set(genes.map(g => g.gene.toUpperCase()));
+    let finalGeneList = [...genes];
+
+    if (custom.gene2) {
+        const secondaryQueries = custom.gene2.split(/[\s,\n;]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+        secondaryQueries.forEach(q => {
+            if (!primaryGeneSymbols.has(q)) {
+                const geneObject = ciliaryGeneMap.get(q) || { gene: q, phylogeny: {} };
+                finalGeneList.push(geneObject);
+                primaryGeneSymbols.add(q);
+            }
+        });
+    }
+
+    if (finalGeneList.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No valid genes provided for analysis.</div>`;
+        return;
+    }
+    
+    // --- 2. Setup & Data Source Selection ---
+    const plotDivId = 'plot-display-area';
+    const source = custom.source || 'nevers_2017'; 
+    const isLi = source === 'li_2014';
         
-// --- REPLACE EXISTING function renderPhylogenyHeatmap(genes, custom) ---
+    const CIL_PANEL = isLi ? LI_CIL_ORG : NEVERS_CIL_ORG;
+    const NCIL_PANEL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_ORG;
+    const allOrgNames = [...CIL_PANEL, ...NCIL_PANEL];
 
-//**
-const FONT_SIZE = 18;
-const FONT_WEIGHT = 'bold';
+    const phyloCache = isLi ? window.liPhylogenyCache : window.neversPhylogenyCache;
+    const masterOrgList = isLi ? (phyloCache.summary?.organisms_list || []) : (phyloCache.organism_groups?.all_organisms_list || []);
+    const masterOrgMap = new Map(masterOrgList.map((name, index) => [name, index])); 
+        
+    // --- 3. Species Filtering ---
+    let organismsToDisplay = [];
+    const selectedFilters = custom.speciesFilters;
 
+    if (selectedFilters && selectedFilters.length > 0 && !selectedFilters.includes('all')) {
+        const filteredOrgNamesSet = new Set();
+        Object.values(PHYLO_SPECIES_GROUPS).flat().forEach(name => filteredOrgNamesSet.add(name));
 
-const layout = {
-title: {
-text: custom.title || `Phylogenetic Conservation Heatmap (${isLi ? 'Li et al. 2014' : 'Nevers et al. 2017'})`,
-font: { size: custom.titleFontSize || 24, weight: FONT_WEIGHT }
-},
-width: custom.figureWidth || 1000,
-height: plotHeight,
-xaxis: {
-title: { text: 'Organisms', font: { size: FONT_SIZE, weight: FONT_WEIGHT } }, // X-Axis Title FIX
-tickangle: -45,
-tickfont: { size: FONT_SIZE, weight: FONT_WEIGHT }, // X-Axis Labels FIX
-tickvals: Array.from({length: orgs.length}, (_, i) => i),
-ticktext: orgs.map(shortenOrganismName),
-showgrid: false, zeroline: false,
-side: 'bottom',
-automargin: true
-},
-yaxis: {
-title: { text: 'Genes', font: { size: FONT_SIZE, weight: FONT_WEIGHT } }, // Y-Axis Title FIX
-automargin: true,
-tickfont: { size: FONT_SIZE, weight: FONT_WEIGHT } // Y-Axis Labels FIX
-},
-margin: { l: 150, r: 20, t: 120, b: 250 },
-shapes: [{
-type: 'line',
-xref: 'x',
-yref: 'paper',
-x0: separatorIndex,
-x1: separatorIndex,
-y0: 0,
-y1: 1,
-line: { color: 'black', width: 2 }
-}],
-annotations: [
-{
-text: 'CILIATED',
-xref: 'x',
-yref: 'paper',
-x: filteredCilCount > 0 ? (filteredCilCount - 1) / 2 : 0,
-y: 1.05,
-showarrow: false,
-font: { color: '#698ECF', size: FONT_SIZE, weight: FONT_WEIGHT }, // ANNOTATION FIX
-xanchor: 'center'
-},
-{
-text: 'NON-CILIATED',
-xref: 'x',
-yref: 'paper',
-x: filteredCilCount + ((orgs.length - filteredCilCount) / 2) - 0.5,
-y: 1.05,
-showarrow: false,
-font: { color: '#d62728', size: FONT_SIZE, weight: FONT_WEIGHT }, // ANNOTATION FIX
-xanchor: 'center'
+        organismsToDisplay = allOrgNames.filter(name => 
+            selectedFilters.some(groupKey => PHYLO_SPECIES_GROUPS[groupKey]?.includes(name) || PHYLO_SPECIES_GROUPS[groupKey]?.includes(shortenOrganismName(name)))
+        );
+    } else {
+        organismsToDisplay = allOrgNames;
+    }
+    
+    organismsToDisplay = Array.from(new Set(organismsToDisplay)).filter(Boolean);
+    if (organismsToDisplay.length === 0) {
+        organismsToDisplay = allOrgNames;
+    }
+
+    const orgs = organismsToDisplay;
+
+    // --- 4. Data Processing and Scoring ---
+    const z = [];
+    const yLabels = [];
+    const textMatrix = [];
+
+    finalGeneList.forEach(gene => {
+        const geneSymbol = gene.gene || gene.Gene;
+        if (!gene.phylogeny) gene.phylogeny = {};
+        
+        const phyData = gene.phylogeny?.[source];
+        const scores = calculatePhyloScores(gene)[source] || {}; 
+        
+        const row = [];
+        const textRow = [];
+        
+        if (!phyData || !phyData.species_data || !Array.isArray(phyData.species_data)) {
+            orgs.forEach(org => { 
+                row.push(0); 
+                textRow.push(`Gene: ${geneSymbol}<br>Organism: ${org}<br>Status: No Data (Check master DB)`); 
+            });
+        } else {
+            const presenceIndices = new Set(phyData.species_data);
+            
+            orgs.forEach((displayOrg) => {
+                const isCiliated = CIL_PANEL.includes(displayOrg);
+                let status = 0;
+
+                const masterOrgKey = displayOrg; 
+                let masterIndex = masterOrgMap.get(masterOrgKey); 
+                
+                if (masterIndex !== undefined && masterIndex !== -1 && presenceIndices.has(masterIndex)) {
+                    status = isCiliated ? 2 : 1; 
+                    textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Present in ${isCiliated ? 'Ciliated' : 'Non-Ciliated'} group`);
+                } else {
+                    textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Absent`);
+                }
+                row.push(status);
+            });
+        }
+        
+        z.push(row);
+        
+        yLabels.push(geneSymbol); 
+        textMatrix.push(textRow);
+    });
+    
+    // --- 5. Plotly Setup ---
+    
+    const filteredCilCount = orgs.filter(name => CIL_PANEL.includes(name)).length;
+    const separatorIndex = filteredCilCount > 0 ? filteredCilCount - 0.5 : -0.5;
+    const plotHeight = custom.figureHeight || Math.max(500, finalGeneList.length * 40 + 200);
+
+    const data = [{
+        type: 'heatmap', 
+        z: z, 
+        x: orgs.map(shortenOrganismName),
+        y: yLabels, 
+        customdata: textMatrix,
+        colorscale: [
+            [0, '#F0F0F0'],        
+            [0.0001, '#FFE5B5'],
+            [1, '#FFE5B5'],        
+            [1.0001, '#698ECF'],
+            [2, '#698ECF']        
+        ],
+        showscale: false,
+        hovertemplate: '%{customdata}<extra></extra>',
+        xgap: 0.5, ygap: 0.5
+    }];
+
+    // --- FONT STANDARDIZATION ---
+    const FONT_SIZE = 18;
+    const FONT_WEIGHT = 'bold';
+
+    const layout = {
+        title: { 
+            text: custom.title || `Phylogenetic Conservation Heatmap (${isLi ? 'Li et al. 2014' : 'Nevers et al. 2017'})`,
+            font: { size: custom.titleFontSize || 24, weight: FONT_WEIGHT }
+        },
+        width: custom.figureWidth || 1000, 
+        height: plotHeight,
+        xaxis: { 
+            title: { text: 'Organisms', font: { size: FONT_SIZE, weight: FONT_WEIGHT } }, // X-Axis Title FIX
+            tickangle: -45,
+            tickfont: { size: FONT_SIZE, weight: FONT_WEIGHT }, // X-Axis Labels FIX
+            tickvals: Array.from({length: orgs.length}, (_, i) => i),
+            ticktext: orgs.map(shortenOrganismName),
+            showgrid: false, zeroline: false, 
+            side: 'bottom', 
+            automargin: true
+        },
+        yaxis: { 
+            title: { text: 'Genes', font: { size: FONT_SIZE, weight: FONT_WEIGHT } }, // Y-Axis Title FIX
+            automargin: true, 
+            tickfont: { size: FONT_SIZE, weight: FONT_WEIGHT } // Y-Axis Labels FIX
+        },
+        margin: { l: 150, r: 20, t: 120, b: 250 }, 
+        shapes: [{
+            type: 'line', 
+            xref: 'x', 
+            yref: 'paper', 
+            x0: separatorIndex, 
+            x1: separatorIndex,
+            y0: 0, 
+            y1: 1, 
+            line: { color: 'black', width: 2 } 
+        }],
+        annotations: [
+            { 
+                text: 'CILIATED', 
+                xref: 'x', 
+                yref: 'paper', 
+                x: filteredCilCount > 0 ? (filteredCilCount - 1) / 2 : 0, 
+                y: 1.05, 
+                showarrow: false, 
+                font: { color: '#698ECF', size: FONT_SIZE, weight: FONT_WEIGHT }, // ANNOTATION FIX
+                xanchor: 'center' 
+            },
+            { 
+                text: 'NON-CILIATED', 
+                xref: 'x', 
+                yref: 'paper', 
+                x: filteredCilCount + ((orgs.length - filteredCilCount) / 2) - 0.5, 
+                y: 1.05,
+                showarrow: false, 
+                font: { color: '#d62728', size: FONT_SIZE, weight: FONT_WEIGHT }, // ANNOTATION FIX
+                xanchor: 'center' 
+            }
+        ]
+    };
+    
+    Plotly.newPlot(plotDivId, data, layout, { responsive: true });
 }
-]
-};
-Plotly.newPlot(plotDivId, data, layout, { responsive: true });
-}
+
+
+
 
 // --- FULL CODE: function renderScrnaUMAPPlot(gene1, gene2 = null, custom) ---
 // NOTE: This code assumes UMAP_CELL_ANNOTATIONS is defined globally elsewhere in the script.
