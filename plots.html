@@ -438,6 +438,19 @@ const LI_NCIL_ORG = [
     "B distachyon", "S bicolor", "V vinifera", "C parvum", "E histolytica", "E cuniculi"
 ];
 
+ // ADD THIS: UMAP Cell Annotation Coordinates (Moved from renderScrnaUMAPPlot)
+const UMAP_CELL_ANNOTATIONS = {
+    'ciliated cell': { x: 10, y: 0.5, label: 'Ciliated Cells' },
+    'club cell': { x: 12, y: 14, label: 'Club Cells' },
+    'goblet cell': { x: 2, y: 16, label: 'Goblet/Secretory' },
+    'basal cell': { x: 9, y: 5, label: 'Basal/Stem Cells' },
+    'pulmonary alveolar type 1 cell': { x: -5, y: -4, label: 'Alveolar Type 1' },
+    'pulmonary alveolar type 2 cell': { x: 5, y: -8, label: 'Alveolar Type 2' },
+    'lung secretory cell': { x: 6, y: -2, label: 'Lung Secretory' },
+    'neuroendocrine cell': { x: 15, y: -3, label: 'Neuroendocrine' },
+    'stem cell': { x: 8, y: 7, label: 'Stem/Progenitor' }
+};
+       
 
 // --- TSV Parsing Helper (UNCHANGED) ---
 function parseTsvData(tsvText) {
@@ -723,20 +736,6 @@ function clearPlot() {
  * @param {object} custom - Customization settings.
  */
 async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) { 
-    // --- NEW: UMAP Cluster Annotation Coordinates (Defined inside the function) ---
-    const UMAP_CELL_ANNOTATIONS = {
-        'ciliated cell': { x: 10, y: 0.5, label: 'Ciliated Cells' },
-        'club cell': { x: 12, y: 14, label: 'Club Cells' },
-        'goblet cell': { x: 2, y: 16, label: 'Goblet/Secretory' },
-        'basal cell': { x: 9, y: 5, label: 'Basal/Stem Cells' },
-        'pulmonary alveolar type 1 cell': { x: -5, y: -4, label: 'Alveolar Type 1' },
-        'pulmonary alveolar type 2 cell': { x: 5, y: -8, label: 'Alveolar Type 2' },
-        'lung secretory cell': { x: 6, y: -2, label: 'Lung Secretory' },
-        'neuroendocrine cell': { x: 15, y: -3, label: 'Neuroendocrine' },
-        'stem cell': { x: 8, y: 7, label: 'Stem/Progenitor' }
-    };
-    // --------------------------------------------------------------------------
-
     const plotDivId = 'plot-display-area'; 
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
