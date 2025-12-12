@@ -934,8 +934,160 @@ function renderPhylogenyHeatmap(genes, custom) {
     
     Plotly.newPlot(plotDivId, data, layout, { responsive: true });
 }
-        
-window.renderScrnaUMAPPlot = renderScrnaUMAPPlot;
+
+// --- FULL CODE: function renderScrnaUMAPPlot(gene1, gene2 = null, custom) ---
+// NOTE: This code assumes UMAP_CELL_ANNOTATIONS is defined globally elsewhere in the script.
+
+async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) { 
+    // UMAP_CELL_ANNOTATIONS is assumed to be defined globally now.
+
+    const plotDivId = 'plot-display-area'; 
+    const umapData = window.CiliAI_UMAP;
+    const cellData = window.CiliAI.cellDataCache;
+    const plotDiv = document.getElementById(plotDivId);
+       
+    // Determine mode and genes
+    const genePrimary = gene1 ? gene1.toUpperCase() : 'FOXJ1';
+    const geneSecondary = gene2 ? gene2.toUpperCase() : null;
+    const isRatioMode = geneSecondary && geneSecondary !== genePrimary;
+       
+    let plotTitle, colorTitle;
+
+    if (isRatioMode) {
+        plotTitle = `UMAP: <strong>${genePrimary} / ${geneSecondary}</strong> Expression Ratio`;
+        colorTitle = `${genePrimary} / ${geneSecondary} Ratio`;
+    } else {
+        plotTitle = `UMAP: <strong>${genePrimary}</strong> Expression`;
+        colorTitle = `${genePrimary} Expr. (TPM)`;
+    }
+
+    if (!plotDiv) {
+        console.error('UMAP plot container "plot-display-area" not found.');
+        return;
+    }
+           
+    // Check if critical data is available 
+    if (!umapData || umapData.length === 0 || !cellData || Object.keys(cellData).length === 0) {
+        plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; padding:20px; color:red; text-align:center;">
+            Critical error: scRNA-seq UMAP coordinates or expression data is missing or failed to load.
+        </div>`;
+        return;
+    }
+
+    plotDiv.innerHTML = ''; // Reset panel
+       
+    // Get expression data for both genes
+    const exprData1 = cellData[genePrimary] || {};
+    const exprData2 = isRatioMode ? (cellData[geneSecondary] || {}) : {};
+           
+    const sampledData = [];
+    const colorArray = [];
+    const sizeArray = [];
+       
+    let maxColorValue = 0;
+    const pseudoCount = 0.01; // Avoid division by zero in ratio mode
+    const expressionThreshold = 2; 
+
+    // Use full UMAP data
+    const sourceData = umapData; 
+
+    for (const point of sourceData) {
+        const value1 = exprData1[point.cell_type] || 0;
+               
+        let colorValue, sizeMagnitude;
+
+        if (isRatioMode) {
+            const value2 = exprData2[point.cell_type] || 0;
+            // Calculate ratio: (G1 + pseudo) / (G2 + pseudo)
+            colorValue = (value1 + pseudoCount) / (value2 + pseudoCount); 
+            // Size based on G1 expression magnitude
+            sizeMagnitude = value1; 
+        } else {
+            colorValue = value1;
+            sizeMagnitude = value1;
+        }
+
+        sampledData.push(point);
+        colorArray.push(colorValue);
+                       
+        // Dot size scaling based on primary magnitude
+        const scaledMagnitude = Math.min(sizeMagnitude, expressionThreshold) / expressionThreshold;
+        sizeArray.push(5 + (12 - 5) * scaledMagnitude); 
+                       
+        if (colorValue > maxColorValue) {
+            maxColorValue = colorValue;
+        }
+    }
+           
+    // Handle case where primary gene has no data
+    if (Object.keys(exprData1).length === 0) {
+        plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">
+            🚫 Gene <strong>${genePrimary}</strong> not found in the expression cache.
+        </div>`;
+        return; 
+    }
+       
+    // --- Annotations & Plotly Setup ---
+    const colorScale = isRatioMode ? 'Viridis' : [[0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']];
+    const cMax = isRatioMode ? Math.min(maxColorValue, 10) : maxColorValue; 
+       
+    // Generate UMAP Annotations using the global constant
+    const annotations = Object.values(UMAP_CELL_ANNOTATIONS).map(ann => ({
+        x: ann.x,
+        y: ann.y,
+        xref: 'x',
+        yref: 'y',
+        text: ann.label,
+        showarrow: false,
+        font: {
+            color: '#333',
+            size: 14,
+            weight: 'bold'
+        },
+        // Draw a gray box behind the text for contrast
+        bgcolor: 'rgba(255, 255, 255, 0.7)',
+        bordercolor: '#ccc',
+        borderwidth: 1,
+        borderpad: 4
+    }));
+
+    const plotData = [{
+        x: sampledData.map(p => p.x),
+        y: sampledData.map(p => p.y),
+        text: sampledData.map((p, i) => {
+            const expr1 = exprData1[p.cell_type] || 0;
+            if (isRatioMode) {
+                const expr2 = exprData2[p.cell_type] || 0;
+                return `Cell Type: ${p.cell_type}<br>${genePrimary}: ${expr1.toFixed(3)}<br>${geneSecondary}: ${expr2.toFixed(3)}<br>Ratio: ${colorArray[i].toFixed(2)}`;
+            }
+            return `Cell Type: ${p.cell_type}<br>Expression: ${expr1.toFixed(3)}`;
+        }),
+        mode: 'markers',
+        type: 'scattergl',
+        hoverinfo: 'text',
+        marker: {
+            color: colorArray,
+            colorscale: colorScale,
+            cmin: isRatioMode ? 0.1 : 0,
+            cmax: cMax > 0 ? cMax : 0.0001,
+            colorbar: { title: colorTitle },
+            size: sizeArray,
+            opacity: 0.8
+        }
+    }];
+
+    const layout = {
+        title: plotTitle,
+        xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
+        yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
+        annotations: annotations, // Pass the annotations here
+        showlegend: false
+    };
+           
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
+}
+window.renderScrnaUMAPPlot = renderScrnaUMAPPlot;        
+
         
 // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
 // --- FIXED PHYLOGENY DATA ACCESS IN OTHER PLOTS ---
