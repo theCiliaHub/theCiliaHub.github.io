@@ -1257,6 +1257,7 @@ function calculatePhyloScores(gene) {
 
 /**
  * Renders the Phylogenetic Conservation Heatmap, handling both Li and Nevers data.
+ * FIX: Moves X-axis organism labels from top to bottom to prevent text overlap.
  * @param {Array} genes - Array of gene objects from main input.
  * @param {Object} custom - Customization settings (including source and gene2).
  */
@@ -1269,7 +1270,6 @@ function renderPhylogenyHeatmap(genes, custom) {
 
     if (custom.gene2) {
         const secondaryQueries = custom.gene2.split(/[\s,\n;]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
-        
         secondaryQueries.forEach(q => {
             if (!primaryGeneSymbols.has(q)) {
                 const geneObject = ciliaryGeneMap.get(q) || { gene: q, phylogeny: {} };
@@ -1289,14 +1289,13 @@ function renderPhylogenyHeatmap(genes, custom) {
     const source = custom.source || 'nevers_2017'; 
     const isLi = source === 'li_2014';
        
-    // Define Organism Panels (Assumes global definition)
     const CIL_PANEL = isLi ? LI_CIL_ORG : NEVERS_CIL_PANEL;
     const NCIL_PANEL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_PANEL;
     const allOrgNames = [...CIL_PANEL, ...NCIL_PANEL];
 
     const phyloCache = isLi ? window.liPhylogenyCache : window.neversPhylogenyCache;
     const masterOrgList = isLi ? (phyloCache.summary?.organisms_list || []) : (phyloCache.organism_groups?.all_organisms_list || []);
-    const masterOrgMap = new Map(masterOrgList.map((name, index) => [name.toUpperCase(), index]));
+    const masterOrgMap = new Map(masterOrgList.map((name, index) => [name, index])); 
        
     // --- 3. Species Filtering ---
     let organismsToDisplay = [];
@@ -1304,7 +1303,6 @@ function renderPhylogenyHeatmap(genes, custom) {
 
     if (selectedFilters && selectedFilters.length > 0 && !selectedFilters.includes('all')) {
         const filteredOrgNamesSet = new Set();
-        // Check both the full name and the shortened name in the groups
         Object.values(PHYLO_SPECIES_GROUPS).flat().forEach(name => filteredOrgNamesSet.add(name));
 
         organismsToDisplay = allOrgNames.filter(name => 
@@ -1321,14 +1319,13 @@ function renderPhylogenyHeatmap(genes, custom) {
 
     const orgs = organismsToDisplay;
 
-    // --- 4. Data Processing and Scoring ---
+    // --- 4. Data Processing and Scoring (Unchanged) ---
     const z = [];
     const yLabels = [];
     const textMatrix = [];
 
     finalGeneList.forEach(gene => {
         const geneSymbol = gene.gene || gene.Gene;
-        // Ensure the gene object has the required structure if it was a minimal object
         if (!gene.phylogeny) gene.phylogeny = {};
         
         const phyData = gene.phylogeny?.[source];
@@ -1337,7 +1334,6 @@ function renderPhylogenyHeatmap(genes, custom) {
         const row = [];
         const textRow = [];
         
-        // Handle missing phylogenetic data gracefully
         if (!phyData || !phyData.species_data || !Array.isArray(phyData.species_data)) {
             orgs.forEach(org => { 
                 row.push(0); 
@@ -1350,10 +1346,9 @@ function renderPhylogenyHeatmap(genes, custom) {
                 const isCiliated = CIL_PANEL.includes(displayOrg);
                 let status = 0;
 
-                // CRITICAL FIX: Look up index by organism name (uppercase key)
-                let masterIndex = masterOrgMap.get(displayOrg.toUpperCase()); 
+                const masterOrgKey = isLi ? displayOrg : displayOrg; 
+                let masterIndex = masterOrgMap.get(masterOrgKey); 
                 
-                // If the organism exists in the study's master list AND the gene is present at that index
                 if (masterIndex !== undefined && masterIndex !== -1 && presenceIndices.has(masterIndex)) {
                     status = isCiliated ? 2 : 1; 
                     textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Present in ${isCiliated ? 'Ciliated' : 'Non-Ciliated'} group`);
@@ -1375,6 +1370,8 @@ function renderPhylogenyHeatmap(genes, custom) {
     
     const filteredCilCount = orgs.filter(name => CIL_PANEL.includes(name)).length;
     const separatorIndex = filteredCilCount > 0 ? filteredCilCount - 0.5 : -0.5;
+    const plotHeight = custom.figureHeight || Math.max(500, finalGeneList.length * 40 + 200);
+
 
     const data = [{
         type: 'heatmap', 
@@ -1400,21 +1397,24 @@ function renderPhylogenyHeatmap(genes, custom) {
             font: { size: custom.titleFontSize || 16 }
         },
         width: custom.figureWidth || 1000, 
-        height: custom.figureHeight || Math.max(500, finalGeneList.length * 40 + 200),
+        height: plotHeight,
         xaxis: { 
             title: 'Organisms', 
             tickangle: -45,
             tickfont: { size: 9 },
             tickvals: Array.from({length: orgs.length}, (_, i) => i),
             ticktext: orgs.map(shortenOrganismName),
-            showgrid: false, zeroline: false, side: 'top', automargin: true
+            showgrid: false, zeroline: false, 
+            side: 'bottom', // CRITICAL FIX: Move labels to the bottom
+            automargin: true
         },
         yaxis: { 
             title: 'Genes', 
             automargin: true, 
             tickfont: { size: 11 } 
         },
-        margin: { l: 100, r: 20, t: 120, b: 200 },
+        // Adjust bottom margin (b) to make space for bottom labels
+        margin: { l: 100, r: 20, t: 120, b: 250 }, 
         shapes: [{
             type: 'line', 
             xref: 'x', 
@@ -1425,13 +1425,14 @@ function renderPhylogenyHeatmap(genes, custom) {
             y1: 1, 
             line: { color: 'black', width: 2 } 
         }],
+        // Adjust annotations to position above the heatmap (relative to paper height)
         annotations: [
             { 
                 text: 'CILIATED', 
                 xref: 'x', 
                 yref: 'paper', 
                 x: filteredCilCount > 0 ? (filteredCilCount - 1) / 2 : 0, 
-                y: 1.05, 
+                y: 0.95, // Positioned near the top of the plot area
                 showarrow: false, 
                 font: { color: '#698ECF', size: 12, weight: 'bold' }, 
                 xanchor: 'center' 
@@ -1441,7 +1442,7 @@ function renderPhylogenyHeatmap(genes, custom) {
                 xref: 'x', 
                 yref: 'paper', 
                 x: filteredCilCount + ((orgs.length - filteredCilCount) / 2) - 0.5, 
-                y: 1.05,
+                y: 0.95, // Positioned near the top of the plot area
                 showarrow: false, 
                 font: { color: '#d62728', size: 12, weight: 'bold' }, 
                 xanchor: 'center' 
