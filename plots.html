@@ -2037,7 +2037,123 @@ function renderComplexNetwork(genes, custom) {
     }
 
 
+function renderCorrelationNetwork(genes, custom) {
+    clearPlot();
+    const plotDivId = 'plot-display-area';
+    const plotDiv = document.getElementById(plotDivId);
+    
+    const cellData = window.CiliAI.cellDataCache;
+    const geneSymbols = genes.map(g => g.gene);
+    
+    // --- 1. Data Preparation ---
+    const expressionVectors = new Map();
+    const cellTypes = Object.keys(UMAP_CELL_ANNOTATIONS).map(ct => ct.trim().toLowerCase());
 
+    geneSymbols.forEach(gene => {
+        const exprData = cellData[gene];
+        if (exprData) {
+            const vector = cellTypes.map(type => exprData[type] || 0);
+            expressionVectors.set(gene, vector);
+        }
+    });
+
+    const validGenes = geneSymbols.filter(g => expressionVectors.has(g));
+
+    if (validGenes.length < 2) {
+        plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">
+            Not enough expression data (requires data for at least two genes) to build a correlation network.
+        </div>`;
+        return;
+    }
+    
+    // --- 2. Calculate Pearson Correlation Matrix ---
+    const correlations = [];
+    const N = validGenes.length;
+    const M = cellTypes.length;
+
+    const calculatePearsonR = (vec1, vec2) => {
+        if (M === 0 || !vec1 || !vec2) return 0;
+        
+        let sum1 = 0, sum2 = 0, sum1sq = 0, sum2sq = 0, sumProd = 0;
+
+        for (let i = 0; i < M; i++) {
+            const val1 = vec1[i] || 0;
+            const val2 = vec2[i] || 0;
+            sum1 += val1;
+            sum2 += val2;
+            sum1sq += val1 * val1;
+            sum2sq += val2 * val2;
+            sumProd += val1 * val2;
+        }
+
+        const numerator = sumProd - (sum1 * sum2 / M);
+        const denominator1 = sum1sq - (sum1 * sum1 / M);
+        const denominator2 = sum2sq - (sum2 * sum2 / M);
+        
+        if (denominator1 <= 0 || denominator2 <= 0) return 0;
+        
+        const denominator = Math.sqrt(denominator1 * denominator2);
+        return denominator === 0 ? 0 : Math.min(1, Math.max(-1, numerator / denominator));
+    };
+
+    // Initialize correlation matrix
+    for (let i = 0; i < N; i++) {
+        correlations[i] = new Array(N).fill(0);
+        correlations[i][i] = 1; // Self-correlation is 1
+    }
+
+    // Fill correlation matrix
+    for (let i = 0; i < N; i++) {
+        for (let j = i + 1; j < N; j++) {
+            const vec1 = expressionVectors.get(validGenes[i]);
+            const vec2 = expressionVectors.get(validGenes[j]);
+            const r = calculatePearsonR(vec1, vec2);
+            correlations[i][j] = r;
+            correlations[j][i] = r;
+        }
+    }
+
+    // --- 3. Plotly Visualization ---
+    const data = [{
+        type: 'heatmap',
+        z: correlations,
+        x: validGenes,
+        y: validGenes,
+        colorscale: [
+            [0.0, '#1565c0'],
+            [0.5, '#f0f0f0'],
+            [1.0, '#d62728']
+        ],
+        zmin: -1,
+        zmax: 1,
+        colorbar: {
+            title: 'Pearson R',
+            titleside: 'right'
+        },
+        hovertemplate: 'Gene Y: %{y}<br>Gene X: %{x}<br>Correlation (R): %{z:.3f}<extra></extra>'
+    }];
+
+    const layout = {
+        title: { 
+            text: custom.title || "Gene Expression Correlation Network (scRNA-seq)", 
+            font: { size: custom.titleSize || 20 } 
+        },
+        xaxis: {
+            automargin: true,
+            tickangle: -45,
+            tickfont: { size: 12 }
+        },
+        yaxis: {
+            automargin: true,
+            tickfont: { size: 12 }
+        },
+        height: custom.height || Math.max(600, N * 25 + 200),
+        width: custom.width || Math.max(600, N * 25 + 200),
+        margin: { t: 80, l: 150, r: 150, b: 150 }
+    };
+
+    Plotly.newPlot(plotDivId, data, layout, { responsive: true });
+}
 // =============================================================================
 // NEW FUNCTIONS FOR CRISPR SCREEN ENRICHMENT
 // =============================================================================
@@ -2585,7 +2701,8 @@ const renderers = {
     'protein_domains': renderDomainCoOccurrence, // REPLACED/UPDATED
     'protein_complex': renderComplexNetwork, 
     'mouse_phenotypes': renderMousePhenotypeHeatmap,
-    'phylogeny': renderPhylogenyHeatmap
+    'phylogeny': renderPhylogenyHeatmap,
+    'correlation_network': renderCorrelationNetwork
 };
 
     const renderer = renderers[type];
@@ -2696,7 +2813,8 @@ function handlePlotSelection(value) {
         "protein_domains": "Protein Domain Co-Occurrence Heatmap", // UPDATED NAME
         "protein_complex": "Complex Membership Map",
         "mouse_phenotypes": "Mouse Phenotype Enrichment Heatmap",
-        "phylogeny": "Phylogenetic Conservation Heatmap"
+        "phylogeny": "Phylogenetic Conservation Heatmap",
+         "correlation_network": "Gene Expression Correlation Network"
     };
     
     const customTitleInput = document.getElementById('custom-title');
@@ -2730,6 +2848,7 @@ function setupPage() {
                         <option value="protein_complex">Complex Membership Map</option>
                         <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
                         <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
+                        <option value="correlation_network">Expression Correlation Network</option>
                     </select>
                     <h3 style="margin-top:20px;">Gene Input</h3>
                     <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">ZC2HC1A
