@@ -1215,6 +1215,13 @@ function classifyPhylo(gene) {
  * @param {object} gene - The gene object containing the .phylogeny property.
  * @returns {object} Scores object with conservation percentages.
  */
+// --- REPLACE EXISTING function calculatePhyloScores(gene) ---
+
+/**
+ * Calculates conservation metrics for a gene based on Li/Nevers data.
+ * @param {object} gene - The gene object containing the .phylogeny property.
+ * @returns {object} Scores object with conservation percentages.
+ */
 function calculatePhyloScores(gene) {
     const scores = {};
     
@@ -1224,7 +1231,6 @@ function calculatePhyloScores(gene) {
 
         const isLi = source === 'li_2014';
         
-        // --- CRITICAL FIX: Get TOTAL study species from the cache metadata ---
         const phyloCache = isLi ? window.liPhylogenyCache : window.neversPhylogenyCache;
 
         // Determine the true total number of species used in the study (denominator)
@@ -1247,15 +1253,44 @@ function calculatePhyloScores(gene) {
     return scores;
 }
     
-// --- FIXED PHYLOGENETIC HEATMAP FUNCTION ---
+// --- REPLACE EXISTING function renderPhylogenyHeatmap(genes, custom) ---
+
+/**
+ * Renders the Phylogenetic Conservation Heatmap.
+ * @param {Array} genes - Array of gene objects from main input (potentially primary gene only).
+ * @param {Object} custom - Customization settings (including source and gene2).
+ */
 function renderPhylogenyHeatmap(genes, custom) {
     clearPlot();
     
-    // --- 1. Setup ---
-    const source = custom.source || 'nevers_2017'; 
-    const isLi = source === 'li_2014';
+    // --- 1. Consolidate Gene List ---
+    const primaryGeneSymbols = new Set(genes.map(g => g.gene.toUpperCase()));
+    let finalGeneList = [...genes];
+
+    if (custom.gene2) {
+        // Parse the secondary input string into an array of symbols
+        const secondaryQueries = custom.gene2.split(/[\s,\n;]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+        
+        secondaryQueries.forEach(q => {
+            if (!primaryGeneSymbols.has(q)) {
+                // Find the full gene object or create a minimal one if not in the map
+                const geneObject = ciliaryGeneMap.get(q) || { gene: q };
+                finalGeneList.push(geneObject);
+                primaryGeneSymbols.add(q); // Prevent duplicates from being re-added
+            }
+        });
+    }
+
+    if (finalGeneList.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No valid genes provided for analysis.</div>`;
+        return;
+    }
     
-    // Use the hardcoded panels for ciliated/non-ciliated status classification
+    // --- 2. Setup & Data Source Selection ---
+    const plotDivId = 'plot-display-area';
+    const source = custom.source || 'nevers_2017'; 
+    const isLi = source === 'li_2014';
+       
     const CIL_PANEL = isLi ? LI_CIL_ORG : NEVERS_CIL_PANEL;
     const NCIL_PANEL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_PANEL;
     const allOrgNames = [...CIL_PANEL, ...NCIL_PANEL];
@@ -1263,8 +1298,8 @@ function renderPhylogenyHeatmap(genes, custom) {
     const phyloCache = isLi ? window.liPhylogenyCache : window.neversPhylogenyCache;
     const masterOrgList = isLi ? (phyloCache.summary?.organisms_list || []) : (phyloCache.organism_groups?.all_organisms_list || []);
     const masterOrgMap = new Map(masterOrgList.map((name, index) => [name.toUpperCase(), index]));
-    
-    // --- 2. Dynamic Species Filtering (NEW) ---
+       
+    // --- 3. Species Filtering ---
     let organismsToDisplay = [];
     const selectedFilters = custom.speciesFilters;
 
@@ -1273,59 +1308,54 @@ function renderPhylogenyHeatmap(genes, custom) {
         selectedFilters.forEach(groupKey => {
             const groupSpecies = PHYLO_SPECIES_GROUPS[groupKey];
             if (groupSpecies) {
-                // Ensure we add all specific names/abbreviations listed in the group
                 groupSpecies.forEach(species => filteredOrgNamesSet.add(species));
             }
         });
 
-        // Filter the full list (allOrgNames) to only include those matching the user's selected groups
-        organismsToDisplay = allOrgNames.filter(name => filteredOrgNamesSet.has(name));
+        organismsToDisplay = allOrgNames.filter(name => 
+            filteredOrgNamesSet.has(name) || filteredOrgNamesSet.has(shortenOrganismName(name))
+        );
     } else {
-        // Default: Display all organisms defined in the hardcoded panels
         organismsToDisplay = allOrgNames;
     }
     
-    // Final check to prevent crash if filter returns empty (shouldn't happen with 'all' default, but safe)
+    organismsToDisplay = Array.from(new Set(organismsToDisplay)).filter(Boolean);
     if (organismsToDisplay.length === 0) {
         organismsToDisplay = allOrgNames;
     }
-    
+
     const orgs = organismsToDisplay; // Final list of organisms for the X-axis
 
-    // --- 3. Data Processing and Scoring ---
+    // --- 4. Data Processing and Scoring ---
     const z = [];
     const yLabels = [];
     const textMatrix = [];
-    let totalPresenceCount = 0;
 
-    genes.forEach(gene => {
+    finalGeneList.forEach(gene => {
         const geneSymbol = gene.gene || gene.Gene;
         const phyData = gene.phylogeny?.[source];
-        const scores = calculatePhyloScores(gene)[source] || {}; // Calculate score (for Y-axis label)
+        const scores = calculatePhyloScores(gene)[source] || {};
         
         const row = [];
         const textRow = [];
         
         if (!phyData || !phyData.species_data || !Array.isArray(phyData.species_data)) {
-            orgs.forEach(org => {
+            orgs.forEach(org => { 
                 row.push(0); 
-                textRow.push(`Gene: ${geneSymbol}<br>Organism: ${org}<br>Status: No Data`);
+                textRow.push(`Gene: ${geneSymbol}<br>Organism: ${org}<br>Status: No Data`); 
             });
         } else {
             const presenceIndices = new Set(phyData.species_data);
             
-            orgs.forEach((displayOrg, index) => {
-                // We check status based on the full panel list, not the filtered list
-                const isCiliated = CIL_PANEL.includes(displayOrg); 
-                let status = 0; 
+            orgs.forEach((displayOrg) => {
+                const isCiliated = CIL_PANEL.includes(displayOrg);
+                let status = 0; // 0 = Absent (default/no data)
 
-                // Look up the index in the master list using the map
                 let masterIndex = masterOrgMap.get(displayOrg.toUpperCase());
                 
                 if (masterIndex !== undefined && masterIndex !== -1 && presenceIndices.has(masterIndex)) {
-                    status = isCiliated ? 2 : 1; // 2=Ciliated, 1=Non-Ciliated
-                    totalPresenceCount++;
-                    textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Present`);
+                    status = isCiliated ? 2 : 1; 
+                    textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Present in ${isCiliated ? 'Ciliated' : 'Non-Ciliated'} group`);
                 } else {
                     textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Absent`);
                 }
@@ -1335,99 +1365,93 @@ function renderPhylogenyHeatmap(genes, custom) {
         
         z.push(row);
         
-        // Enhance Y-axis label with Conservation Score (VITAL CHANGE)
         const scoreLabel = scores.conservationPct !== undefined ? ` (${scores.conservationPct.toFixed(1)}% Conserved)` : '';
         yLabels.push(geneSymbol + scoreLabel);
         textMatrix.push(textRow);
     });
     
-    // --- 4. Plotly Setup ---
+    // --- 5. Plotly Setup ---
     
-    // Recalculate separator index for the filtered list based on the new 'orgs' array
-    // Find the number of ciliated organisms that made it into the filtered list.
     const filteredCilCount = orgs.filter(name => CIL_PANEL.includes(name)).length;
     const separatorIndex = filteredCilCount > 0 ? filteredCilCount - 0.5 : -0.5;
 
     const data = [{
-        type: 'heatmap', 
-        z: z, 
+        type: 'heatmap', 
+        z: z, 
         x: orgs.map(shortenOrganismName),
-        y: yLabels, 
+        y: yLabels, 
         customdata: textMatrix,
         colorscale: [
-            [0, '#F0F0F0'],       // Absent - light gray
-            [0.0001, '#FFE5B5'], // Non-ciliated present - light orange
-            [1, '#FFE5B5'],       
-            [1.0001, '#698ECF'], // Ciliated present - blue
-            [2, '#698ECF']        
+            [0, '#F0F0F0'],       // 0: Absent - light gray
+            [0.0001, '#FFE5B5'], // 1: Non-ciliated present - light orange
+            [1, '#FFE5B5'],       
+            [1.0001, '#698ECF'], // 2: Ciliated present - blue
+            [2, '#698ECF']        
         ],
         showscale: false,
         hovertemplate: '%{customdata}<extra></extra>',
-        xgap: 0.5,
-        ygap: 0.5
+        xgap: 0.5, ygap: 0.5
     }];
 
     const layout = {
-        title: { 
+        title: { 
             text: custom.title || `Phylogenetic Conservation Heatmap (${isLi ? 'Li et al. 2014' : 'Nevers et al. 2017'})`,
             font: { size: custom.titleFontSize || 16 }
         },
-        width: custom.figureWidth || 1000, 
-        height: custom.figureHeight || Math.max(500, genes.length * 40 + 200),
-        xaxis: { 
-            title: 'Organisms', 
+        width: custom.figureWidth || 1000, 
+        height: custom.figureHeight || Math.max(500, finalGeneList.length * 40 + 200),
+        xaxis: { 
+            title: 'Organisms', 
             tickangle: -45,
             tickfont: { size: 9 },
             tickvals: Array.from({length: orgs.length}, (_, i) => i),
             ticktext: orgs.map(shortenOrganismName),
             showgrid: false, zeroline: false, side: 'top', automargin: true
         },
-        yaxis: { 
-            title: 'Genes', 
-            automargin: true, 
-            tickfont: { size: 11 } 
+        yaxis: { 
+            title: 'Genes', 
+            automargin: true, 
+            tickfont: { size: 11 } 
         },
         margin: { l: 100, r: 20, t: 120, b: 200 },
         shapes: [{
-            type: 'line', 
-            xref: 'x', 
-            yref: 'paper', 
-            x0: separatorIndex, 
+            type: 'line', 
+            xref: 'x', 
+            yref: 'paper', 
+            x0: separatorIndex, 
             x1: separatorIndex,
-            y0: 0, 
-            y1: 1, 
-            line: { color: 'black', width: 2 } 
+            y0: 0, 
+            y1: 1, 
+            line: { color: 'black', width: 2 } 
         }],
         annotations: [
-            // Ensure CILIATED label is positioned correctly over the filtered set
-            { 
-                text: 'CILIATED', 
-                xref: 'x', 
-                yref: 'paper', 
-                x: filteredCilCount > 0 ? (filteredCilCount - 1) / 2 : 0, 
-                y: 1.05, 
-                showarrow: false, 
-                font: { color: '#698ECF', size: 12, weight: 'bold' }, 
-                xanchor: 'center' 
+            { 
+                text: 'CILIATED', 
+                xref: 'x', 
+                yref: 'paper', 
+                x: filteredCilCount > 0 ? (filteredCilCount - 1) / 2 : 0, 
+                y: 1.05, 
+                showarrow: false, 
+                font: { color: '#698ECF', size: 12, weight: 'bold' }, 
+                xanchor: 'center' 
             },
-            // Ensure NON-CILIATED label is positioned correctly over the filtered set
-            { 
-                text: 'NON-CILIATED', 
-                xref: 'x', 
-                yref: 'paper', 
-                x: filteredCilCount + ((orgs.length - filteredCilCount) / 2) - 0.5, 
+            { 
+                text: 'NON-CILIATED', 
+                xref: 'x', 
+                yref: 'paper', 
+                x: filteredCilCount + ((orgs.length - filteredCilCount) / 2) - 0.5, 
                 y: 1.05,
-                showarrow: false, 
-                font: { color: '#d62728', size: 12, weight: 'bold' }, 
-                xanchor: 'center' 
+                showarrow: false, 
+                font: { color: '#d62728', size: 12, weight: 'bold' }, 
+                xanchor: 'center' 
             }
         ]
     };
     
-    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+    Plotly.newPlot(plotDivId, data, layout, { responsive: true });
 }
-    
-// --- ENHANCED ORGANISM NAME SHORTENER ---
+
+        
 // --- ENHANCED ORGANISM NAME SHORTENER ---
 function shortenOrganismName(name) {
     if (!name) return 'Unknown';
