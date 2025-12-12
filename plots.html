@@ -916,26 +916,21 @@ function classifyPhylo(gene) {
     }
 }
 
-/**
- * Utility to assign color based on whether the localization includes "Cilia".
- * @param {string} localizationValue - The raw localization string (e.g., "Cilium, Golgi").
- * @returns {string} Hex color code.
- */
-function getLocalizationColor(localizationValue) {
-    const value = (localizationValue || '').toLowerCase();
-    // Prioritize Ciliary locations
-    if (value.includes('cilia') || value.includes('cilium') || value.includes('axoneme') || value.includes('basal body')) {
-        return '#005b96'; // Primary Blue for Cilia
-    } else {
-        return '#ff9f00'; // Accent Orange for Other/Non-Ciliary
-    }
-}
-    
-// 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION
-// GLOBAL COLOR SYSTEM (You already have this — perfect!)
+
+// Reusable colors for core categories in the overview plot
+const OVERVIEW_COLOR_MAP = {
+    'Localization-Ciliary': '#1f77b4', // Primary Blue: Cilia/Basal Body
+    'Localization-Other': '#00bfa5',   // Teal: Non-Ciliary organelles
+    'Phylogeny-High': '#2ca02c',       // Green for High Conservation
+    'Phylogeny-Low': '#d62728',        // Red for Low Conservation
+    'Ciliopathy': '#9467bd',           // Purple for Disease
+    'Screen-Negative': '#ff7f0e',      // Orange: Negative Effect/Loss of function (LFC < 0)
+    'Screen-Positive': '#ffcc00',      // Gold: Positive Effect/Gain of function (LFC > 0)
+    'Default': '#666666'
+};
+
 const CATEGORY_COLOR_MAP = new Map();
 let COLOR_INDEX_COUNTER = 0;
-
 
 function getUniqueColor(value) {
     if (CATEGORY_COLOR_MAP.has(value)) {
@@ -947,91 +942,133 @@ function getUniqueColor(value) {
     return color;
 }
 
-        
-// MAIN FUNCTION - FINAL SCALABLE VERSION
 function renderMultiCategoryManhattan(genes, custom = {}) {
     clearPlot();
 
-    // Optional: Reset colors on every render (remove if you want persistence across plots)
+    // Reset general categorical color map
     CATEGORY_COLOR_MAP.clear();
     COLOR_INDEX_COUNTER = 0;
 
-    const categoryLegends = {}; // { Category: { value: color } }
+    const categoryLegends = {}; // To store category name -> { value: color }
 
     const categories = [
-        { name: "Localization", key: "Localization" },
-        { name: "Complex", key: "Protein.complexes" },
         { name: "Ciliopathy", key: "Ciliopathy" },
-        { name: "Function", key: "Functional.category" },
-        { name: "Screens", key: "screens_summary" },
-        { name: "Cilia Length", key: "cilia_length_effects" },
-        { name: "Phenotypes", key: "Phenotypes_mouse" },
-        { name: "Phylogeny", key: "phylogeny" }
+        { name: "Localization", key: "Localization" },
+        { name: "Phylogeny", key: "phylogeny" },
+        { name: "Screens", key: "screens_summary" }, 
+        { name: "Complex", key: "Protein.complexes" }
     ];
 
     const traces = [];
+    let allYValues = []; 
 
-    // MAIN LOOP - unchanged logic, just collect legend data
+    // 1. Process data for plotting
     categories.forEach((cat, catIdx) => {
-        const x = [], y = [], text = [], colors = [];
+        const x = [], y = [], text = [], colors = [], sizes = [];
 
         genes.forEach((gene, geneIdx) => {
-            if (cat.key === "cilia_length_effects") {
-                const loF = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
-                const oe = gene['Overexpression effects on cilia length (increase/decrease/no effect)'] || 'Not Reported';
+            let categoryValue = null;
+            let dotColor = OVERVIEW_COLOR_MAP['Default'];
+            let dotSize = 10;
+            let hoverText = `${gene.gene}<br>`;
+            let yPosition = geneIdx;
 
-                const processEffect = (type, value, shift) => {
-                    if (value === "Not Reported") return;
-                    const key = `${type} (${value})`;
-                    const color = getUniqueColor("CiliaLength:" + key);
-                    x.push(catIdx + shift * 0.6);
-                    y.push(geneIdx);
-                    text.push(`${gene.gene}<br>Effect: ${type}<br>Result: ${value}`);
-                    colors.push(color);
-                    categoryLegends["Cilia Length"] = categoryLegends["Cilia Length"] || {};
-                    categoryLegends["Cilia Length"][key] = color;
-                };
-                processEffect("LoF", loF, -0.25);
-                processEffect("OE", oe, 0.25);
-            }
-            else if (cat.key === "phylogeny") {
-                const classification = classifyPhylo(gene);
-                if (classification === "No Data") return;
-                const score = calculatePhyloScores(gene)[custom.source || 'nevers_2017']?.conservationPct || 0;
-                const sourceText = custom.source === 'li_2014' ? 'Li (2014)' : 'Nevers (2017)';
-                const color = getUniqueColor("Phylo:" + classification);
-                x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                y.push(geneIdx);
-                text.push(`${gene.gene}<br>Conserved: ${classification}<br>(${score.toFixed(1)}% via ${sourceText})`);
-                colors.push(color);
-                categoryLegends["Phylogeny"] = categoryLegends["Phylogeny"] || {};
-                categoryLegends["Phylogeny"][classification] = color;
-            }
-            else if (cat.key === "screens_summary") {
-                const screenArr = getCleanArray(gene, cat.key) || [];
-                screenArr.forEach(hit => {
-                    const resultKey = hit.source ? `${hit.source} - ${hit.result || "Hit"}` : "Unclassified Hit";
-                    const color = getUniqueColor("Screen:" + resultKey);
-                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                    y.push(geneIdx);
-                    text.push(`${gene.gene}<br>${hit.source || "Unknown"}<br>Result: ${hit.result || "N/A"}`);
-                    colors.push(color);
-                    categoryLegends["Screens"] = categoryLegends["Screens"] || {};
-                    categoryLegends["Screens"][resultKey] = color;
-                });
-            }
-            else {
-                const arr = getCleanArray(gene, cat.key) || [];
-                arr.forEach(val => {
-                    if (!val || val === "N/A" || val === "Unknown" || val.includes('PFAM_ID')) return;
-                    const color = getUniqueColor(`${cat.name}:${val}`);
-                    x.push(catIdx + (Math.random() - 0.5) * 0.6);
-                    y.push(geneIdx);
-                    text.push(`${gene.gene}<br>${cat.name}: ${val}`);
-                    colors.push(color);
+            // --- A. CILIOPATHY (Binary Presence) ---
+            if (cat.key === "Ciliopathy") {
+                const diseases = getCleanArray(gene, cat.key);
+                if (diseases.length > 0) {
+                    categoryValue = 'Associated';
+                    dotColor = OVERVIEW_COLOR_MAP['Ciliopathy'];
+                    hoverText += `Ciliopathy: ${diseases.join('; ').substring(0, 50)}...`;
                     categoryLegends[cat.name] = categoryLegends[cat.name] || {};
-                    categoryLegends[cat.name][val] = color;
-                });
+                    categoryLegends[cat.name]['Associated'] = dotColor;
+                }
+            }
+            // --- B. LOCALIZATION (Distinguish Ciliary vs. Other) ---
+            else if (cat.key === "Localization") {
+                const locs = getCleanArray(gene, cat.key).map(loc => loc.toLowerCase());
+                const isCiliary = locs.some(loc => loc.includes('cili') || loc.includes('basal body'));
+                const isOtherOrganelle = locs.length > 0 && !isCiliary;
+                
+                if (isCiliary) {
+                    categoryValue = 'Cilium/BB';
+                    dotColor = OVERVIEW_COLOR_MAP['Localization-Ciliary'];
+                    hoverText += `Localization: CILIUM/BB (${locs.join('; ').substring(0, 50)}...)`;
+                    categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                    categoryLegends[cat.name]['Cilium/BB'] = dotColor;
+                } else if (isOtherOrganelle) {
+                    categoryValue = 'Non-Ciliary Organelle';
+                    dotColor = OVERVIEW_COLOR_MAP['Localization-Other'];
+                    hoverText += `Localization: Other Organelle (${locs.join('; ').substring(0, 50)}...)`;
+                    yPosition += 0.25;
+                    categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                    categoryLegends[cat.name]['Non-Ciliary Organelle'] = dotColor;
+                }
+            }
+            // --- C. PHYLOGENY (Scored by Conservation) ---
+            else if (cat.key === "phylogeny") {
+                const scores = calculatePhyloScores(gene)[custom.source || 'nevers_2017'];
+                const conservationPct = scores?.conservationPct || 0;
+                
+                if (conservationPct > 0) {
+                    const classification = conservationPct > 30 ? 'High Conservation' : 'Low/Mixed Conservation';
+                    dotSize = Math.max(8, 8 + (conservationPct / 10)); 
+                    dotColor = conservationPct > 30 ? OVERVIEW_COLOR_MAP['Phylogeny-High'] : OVERVIEW_COLOR_MAP['Phylogeny-Low'];
+                    categoryValue = classification;
+                    hoverText += `Conservation: ${conservationPct.toFixed(1)}%`;
+                    categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                    categoryLegends[cat.name][classification] = dotColor;
+                }
+            }
+            // --- D. SCREENS (Encode LFC Magnitude and Direction) ---
+            else if (cat.key === "screens_summary") {
+                const screenArray = getCleanArray(gene, cat.key) || [];
+                const maxAbsLFC = screenArray.reduce((max, hit) => Math.max(max, Math.abs(hit.LFC || 0)), 0);
+                const relevantHit = screenArray.find(hit => Math.abs(hit.LFC || 0) === maxAbsLFC);
+                const LFC = relevantHit ? relevantHit.LFC : 0;
+                
+                if (Math.abs(LFC) > 0.5) { 
+                    dotSize = Math.min(18, 10 + Math.abs(LFC) * 5);
+                    
+                    if (LFC < 0) {
+                        dotColor = OVERVIEW_COLOR_MAP['Screen-Negative'];
+                        yPosition = geneIdx + Math.abs(LFC) * 0.5; // Shift down for negative effect
+                        categoryValue = 'Negative Effect';
+                    } else {
+                        dotColor = OVERVIEW_COLOR_MAP['Screen-Positive'];
+                        yPosition = geneIdx - Math.abs(LFC) * 0.5; // Shift up for positive effect
+                        categoryValue = 'Positive Effect';
+                    }
+                    
+                    hoverText += `Screen Hit (LFC: ${LFC.toFixed(2)})`;
+                    categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                    categoryLegends[cat.name]['Negative Effect (LFC < 0)'] = OVERVIEW_COLOR_MAP['Screen-Negative'];
+                    categoryLegends[cat.name]['Positive Effect (LFC > 0)'] = OVERVIEW_COLOR_MAP['Screen-Positive'];
+                }
+            }
+            // --- E. OTHER CATEGORICAL (e.g., Complexes) ---
+            else if (cat.key === "Protein.complexes") {
+                const complexes = getCleanArray(gene, cat.key);
+                if (complexes.length > 0) {
+                     const primaryComplex = complexes[0];
+                     dotColor = getUniqueColor(cat.name + ':' + primaryComplex);
+                     hoverText += `Complexes: ${complexes.join('; ').substring(0, 50)}...`;
+                     yPosition += (Math.random() - 0.5) * 0.3;
+                     
+                     // Add to legend using unique color
+                     categoryLegends[cat.name] = categoryLegends[cat.name] || {};
+                     categoryLegends[cat.name][primaryComplex] = dotColor;
+                }
+            }
+
+
+            if (categoryValue) {
+                x.push(catIdx);
+                y.push(yPosition);
+                text.push(hoverText);
+                colors.push(dotColor);
+                sizes.push(dotSize);
+                allYValues.push(yPosition);
             }
         });
 
@@ -1040,41 +1077,49 @@ function renderMultiCategoryManhattan(genes, custom = {}) {
                 x, y, text,
                 mode: "markers",
                 name: cat.name,
-                marker: { size: 13, color: colors },
-                hovertemplate: "%{text}<extra></extra>"
+                marker: { size: sizes, color: colors, line: { width: 1, color: '#333' } },
+                hovertemplate: "%{text}<extra></extra>",
+                showlegend: false
             });
         }
     });
 
-    // CLEAN LAYOUT - No more giant bottom margin!
-    const plotHeight = Math.max(custom.height || 900, genes.length * 28 + 300);
+    // 2. Plotting and Layout
+    const plotHeight = Math.max(custom.height || 700, genes.length * 30 + 300);
+
+    const originalTickValues = genes.map((_, i) => i);
+    const minRange = allYValues.length > 0 ? Math.min(...allYValues) - 0.7 : -0.5;
+    const maxRange = allYValues.length > 0 ? Math.max(...allYValues) + 0.7 : genes.length - 0.5;
 
     const layout = {
-        title: { text: custom.title || "Gene Feature Overview", font: { size: 24 } },
+        title: { text: custom.title || "Ciliary Gene Feature Overview", font: { size: 24 } },
         xaxis: {
             tickvals: categories.map((_, i) => i),
             ticktext: categories.map(c => c.name),
             tickangle: -45,
             range: [-0.5, categories.length - 0.5],
             automargin: true,
-            showgrid: false
+            showgrid: false,
+            zeroline: false
         },
         yaxis: {
-            tickvals: genes.map((_, i) => i),
+            tickvals: originalTickValues,
             ticktext: genes.map(g => g.gene),
+            range: [maxRange, minRange],
             automargin: true,
-            showgrid: true
+            showgrid: true,
+            zeroline: false
         },
         height: plotHeight,
-        width: custom.width || 1450,
-        margin: { l: 220, r: 60, t: 110, b: 90 }, // Clean, readable
+        width: custom.width || 1200,
+        margin: { l: 220, r: 60, t: 110, b: 90 },
         showlegend: false,
         hovermode: "closest"
     };
 
     Plotly.newPlot("plot-display-area", traces, layout, { responsive: true });
-
-    // EXTERNAL, SCROLLABLE, MULTI-COLUMN LEGEND
+    
+    // 3. EXTERNAL, SCROLLABLE, MULTI-COLUMN LEGEND (Not omitted)
     let legendContainer = document.getElementById("external-gene-legend");
     if (!legendContainer) {
         legendContainer = document.createElement("div");
@@ -1089,7 +1134,7 @@ function renderMultiCategoryManhattan(genes, custom = {}) {
         background: #fcfcfc;
         border: 1px solid #e2e2e2;
         border-radius: 12px;
-        max-height: 700px;
+        max-height: 400px; /* Enforce scroll height */
         overflow-y: auto;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         display: grid;
@@ -1103,7 +1148,7 @@ function renderMultiCategoryManhattan(genes, custom = {}) {
         const catDiv = document.createElement("div");
 
         const header = document.createElement("h3");
-        header.textContent = catName;
+        header.textContent = catName + " Keys";
         header.style.cssText = "margin: 0 0 12px 0; color: #2c3e50; font-size: 16px; font-weight: 600;";
         catDiv.appendChild(header);
 
@@ -1112,23 +1157,28 @@ function renderMultiCategoryManhattan(genes, custom = {}) {
             .forEach(([label, color]) => {
                 const row = document.createElement("div");
                 row.style.cssText = "margin: 7px 0; display: flex; align-items: center; font-size: 14px;";
-                row.innerHTML = `<span style="color:${color}; font-size:22px; margin-right:12px;">●</span>${label}`;
+                
+                // Add distinction for size/score encoding
+                let symbol = '●';
+                if (catName === 'Phylogeny') symbol = '★';
+                if (catName === 'Screens') symbol = '▼▲';
+
+                row.innerHTML = `<span style="color:${color}; font-size:22px; margin-right:12px; line-height: 1;">${symbol}</span>${label}`;
                 catDiv.appendChild(row);
             });
 
         legendContainer.appendChild(catDiv);
     });
 
-    // Optional: Add a nice title
+    // Add general legend title if needed
     if (!document.getElementById("legend-title")) {
         const title = document.createElement("h2");
         title.id = "legend-title";
-        title.textContent = "Legend";
+        title.textContent = "Feature Visualization Legend";
         title.style.cssText = "margin: 40px 0 10px 0; color: #2c3e50; font-size: 20px;";
         legendContainer.before(title);
     }
-}    
-
+}
     
 /**
  * Utility to classify a gene's conservation based on Li/Nevers data.
@@ -2529,22 +2579,25 @@ function setupPage() {
                 <div class="control-card">
                     <h3>Select Analysis Type</h3>
                     <select id="analysis-dropdown" onchange="handlePlotSelection(this.value)">
-            <option value="">-- Choose Plot Type --</option>
-    <option value="screen_enrichment"> Ciliary Gene Enrichment Analysis</option> 
-    <option value="raw_check">Ciliary Gene Check (Table)</option> 
-    <option value="gene_overview">Gene Overview / Summary</option>
-    <option value="expression_heatmap">Expression Heatmap</option>
-    <option value="scrna_dot">scRNA-seq (Lung)</option>
-    <option value="ciliopathy">Ciliopathy & Disease Associations</option>
-    <option value="localization_heatmap">Localization Heatmap</option>
-    <option value="crispr_screens">CRISPR & siRNA Screens Summary</option>
-    <option value="protein_domains">Protein Domain Architecture</option>
-    <option value="protein_complex">Complex Membership Map</option>
-    <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
-    <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
-</select>
+                        <option value="">-- Choose Plot Type --</option>
+                        <option value="screen_enrichment">Ciliary Gene Enrichment Analysis</option>
+                        <option value="raw_check">Raw Ciliary Gene Check (Table)</option>
+                        <option value="gene_overview">Gene Overview / Summary</option>
+                        <option value="expression_heatmap">Expression Heatmap</option>
+                        <option value="scrna_dot">scRNA-seq (Lung)</option>
+                        <option value="ciliopathy">Ciliopathy & Disease Associations</option>
+                        <option value="localization_heatmap">Localization Heatmap</option>
+                        <option value="crispr_screens">CRISPR & siRNA Screens Summary</option>
+                        <option value="protein_domains">Protein Domain Architecture</option>
+                        <option value="protein_complex">Complex Membership Map</option>
+                        <option value="mouse_phenotypes">Mouse Phenotype Enrichment</option>
+                        <option value="phylogeny">Phylogenetic Conservation Heatmap</option>
+                    </select>
                     <h3 style="margin-top:20px;">Gene Input</h3>
-                    <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">IFT88
+                    <textarea id="ciliaplot-genes-input" placeholder="Enter genes (one per line)">ZC2HC1A
+WDR31
+WDR54
+ZNF474
 BBS1
 CEP290
 ARL13B
@@ -2554,7 +2607,6 @@ BBS5
 IFT81
 CEP41
 WDR27
-CEP41
 WDR90
 KIF19
 KIF17</textarea>
@@ -2562,12 +2614,12 @@ KIF17</textarea>
                     <div id="customization-panel">
                         <h3 style="margin-top:20px;">Customization</h3>
                         <div class="customization-grid">
-                            <div class="form-group"><label>Title</label><input id="custom-title" value="Phylogenetic Conservation Heatmap"></div>
+                            <div class="form-group"><label>Title</label><input id="custom-title" value="Ciliary Gene Enrichment Analysis"></div>
                             <div class="form-group"><label>Title Size</label><input id="title-size" type="number" value="24"></div>
                             <div class="form-group"><label>Width</label><input id="fig-width" type="number" value="1100"></div>
                             <div class="form-group"><label>Height</label><input id="fig-height" type="number" value="700"></div>
                             
-                            <div class="form-group" id="phy-source-group">
+                            <div class="form-group" id="phy-source-group" style="display: none;">
                                 <label>Source</label>
                                 <select id="phy-source">
                                     <option value="nevers_2017">Nevers et al. 2017</option>
@@ -2577,7 +2629,7 @@ KIF17</textarea>
 
                             <div class="form-group full-width">
                                 <label>Second Gene (For Co-expression/Ratio UMAP)</label>
-                                <input type="text" id="second-gene-input" placeholder="Optional, e.g., BBS1, FOXJ1">
+                                <input type="text" id="second-gene-input" placeholder="Optional, e.g., FOXJ1">
                             </div>
                             <div class="form-group full-width" id="phy-filter-group" style="display: none;">
                                 <label>Filter Species Groups (Ctrl+Click to select multiple)</label>
@@ -2591,20 +2643,21 @@ KIF17</textarea>
                                     <option value="fungi">Non-Ciliary Fungi</option>
                                 </select>
                             </div>
-                            </div>
+                        </div>
                     </div>
                 </div>
             </aside>
 
             <main>
                 <div class="control-card">
-                    <div class="download-controls">
+                    <div class="download-controls" style="display: none;">
                         <select id="download-format"><option>png</option><option>pdf</option></select>
                         <button id="download-plot-btn">Download</button>
                     </div>
                     <div id="plot-display-area">
                         <div id="cilia-svg" style="width: 100%; height: 100%;">Your plot will appear here</div>
                     </div>
+                    <div id="gene-screen-results-container"></div>
                 </div>
             </main>
         </div>`;
@@ -2614,15 +2667,28 @@ KIF17</textarea>
     document.getElementById('analysis-dropdown').onchange = (e) => handlePlotSelection(e.target.value);
     
     const dropdown = document.getElementById('analysis-dropdown');
-    const initialType = 'phylogeny'; // Set default plot type to phylogeny
-    dropdown.value = initialType;
+    const initialType = 'screen_enrichment'; // Set default type
+    dropdown.value = initialType; // Set initial dropdown selection
     
-    // Call handler to show source and filter dropdowns initially
-    handlePlotSelection(initialType); 
+    // Initial content setup (matches the textarea default value)
+    document.getElementById('ciliaplot-genes-input').value = `ZC2HC1A
+WDR31
+WDR54
+ZNF474
+BBS1
+CEP290
+ARL13B
+AHI1
+BBS2
+BBS5
+IFT81
+CEP41
+WDR27
+WDR90
+KIF19
+KIF17`;
     
-    // Ensure Nevers is selected by default for the source dropdown
-    document.getElementById('phy-source').value = 'nevers_2017';
-    
+    handlePlotSelection(initialType);
     generatePlot();
 }
 
