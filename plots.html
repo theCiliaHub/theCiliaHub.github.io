@@ -714,175 +714,228 @@ function clearPlot() {
     el.innerHTML = '';
     if (window.currentPlot) Plotly.purge(el);
 }
-      
+
+// --- NEW GLOBAL CONSTANT (Add this near the top of your script block) ---
+const UMAP_CELL_ANNOTATIONS = {
+    'ciliated cell': { x: 10, y: 0.5, label: 'Ciliated Cells' },
+    'club cell': { x: 12, y: 14, label: 'Club Cells' },
+    'goblet cell': { x: 2, y: 16, label: 'Goblet/Secretory' },
+    'basal cell': { x: 9, y: 5, label: 'Basal/Stem Cells' },
+    'pulmonary alveolar type 1 cell': { x: -5, y: -4, label: 'Alveolar Type 1' },
+    'pulmonary alveolar type 2 cell': { x: 5, y: -8, label: 'Alveolar Type 2' },
+    'lung secretory cell': { x: 6, y: -2, label: 'Lung Secretory' },
+    'neuroendocrine cell': { x: 15, y: -3, label: 'Neuroendocrine' },
+    'stem cell': { x: 8, y: 7, label: 'Stem/Progenitor' }
+};
+
+        
+// --- REPLACE EXISTING function renderPhylogenyHeatmap(genes, custom) ---
+
 /**
- * UMAP PLOT (Expression Mapping Mode)
- * Renders a UMAP visualization based on single gene expression or gene ratio, with cluster annotations.
- * @param {string} gene1 - The primary gene symbol (always derived from main input).
- * @param {string | null} gene2 - The secondary gene symbol (from custom input field).
- * @param {object} custom - Customization settings.
+ * Renders the Phylogenetic Conservation Heatmap, handling both Li and Nevers data.
+ * FIX 1: Ensures correct species mapping for Li 2014 data (prevents blank heatmap).
+ * FIX 2: Standardizes all axis and label fonts to size 18 and bold.
+ * @param {Array} genes - Array of gene objects from main input.
+ * @param {Object} custom - Customization settings (including source and gene2).
  */
-async function renderScrnaUMAPPlot(gene1, gene2 = null, custom) { 
-    // --- NEW: UMAP Cluster Annotation Coordinates (Defined inside the function) ---
-    const UMAP_CELL_ANNOTATIONS = {
-        'ciliated cell': { x: 10, y: 0.5, label: 'Ciliated Cells' },
-        'club cell': { x: 12, y: 14, label: 'Club Cells' },
-        'goblet cell': { x: 2, y: 16, label: 'Goblet/Secretory' },
-        'basal cell': { x: 9, y: 5, label: 'Basal/Stem Cells' },
-        'pulmonary alveolar type 1 cell': { x: -5, y: -4, label: 'Alveolar Type 1' },
-        'pulmonary alveolar type 2 cell': { x: 5, y: -8, label: 'Alveolar Type 2' },
-        'lung secretory cell': { x: 6, y: -2, label: 'Lung Secretory' },
-        'neuroendocrine cell': { x: 15, y: -3, label: 'Neuroendocrine' },
-        'stem cell': { x: 8, y: 7, label: 'Stem/Progenitor' }
-    };
-    // --------------------------------------------------------------------------
+function renderPhylogenyHeatmap(genes, custom) {
+    clearPlot();
+    
+    // --- 1. Consolidate Gene List ---
+    const primaryGeneSymbols = new Set(genes.map(g => g.gene.toUpperCase()));
+    let finalGeneList = [...genes];
 
-    const plotDivId = 'plot-display-area'; 
-    const umapData = window.CiliAI_UMAP;
-    const cellData = window.CiliAI.cellDataCache;
-    const plotDiv = document.getElementById(plotDivId);
-       
-    // Determine mode and genes
-    const genePrimary = gene1 ? gene1.toUpperCase() : 'FOXJ1';
-    const geneSecondary = gene2 ? gene2.toUpperCase() : null;
-    const isRatioMode = geneSecondary && geneSecondary !== genePrimary;
-       
-    let plotTitle, colorTitle;
-
-    if (isRatioMode) {
-        plotTitle = `UMAP: <strong>${genePrimary} / ${geneSecondary}</strong> Expression Ratio`;
-        colorTitle = `${genePrimary} / ${geneSecondary} Ratio`;
-    } else {
-        plotTitle = `UMAP: <strong>${genePrimary}</strong> Expression`;
-        colorTitle = `${genePrimary} Expr. (TPM)`;
-    }
-
-    if (!plotDiv) {
-        console.error('UMAP plot container "plot-display-area" not found.');
-        return;
-    }
-           
-    // Check if critical data is available 
-    if (!umapData || umapData.length === 0 || !cellData || Object.keys(cellData).length === 0) {
-        plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; padding:20px; color:red; text-align:center;">
-            Critical error: scRNA-seq UMAP coordinates or expression data is missing or failed to load.
-        </div>`;
-        return;
-    }
-
-    plotDiv.innerHTML = ''; // Reset panel
-       
-    // Get expression data for both genes
-    const exprData1 = cellData[genePrimary] || {};
-    const exprData2 = isRatioMode ? (cellData[geneSecondary] || {}) : {};
-           
-    const sampledData = [];
-    const colorArray = [];
-    const sizeArray = [];
-       
-    let maxColorValue = 0;
-    const pseudoCount = 0.01; // Avoid division by zero in ratio mode
-    const expressionThreshold = 2; 
-
-    // Use full UMAP data
-    const sourceData = umapData; 
-
-    for (const point of sourceData) {
-        const value1 = exprData1[point.cell_type] || 0;
-               
-        let colorValue, sizeMagnitude;
-
-        if (isRatioMode) {
-            const value2 = exprData2[point.cell_type] || 0;
-            // Calculate ratio: (G1 + pseudo) / (G2 + pseudo)
-            colorValue = (value1 + pseudoCount) / (value2 + pseudoCount); 
-            // Size based on G1 expression magnitude
-            sizeMagnitude = value1; 
-        } else {
-            colorValue = value1;
-            sizeMagnitude = value1;
-        }
-
-        sampledData.push(point);
-        colorArray.push(colorValue);
-                       
-        // Dot size scaling based on primary magnitude
-        const scaledMagnitude = Math.min(sizeMagnitude, expressionThreshold) / expressionThreshold;
-        sizeArray.push(5 + (12 - 5) * scaledMagnitude); 
-                       
-        if (colorValue > maxColorValue) {
-            maxColorValue = colorValue;
-        }
-    }
-           
-    // Handle case where primary gene has no data
-    if (Object.keys(exprData1).length === 0) {
-        plotDiv.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">
-            🚫 Gene <strong>${genePrimary}</strong> not found in the expression cache.
-        </div>`;
-        return; 
-    }
-       
-    // --- Annotations & Plotly Setup ---
-    const colorScale = isRatioMode ? 'Viridis' : [[0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']];
-    const cMax = isRatioMode ? Math.min(maxColorValue, 10) : maxColorValue; 
-       
-    // --- Generate UMAP Annotations ---
-    const annotations = Object.values(UMAP_CELL_ANNOTATIONS).map(ann => ({
-        x: ann.x,
-        y: ann.y,
-        xref: 'x',
-        yref: 'y',
-        text: ann.label,
-        showarrow: false,
-        font: {
-            color: '#333',
-            size: 14,
-            weight: 'bold'
-        },
-        // Draw a gray box behind the text for contrast
-        bgcolor: 'rgba(255, 255, 255, 0.7)',
-        bordercolor: '#ccc',
-        borderwidth: 1,
-        borderpad: 4
-    }));
-    // --- END Generate UMAP Annotations ---
-
-    const plotData = [{
-        x: sampledData.map(p => p.x),
-        y: sampledData.map(p => p.y),
-        text: sampledData.map((p, i) => {
-            const expr1 = exprData1[p.cell_type] || 0;
-            if (isRatioMode) {
-                const expr2 = exprData2[p.cell_type] || 0;
-                return `Cell Type: ${p.cell_type}<br>${genePrimary}: ${expr1.toFixed(3)}<br>${geneSecondary}: ${expr2.toFixed(3)}<br>Ratio: ${colorArray[i].toFixed(2)}`;
+    if (custom.gene2) {
+        const secondaryQueries = custom.gene2.split(/[\s,\n;]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+        secondaryQueries.forEach(q => {
+            if (!primaryGeneSymbols.has(q)) {
+                const geneObject = ciliaryGeneMap.get(q) || { gene: q, phylogeny: {} };
+                finalGeneList.push(geneObject);
+                primaryGeneSymbols.add(q);
             }
-            return `Cell Type: ${p.cell_type}<br>Expression: ${expr1.toFixed(3)}`;
-        }),
-        mode: 'markers',
-        type: 'scattergl',
-        hoverinfo: 'text',
-        marker: {
-            color: colorArray,
-            colorscale: colorScale,
-            cmin: isRatioMode ? 0.1 : 0,
-            cmax: cMax > 0 ? cMax : 0.0001,
-            colorbar: { title: colorTitle },
-            size: sizeArray,
-            opacity: 0.8
+        });
+    }
+
+    if (finalGeneList.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#e74c3c; font-size:16px;">No valid genes provided for analysis.</div>`;
+        return;
+    }
+    
+    // --- 2. Setup & Data Source Selection ---
+    const plotDivId = 'plot-display-area';
+    const source = custom.source || 'nevers_2017'; 
+    const isLi = source === 'li_2014';
+       
+    const CIL_PANEL = isLi ? LI_CIL_ORG : NEVERS_CIL_ORG;
+    const NCIL_PANEL = isLi ? LI_NCIL_ORG : NEVERS_NCIL_ORG;
+    const allOrgNames = [...CIL_PANEL, ...NCIL_PANEL];
+
+    const phyloCache = isLi ? window.liPhylogenyCache : window.neversPhylogenyCache;
+    const masterOrgList = isLi ? (phyloCache.summary?.organisms_list || []) : (phyloCache.organism_groups?.all_organisms_list || []);
+    
+    // CRITICAL FIX for Li 2014: Master map keys must match the list generated by Li's parser, 
+    // which are the keys provided in LI_CIL_ORG (e.g., 'H sapiens', not 'Homo sapiens').
+    const masterOrgMap = new Map(masterOrgList.map((name, index) => [name, index])); 
+       
+    // --- 3. Species Filtering ---
+    let organismsToDisplay = [];
+    const selectedFilters = custom.speciesFilters;
+
+    if (selectedFilters && selectedFilters.length > 0 && !selectedFilters.includes('all')) {
+        const filteredOrgNamesSet = new Set();
+        Object.values(PHYLO_SPECIES_GROUPS).flat().forEach(name => filteredOrgNamesSet.add(name));
+
+        organismsToDisplay = allOrgNames.filter(name => 
+            selectedFilters.some(groupKey => PHYLO_SPECIES_GROUPS[groupKey]?.includes(name) || PHYLO_SPECIES_GROUPS[groupKey]?.includes(shortenOrganismName(name)))
+        );
+    } else {
+        organismsToDisplay = allOrgNames;
+    }
+    
+    organismsToDisplay = Array.from(new Set(organismsToDisplay)).filter(Boolean);
+    if (organismsToDisplay.length === 0) {
+        organismsToDisplay = allOrgNames;
+    }
+
+    const orgs = organismsToDisplay;
+
+    // --- 4. Data Processing and Scoring ---
+    const z = [];
+    const yLabels = [];
+    const textMatrix = [];
+
+    finalGeneList.forEach(gene => {
+        const geneSymbol = gene.gene || gene.Gene;
+        if (!gene.phylogeny) gene.phylogeny = {};
+        
+        const phyData = gene.phylogeny?.[source];
+        const scores = calculatePhyloScores(gene)[source] || {}; 
+        
+        const row = [];
+        const textRow = [];
+        
+        if (!phyData || !phyData.species_data || !Array.isArray(phyData.species_data)) {
+            orgs.forEach(org => { 
+                row.push(0); 
+                textRow.push(`Gene: ${geneSymbol}<br>Organism: ${org}<br>Status: No Data (Check master DB)`); 
+            });
+        } else {
+            const presenceIndices = new Set(phyData.species_data);
+            
+            orgs.forEach((displayOrg) => {
+                const isCiliated = CIL_PANEL.includes(displayOrg);
+                let status = 0;
+
+                // Fix: The masterOrgKey *is* the key for the LI_CIL_ORG/NEVERS_CIL_PANEL lists.
+                // We use this exact string to look up the index in the masterOrgMap.
+                const masterOrgKey = displayOrg; 
+                let masterIndex = masterOrgMap.get(masterOrgKey); 
+                
+                if (masterIndex !== undefined && masterIndex !== -1 && presenceIndices.has(masterIndex)) {
+                    status = isCiliated ? 2 : 1; 
+                    textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Present in ${isCiliated ? 'Ciliated' : 'Non-Ciliated'} group`);
+                } else {
+                    textRow.push(`Gene: ${geneSymbol}<br>Organism: ${displayOrg}<br>Status: Absent`);
+                }
+                row.push(status);
+            });
         }
+        
+        z.push(row);
+        
+        // Y-Axis FIX 1: Display only the Gene Symbol
+        yLabels.push(geneSymbol); 
+        textMatrix.push(textRow);
+    });
+    
+    // --- 5. Plotly Setup ---
+    
+    const filteredCilCount = orgs.filter(name => CIL_PANEL.includes(name)).length;
+    const separatorIndex = filteredCilCount > 0 ? filteredCilCount - 0.5 : -0.5;
+    const plotHeight = custom.figureHeight || Math.max(500, finalGeneList.length * 40 + 200);
+
+    const data = [{
+        type: 'heatmap', 
+        z: z, 
+        x: orgs.map(shortenOrganismName),
+        y: yLabels, 
+        customdata: textMatrix,
+        colorscale: [
+            [0, '#F0F0F0'],       
+            [0.0001, '#FFE5B5'],
+            [1, '#FFE5B5'],       
+            [1.0001, '#698ECF'],
+            [2, '#698ECF']        
+        ],
+        showscale: false,
+        hovertemplate: '%{customdata}<extra></extra>',
+        xgap: 0.5, ygap: 0.5
     }];
 
+    const FONT_SIZE = 18;
+    const FONT_WEIGHT = 'bold';
+
     const layout = {
-        title: plotTitle,
-        xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
-        yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
-        annotations: annotations, // Pass the annotations here
-        showlegend: false
+        title: { 
+            text: custom.title || `Phylogenetic Conservation Heatmap (${isLi ? 'Li et al. 2014' : 'Nevers et al. 2017'})`,
+            font: { size: custom.titleFontSize || 24, weight: FONT_WEIGHT } // Default title size increased
+        },
+        width: custom.figureWidth || 1000, 
+        height: plotHeight,
+        xaxis: { 
+            title: { text: 'Organisms', font: { size: FONT_SIZE, weight: FONT_WEIGHT } }, // X-Axis Title FIX
+            tickangle: -45,
+            tickfont: { size: FONT_SIZE, weight: FONT_WEIGHT }, // X-Axis Labels FIX
+            tickvals: Array.from({length: orgs.length}, (_, i) => i),
+            ticktext: orgs.map(shortenOrganismName),
+            showgrid: false, zeroline: false, 
+            side: 'bottom', 
+            automargin: true
+        },
+        yaxis: { 
+            title: { text: 'Genes', font: { size: FONT_SIZE, weight: FONT_WEIGHT } }, // Y-Axis Title FIX
+            automargin: true, 
+            tickfont: { size: FONT_SIZE, weight: FONT_WEIGHT } // Y-Axis Labels FIX
+        },
+        margin: { l: 150, r: 20, t: 120, b: 250 }, 
+        shapes: [{
+            type: 'line', 
+            xref: 'x', 
+            yref: 'paper', 
+            x0: separatorIndex, 
+            x1: separatorIndex,
+            y0: 0, 
+            y1: 1, 
+            line: { color: 'black', width: 2 } 
+        }],
+        annotations: [
+            { 
+                text: 'CILIATED', 
+                xref: 'x', 
+                yref: 'paper', 
+                x: filteredCilCount > 0 ? (filteredCilCount - 1) / 2 : 0, 
+                y: 1.05, 
+                showarrow: false, 
+                font: { color: '#698ECF', size: FONT_SIZE, weight: FONT_WEIGHT }, // ANNOTATION FIX
+                xanchor: 'center' 
+            },
+            { 
+                text: 'NON-CILIATED', 
+                xref: 'x', 
+                yref: 'paper', 
+                x: filteredCilCount + ((orgs.length - filteredCilCount) / 2) - 0.5, 
+                y: 1.05,
+                showarrow: false, 
+                font: { color: '#d62728', size: FONT_SIZE, weight: FONT_WEIGHT }, // ANNOTATION FIX
+                xanchor: 'center' 
+            }
+        ]
     };
-           
-    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
+    
+    Plotly.newPlot(plotDivId, data, layout, { responsive: true });
 }
+        
+window.renderScrnaUMAPPlot = renderScrnaUMAPPlot;
         
 // 1. Gene Feature Overview (Manhattan-style) - ENRICHED VERSION (FIXED: Screens/Tissue access)
 // --- FIXED PHYLOGENY DATA ACCESS IN OTHER PLOTS ---
