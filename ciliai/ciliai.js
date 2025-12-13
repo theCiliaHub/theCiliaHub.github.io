@@ -1205,7 +1205,7 @@ function extractEvolutionIntent(qLower) {
     
 
 /**
- * Renders UMAP with RED Color Scale (Restored)
+ * Renders UMAP with Dim -> Bold Cluster Labels
  */
 async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
@@ -1223,39 +1223,52 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
 
     let expressionMap = window.CiliAI.cellDataCache[targetGenes[0].toUpperCase()] || {};
 
-    // 1. Prepare Data
+    // 1. Prepare Data & Calculate Centroids for Labels
     const sampleSize = 10000;
     const sampledData = [];
     const colorArray = [];
     const sizeArray = [];
+    const clusterSums = {}; // Helper for centroids
     
     const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
     
     let maxExpr = 0;
-    for (const point of sourceData) {
-        const val = expressionMap[point.cell_type] || 0;
-        if(val > maxExpr) maxExpr = val;
-    }
-    const scaleMax = maxExpr > 0 ? maxExpr : 1;
-
+    
     for (const point of sourceData) {
         const val = expressionMap[point.cell_type] || 0;
         sampledData.push(point);
         colorArray.push(val);
-        const size = val > 0 ? 6 : 3;
-        sizeArray.push(size);
+        sizeArray.push(val > 0 ? 6 : 3);
+        if(val > maxExpr) maxExpr = val;
+
+        // Centroid Calculation
+        if (!clusterSums[point.cell_type]) clusterSums[point.cell_type] = { x: 0, y: 0, count: 0 };
+        clusterSums[point.cell_type].x += point.x;
+        clusterSums[point.cell_type].y += point.y;
+        clusterSums[point.cell_type].count++;
     }
 
-    // 2. RED COLOR SCALE (Restored from previous version)
-    const redColorScale = [
-        [0, '#F8F8F8'],       // Lightest grey/white
-        [0.0001, '#FFDAD0'],  // Very light red threshold
-        [1, '#E60000']        // Dark Red
-    ];
+    // Generate Annotations (Labels)
+    const annotations = Object.keys(clusterSums).map(cellType => {
+        const c = clusterSums[cellType];
+        return {
+            x: c.x / c.count,
+            y: c.y / c.count,
+            text: cellType,
+            showarrow: false,
+            font: { size: 10, color: 'rgba(50, 50, 50, 0.5)', family: 'Inter, sans-serif' }, // Dim default
+            bgcolor: 'rgba(255,255,255,0.3)',
+            name: cellType // ID for hover logic
+        };
+    });
+
+    const scaleMax = maxExpr > 0 ? maxExpr : 1;
+    const redColorScale = [[0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']];
 
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
+        customdata: sampledData.map(p => p.cell_type), // Needed for hover
         text: sampledData.map((p, i) => `<b>${p.cell_type}</b><br>Expr: ${colorArray[i].toFixed(2)}`),
         mode: 'markers',
         type: 'scattergl',
@@ -1272,17 +1285,39 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
     }];
 
     const layout = {
-        title: { text: `<b>${gene} Expression</b>`, font: { size: 16, color: '#2d3748' }, x: 0.05 },
+        title: { text: `<b>${gene} Expression (Lung scRNA)</b>`, font: { size: 16, color: '#2d3748' }, x: 0.05 },
         xaxis: { visible: false },
         yaxis: { visible: false },
         hovermode: 'closest',
         margin: { t: 50, b: 20, l: 20, r: 20 },
         plot_bgcolor: '#ffffff',
         paper_bgcolor: '#ffffff',
-        showlegend: false
+        showlegend: false,
+        annotations: annotations // Add the labels
     };
 
     await Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displaylogo: false });
+
+    // 2. Interactive Hover Events (Bold Label on Hover)
+    plotDiv.on('plotly_hover', function(data){
+        const point = data.points[0];
+        if(!point) return;
+        const hoveredType = point.customdata;
+
+        // Update annotations: Make the hovered one Bold & Big
+        const newAnns = annotations.map(ann => {
+            if (ann.text === hoveredType) {
+                return { ...ann, font: { size: 16, color: '#000000', weight: 'bold' }, bgcolor: 'rgba(255,255,255,0.8)' };
+            }
+            return ann;
+        });
+        Plotly.relayout(plotDivId, { annotations: newAnns });
+    });
+
+    plotDiv.on('plotly_unhover', function(data){
+        // Reset to default dim state
+        Plotly.relayout(plotDivId, { annotations: annotations });
+    });
 
     // Close Button
     if (!document.getElementById('ciliai-back-btn')) {
@@ -2401,125 +2436,61 @@ function performMultiCriteriaFilter(query, intents) {
  * while keeping the chat stream clean.
  */
 /**
- * Renders the "Gene Dashboard" into the main 'cilia-svg' panel.
- * Full version with no brevity.
+ * Returns Full Gene Info HTML for the Chat Window
  */
 async function displayFullGeneInfo(geneSymbol) {
     const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
-    
-    // 1. Validation: Check if gene exists in database
     if (!gm || !gm[geneSymbol]) {
         return `<div class="ai-result-card">No data found for gene <strong>${geneSymbol}</strong></div>`;
     }
-    
     const g = gm[geneSymbol];
-    const viewContainer = document.getElementById('cilia-svg');
+    const safeVal = (v) => (v && v !== 'N/A' && v !== '0') ? v : '<span style="color:#ccc">—</span>';
     
-    // 2. Only update visualization panel if it exists in the DOM
-    if (viewContainer) {
-        // Helper: Format null/empty values
-        const safeVal = (v) => (v && v !== 'N/A' && v !== '0') ? v : '<span style="color:#ccc">—</span>';
-        
-        // Helper: Render mini bar charts for expression data
-        const renderExpression = (data) => {
-            if (!data) return '<p style="color:#a0aec0; font-size: 12px;">No scRNA data available.</p>';
+    // Use the scRNA data from the gene object
+    const scRNA = g.expression?.scRNA || {};
+
+    // Build the HTML using your requested template
+    const html = `
+        <div class="ai-result-card" style="font-family: 'Inter', sans-serif;">
+            <h2 style="margin-top:0; color:#2b6cb0;">${geneSymbol}</h2>
+            <p><strong>Description:</strong> ${g['Gene.Description'] || 'No description available'}</p>
+            <p><strong>Localization:</strong> ${g.Localization || 'Unknown'}</p>
             
-            // Sort by expression value (descending) and take top 5
-            const sorted = Object.entries(data).sort(([,a], [,b]) => b - a).slice(0, 5);
-            
-            let html = '<table style="width:100%; font-size: 12px; border-collapse: collapse;">';
-            sorted.forEach(([k, v]) => {
-                // Calculate bar width (max 100%)
-                const w = Math.min(100, v * 10);
-                html += `
-                    <tr>
-                        <td style="padding:4px 0; color:#4a5568;">${k}</td>
-                        <td style="text-align:right; width:40%;">
-                            <div style="display:flex; justify-content:flex-end; align-items:center;">
-                                <span style="margin-right:6px; font-weight:600; color:#2b6cb0;">${v.toFixed(1)}</span>
-                                <div style="width:50px; height:4px; background:#edf2f7; border-radius:2px;">
-                                    <div style="width:${w}%; height:100%; background:#4299e1; border-radius:2px;"></div>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>`;
-            });
-            return html + '</table>';
-        };
-
-        // 3. Build the Dashboard HTML Template
-        const dashboardHTML = `
-            <div class="gene-dashboard-container" style="padding: 20px; font-family: 'Inter', sans-serif; background: #fff; height: 100%; overflow-y: auto;">
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 20px;">
-                    <div>
-                        <h1 style="margin: 0; font-size: 24px; color: #2d3748;">${geneSymbol}</h1>
-                        <p style="margin: 5px 0 0; color: #718096; font-size: 13px;">${g['Gene.Description'] || 'No description available'}</p>
-                    </div>
-                    <div style="text-align: right;">
-                         <span style="background: #ebf8ff; color: #2b6cb0; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">
-                            ${g.Localization || 'Unknown Loc.'}
-                         </span>
-                    </div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px;">
-                    <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
-                        <div style="font-size: 10px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Phenotype (LoF)</div>
-                        <div style="font-size: 13px; font-weight: 500; color: #2d3748; margin-top: 4px;">
-                            ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}
-                        </div>
-                    </div>
-                    <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
-                        <div style="font-size: 10px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Ortholog (Mouse)</div>
-                        <div style="font-size: 13px; font-weight: 500; color: #2d3748; margin-top: 4px;">
-                            ${safeVal(g.Ortholog_Mouse)}
-                        </div>
-                    </div>
-                    <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
-                        <div style="font-size: 10px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">OMIM ID</div>
-                        <div style="font-size: 13px; font-weight: 500; color: #2d3748; margin-top: 4px;">
-                            ${safeVal(g.OMIM?.ID)}
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    
-                    <div>
-                        <h3 style="font-size: 14px; border-left: 3px solid #4299e1; padding-left: 8px; margin-bottom: 10px; color:#2d3748;">scRNA Expression</h3>
-                        ${renderExpression(g.expression?.scRNA)}
-                    </div>
-
-                    <div>
-                        <h3 style="font-size: 14px; border-left: 3px solid #ed8936; padding-left: 8px; margin-bottom: 10px; color:#2d3748;">Actions</h3>
-                        <div style="display:flex; flex-direction:column; gap:8px;">
-                            <button onclick="window.handleAIQuery('show evolution of ${geneSymbol}')" style="padding: 8px; background: white; border: 1px solid #cbd5e0; color: #4a5568; border-radius: 6px; cursor: pointer; font-size: 12px; text-align:left; transition:background 0.2s;">
-                                🧬 View Phylogeny Heatmap
-                            </button>
-                            <button onclick="window.handleAIQuery('plot umap for ${geneSymbol}')" style="padding: 8px; background: white; border: 1px solid #cbd5e0; color: #4a5568; border-radius: 6px; cursor: pointer; font-size: 12px; text-align:left; transition:background 0.2s;">
-                                📊 View UMAP Plot
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            <div style="background:#f7fafc; padding:10px; border-radius:8px; margin:10px 0;">
+                <p style="margin:5px 0;"><strong>Mouse Ortholog:</strong> ${safeVal(g.Ortholog_Mouse)}</p>
+                <p style="margin:5px 0;"><strong>Phenotype (LoF):</strong> ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</p>
+                <p style="margin:5px 0;"><strong>OMIM:</strong> ${safeVal(g.OMIM?.ID)}</p>
             </div>
-        `;
-        
-        // 4. Inject into the page
-        viewContainer.innerHTML = dashboardHTML;
-    }
 
-    // 5. Return the Chat Message (Short Summary)
-    return `
-        <div class="ai-result-card">
-            <p>I've loaded the full dashboard for <strong>${geneSymbol}</strong> in the main panel.</p>
-            <div class="ciliai-reaction-buttons" style="margin-top:10px;">
-                 <span class="gene-badge" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">Show Evolution</span>
-                 <span class="gene-badge" onclick="window.handleAIQuery('plot umap for ${geneSymbol}')">Show UMAP</span>
+            ${Object.keys(scRNA).length > 0 ? `
+                <h3 class="section-title" style="margin-top: 1.5rem; font-size:14px; border-bottom:1px solid #eee; padding-bottom:5px;">Single-Cell Expression</h3>
+                <div class="info-row" style="font-size:13px; margin-bottom:10px;">
+                    <span class="info-label" style="color:#666;">scRNA-seq in Lung Cells:</span>
+                    <span class="info-value">
+                        ${Object.entries(scRNA)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 6) // Limit to top 6 to prevent huge walls of text
+                            .map(([cellType, value]) => 
+                                `<strong>${cellType}:</strong> ${typeof value === 'number' ? value.toFixed(2) : value}`
+                            ).join('; ')}
+                    </span>
+                </div>
+                <div class="data-source-note" style="font-size:11px; color:#718096; background:#f1f5f9; padding:8px; border-radius:4px;">
+                    <strong>Data Source:</strong> human lung organoid cell atlas (AnnData v0.10).
+                    <a href="https://datasets.cellxgene.cziscience.com/a2011f35-04c4-427f-80d1-27ee0670251d.h5ad" target="_blank" class="external-link with-icon" style="color:#3182ce; text-decoration:none;">
+                        [Download Source H5AD]
+                    </a>
+                </div>
+            ` : '<p>No scRNA data available.</p>'}
+
+            <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+                <span class="gene-badge" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">Show Evolution</span>
+                <span class="gene-badge" onclick="window.handleAIQuery('plot umap for ${geneSymbol}')">Show UMAP</span>
             </div>
         </div>
     `;
+    
+    return html;
 }
 
 // Helpers for the Dashboard (Add these adjacent to displayFullGeneInfo)
@@ -3154,6 +3125,8 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 
+// Global default list
+const DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
 /**
  * (REPLACEMENT) The Main "Level 1" Query Router
  * This function is declared globally immediately to solve ReferenceError issues.
@@ -3307,13 +3280,21 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-    // =======================================================
+   // =======================================================
     // =( 8 )= INTENT: PHYLOGENY / EVOLUTION (REPLACEMENT)
     // =======================================================
     else if (qLower.includes('evolution') || qLower.includes('phylogen') || (qLower.includes('show') && qLower.includes('li'))) {
-        const genes = extractMultipleGenes(query);
+        let genes = extractMultipleGenes(query);
         
         if (genes.length > 0) {
+            // ** INJECT DEFAULTS IF SINGLE GENE **
+            // If user asks for just one gene (e.g. "evolution of IFT88"), 
+            // we show it alongside the default panel for context.
+            if (genes.length === 1) {
+                // Combine default list + requested gene, remove duplicates
+                genes = [...new Set([...DEFAULT_PHYLO_GENES, genes[0]])];
+            }
+
             // A: Lazy Load Data if missing
             if (!window.liPhylogenyCache) {
                 window.addChatMessage("Loading phylogeny data... (this happens once)", false);
@@ -3331,22 +3312,41 @@ window.handleAIQuery = async function (query) {
                         // Add a simple Close button over the plot
                         const btn = document.createElement('button');
                         btn.textContent = '✕ Close View';
-                        btn.style.cssText = 'position:absolute; top:10px; right:10px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer;';
+                        btn.style.cssText = 'position:absolute; top:10px; right:10px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px;';
                         btn.onclick = () => window.generateAndInjectSVG();
                         
+                        // Add 'Add Gene' Button overlay
+                        const addBtn = document.createElement('button');
+                        addBtn.id = 'ciliai-add-gene-btn';
+                        addBtn.textContent = '+ Add Gene';
+                        addBtn.style.cssText = 'position:absolute; top:10px; right:100px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px;';
+                        addBtn.onclick = () => {
+                            const newGene = prompt("Enter gene symbol to add:");
+                            if(newGene) window.handleAIQuery(`show evolution of ${genes.join(' ')} ${newGene}`);
+                        };
+
                         const container = document.getElementById('cilia-svg');
-                        if(container) container.prepend(btn);
+                        if(container) {
+                            container.prepend(btn);
+                            
+                            // Remove old add button if exists to prevent duplicates
+                            const oldAddBtn = document.getElementById('ciliai-add-gene-btn');
+                            if(oldAddBtn) oldAddBtn.remove();
+                            
+                            container.prepend(addBtn);
+                        }
                      } else {
                         window.addChatMessage("Could not render heatmap (Data missing or gene not found).", false);
                      }
                 }
             }, 100); 
             
-            html = `<div class="ai-result-card">Showing evolution heatmap for <strong>${genes.join(', ')}</strong> in the main panel.</div>`;
+            html = `<div class="ai-result-card">Showing evolution heatmap for <strong>${genes.length} genes</strong> in the main panel.</div>`;
         } else {
              html = "Please specify a gene for evolution analysis (e.g., 'Evolution of IFT88').";
         }
-    }
+    }     
+        
         // =======================================================
         // =( 9 )= INTENT: FUNCTIONAL MODULES
         // =======================================================
