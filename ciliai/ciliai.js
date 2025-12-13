@@ -2413,64 +2413,135 @@ function performMultiCriteriaFilter(query, intents) {
  * Fancy Dashboard Version (v6.0 - Cell Whisperer Style)
  * Renders a comprehensive "Gene Dashboard" in the left/main panel
  * while keeping the chat stream clean.
- */
+
 /**
- * Returns Full Gene Info HTML for the Chat Window
+ * Unified Gene Dashboard (v8.0)
+ * Combines Cell Whisperer Design + GTDB Badge System + Detailed Data Tables
  */
-async function displayFullGeneInfo(geneSymbol) {
+window.displayFullGeneInfo = async function(geneSymbol) {
     const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
     if (!gm || !gm[geneSymbol]) {
         return `<div class="ai-result-card">No data found for gene <strong>${geneSymbol}</strong></div>`;
     }
     const g = gm[geneSymbol];
     const safeVal = (v) => (v && v !== 'N/A' && v !== '0') ? v : '<span style="color:#ccc">—</span>';
-    
-    // Use the scRNA data from the gene object
     const scRNA = g.expression?.scRNA || {};
 
-    // Build the HTML using your requested template
-    const html = `
-        <div class="ai-result-card" style="font-family: 'Inter', sans-serif;">
-            <h2 style="margin-top:0; color:#2b6cb0;">${geneSymbol}</h2>
-            <p><strong>Description:</strong> ${g['Gene.Description'] || 'No description available'}</p>
-            <p><strong>Localization:</strong> ${g.Localization || 'Unknown'}</p>
+    // --- 1. CALCULATE CILIARY CONFIDENCE SCORE (GTDB Style) ---
+    let score = 0;
+    // +1 per positive screen
+    if (g.screens) score += g.screens.length; 
+    // +2 for Ciliopathy link
+    if (g.Ciliopathies && g.Ciliopathies.length > 0) score += 2;
+    // +1 for C. elegans Ortholog (Evolutionary conservation)
+    if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') score += 1; 
+
+    let badge = '';
+    if (score >= 4) badge = `<span class="cilia-badge badge-gold" title="High Confidence: Multiple screens + Disease link">🥇 High Confidence</span>`;
+    else if (score >= 2) badge = `<span class="cilia-badge badge-silver" title="Verified: Found in multiple datasets">🥈 Verified</span>`;
+    else badge = `<span class="cilia-badge badge-bronze" title="Candidate: Limited data">🥉 Candidate</span>`;
+
+    // --- 2. CSS STYLES (Inline for portability) ---
+    const styles = `
+        <style>
+            .cilia-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; margin-left: 10px; vertical-align: middle; }
+            .badge-gold { background: #fefcbf; color: #744210; border: 1px solid #d69e2e; }
+            .badge-silver { background: #edf2f7; color: #2d3748; border: 1px solid #cbd5e0; }
+            .badge-bronze { background: #fff5f5; color: #742a2a; border: 1px solid #feb2b2; }
             
-            <div style="background:#f7fafc; padding:10px; border-radius:8px; margin:10px 0;">
-                <p style="margin:5px 0;"><strong>Mouse Ortholog:</strong> ${safeVal(g.Ortholog_Mouse)}</p>
-                <p style="margin:5px 0;"><strong>Phenotype (LoF):</strong> ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</p>
-                <p style="margin:5px 0;"><strong>OMIM:</strong> ${safeVal(g.OMIM?.ID)}</p>
-            </div>
+            .fancy-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; border-radius: 6px; overflow: hidden; border: 1px solid #e2e8f0; }
+            .fancy-table th { background: #ebf8ff; color: #2c5282; padding: 6px 8px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+            .fancy-table td { padding: 6px 8px; border-bottom: 1px solid #E2E8F0; color: #4a5568; }
+            .fancy-table tr:last-child td { border-bottom: none; }
+            .fancy-table tr:hover { background: #f7fafc; }
+            
+            .section-header { margin-top: 1.2rem; font-size: 13px; font-weight: 700; color: #2d3748; border-bottom: 2px solid #edf2f7; padding-bottom: 4px; margin-bottom: 8px; }
+            .data-source-note { font-size: 10px; color: #718096; margin-top: 4px; font-style: italic; }
+        </style>
+    `;
 
-            ${Object.keys(scRNA).length > 0 ? `
-                <h3 class="section-title" style="margin-top: 1.5rem; font-size:14px; border-bottom:1px solid #eee; padding-bottom:5px;">Single-Cell Expression</h3>
-                <div class="info-row" style="font-size:13px; margin-bottom:10px;">
-                    <span class="info-label" style="color:#666;">scRNA-seq in Lung Cells:</span>
-                    <span class="info-value">
-                        ${Object.entries(scRNA)
-                            .sort((a, b) => b[1] - a[1])
-                            .slice(0, 6) // Limit to top 6 to prevent huge walls of text
-                            .map(([cellType, value]) => 
-                                `<strong>${cellType}:</strong> ${typeof value === 'number' ? value.toFixed(2) : value}`
-                            ).join('; ')}
-                    </span>
-                </div>
-                <div class="data-source-note" style="font-size:11px; color:#718096; background:#f1f5f9; padding:8px; border-radius:4px;">
-                    <strong>Data Source:</strong> human lung organoid cell atlas (AnnData v0.10).
-                    <a href="https://datasets.cellxgene.cziscience.com/a2011f35-04c4-427f-80d1-27ee0670251d.h5ad" target="_blank" class="external-link with-icon" style="color:#3182ce; text-decoration:none;">
-                        [Download Source H5AD]
-                    </a>
-                </div>
-            ` : '<p>No scRNA data available.</p>'}
+    // --- 3. BUILD HTML ---
+    let html = `${styles}<div class="ai-result-card" style="font-family: 'Inter', sans-serif;">`;
+    
+    // Header
+    html += `<div style="display:flex; align-items:center; margin-bottom:10px;">
+                <h2 style="margin:0; color:#2b6cb0;">${geneSymbol}</h2>
+                ${badge}
+             </div>`;
+             
+    html += `<p><strong>Description:</strong> ${g['Gene.Description'] || 'No description available'}</p>`;
+    html += `<p><strong>Localization:</strong> ${g.Localization || 'Unknown'}</p>`;
 
-            <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+    // Key Stats Box (v6.0 Style)
+    html += `<div style="background:#f7fafc; padding:10px; border-radius:8px; margin:10px 0; font-size: 0.95em; border: 1px solid #edf2f7;">
+                <p style="margin:3px 0;"><strong>Mouse Ortholog:</strong> ${safeVal(g.Ortholog_Mouse)}</p>
+                <p style="margin:3px 0;"><strong>Phenotype (LoF):</strong> ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</p>
+                <p style="margin:3px 0;"><strong>OMIM:</strong> ${safeVal(g.OMIM?.ID)}</p>
+             </div>`;
+
+    // --- MERGED DETAILED TABLES (v5.1 Style) ---
+
+    // 1. Cilia Effects Table
+    html += `<div class="section-header">Cilia Effects</div>`;
+    html += `<table class="fancy-table">
+                <tr><th>Effect Type</th><th>Result</th></tr>
+                <tr><td>Overexpression</td><td>${safeVal(g['Overexpression effects on cilia length (increase/decrease/no effect)'])}</td></tr>
+                <tr><td>Loss-of-Function</td><td>${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</td></tr>
+                <tr><td>% Ciliated</td><td>${safeVal(g['Percentage of ciliated cells (increase/decrease/no effect)'])}</td></tr>
+             </table>`;
+
+    // 2. Screens Table
+    if (Array.isArray(g.screens) && g.screens.length > 0) {
+        html += `<div class="section-header">Screen Results</div>`;
+        html += `<table class="fancy-table"><tr><th>Source</th><th>Result</th></tr>`;
+        g.screens.forEach(s => {
+            html += `<tr><td><strong>${s.source}</strong></td><td>${s.result}</td></tr>`;
+        });
+        html += `</table>`;
+    }
+
+    // 3. scRNA Expression Table
+    if (Object.keys(scRNA).length > 0) {
+        html += `<div class="section-header">scRNA Expression (Lung Organoid)</div>`;
+        html += `<table class="fancy-table"><tr><th>Cell Type</th><th>TPM</th></tr>`;
+        // Top 5 cell types
+        Object.entries(scRNA).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([k,v]) => {
+             html += `<tr><td>${k}</td><td><strong>${Number(v).toFixed(2)}</strong></td></tr>`;
+        });
+        html += `</table>`;
+        html += `<div class="data-source-note">Source: human lung organoid cell atlas (AnnData v0.10). [Download Source H5AD]</div>`;
+    }
+
+    // 4. Complexes Table
+    if (g.complex_components) {
+        html += `<div class="section-header">Protein Complexes</div>`;
+        html += `<table class="fancy-table"><tr><th>Complex</th><th>Members</th></tr>`;
+        for (const [cname, members] of Object.entries(g.complex_components)) {
+            html += `<tr><td>${cname}</td><td>${members.join(', ')}</td></tr>`;
+        }
+        html += `</table>`;
+    }
+
+    // 5. Phylogeny Table
+    if (g.phylogeny) {
+        html += `<div class="section-header">Evolutionary History</div>`;
+        html += `<table class="fancy-table"><tr><th>Dataset</th><th>Class</th><th>Species Count</th></tr>`;
+        for (const [pkey, pval] of Object.entries(g.phylogeny)) {
+             const safeP = pval || {};
+             html += `<tr><td>${pkey}</td><td>${safeP.class || '-'}</td><td>${safeP.species_data?.length || 0}</td></tr>`;
+        }
+        html += `</table>`;
+    }
+
+    // --- ACTIONS (v6.0 Buttons) ---
+    html += `<div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px; display:flex; gap:10px;">
                 <span class="gene-badge" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">Show Evolution</span>
                 <span class="gene-badge" onclick="window.handleAIQuery('plot umap for ${geneSymbol}')">Show UMAP</span>
-            </div>
-        </div>
-    `;
+             </div>`;
     
+    html += `</div>`; // Close card
     return html;
-}
+};
 
 // Helpers for the Dashboard (Add these adjacent to displayFullGeneInfo)
 function renderMiniExpressionTable(data) {
