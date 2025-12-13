@@ -1204,126 +1204,94 @@ function extractEvolutionIntent(qLower) {
     }
     
 
+/**
+ * Renders UMAP with RED Color Scale (Restored)
+ */
 async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
     const umapData = window.CiliAI_UMAP;
     const plotDiv = document.getElementById(plotDivId);
 
-    // Safety checks remain the same...
+    if (typeof targetGenes === 'string') targetGenes = [targetGenes];
+    if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
+
     const gene = displayName.toUpperCase();
     if (!plotDiv || !umapData) {
-        if (window.addChatMessage) window.addChatMessage('UMAP data is not available.', false);
+        window.addChatMessage('UMAP data is not available.', false);
         return;
     }
 
-    // Logic for Single vs Complex remains the same...
-    let expressionMap;
-    let plotTitle;
-    if (targetGenes.length === 1 && targetGenes[0] !== displayName) {
-        expressionMap = window.CiliAI.cellDataCache[targetGenes[0].toUpperCase()] || {};
-        plotTitle = `${displayName}`;
-    } else {
-        expressionMap = (typeof getAverageComplexExpression === 'function') 
-            ? getAverageComplexExpression(targetGenes) 
-            : {};
-        plotTitle = `${displayName} (Avg)`;
-    }
+    let expressionMap = window.CiliAI.cellDataCache[targetGenes[0].toUpperCase()] || {};
 
-    // 1. Data Processing (Same logic, new colors)
-    const sampleSize = 15000;
+    // 1. Prepare Data
+    const sampleSize = 10000;
     const sampledData = [];
     const colorArray = [];
     const sizeArray = [];
-    let maxExpression = 0;
     
-    // ... (Use existing sampling logic here) ...
-    // Re-implementing the loop for brevity in the snippet:
     const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
+    
+    let maxExpr = 0;
     for (const point of sourceData) {
-        const expressionValue = expressionMap[point.cell_type] || 0;
+        const val = expressionMap[point.cell_type] || 0;
+        if(val > maxExpr) maxExpr = val;
+    }
+    const scaleMax = maxExpr > 0 ? maxExpr : 1;
+
+    for (const point of sourceData) {
+        const val = expressionMap[point.cell_type] || 0;
         sampledData.push(point);
-        colorArray.push(expressionValue);
-        const scaledMagnitude = Math.min(expressionValue, 2) / 2;
-        sizeArray.push(3 + (8 * scaledMagnitude)); // Slightly smaller dots for cleaner look
-        if (expressionValue > maxExpression) maxExpression = expressionValue;
+        colorArray.push(val);
+        const size = val > 0 ? 6 : 3;
+        sizeArray.push(size);
     }
 
-    // 2. MODERNIZED COLOR SCALE (Cell Whisperer / Seurat Style)
-    // Uses a clean Grey -> Purple -> Yellow/Red scheme or similar high-contrast scientific scale
-    const modernColorScale = [
-        [0, '#e2e8f0'],       // Light Grey for zero
-        [0.05, '#d6bcfa'],    // Very light purple threshold
-        [0.5, '#805ad5'],     // Purple mid
-        [1, '#2b6cb0']        // Blue max
+    // 2. RED COLOR SCALE (Restored from previous version)
+    const redColorScale = [
+        [0, '#F8F8F8'],       // Lightest grey/white
+        [0.0001, '#FFDAD0'],  // Very light red threshold
+        [1, '#E60000']        // Dark Red
     ];
 
-    // 3. Define Plotly Trace
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
-        customdata: sampledData.map(p => p.cell_type),
         text: sampledData.map((p, i) => `<b>${p.cell_type}</b><br>Expr: ${colorArray[i].toFixed(2)}`),
         mode: 'markers',
         type: 'scattergl',
         hoverinfo: 'text',
         marker: {
-            color: colorArray, 
-            colorscale: 'Viridis', // Viridis is cleaner and more scientific than custom red gradients
-            reversescale: false,   // Viridis default is dark=low, yellow=high
-            colorbar: {
-                title: 'TPM',
-                len: 0.5,
-                thickness: 10,
-                outlinewidth: 0,
-                tickfont: { family: 'Inter, sans-serif', size: 10 }
-            },
-            size: sizeArray, 
-            opacity: 0.8
+            color: colorArray,
+            colorscale: redColorScale, 
+            cmin: 0,
+            cmax: scaleMax,
+            colorbar: { title: 'TPM', len: 0.5, thickness: 10 },
+            size: sizeArray,
+            opacity: 0.7
         }
     }];
 
-    // 4. CLEAN LAYOUT (The key Cell Whisperer improvement)
-    // Removing grids, axis lines, and zero lines for a pure "Data Cloud" look
-    const cleanLayout = {
-        title: {
-            text: `<b>${plotTitle}</b>`,
-            font: { family: 'Inter, sans-serif', size: 18, color: '#2d3748' },
-            x: 0.05
-        },
-        xaxis: { 
-            visible: false,       // Hide Axis entirely
-            showgrid: false, 
-            zeroline: false 
-        },
-        yaxis: { 
-            visible: false,       // Hide Axis entirely
-            showgrid: false, 
-            zeroline: false 
-        },
+    const layout = {
+        title: { text: `<b>${gene} Expression</b>`, font: { size: 16, color: '#2d3748' }, x: 0.05 },
+        xaxis: { visible: false },
+        yaxis: { visible: false },
         hovermode: 'closest',
-        margin: { t: 60, b: 20, l: 20, r: 20 }, // Tighter margins
+        margin: { t: 50, b: 20, l: 20, r: 20 },
         plot_bgcolor: '#ffffff',
         paper_bgcolor: '#ffffff',
         showlegend: false
-        // ... (Annotations logic can be added here if needed) ...
     };
 
-    // 5. Create Plot
-    await Plotly.newPlot(plotDivId, plotData, cleanLayout, { 
-        responsive: true, 
-        displayModeBar: true, 
-        displaylogo: false, // Remove Plotly logo
-        modeBarButtonsToRemove: ['lasso2d', 'select2d'] 
-    });
+    await Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displaylogo: false });
 
-    // 6. Add "Back to Dashboard" Button styled cleanly
+    // Close Button
     if (!document.getElementById('ciliai-back-btn')) {
-        const backButton = document.createElement('button');
-        backButton.id = 'ciliai-back-btn';
-        backButton.style.cssText = 'position: absolute; top: 20px; right: 20px; background: white; border: 1px solid #e2e8f0; padding: 6px 12px; border-radius: 6px; cursor: pointer; color: #4a5568; font-family: Inter, sans-serif; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);';
-        backButton.textContent = '✕ Close Plot';
-        backButton.onclick = () => window.generateAndInjectSVG();
-        plotDiv.prepend(backButton);
+        const btn = document.createElement('button');
+        btn.id = 'ciliai-back-btn';
+        btn.style.cssText = 'position: absolute; top: 15px; right: 15px; background: white; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: #4a5568; font-size: 11px; z-index:10;';
+        btn.textContent = '✕ Close Plot';
+        btn.onclick = () => window.generateAndInjectSVG();
+        plotDiv.prepend(btn);
     }
 }
 
@@ -2432,86 +2400,122 @@ function performMultiCriteriaFilter(query, intents) {
  * Renders a comprehensive "Gene Dashboard" in the left/main panel
  * while keeping the chat stream clean.
  */
+/**
+ * Renders the "Gene Dashboard" into the main 'cilia-svg' panel.
+ * Full version with no brevity.
+ */
 async function displayFullGeneInfo(geneSymbol) {
     const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
     
-    // 1. Validation
+    // 1. Validation: Check if gene exists in database
     if (!gm || !gm[geneSymbol]) {
         return `<div class="ai-result-card">No data found for gene <strong>${geneSymbol}</strong></div>`;
     }
-    const g = gm[geneSymbol];
-
-    // 2. Target the Main Visualization Panel (cilia-svg)
-    const viewContainer = document.getElementById('cilia-svg');
-    if (!viewContainer) {
-        console.error("Main view container 'cilia-svg' not found.");
-        return "Error: Could not render dashboard.";
-    }
-
-    // 3. Prepare Data Helpers
-    const safeVal = (v) => (v && v !== 'N/A' && v !== '0') ? v : '<span style="color:#ccc">—</span>';
     
-    // 4. Build the Dashboard HTML (Cell Whisperer Style Card Layout)
-    const dashboardHTML = `
-        <div class="gene-dashboard-container" style="padding: 20px; font-family: 'Inter', sans-serif; background: #fff; height: 100%; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 20px;">
-                <div>
-                    <h1 style="margin: 0; font-size: 28px; color: #2d3748;">${geneSymbol}</h1>
-                    <p style="margin: 5px 0 0; color: #718096; font-size: 14px;">${g['Gene.Description'] || 'No description available'}</p>
-                </div>
-                <div style="text-align: right;">
-                     <span style="background: #ebf8ff; color: #2b6cb0; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-                        ${g.Localization || 'Unknown Loc.'}
-                     </span>
-                </div>
-            </div>
+    const g = gm[geneSymbol];
+    const viewContainer = document.getElementById('cilia-svg');
+    
+    // 2. Only update visualization panel if it exists in the DOM
+    if (viewContainer) {
+        // Helper: Format null/empty values
+        const safeVal = (v) => (v && v !== 'N/A' && v !== '0') ? v : '<span style="color:#ccc">—</span>';
+        
+        // Helper: Render mini bar charts for expression data
+        const renderExpression = (data) => {
+            if (!data) return '<p style="color:#a0aec0; font-size: 12px;">No scRNA data available.</p>';
+            
+            // Sort by expression value (descending) and take top 5
+            const sorted = Object.entries(data).sort(([,a], [,b]) => b - a).slice(0, 5);
+            
+            let html = '<table style="width:100%; font-size: 12px; border-collapse: collapse;">';
+            sorted.forEach(([k, v]) => {
+                // Calculate bar width (max 100%)
+                const w = Math.min(100, v * 10);
+                html += `
+                    <tr>
+                        <td style="padding:4px 0; color:#4a5568;">${k}</td>
+                        <td style="text-align:right; width:40%;">
+                            <div style="display:flex; justify-content:flex-end; align-items:center;">
+                                <span style="margin-right:6px; font-weight:600; color:#2b6cb0;">${v.toFixed(1)}</span>
+                                <div style="width:50px; height:4px; background:#edf2f7; border-radius:2px;">
+                                    <div style="width:${w}%; height:100%; background:#4299e1; border-radius:2px;"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+            return html + '</table>';
+        };
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
-                <div class="stat-card" style="background: #f7fafc; padding: 15px; border-radius: 8px;">
-                    <div style="font-size: 11px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Cilia Effect (LoF)</div>
-                    <div style="font-size: 15px; font-weight: 500; color: #2d3748; margin-top: 5px;">${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</div>
-                </div>
-                <div class="stat-card" style="background: #f7fafc; padding: 15px; border-radius: 8px;">
-                    <div style="font-size: 11px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Mouse Ortholog</div>
-                    <div style="font-size: 15px; font-weight: 500; color: #2d3748; margin-top: 5px;">${safeVal(g.Ortholog_Mouse)}</div>
-                </div>
-                <div class="stat-card" style="background: #f7fafc; padding: 15px; border-radius: 8px;">
-                    <div style="font-size: 11px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">OMIM ID</div>
-                    <div style="font-size: 15px; font-weight: 500; color: #2d3748; margin-top: 5px;">${safeVal(g.OMIM?.ID)}</div>
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+        // 3. Build the Dashboard HTML Template
+        const dashboardHTML = `
+            <div class="gene-dashboard-container" style="padding: 20px; font-family: 'Inter', sans-serif; background: #fff; height: 100%; overflow-y: auto;">
                 
-                <div>
-                    <h3 style="font-size: 16px; border-left: 4px solid #4299e1; padding-left: 10px; margin-bottom: 15px;">scRNA Expression (Lung)</h3>
-                    ${renderMiniExpressionTable(g.expression?.scRNA)}
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 20px;">
+                    <div>
+                        <h1 style="margin: 0; font-size: 24px; color: #2d3748;">${geneSymbol}</h1>
+                        <p style="margin: 5px 0 0; color: #718096; font-size: 13px;">${g['Gene.Description'] || 'No description available'}</p>
+                    </div>
+                    <div style="text-align: right;">
+                         <span style="background: #ebf8ff; color: #2b6cb0; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">
+                            ${g.Localization || 'Unknown Loc.'}
+                         </span>
+                    </div>
                 </div>
 
-                <div>
-                    <h3 style="font-size: 16px; border-left: 4px solid #ed8936; padding-left: 10px; margin-bottom: 15px;">Complexes & Phylogeny</h3>
-                    ${renderMiniComplexList(g.complex_components)}
-                    <div style="margin-top: 20px;">
-                        <button onclick="window.handleAIQuery('show li plot for ${geneSymbol}')" style="width: 100%; padding: 10px; background: white; border: 1px solid #cbd5e0; color: #4a5568; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s;">
-                            View Phylogenetic Heatmap ➔
-                        </button>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                    <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 10px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Phenotype (LoF)</div>
+                        <div style="font-size: 13px; font-weight: 500; color: #2d3748; margin-top: 4px;">
+                            ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}
+                        </div>
+                    </div>
+                    <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 10px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Ortholog (Mouse)</div>
+                        <div style="font-size: 13px; font-weight: 500; color: #2d3748; margin-top: 4px;">
+                            ${safeVal(g.Ortholog_Mouse)}
+                        </div>
+                    </div>
+                    <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 10px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">OMIM ID</div>
+                        <div style="font-size: 13px; font-weight: 500; color: #2d3748; margin-top: 4px;">
+                            ${safeVal(g.OMIM?.ID)}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    
+                    <div>
+                        <h3 style="font-size: 14px; border-left: 3px solid #4299e1; padding-left: 8px; margin-bottom: 10px; color:#2d3748;">scRNA Expression</h3>
+                        ${renderExpression(g.expression?.scRNA)}
+                    </div>
+
+                    <div>
+                        <h3 style="font-size: 14px; border-left: 3px solid #ed8936; padding-left: 8px; margin-bottom: 10px; color:#2d3748;">Actions</h3>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <button onclick="window.handleAIQuery('show evolution of ${geneSymbol}')" style="padding: 8px; background: white; border: 1px solid #cbd5e0; color: #4a5568; border-radius: 6px; cursor: pointer; font-size: 12px; text-align:left; transition:background 0.2s;">
+                                🧬 View Phylogeny Heatmap
+                            </button>
+                            <button onclick="window.handleAIQuery('plot umap for ${geneSymbol}')" style="padding: 8px; background: white; border: 1px solid #cbd5e0; color: #4a5568; border-radius: 6px; cursor: pointer; font-size: 12px; text-align:left; transition:background 0.2s;">
+                                📊 View UMAP Plot
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+        `;
+        
+        // 4. Inject into the page
+        viewContainer.innerHTML = dashboardHTML;
+    }
 
-            <button onclick="window.generateAndInjectSVG()" style="position: absolute; top: 20px; right: 20px; background: #edf2f7; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; color: #4a5568; font-size: 12px;">✕ Close View</button>
-        </div>
-    `;
-
-    // 5. Inject Dashboard into Main View
-    viewContainer.innerHTML = dashboardHTML;
-    
-    // 6. Return Short Summary to Chat (This is the "Whisperer" part)
+    // 5. Return the Chat Message (Short Summary)
     return `
         <div class="ai-result-card">
             <p>I've loaded the full dashboard for <strong>${geneSymbol}</strong> in the main panel.</p>
             <div class="ciliai-reaction-buttons" style="margin-top:10px;">
-                 <span class="gene-badge" onclick="window.handleAIQuery('show li plot for ${geneSymbol}')">Show Evolution</span>
+                 <span class="gene-badge" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">Show Evolution</span>
                  <span class="gene-badge" onclick="window.handleAIQuery('plot umap for ${geneSymbol}')">Show UMAP</span>
             </div>
         </div>
@@ -3303,20 +3307,46 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-        // =======================================================
-        // =( 8 )= INTENT: PHYLOGENY / EVOLUTION
-        // =======================================================
-        else if (htmlResult === null && (
-            qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
-            qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
-            qLower.includes('mammalian specific') || qLower.includes('ciliary specific') ||
-            qLower.includes('table')
-        )) {
-            window.log('Routing via: Intent (Phylogeny Engine)');
-            // Assuming routePhylogenyAnalysis is defined elsewhere
-            htmlResult = await window.routePhylogenyAnalysis(query);
+    // =======================================================
+    // =( 8 )= INTENT: PHYLOGENY / EVOLUTION (REPLACEMENT)
+    // =======================================================
+    else if (qLower.includes('evolution') || qLower.includes('phylogen') || (qLower.includes('show') && qLower.includes('li'))) {
+        const genes = extractMultipleGenes(query);
+        
+        if (genes.length > 0) {
+            // A: Lazy Load Data if missing
+            if (!window.liPhylogenyCache) {
+                window.addChatMessage("Loading phylogeny data... (this happens once)", false);
+                await ensurePhylogenyDataLoaded();
+            }
+            
+            // B: Plot the Heatmap directly to 'cilia-svg'
+            // We use a small timeout to ensure the UI is ready if data just loaded
+            setTimeout(() => {
+                if (window.renderLiPhylogenyHeatmap) {
+                     const res = window.renderLiPhylogenyHeatmap(genes);
+                     if (res) {
+                        Plotly.newPlot('cilia-svg', res.plotData, res.plotLayout);
+                        
+                        // Add a simple Close button over the plot
+                        const btn = document.createElement('button');
+                        btn.textContent = '✕ Close View';
+                        btn.style.cssText = 'position:absolute; top:10px; right:10px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer;';
+                        btn.onclick = () => window.generateAndInjectSVG();
+                        
+                        const container = document.getElementById('cilia-svg');
+                        if(container) container.prepend(btn);
+                     } else {
+                        window.addChatMessage("Could not render heatmap (Data missing or gene not found).", false);
+                     }
+                }
+            }, 100); 
+            
+            html = `<div class="ai-result-card">Showing evolution heatmap for <strong>${genes.join(', ')}</strong> in the main panel.</div>`;
+        } else {
+             html = "Please specify a gene for evolution analysis (e.g., 'Evolution of IFT88').";
         }
-
+    }
         // =======================================================
         // =( 9 )= INTENT: FUNCTIONAL MODULES
         // =======================================================
