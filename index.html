@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — Unified Explorer</title>
-    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     
     <style>
@@ -19,7 +19,7 @@
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { height: 100%; font-family: 'Inter', sans-serif; background: #f1f5f9; overflow: hidden; }
+        body, html { height: 100%; font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f1f5f9; overflow: hidden; }
 
         /* --- Top Navigation Bar --- */
         .top-navbar {
@@ -56,7 +56,7 @@
             height: 100%;
             display: flex;
             align-items: center;
-            font-size: 19px;
+            font-size: 15px; /* Adjusted for better legibility */
             font-weight: 500;
             transition: background-color 0.3s;
         }
@@ -98,6 +98,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
         }
 
         .viz-header {
@@ -106,10 +107,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: #fff;
         }
 
         .viz-title { font-size: 15px; font-weight: 600; color: var(--accent-text); }
-        .save-btn { border: none; background: var(--secondary-blue); color: var(--primary-blue); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .save-btn { border: none; background: var(--secondary-blue); color: var(--primary-blue); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; }
         .save-btn:hover { background: var(--primary-blue); color: white; }
 
         #cilia-svg { flex: 1; width: 100%; height: 100%; position: relative; overflow: auto; }
@@ -123,16 +125,18 @@
             overflow: hidden;
         }
 
-        .chat-header { padding: 20px; border-bottom: 1px solid var(--border-light); }
-        .chat-header h2 { font-size: 18px; color: var(--primary-blue); }
+        .chat-header { padding: 20px; border-bottom: 1px solid var(--border-light); background: #fff; }
+        .chat-header h2 { font-size: 18px; color: var(--primary-blue); margin-bottom: 4px; }
         .chat-header p { font-size: 12px; color: #666; }
 
-        .messages-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .messages-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
         .ciliai-message { display: flex; gap: 8px; }
         .ciliai-message.user { justify-content: flex-end; }
         .ciliai-message-content { max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
-        .ciliai-message.user .ciliai-message-content { background: var(--primary-blue); color: white; border-radius: 14px 14px 4px 14px; }
-        .ciliai-message.assistant .ciliai-message-content { background: #f0f0f0; color: #333; border-radius: 14px 14px 14px 4px; }
+        
+        /* Updated Bubbles to match Cell Whisperer Style */
+        .ciliai-message.user .ciliai-message-content { background: #ebf8ff; color: #2b6cb0; border-radius: 12px 12px 2px 12px; font-weight: 500; }
+        .ciliai-message.assistant .ciliai-message-content { background: #ffffff; color: #2d3748; border: 1px solid #e2e8f0; border-radius: 12px 12px 12px 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
         .input-area { padding: 15px; border-top: 1px solid var(--border-light); background: white; }
         .chat-input-group { display: flex; gap: 10px; }
@@ -142,15 +146,32 @@
         .send-btn:hover { background: #00477a; }
 
         .status-badge { 
-            padding: 8px 14px; 
-            border-radius: 6px; 
-            font-size: 12px; 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-size: 11px; 
             font-weight: 600; 
             transition: background 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
         .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
         .status.error { background: var(--status-error-bg); color: #c62828; }
+
+        /* Gene Badge Styling */
+        .gene-badge {
+            display: inline-block;
+            background: #edf2f7;
+            color: #4a5568;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin: 2px;
+            cursor: pointer;
+            border: 1px solid #cbd5e0;
+        }
+        .gene-badge:hover { background: #e2e8f0; color: #2d3748; }
 
         svg { width: 100%; height: auto; }
     </style>
@@ -160,8 +181,8 @@
         <div class="brand">
             <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
             <div>
-                <div>CiliAI</div>
-                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
+                <div style="line-height: 1.2;">CiliAI</div>
+                <div style="font-size: 10px; opacity: 0.8; font-weight: 400;">Unified Explorer</div>
             </div>
         </div>
         
@@ -180,13 +201,13 @@
                     <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (e.g., IFT88, FOXJ1)...">
                     <button class="search-btn" onclick="window.searchGene()">Search</button>
                 </div>
-                <div id="dataStatus" class="status-badge loading">Loading...</div>
+                <div id="dataStatus" class="status-badge loading">Initializing...</div>
             </div>
             
             <div class="viz-card">
                 <div class="viz-header">
-                    <div class="viz-title">Visualization</div>
-                    <button class="save-btn" onclick="window.downloadPlot('cilia-svg', 'ciliai-plot')">📷 Save</button>
+                    <div class="viz-title">Visualization Dashboard</div>
+                    <button class="save-btn" onclick="window.downloadPlot('cilia-svg', 'ciliai-plot')">📷 Save Image</button>
                 </div>
                 <div id="cilia-svg"></div>
             </div>
@@ -195,20 +216,24 @@
         <aside class="right-panel">
             <div class="chat-header">
                 <h2>CiliAI Assistant</h2>
-                <p>Ask about genes & ciliary biology</p>
+                <p>Ask about genes, structure, or evolution</p>
             </div>
 
             <div class="messages-area" id="messages">
                 <div class="ciliai-message assistant">
                     <div class="ciliai-message-content">
-                        👋 Hello! I'm CiliAI. Ask me about genes, cilia structure, or ciliopathies.
+                        👋 <strong>Hello! I'm CiliAI.</strong><br>
+                        I can visualize gene expression, phylogeny, and screen data. Try asking:
+                        <br><br>
+                        <span class="gene-badge" onclick="window.handleAIQuery('what is ift88?')">What is IFT88?</span>
+                        <span class="gene-badge" onclick="window.handleAIQuery('plot umap for foxj1')">Plot UMAP for FOXJ1</span>
                     </div>
                 </div>
             </div>
 
             <div class="input-area">
                 <div class="chat-input-group">
-                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question...">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="Type a question...">
                     <button class="send-btn" onclick="window.handleUserSend()">Send</button>
                 </div>
             </div>
@@ -246,13 +271,17 @@
             const statusEl = document.getElementById('dataStatus');
             if (statusEl) {
                 statusEl.textContent = text;
-                statusEl.className = `status-badge status ${state}`; 
+                // Map logical states to CSS classes
+                let cssClass = 'ready';
+                if (state === 'loading') cssClass = 'loading';
+                if (state === 'error') cssClass = 'error';
+                statusEl.className = `status-badge status ${cssClass}`; 
             }
         };
         
         window.downloadPlot = function(divId, filename) {
             if (typeof Plotly !== 'undefined') {
-                Plotly.downloadImage(divId, {format: 'png', filename: filename});
+                Plotly.downloadImage(divId, {format: 'png', filename: filename, width: 1200, height: 800});
             }
         };
 
@@ -337,10 +366,9 @@
         };
 
         window.showDefaultUMAP = function() {
-            window.addChatMessage('Loading UMAP visualization for FOXJ1...', false);
-            
+            // Check if logic exists, otherwise wait
             if (typeof window.renderUMAPPlot === 'function') {
-                window.renderUMAPPlot('FOXJ1');
+                window.renderUMAPPlot('FOXJ1', ['FOXJ1']);
             }
         };
         
@@ -355,21 +383,19 @@
 
         // 4. Initialization
         async function init() {
-            window.updateStatus('Loading databases...', 'loading');
+            window.updateStatus('Loading Data...', 'loading');
             const loaded = await window.loadCiliAIData();
             
             if (loaded) {
-                window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-                window.addChatMessage(`✅ Database loaded with ${window.CiliAI.masterData.length} genes!`, false);
+                window.updateStatus('System Ready', 'ready');
+                window.addChatMessage(`✅ System loaded. ${window.CiliAI.masterData.length} genes available.`, false);
                 
-                // Render the initial UMAP plot
-                if (typeof window.renderUMAPPlot === 'function') {
-                    window.showDefaultUMAP();
-                } else {
-                    window.addChatMessage('Plotting engine is loading...', false);
+                // Initialize the default visualization in the center panel
+                if (typeof window.generateAndInjectSVG === 'function') {
+                    window.generateAndInjectSVG(); 
                 }
             } else {
-                window.updateStatus('Failed to load', 'error');
+                window.updateStatus('Connection Error', 'error');
             }
         }
 
@@ -381,6 +407,6 @@
         }
     </script>
     
-    <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
+    <script src="ciliai.js"></script>
 </body>
 </html>
