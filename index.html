@@ -365,12 +365,22 @@
             }
         };
 
+        // --- FIXED: DEFAULT PLOT IS WDR31 ---
         window.showDefaultUMAP = function() {
-            // Check if logic exists, otherwise wait
             if (typeof window.renderUMAPPlot === 'function') {
-                window.renderUMAPPlot('FOXJ1', ['FOXJ1']);
+                window.renderUMAPPlot('WDR31', ['WDR31']);
             }
         };
+
+        async function init() {
+            // ... (loading logic) ...
+            if (loaded) {
+                // ... (status update) ...
+                
+                // Show WDR31 UMAP immediately
+                window.showDefaultUMAP(); 
+            }
+        }
         
         // Enter key press to send message
         document.getElementById('chatInput').addEventListener('keydown', function(event) {
