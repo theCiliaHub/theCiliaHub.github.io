@@ -201,7 +201,21 @@
             <div class="messages-area" id="messages">
                 <div class="ciliai-message assistant">
                     <div class="ciliai-message-content">
-                        👋 Hello! I'm CiliAI. Ask me about genes, cilia structure, or ciliopathies.
+                        <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px; color: #2d3748;">
+                            👋 Welcome to CiliAI
+                        </div>
+                        <p style="margin: 0 0 10px 0; color: #4a5568;">
+                            I am your research assistant for ciliary biology. I can visualize gene expression (scRNA), analyze phylogenetic conservation, and retrieve screen data.
+                        </p>
+                        <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Try asking:
+                        </p>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                            <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">What is IFT88?</span>
+                            <span class="gene-badge" onclick="window.handleAIQuery('plot umap for FOXJ1')">Display expression of FOXJ1 in Lung scRNA-seq</span>
+                            <span class="gene-badge" onclick="window.handleAIQuery('Show evolution of BBS1')">Show the evolutionary conservarion of BBS1</span>
+                            <span class="gene-badge" onclick="window.handleAIQuery('List transition zone genes')">List transition zone genes</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -337,10 +351,10 @@
         };
 
         window.showDefaultUMAP = function() {
-            window.addChatMessage('Loading UMAP visualization for FOXJ1...', false);
+            window.addChatMessage('Loading UMAP visualization for WDR31...', false);
             
             if (typeof window.renderUMAPPlot === 'function') {
-                window.renderUMAPPlot('FOXJ1');
+                window.renderUMAPPlot('WDR31');
             }
         };
         
