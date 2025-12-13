@@ -1,84 +1,47 @@
 /* ==============================================================
- * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
- * ==============================================================
- * • BUILT FROM SCRATCH based on user's question list.
- * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
- * • Lazy-loads the large phylogeny files only when needed.
- * • Fixes all known layout, normalization, and query routing bugs.
- * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
+ * CiliAI – Unified Logic Engine (v7.1 – Safe Initialization)
  * ============================================================== */
 
+// 1. GLOBAL STATE & UTILITIES
 // ==========================================================
-// SAFE FALLBACKS (Prevents crashes if UI functions missing)
-// ==========================================================
 
-// CRITICAL FIX: Ensure all functions called early are defined globally or via fallbacks.
-
-if (typeof window.updateStatus !== "function") {
-    window.updateStatus = function (msg, state) {
-        console.log(`STATUS[${state}]: ${msg}`);
-    };
-}
-
-if (typeof window.renderUMAPPlot !== "function") {
-    window.renderUMAPPlot = function () {
-        console.warn("renderUMAPPlot() not implemented.");
-    };
-}
-
-// FIX ADDITIONS: These three are called *inside* loadCiliAIData and initCiliAI early on.
+// Define logger first to prevent ReferenceErrors
 if (typeof window.log !== "function") {
-    window.log = function (msg) {
-        console.log(`CiliAI LOG: ${msg}`);
-    };
+    window.log = function (msg) { console.log(`CiliAI LOG: ${msg}`); };
 }
 
+// Define chat handler immediately so UI doesn't crash during load
 if (typeof window.addChatMessage !== "function") {
-    window.addChatMessage = function (msg, isUser) {
-        // This simple fallback ensures no crash if the chat UI isn't ready
-        console.log(`CHAT [${isUser ? 'USER' : 'AI'}]: ${msg}`);
+    window.addChatMessage = function (msg, isUser) { 
+        const chatWindow = document.getElementById('messages');
+        if (chatWindow) {
+            const div = document.createElement('div');
+            div.className = isUser ? 'ciliai-message user' : 'ciliai-message assistant';
+            div.innerHTML = `<div class="ciliai-message-content">${msg}</div>`;
+            chatWindow.appendChild(div);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        } else {
+            console.log(`CHAT: ${msg}`); 
+        }
     };
 }
 
-if (typeof window.react !== "function") {
-    window.react = function (type) {
-        // Fallback relies on addChatMessage being defined above
-        window.addChatMessage(`Feedback received: ${type}`, false);
-    };
-}
+// Ensure Global State exists (Preserve existing state if re-loaded)
+window.CiliAI = window.CiliAI || {
+    data: { umap: [] },
+    masterData: [],
+    ready: false,
+    lookups: {},
+    cellDataCache: {},
+    lastQueryContext: { type: null, data: [], term: null } // Critical for "Yes" context
+};
 
-if (typeof window.clearChat !== "function") {
-    window.clearChat = function () {
-        // Fallback uses the logging function
-        window.log('clearChat() fallback executed.');
-    };
-}
+// Global variables for lazy loading
+window.liPhylogenyCache = null;
+window.neversPhylogenyCache = null;
 
-// NOTE: We also ensure 'handleUserSend' and 'handleGeneSearch' have fallbacks 
-// as they are often called early by HTML event listeners.
-
-if (typeof window.handleUserSend !== "function") {
-    window.handleUserSend = function () {
-        window.log("handleUserSend() fallback executed.");
-    };
-}
-
-if (typeof window.handleGeneSearch !== "function") {
-    window.handleGeneSearch = function () {
-        window.log("handleGeneSearch() fallback executed.");
-    };
-}
-
-    
-    // ==========================================================
-    // GLOBAL STATE
-    // ==========================================================
-    window.CiliAI = {
-        data: { umap: [] },
-        masterData: [],
-        ready: false,
-        lookups: {}
-    };
+// Default genes for phylogeny queries
+const DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
 
     // --- Global variables to hold your data ---
 let ciliaryGeneMap = new Map();
@@ -3141,9 +3104,6 @@ window.terminologyQueries = {
 // 5. QUERY ROUTER (THE BRAIN) - FIXED YES FALLBACK
 // ==========================================================
 
-// Global default list for phylogeny if user asks for a single gene
-const DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
@@ -3861,6 +3821,17 @@ window.getPhylogenyClassSpeciesOverlap = getPhylogenyClassSpeciesOverlap;
 window.getClusterBoundaries = getClusterBoundaries;
 window.getGenesByComplex = getGenesByComplex;
 window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
+
+// ==========================================================
+// AUTO-STARTUP (Force WDR31 Default)
+// ==========================================================
+(function() {
+    // If data is already loaded (from index.html), trigger the default plot immediately
+    if (window.CiliAI && window.CiliAI.ready && window.renderUMAPPlot) {
+        window.log("Auto-launching WDR31 default...");
+        window.renderUMAPPlot('WDR31', ['WDR31']);
+    }
+})();
 
 // Expose optional additional handlers if defined
 if (typeof handleDomainQuery === 'function') {
