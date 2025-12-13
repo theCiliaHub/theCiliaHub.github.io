@@ -4,9 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — Unified Explorer</title>
+
+    <!-- Non-visual metadata -->
+    <meta name="description" content="CiliAI: an interactive explorer for curated ciliary genes, scRNA-seq expression, and ciliopathy-related biology.">
+    <meta name="keywords" content="cilia, ciliopathy, scRNA-seq, gene explorer, FOXJ1, IFT88">
+    <meta name="author" content="CiliaHub">
+    <meta name="robots" content="index, follow">
+
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-    
+
     <style>
         :root {
             --primary-blue: #005b96;
@@ -17,11 +24,10 @@
             --status-ready-bg: #e8f5e9;
             --status-error-bg: #ffebee;
         }
-        
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { height: 100%; font-family: 'Inter', sans-serif; background: #f1f5f9; overflow: hidden; }
 
-        /* --- Top Navigation Bar --- */
         .top-navbar {
             background: var(--primary-blue);
             color: white;
@@ -65,7 +71,6 @@
             background-color: rgba(255, 255, 255, 0.1);
         }
 
-        /* --- Main Layout: Two Panels --- */
         .app-container {
             display: grid;
             grid-template-columns: 1fr 400px;
@@ -73,7 +78,6 @@
             width: 100vw;
         }
 
-        /* --- Left Panel: Visualization and Search --- */
         .center-panel {
             display: flex;
             flex-direction: column;
@@ -82,11 +86,42 @@
             background: #f1f5f9;
         }
 
-        .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; height: 40px; }
-        .search-container { display: flex; gap: 10px; flex: 1; max-width: 600px; }
-        .search-input { flex: 1; padding: 0 15px; border: 2px solid var(--border-light); border-radius: 8px; height: 40px; font-size: 14px; }
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            height: 40px;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 10px;
+            flex: 1;
+            max-width: 600px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 0 15px;
+            border: 2px solid var(--border-light);
+            border-radius: 8px;
+            height: 40px;
+            font-size: 14px;
+        }
+
         .search-input:focus { outline: none; border-color: var(--primary-blue); }
-        .search-btn { padding: 0 20px; background: var(--primary-blue); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+        .search-btn {
+            padding: 0 20px;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
         .search-btn:hover { background: #00477a; }
 
         .viz-card {
@@ -108,13 +143,35 @@
             align-items: center;
         }
 
-        .viz-title { font-size: 15px; font-weight: 600; color: var(--accent-text); }
-        .save-btn { border: none; background: var(--secondary-blue); color: var(--primary-blue); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        .save-btn:hover { background: var(--primary-blue); color: white; }
+        .viz-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--accent-text);
+        }
 
-        #cilia-svg { flex: 1; width: 100%; height: 100%; position: relative; overflow: auto; }
+        .save-btn {
+            border: none;
+            background: var(--secondary-blue);
+            color: var(--primary-blue);
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
 
-        /* --- Right Panel: Chat --- */
+        .save-btn:hover {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        #cilia-svg {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: auto;
+        }
+
         .right-panel {
             display: flex;
             flex-direction: column;
@@ -123,31 +180,94 @@
             overflow: hidden;
         }
 
-        .chat-header { padding: 20px; border-bottom: 1px solid var(--border-light); }
-        .chat-header h2 { font-size: 18px; color: var(--primary-blue); }
-        .chat-header p { font-size: 12px; color: #666; }
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-light);
+        }
 
-        .messages-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .chat-header h2 {
+            font-size: 18px;
+            color: var(--primary-blue);
+        }
+
+        .chat-header p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .messages-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
         .ciliai-message { display: flex; gap: 8px; }
         .ciliai-message.user { justify-content: flex-end; }
-        .ciliai-message-content { max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
-        .ciliai-message.user .ciliai-message-content { background: var(--primary-blue); color: white; border-radius: 14px 14px 4px 14px; }
-        .ciliai-message.assistant .ciliai-message-content { background: #f0f0f0; color: #333; border-radius: 14px 14px 14px 4px; }
 
-        .input-area { padding: 15px; border-top: 1px solid var(--border-light); background: white; }
-        .chat-input-group { display: flex; gap: 10px; }
-        .chat-input { flex: 1; padding: 12px; border: 2px solid var(--border-light); border-radius: 8px; font-size: 14px; }
+        .ciliai-message-content {
+            max-width: 90%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .ciliai-message.user .ciliai-message-content {
+            background: var(--primary-blue);
+            color: white;
+            border-radius: 14px 14px 4px 14px;
+        }
+
+        .ciliai-message.assistant .ciliai-message-content {
+            background: #f0f0f0;
+            color: #333;
+            border-radius: 14px 14px 14px 4px;
+        }
+
+        .input-area {
+            padding: 15px;
+            border-top: 1px solid var(--border-light);
+            background: white;
+        }
+
+        .chat-input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--border-light);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
         .chat-input:focus { outline: none; border-color: var(--primary-blue); }
-        .send-btn { background: var(--primary-blue); color: white; padding: 12px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+        .send-btn {
+            background: var(--primary-blue);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
         .send-btn:hover { background: #00477a; }
 
-        .status-badge { 
-            padding: 8px 14px; 
-            border-radius: 6px; 
-            font-size: 12px; 
-            font-weight: 600; 
+        .status-badge {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
             transition: background 0.3s;
         }
+
         .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
         .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
         .status.error { background: var(--status-error-bg); color: #c62828; }
@@ -155,265 +275,145 @@
         svg { width: 100%; height: auto; }
     </style>
 </head>
+
 <body>
-    <nav class="top-navbar">
-        <div class="brand">
-            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
-            <div>
-                <div>CiliAI</div>
-                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
-            </div>
+<nav class="top-navbar">
+    <div class="brand">
+        <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png"
+             alt="CiliAI Logo" style="height:36px;border-radius:6px;">
+        <div>
+            <div>CiliAI</div>
+            <div style="font-size:10px;opacity:0.8;">Gene Explorer</div>
         </div>
-        
-        <ul class="nav-links">
-            <li><a href="index.html" class="active">Home</a></li>
-            <li><a href="plots.html">Cilia Analysis</a></li>
-             <li><a href="ciliahub.html">CiliaHub</a></li>        
-            <li><a href="about.html">About</a></li>
-        </ul>
-    </nav>
-<section style="
-    background: white;
-    border-bottom: 1px solid var(--border-light);
-    padding: 24px 40px;
-">
-    <h1 style="font-size: 22px; color: var(--primary-blue); margin-bottom: 6px;">
-        CiliAI — Unified Ciliary Gene Explorer
-    </h1>
-    <p style="font-size: 14px; color: #444; max-width: 900px;">
-        Explore curated ciliary genes, single-cell expression patterns, and functional annotations.
-        Search genes, visualize scRNA-seq UMAPs, and ask CiliAI questions about cilia biology and ciliopathies.
-    </p>
-    <p style="font-size: 12px; color: #666; margin-top: 6px;">
-        Current dataset: <strong>2,365 genes</strong> · Multi-species · Literature-curated
-    </p>
-</section>
+    </div>
 
-    <div class="app-container">
-        <div class="center-panel">
-            <div class="top-bar">
-                <div class="search-container">
-                    <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (IFT88, FOXJ1, ARL13B…) or ask in chat →">
-                    <button class="search-btn" onclick="window.searchGene()">Search</button>
-                </div>
-                <div id="dataStatus" class="status-badge loading">Loading...</div>
+    <ul class="nav-links">
+        <li><a href="index.html" class="active">Home</a></li>
+        <li><a href="plots.html">Cilia Analysis</a></li>
+        <li><a href="ciliahub.html">CiliaHub</a></li>
+        <li><a href="about.html">About</a></li>
+    </ul>
+</nav>
+
+<div class="app-container">
+    <div class="center-panel">
+        <div class="top-bar">
+            <div class="search-container">
+                <input id="geneSearch" class="search-input"
+                       placeholder="Search gene (e.g., IFT88, FOXJ1)..."
+                       aria-label="Search ciliary gene">
+                <button class="search-btn" onclick="window.searchGene()">Search</button>
             </div>
-            
-            <div class="viz-card">
-                <div class="viz-header">
-                    <div class="viz-title">scRNA-seq UMAP (gene-centric view)</div>
-                    <button class="save-btn" onclick="window.downloadPlot('cilia-svg', 'ciliai-plot')">📷 Save</button>
-                </div>
-                <div id="cilia-svg"></div>
-            </div>
+            <div id="dataStatus" class="status-badge loading">Loading...</div>
         </div>
 
-        <aside class="right-panel">
-            <div class="chat-header">
-                <h2>CiliAI Assistant</h2>
-                <p>Ask about genes & ciliary biology</p>
+        <div class="viz-card">
+            <div class="viz-header">
+                <div class="viz-title">Visualization</div>
+                <button class="save-btn"
+                        onclick="window.downloadPlot('cilia-svg','ciliai-plot')">📷 Save</button>
             </div>
+            <div id="cilia-svg"></div>
+        </div>
+    </div>
 
+    <aside class="right-panel">
+        <div class="chat-header">
+            <h2>CiliAI Assistant</h2>
+            <p>Ask about genes & ciliary biology</p>
+        </div>
+
+        <div class="messages-area" id="messages">
             <div class="ciliai-message assistant">
-        <div class="ciliai-message-content">
-        👋 Hi, I’m <strong>CiliAI</strong>.<br><br>
-        Try:
-        <ul style="margin:6px 0 0 16px;">
-            <li><em>What is IFT88?</em></li>
-            <li><em>Show FOXJ1 expression</em></li>
-            <li><em>Genes linked to ciliopathies</em></li>
-        </ul>
-    </div>
-    </div>
-
-            <div class="input-area">
-                <div class="chat-input-group">
-                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question...">
-                    <button class="send-btn" onclick="window.handleUserSend()">Send</button>
+                <div class="ciliai-message-content">
+                    👋 Hello! I'm CiliAI. Ask me about genes, cilia structure, or ciliopathies.
                 </div>
             </div>
-        </aside>
-    </div>
+        </div>
 
-    <script>
-        // 1. Initialize Global State
-        window.CiliAI = {
-            data: { umap: [] },
-            masterData: [],
-            ready: false,
-            lookups: {},
-            cellDataCache: {},
-            lastQueryContext: { type: null, data: [], term: null }, 
-            CiliAI_UMAP: null 
-        };
+        <div class="input-area">
+            <div class="chat-input-group">
+                <input id="chatInput" class="chat-input"
+                       placeholder="Ask a question..."
+                       aria-label="Ask CiliAI a question">
+                <button class="send-btn" onclick="window.handleUserSend()">Send</button>
+            </div>
+        </div>
+    </aside>
+</div>
 
-        // 2. Define Helper Functions 
-        if (typeof window.log !== "function") {
-            window.log = (msg) => console.log(`[CiliAI] ${msg}`);
+<script>
+    window.CiliAI = {
+        data: { umap: [] },
+        masterData: [],
+        ready: false,
+        lookups: {},
+        cellDataCache: {},
+        lastQueryContext: { type: null, data: [], term: null },
+        CiliAI_UMAP: null
+    };
+
+    window.log = (msg) => console.log(`[CiliAI] ${msg}`);
+
+    window.addChatMessage = function (html, isUser = false) {
+        const messages = document.getElementById('messages');
+        if (!messages) return;
+        const msg = document.createElement('div');
+        msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+        msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
+        messages.appendChild(msg);
+        messages.scrollTop = messages.scrollHeight;
+    };
+
+    window.updateStatus = function (text, state = 'normal') {
+        const el = document.getElementById('dataStatus');
+        if (!el) return;
+        el.textContent = text;
+        el.className = `status-badge status ${state}`;
+    };
+
+    window.downloadPlot = function (divId, filename) {
+        if (window.Plotly && document.getElementById(divId)) {
+            Plotly.downloadImage(divId, { format: 'png', filename });
         }
+    };
 
-        window.addChatMessage = function(html, isUser = false) {
-            const messages = document.getElementById('messages');
-            if (!messages) return;
-            const msg = document.createElement('div');
-            msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
-            msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
-            messages.appendChild(msg);
-            messages.scrollTop = messages.scrollHeight;
-        };
+    let _initialized = false;
+    async function init() {
+        if (_initialized) return;
+        _initialized = true;
 
-        window.updateStatus = function(text, state = 'normal') {
-            const statusEl = document.getElementById('dataStatus');
-            if (statusEl) {
-                statusEl.textContent = text;
-                statusEl.className = `status-badge status ${state}`; 
-            }
-        };
-        
-        window.downloadPlot = function(divId, filename) {
-            if (typeof Plotly !== 'undefined') {
-                Plotly.downloadImage(divId, {format: 'png', filename: filename});
-            }
-        };
+        window.updateStatus('Loading curated gene datasets…', 'loading');
 
-        // Data Loading Logic 
-        window.loadCiliAIData = async function(timeoutMs = 60000) {
-            const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-            const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-            const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
-            
-            try {
-                window.log(`Fetching main database: ${mainDbUrl}`);
-                const [mainRes, lookupsRes] = await Promise.all([fetch(mainDbUrl), fetch(lookupsUrl)]);
+        try {
+            const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+            const [mainRes, lookupRes] = await Promise.all([
+                fetch(base + 'ciliAI_master_database.json'),
+                fetch(base + 'ciliAI_lookups.json')
+            ]);
 
-                if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
-                if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
+            const mainData = await mainRes.json();
+            const lookupData = await lookupRes.json();
 
-                const mainData = await mainRes.json();
-                const lookupData = await lookupsRes.json();
+            window.CiliAI.masterData = mainData.masterData || [];
+            window.CiliAI.lookups = lookupData.lookups || {};
+            window.CiliAI_UMAP = mainData.umapData || [];
+            window.CiliAI.data.umap = window.CiliAI_UMAP;
 
-                window.CiliAI.masterData = mainData.masterData || [];
-                window.CiliAI.lookups = lookupData.lookups || {};
-                window.CiliAI_UMAP = mainData.umapData || [];
-                window.CiliAI.data.umap = mainData.umapData || [];
-                
-                // Build fast lookup maps
-                window.CiliAI.lookups.umapByGene = {};
-                window.CiliAI.lookups.geneMap = {};
-                window.CiliAI.cellDataCache = {};
-                
-                if (Array.isArray(window.CiliAI_UMAP)) {
-                    window.CiliAI_UMAP.forEach(point => {
-                        if (point.Gene) window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
-                    });
-                }
-                mainData.masterData.forEach(gene => {
-                    if (gene.Gene) {
-                        window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
-                        if (gene.expression?.scRNA) {
-                            window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
-                        }
-                    }
-                });
-                
-                window.CiliAI.ready = true;
-                window.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
-                return true;
-            } catch (err) {
-                console.error("Failed to load CiliAI master database:", err);
-                window.log(`Load error: ${err.message}`);
-                window.updateStatus('Load failed', 'error');
-                window.CiliAI.ready = false;
-                return false;
-            }
-        };
+            window.log('Data sources: literature-curated ciliary gene sets and public scRNA-seq datasets');
 
-        // 3. Define UI Handlers (These bridge the HTML events to the core logic in ciliAI.js)
-        window.handleUserSend = function() {
-            const input = document.getElementById('chatInput');
-            if (!input || !input.value.trim()) return;
-            const query = input.value.trim();
-            window.addChatMessage(query, true);
-            input.value = '';
-            
-            if (typeof window.handleAIQuery === 'function') {
-                window.handleAIQuery(query);
-            } else {
-                window.addChatMessage('CiliAI logic engine not yet loaded. Please wait.', false);
-            }
-        };
+            window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
+            window.addChatMessage(`✅ Database loaded with ${window.CiliAI.masterData.length} genes!`);
 
-        window.searchGene = function() {
-            const input = document.getElementById('geneSearch');
-            if (!input || !input.value.trim()) return;
-            const gene = input.value.trim().toUpperCase();
-            window.addChatMessage(`Tell me about ${gene}`, true);
-            
-            if (typeof window.handleAIQuery === 'function') {
-                window.handleAIQuery(`What is ${gene}?`);
-            } else {
-                window.addChatMessage('CiliAI logic engine not yet loaded. Please wait.', false);
-            }
-        };
-
-        window.showDefaultUMAP = function() {
-            window.addChatMessage('Loading UMAP visualization for FOXJ1...', false);
-            
-            if (typeof window.renderUMAPPlot === 'function') {
-                window.renderUMAPPlot('FOXJ1');
-            }
-        };
-        
-        // Enter key press to send message
-        document.getElementById('chatInput').addEventListener('keydown', function(event) {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault(); 
-                window.handleUserSend();
-            }
-        });
-
-
-        // 4. Initialization
-        async function init() {
-            window.updateStatus('Loading gene & scRNA-seq data…', 'loading');
-            const loaded = await window.loadCiliAIData();
-            
-            if (loaded) {
-                window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-                window.addChatMessage(`✅ Database loaded with ${window.CiliAI.masterData.length} genes!`, false);
-                
-                // Render the initial UMAP plot
-                if (typeof window.renderUMAPPlot === 'function') {
-                    window.showDefaultUMAP();
-                } else {
-                    window.addChatMessage('Plotting engine is loading...', false);
-                }
-            } else {
-                window.updateStatus('Failed to load', 'error');
-            }
+        } catch (e) {
+            console.error(e);
+            window.updateStatus('Load failed', 'error');
         }
+    }
 
-        // Start on page load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
-        }
-    </script>
-    
-    <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
-    <footer style="
-    background:#f8fafc;
-    border-top:1px solid var(--border-light);
-    padding:12px 20px;
-    font-size:11px;
-    color:#555;
-    text-align:center;
-">
-    If you use CiliAI or CiliaHub, please cite the relevant publications.
-    <br>
-    © CiliaHub · Academic research tool · Not for clinical use
-</footer>
+    document.addEventListener('DOMContentLoaded', init);
+</script>
 
+<script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
 </body>
 </html>
