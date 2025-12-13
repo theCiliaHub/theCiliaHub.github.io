@@ -379,39 +379,29 @@ function setupPageEventListeners() {
  */
 function extractMultipleGenes(query) {
     if (!query || typeof query !== 'string') return [];
-    
-    log(`[Gene Extraction] Processing: "${query}"`);
     const qLower = query.toLowerCase();
-
-    // Manual map for high-priority or problematic gene names
+    
+    // Manual map for common genes (Force match without map lookup for these)
     const manualMap = {
-        'kif3a': 'KIF3A',
-        'ift88': 'IFT88',
-        'bbs1': 'BBS1',
-        'arl13b': 'ARL13B',
-        'cep290': 'CEP290',
-        'tmem67': 'TMEM67',
-        'ofd1': 'OFD1',
-        'ift52': 'IFT52',
-        'pkd1': 'PKD1',
-        'evc2': 'EVC2',
-        // --- ADDED FIXES FOR LOG ERRORS ---
-        'ndr1': 'NDR1', 
-        'slmap3': 'SLMAP3'
+        'kif3a': 'KIF3A', 'ift88': 'IFT88', 'bbs1': 'BBS1', 'arl13b': 'ARL13B', 
+        'cep290': 'CEP290', 'tmem67': 'TMEM67', 'ofd1': 'OFD1', 'ift52': 'IFT52', 
+        'foxj1': 'FOXJ1', 'pkd1': 'PKD1', 'wdr31': 'WDR31', 'bbs7': 'BBS7', 
+        'ift81': 'IFT81', 'znf474': 'ZNF474', 'cep41': 'CEP41', 'zc2hc1a': 'ZC2HC1A', 'bbs2': 'BBS2', 'bbs5': 'BBS5'
     };
 
     let foundGenes = new Set();
     
-    // Check manual map first
+    // 1. Check manual map first (Highest Priority)
     for (const [key, gene] of Object.entries(manualMap)) {
-        if (qLower.includes(key)) {
-            log(`[Gene Extraction] Found via manual map: ${gene}`);
+        // Check for exact word match to avoid substring issues (e.g. "if" in "shift")
+        const regex = new RegExp(`\\b${key}\\b`, 'i');
+        if (regex.test(qLower)) {
             foundGenes.add(gene);
         }
     }
 
-    // Use regex for other gene-like patterns
-    const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
+    // 2. Regex Extraction
+    const geneRegex = /\b([A-Z0-9][A-Z0-9\-\.]{2,})\b/gi; // At least 3 chars, starts with alphanumeric
     let matches = query.match(geneRegex) || [];
     
     // Enhanced stop words list to prevent "THE" bug
@@ -423,21 +413,27 @@ function extractMultipleGenes(query) {
         "KNOCKED", "DOWN", "WHEN", "NO", "KNOWN", "CORUM", "LINKED", "ASSOCIATED"
     ]);
     
-    const geneMap = window.CiliAI.lookups.geneMap;
-    if (!geneMap) return [];
-
+    const geneMap = window.CiliAI.lookups.geneMap || {};
+    
     for (const match of matches) {
         const upperMatch = match.toUpperCase();
-        if (!stopWords.has(upperMatch) && geneMap[upperMatch]) {
-            log(`[Gene Extraction] Found via regex: ${upperMatch}`);
+        
+        // Skip stop words
+        if (stopWords.has(upperMatch)) continue;
+
+        // Verify existence in database OR if it's already in our manual map/found set
+        if (geneMap[upperMatch] || foundGenes.has(upperMatch)) {
             foundGenes.add(upperMatch);
         }
     }
     
-    const finalGenes = Array.from(foundGenes);
-    log(`[Gene Extraction] Final valid genes:`, finalGenes);
-    return finalGenes;
+    const result = Array.from(foundGenes);
+    // Debug log to trace extraction
+    if(window.log) window.log(`[Gene Extraction] Input: "${query}" -> Found: ${JSON.stringify(result)}`);
+    
+    return result;
 }
+
 
     
     
@@ -1298,25 +1294,34 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
 
     await Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displaylogo: false });
 
-    // 2. Interactive Hover Events (Bold Label on Hover)
+   // 3. Interactive Label Logic (FIXED)
     plotDiv.on('plotly_hover', function(data){
+        // SAFETY CHECK: Ensure data and points exist
+        if (!data || !data.points || !data.points.length) return;
+
         const point = data.points[0];
-        if(!point) return;
+        if(!point || !point.customdata) return;
+        
         const hoveredType = point.customdata;
 
-        // Update annotations: Make the hovered one Bold & Big
+        // Clone annotations and update the hovered one
         const newAnns = annotations.map(ann => {
             if (ann.text === hoveredType) {
-                return { ...ann, font: { size: 16, color: '#000000', weight: 'bold' }, bgcolor: 'rgba(255,255,255,0.8)' };
+                // Highlight style: Bold, Larger, Black
+                return { 
+                    ...ann, 
+                    font: { size: 16, color: '#000000', weight: 'bold', family: 'Inter, sans-serif' },
+                    bgcolor: 'rgba(255,255,255,0.9)',
+                    bordercolor: '#333'
+                };
             }
             return ann;
         });
-        Plotly.relayout(plotDivId, { annotations: newAnns });
-    });
-
-    plotDiv.on('plotly_unhover', function(data){
-        // Reset to default dim state
-        Plotly.relayout(plotDivId, { annotations: annotations });
+        
+        // Wrap in requestAnimationFrame to prevent stuttering/crashing on rapid moves
+        requestAnimationFrame(() => {
+            Plotly.relayout(plotDivId, { annotations: newAnns });
+        });
     });
 
     // Close Button
@@ -2842,7 +2847,7 @@ function getCiliopathyGenes(term) {
  */
 function extractLocalizationIntent(qLower) {
     const keywords = {
-        'basal body': ['basal body', 'bb'],
+        'basal body': ['basal body', 'bb', 'basal bodies'],
         'transition zone': ['transition zone', 'tz'],
         'axoneme': ['axoneme', 'axonemal'],
         'ciliary tip': ['ciliary tip', 'tip'],
@@ -2885,10 +2890,13 @@ function extractPhenotypeIntent(qLower) {
  * @param {string} query - The original user query.
  * @returns {string|null} An HTML string if a complex query is handled, or null to fall back.
  */
+/**
+ * (REPLACEMENT) The main "Level 2/3" query router.
+ */
 function handleComplexQuery(query) {
     const qLower = query.toLowerCase();
 
-    // 1. Extract all possible intents (Expanded to include domain and negation in complex/phenotype)
+    // 1. Extract Intents
     const intents = {
         localization: extractLocalizationIntent(qLower),
         phenotype: extractPhenotypeIntent(qLower),
@@ -2896,24 +2904,27 @@ function handleComplexQuery(query) {
         expression: extractExpressionIntent(qLower),
         complex: extractComplexIntent(qLower),
         evolution: extractEvolutionIntent(qLower),
-        domain: extractDomainIntent(qLower), // <-- NEW INTENT ADDED
-        isNegative: qLower.includes('not in') || qLower.includes('not expressed') || qLower.includes('no known phenotype') || qLower.includes('not expressed in') // <-- Expanded Negation
+        domain: extractDomainIntent(qLower), 
+        isNegative: qLower.includes('not in') || qLower.includes('not expressed') || qLower.includes('no known phenotype')
     };
 
-    // 2. Count how many intents we found (excluding isNegative flag)
+    // 2. Count intents
     let intentCount = 0;
     if (intents.localization) intentCount++;
-    if (intents.phenotype || qLower.includes('no known phenotype')) intentCount++; // Count 'no known phenotype' as a phenotype intent
+    if (intents.phenotype || qLower.includes('no known phenotype')) intentCount++;
     if (intents.disease) intentCount++;
     if (intents.expression) intentCount++;
-    if (intents.complex || qLower.includes('not in a known ciliary complex')) intentCount++; // Count 'not in complex' as a complex intent
+    if (intents.complex || qLower.includes('not in a known ciliary complex')) intentCount++;
     if (intents.evolution) intentCount++;
-    if (intents.domain) intentCount++; // <-- Domain Count
+    if (intents.domain) intentCount++;
 
-    // 3. If it's not a multi-intent query (at least 2 criteria), fall back to the simple router
-    if (intentCount < 2) {
-        log(`[Complex Router] Only ${intentCount} intent(s) found. Falling back to simple router.`);
-        return null;
+    // --- FIX: ALLOW SINGLE INTENT FOR "LIST" QUERIES ---
+    // If the user explicitly asks to "list", "show", or "find" genes, allow single intent.
+    const isListRequest = qLower.includes('list') || qLower.includes('show genes') || qLower.includes('find genes') || qLower.includes('which genes');
+    
+    if (intentCount < 2 && !isListRequest) {
+        // Only fall back if it's NOT a list request
+        return null; 
     }
 
     log(`[Complex Router] Handling complex query with ${intentCount} intents:`, intents);
