@@ -1204,95 +1204,105 @@ function extractEvolutionIntent(qLower) {
     }
     
 
-/**
-* UMAP PLOT (Expression Mapping Mode) - MODIFIED FOR COMPLEX/ZOOM
-* Renders a UMAP visualization where points are colored and sized based on the
-* expression level of the requested gene (or FOXJ1 by default), or the average 
-* expression of a gene set.
-* * @param {string} displayName - The name shown in the title (e.g., 'IFT-B COMPLEX' or 'IFT88').
-* @param {Array<string>} targetGenes - Array of gene symbols for which to calculate expression.
-* @param {string|null} zoomToCellType - Cell type to zoom into, if provided.
-*/
-// FIX: Provide a default empty array [] for targetGenes argument in the function definition
-async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = null) { 
+async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
     const umapData = window.CiliAI_UMAP;
     const plotDiv = document.getElementById(plotDivId);
 
-    // This line is safer if targetGenes defaults to []
-    const gene = displayName.toUpperCase(); 
+    // This line is safer now that targetGenes defaults to [] in the arguments
+    const gene = displayName.toUpperCase();
 
     if (!plotDiv || !umapData) {
-        window.addChatMessage('UMAP data is not available to plot.', false);
+        if (window.addChatMessage) {
+            window.addChatMessage('UMAP data is not available to plot.', false);
+        }
         return;
     }
-    
-    // --- CRITICAL FIX: The outer IF statement was nested again incorrectly ---
+
     let expressionMap;
     let plotTitle;
 
-    if (targetGenes.length === 1 && targetGenes[0] !== displayName) { // Assuming this checks for single gene vs complex/default
-        // Single Gene Lookup (Direct expression value for the cell type)
+    // Use HTML <b> tags for bolding in Plotly titles, not Markdown **
+    if (targetGenes.length === 1 && targetGenes[0] !== displayName) {
+        // Single Gene Lookup
         expressionMap = window.CiliAI.cellDataCache[targetGenes[0].toUpperCase()] || {};
-        plotTitle = `UMAP: **${displayName}** Expression`;
+        plotTitle = `UMAP: <b>${displayName}</b> Expression`;
     } else {
-        // Complex / Multiple Gene Lookup (Average expression across the set)
-        expressionMap = getAverageComplexExpression(targetGenes);
-        plotTitle = `UMAP: Avg. **${displayName}** Expression`;
+        // Complex / Multiple Gene Lookup
+        // Assuming getAverageComplexExpression is defined globally in your app
+        expressionMap = (typeof getAverageComplexExpression === 'function') 
+            ? getAverageComplexExpression(targetGenes) 
+            : {};
+        plotTitle = `UMAP: Avg. <b>${displayName}</b> Expression`;
     }
 
     // 1. Prepare arrays
     const sampleSize = 15000;
     const sampledData = [];
     const colorArray = [];
-    const sizeArray = []; 
+    const sizeArray = [];
     
     let maxExpression = 0;
-    const sizeBase = 5;      
-    const sizeScaleMax = 12;  
-    const expressionThreshold = 2; // Expression cap for dot size scaling
+    const sizeBase = 5;
+    const sizeScaleMax = 12;
+    const expressionThreshold = 2;
 
+    // Random sampling if data is too large
     const sourceData = umapData.length > sampleSize 
-                        ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
+                        ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
                         : umapData;
 
     for (const point of sourceData) {
-        // Look up expression value for this cell's type
         const expressionValue = expressionMap[point.cell_type] || 0;
         
         sampledData.push(point);
         colorArray.push(expressionValue);
         
         const scaledMagnitude = Math.min(expressionValue, expressionThreshold) / expressionThreshold;
-        sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude); 
+        sizeArray.push(sizeBase + (sizeScaleMax - sizeBase) * scaledMagnitude);
         
         if (expressionValue > maxExpression) {
             maxExpression = expressionValue;
         }
     }
-    
-    if (maxExpression === 0) {
-        window.addChatMessage(`Gene/Complex **${gene}** found, but has no detectable expression in the loaded Lung scRNA-seq dataset.`, false);
+
+    if (maxExpression === 0 && window.addChatMessage) {
+        window.addChatMessage(`Gene/Complex <b>${gene}</b> found, but has no detectable expression in the loaded Lung scRNA-seq dataset.`, false);
     }
-    
+
     // 2. Annotations (Cell Type Labels)
     const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
-    const annotations = [];
-    const median = arr => { /* ... median logic here ... */ };
+    
+    // Internal helper for median
+    const calculateMedian = (arr) => {
+        if (arr.length === 0) return 0;
+        const sorted = [...arr].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    };
+
+    // Store base annotations to easily reset them later
+    const baseAnnotations = [];
+
     for (const ct of cellTypes) {
-        // ... (Annotation calculation logic) ...
         const pts = sampledData.filter(d => d.cell_type === ct);
         if (pts.length === 0) continue;
+        
         const xs = pts.map(p => p.x);
         const ys = pts.map(p => p.y);
 
-        annotations.push({
-            x: median(xs),
-            y: median(ys),
-            text: ct,
+        baseAnnotations.push({
+            x: calculateMedian(xs),
+            y: calculateMedian(ys),
+            text: ct, // Plain text initially
+            name: ct, // Used to identify the annotation during hover events
             showarrow: false,
-            font: { color: '#FFFFFF', size: 10, family: 'Arial, sans-serif' },
-            bgcolor: 'rgba(0,0,0,0.45)', borderpad: 2, bordercolor: 'rgba(0,0,0,0.45)', borderwidth: 1,
+            // "Dim" default state
+            font: { color: 'rgba(255, 255, 255, 0.7)', size: 10, family: 'Arial, sans-serif' },
+            bgcolor: 'rgba(0, 0, 0, 0.3)', 
+            borderpad: 2, 
+            bordercolor: 'rgba(0,0,0,0.1)', 
+            borderwidth: 1,
             xref: 'x', yref: 'y'
         });
     }
@@ -1303,10 +1313,12 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
         [0.0001, '#FFDAD0'], 
         [1, '#E60000'] 
     ];
-    
+
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
+        // Add customdata so we can retrieve the cell_type easily during hover events
+        customdata: sampledData.map(p => p.cell_type),
         text: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${colorArray[i].toFixed(3)}`),
         mode: 'markers',
         type: 'scattergl',
@@ -1314,7 +1326,7 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
         marker: {
             color: colorArray, 
             colorscale: colorScaleRedGradient, 
-            cmin: 0,
+            cmin: 0, 
             cmax: maxExpression > 0 ? maxExpression : 0.0001,
             colorbar: {
                 title: `${gene} Expr. (TPM)`
@@ -1330,19 +1342,19 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
     let zoomAnnotation = [];
 
     if (zoomToCellType) {
-        const bounds = getClusterBoundaries(zoomToCellType);
+        // Assuming getClusterBoundaries is global or imported
+        const bounds = (typeof getClusterBoundaries === 'function') ? getClusterBoundaries(zoomToCellType) : null;
         if (bounds) {
             xRange = [bounds.xMin, bounds.xMax];
             yRange = [bounds.yMin, bounds.yMax];
             plotTitle = `${plotTitle} (Zoomed to ${zoomToCellType})`;
             
-            // Highlight the zoomed area (optional: a faint rectangle or outline)
             zoomAnnotation.push({
                 xref: 'x', yref: 'y',
                 x: bounds.center.x, y: bounds.center.y,
-                text: `**${zoomToCellType}**`,
+                text: `<b>${zoomToCellType}</b>`,
                 showarrow: false,
-                font: { color: '#005b96', size: 14, weight: 'bold' }
+                font: { color: '#005b96', size: 14 }
             });
         }
     }
@@ -1355,20 +1367,73 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
         margin: { t: 50, b: 50, l: 50, r: 50 },
         plot_bgcolor: '#FFFFFF',
         paper_bgcolor: '#F8F8F8',
-        annotations: annotations.concat(zoomAnnotation),
+        annotations: baseAnnotations.concat(zoomAnnotation),
         showlegend: false
     };
 
-    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
+    // Create the plot
+    await Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 
-    // --- Back button (Keep as is) ---
-    const backButton = document.createElement('button');
-    backButton.id = 'ciliai-back-btn';
-    backButton.className = 'ciliai-button';
-    backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10;';
-    backButton.textContent = 'Back to Diagram';
-    backButton.onclick = () => window.generateAndInjectSVG();
-    plotDiv.prepend(backButton);
+    // --- Interactive Annotation Logic (Hover Effects) ---
+    // State tracker to prevent unnecessary redraws
+    let currentHoveredClass = null; 
+
+    plotDiv.on('plotly_hover', function(data) {
+        // Get the cell type from the hovered point (using customdata we added)
+        const point = data.points[0];
+        if (!point) return;
+
+        const cellType = point.customdata;
+
+        // Only update if we moved to a new cell type
+        if (cellType !== currentHoveredClass) {
+            currentHoveredClass = cellType;
+
+            // Create a new annotation array based on the base set
+            const newAnnotations = baseAnnotations.map(ann => {
+                if (ann.name === cellType) {
+                    // Highlight style: Bigger, Bold (via HTML), Opaque
+                    return {
+                        ...ann,
+                        text: `<b>${ann.name}</b>`, // Make text bold
+                        font: { color: '#FFFFFF', size: 16, family: 'Arial, sans-serif' }, // Bigger size
+                        bgcolor: 'rgba(0, 0, 0, 0.8)', // Darker background
+                        bordercolor: '#FFFFFF'
+                    };
+                } else {
+                    // Keep others dim
+                    return ann;
+                }
+            });
+
+            // If zoomed, keep the zoom label
+            const finalAnnotations = newAnnotations.concat(zoomAnnotation);
+
+            Plotly.relayout(plotDivId, { annotations: finalAnnotations });
+        }
+    });
+
+    plotDiv.on('plotly_unhover', function(data) {
+        // Reset only if we currently have a highlighted class
+        if (currentHoveredClass !== null) {
+            currentHoveredClass = null;
+            // Reset to base annotations
+            Plotly.relayout(plotDivId, { annotations: baseAnnotations.concat(zoomAnnotation) });
+        }
+    });
+
+    // --- Back button ---
+    // Check if button already exists to prevent duplicates on re-render
+    if (!document.getElementById('ciliai-back-btn')) {
+        const backButton = document.createElement('button');
+        backButton.id = 'ciliai-back-btn';
+        backButton.className = 'ciliai-button';
+        backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10; cursor: pointer; color: white; border: none; padding: 5px 10px; border-radius: 4px;';
+        backButton.textContent = 'Back to Diagram';
+        // Assuming generateAndInjectSVG is global
+        backButton.onclick = () => window.generateAndInjectSVG();
+        plotDiv.prepend(backButton);
+    }
 }
 
 /**
