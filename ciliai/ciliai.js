@@ -1330,6 +1330,7 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
     }
 }
 
+
 /**
  * Calculates the bounding box (min/max UMAP coordinates) for a specified cell type cluster.
  * Also calculates the center point for potential annotation placement.
