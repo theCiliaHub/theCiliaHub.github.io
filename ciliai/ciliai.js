@@ -3137,17 +3137,18 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 
-// Global default list
+// ==========================================================
+// 5. QUERY ROUTER (THE BRAIN) - FIXED YES FALLBACK
+// ==========================================================
+
+// Global default list for phylogeny if user asks for a single gene
 const DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-/**
- * (REPLACEMENT) The Main "Level 1" Query Router
- * This function is declared globally immediately to solve ReferenceError issues.
- */
+
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
 
-    // Validate query *before* any routing
+    // Validate query
     if (!query) return;
     const qLower = query.toLowerCase().trim();
 
@@ -3183,14 +3184,13 @@ window.handleAIQuery = async function (query) {
         // --- High Priority Plot Buttons (Immediate Actions) ---
         if (qLower === 'plot default umap') {
             window.log('Routing via: Intent (Default UMAP Plot)');
-            // FIX: Pass the gene as an array for targetGenes
-            window.renderUMAPPlot('FOXJ1', ['FOXJ1']); 
-            htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
+            window.renderUMAPPlot('WDR31', ['WDR31']); // Fixed default to WDR31
+            htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>WDR31</strong> on the left.</p></div>`;
         }
         else if (qLower === 'plot default phylogeny') {
             window.log('Routing via: Intent (Default Phylogeny Plot)');
-            const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-            htmlResult = await window.routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
+            htmlResult = await window.handleAIQuery(`show nevers plot for ${DEFAULT_PHYLO_GENES.join(',')}`);
+            return; // handleAIQuery called recursively, stop here
         }
         
         // =======================================================
@@ -3209,20 +3209,29 @@ window.handleAIQuery = async function (query) {
             }
         }
         
-// =======================================================
+        // =======================================================
         // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes") - FIXED
         // =======================================================
-        // FIX: Use includes('yes') on qLower to catch "Yes" and "YES"
-        const isFollowUp = (qLower.includes('yes') || qLower === 'ok' || qLower.includes('view the list') || qLower.includes('show list')) && 
-                             !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
+        // Use regex for loose matching of "yes", "sure", "ok", "show list"
+        const isFollowUp = /^(yes|yeah|sure|ok|okay|yep|show list|view list)/i.test(qLower) &&
+                           !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
         if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
             // 2A: List Follow-up (Prioritize general list)
             if (window.lastQueryContext.type === 'list_followup') {
                 window.log('Routing via: Intent (Follow-up: Show List)');
-                window.showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+                
+                // CRITICAL: Ensure showDataInLeftPanel exists before calling
+                if (typeof window.showDataInLeftPanel === 'function') {
+                    window.showDataInLeftPanel(window.lastQueryContext.term, window.lastQueryContext.data);
+                    window.addChatMessage(`I've displayed the list for <strong>${window.lastQueryContext.term}</strong> in the main panel.`, false);
+                } else {
+                    window.log("Error: showDataInLeftPanel not found.");
+                    window.addChatMessage("Error displaying list table.", false);
+                }
+                
                 window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
-                return; // CRITICAL: Stop execution immediately after showing the list.
+                return; // Stop execution immediately after showing the list.
             }
             
             // 2B: Screen References Follow-up
@@ -3231,14 +3240,15 @@ window.handleAIQuery = async function (query) {
                 htmlResult = window.handleScreenReferenceFollowup();
             }
         }
+
         // =======================================================
-    // =( 3 )= INTENT: EXPLICIT SCREEN REFERENCES (FIXED)
-    // =======================================================
-    else if (htmlResult === null && (qLower.includes('show screen reference') || qLower.includes('show publication detail') || qLower.includes('provide the paper'))) {
-    window.log('Routing via: Intent (Explicit Screen References - FIXED)');
-    // Assuming handleScreenReferenceFollowup is defined elsewhere
-    htmlResult = window.handleScreenReferenceFollowup(); 
-    }
+        // =( 3 )= INTENT: EXPLICIT SCREEN REFERENCES (FIXED)
+        // =======================================================
+        else if (htmlResult === null && (qLower.includes('show screen reference') || qLower.includes('show publication detail') || qLower.includes('provide the paper'))) {
+            window.log('Routing via: Intent (Explicit Screen References - FIXED)');
+            // Assuming handleScreenReferenceFollowup is defined elsewhere
+            htmlResult = window.handleScreenReferenceFollowup(); 
+        }
 
         // =======================================================
         // =( 4 )= INTENT: SCREENS / PHENOTYPES
@@ -3292,72 +3302,74 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-   // =======================================================
-    // =( 8 )= INTENT: PHYLOGENY / EVOLUTION (REPLACEMENT)
-    // =======================================================
-    else if (qLower.includes('evolution') || qLower.includes('phylogen') || (qLower.includes('show') && qLower.includes('li'))) {
-        let genes = extractMultipleGenes(query);
-        
-        if (genes.length > 0) {
-            // ** INJECT DEFAULTS IF SINGLE GENE **
-            // If user asks for just one gene (e.g. "evolution of IFT88"), 
-            // we show it alongside the default panel for context.
-            if (genes.length === 1) {
-                // Combine default list + requested gene, remove duplicates
-                genes = [...new Set([...DEFAULT_PHYLO_GENES, genes[0]])];
-            }
-
-            // A: Lazy Load Data if missing
-            if (!window.liPhylogenyCache) {
-                window.addChatMessage("Loading phylogeny data... (this happens once)", false);
-                await ensurePhylogenyDataLoaded();
-            }
+        // =======================================================
+        // =( 8 )= INTENT: PHYLOGENY / EVOLUTION (REPLACEMENT)
+        // =======================================================
+        else if (htmlResult === null && (qLower.includes('evolution') || qLower.includes('phylogen') || (qLower.includes('show') && qLower.includes('li')))) {
+            window.log('Routing via: Intent (Phylogeny Engine)');
+            let genes = window.extractMultipleGenes(query);
             
-            // B: Plot the Heatmap directly to 'cilia-svg'
-            // We use a small timeout to ensure the UI is ready if data just loaded
-            setTimeout(() => {
-                if (window.renderLiPhylogenyHeatmap) {
-                     const res = window.renderLiPhylogenyHeatmap(genes);
-                     if (res) {
-                        Plotly.newPlot('cilia-svg', res.plotData, res.plotLayout);
-                        
-                        // Add a simple Close button over the plot
-                        const btn = document.createElement('button');
-                        btn.textContent = '✕ Close View';
-                        btn.style.cssText = 'position:absolute; top:10px; right:10px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px;';
-                        btn.onclick = () => window.generateAndInjectSVG();
-                        
-                        // Add 'Add Gene' Button overlay
-                        const addBtn = document.createElement('button');
-                        addBtn.id = 'ciliai-add-gene-btn';
-                        addBtn.textContent = '+ Add Gene';
-                        addBtn.style.cssText = 'position:absolute; top:10px; right:100px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px;';
-                        addBtn.onclick = () => {
-                            const newGene = prompt("Enter gene symbol to add:");
-                            if(newGene) window.handleAIQuery(`show evolution of ${genes.join(' ')} ${newGene}`);
-                        };
-
-                        const container = document.getElementById('cilia-svg');
-                        if(container) {
-                            container.prepend(btn);
-                            
-                            // Remove old add button if exists to prevent duplicates
-                            const oldAddBtn = document.getElementById('ciliai-add-gene-btn');
-                            if(oldAddBtn) oldAddBtn.remove();
-                            
-                            container.prepend(addBtn);
-                        }
-                     } else {
-                        window.addChatMessage("Could not render heatmap (Data missing or gene not found).", false);
-                     }
+            if (genes.length > 0) {
+                // ** INJECT DEFAULTS IF SINGLE GENE **
+                // If user asks for just one gene (e.g. "evolution of IFT88"), 
+                // we show it alongside the default panel for context.
+                if (genes.length === 1) {
+                    // Combine default list + requested gene, remove duplicates
+                    genes = [...new Set([...DEFAULT_PHYLO_GENES, genes[0]])];
                 }
-            }, 100); 
-            
-            html = `<div class="ai-result-card">Showing evolution heatmap for <strong>${genes.length} genes</strong> in the main panel.</div>`;
-        } else {
-             html = "Please specify a gene for evolution analysis (e.g., 'Evolution of IFT88').";
+
+                // A: Lazy Load Data if missing
+                if (!window.liPhylogenyCache) {
+                    window.addChatMessage("Loading phylogeny data... (this happens once)", false);
+                    await window.ensurePhylogenyDataLoaded();
+                }
+                
+                // B: Plot the Heatmap directly to 'cilia-svg'
+                // We use a small timeout to ensure the UI is ready if data just loaded
+                setTimeout(() => {
+                    if (window.renderLiPhylogenyHeatmap) {
+                         const res = window.renderLiPhylogenyHeatmap(genes);
+                         if (res) {
+                            Plotly.newPlot('cilia-svg', res.plotData, res.plotLayout);
+                            
+                            // Add 'Add Gene' Button overlay
+                            const container = document.getElementById('cilia-svg');
+                            if(container) {
+                                // Clear old buttons
+                                const oldAdd = document.getElementById('ciliai-add-gene-btn');
+                                if(oldAdd) oldAdd.remove();
+                                const oldClose = document.getElementById('ciliai-back-btn');
+                                if(oldClose) oldClose.remove();
+
+                                const addBtn = document.createElement('button');
+                                addBtn.id = 'ciliai-add-gene-btn';
+                                addBtn.textContent = '+ Add Gene';
+                                addBtn.style.cssText = 'position:absolute; top:10px; right:100px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px;';
+                                addBtn.onclick = () => {
+                                    const newGene = prompt("Enter gene symbol to add:");
+                                    if(newGene) window.handleAIQuery(`show evolution of ${genes.join(' ')} ${newGene}`);
+                                };
+
+                                const closeBtn = document.createElement('button');
+                                closeBtn.id = 'ciliai-back-btn';
+                                closeBtn.textContent = '✕ Close View';
+                                closeBtn.style.cssText = 'position:absolute; top:10px; right:10px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px;';
+                                closeBtn.onclick = () => window.generateAndInjectSVG();
+                                
+                                container.prepend(closeBtn);
+                                container.prepend(addBtn);
+                            }
+                         } else {
+                            window.addChatMessage("Could not render heatmap (Data missing or gene not found).", false);
+                         }
+                    }
+                }, 100); 
+                
+                htmlResult = `<div class="ai-result-card">Showing evolution heatmap for <strong>${genes.length} genes</strong> in the main panel.</div>`;
+            } else {
+                 htmlResult = "Please specify a gene for evolution analysis (e.g., 'Evolution of IFT88').";
+            }
         }
-    }     
         
         // =======================================================
         // =( 9 )= INTENT: FUNCTIONAL MODULES
@@ -3383,7 +3395,7 @@ window.handleAIQuery = async function (query) {
                 // Assuming handleScRnaQuery is defined elsewhere
                 htmlResult = window.handleScRnaQuery(genes);
                 htmlResult = htmlResult.replace(`</div>`,
-                    `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-umap-plot" data-genes="${genes[0]}">View ${genes[0]} on UMAP</a></p></div>`);
+                    `<p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="window.handleAIQuery('plot umap for ${genes[0]}')">View ${genes[0]} on UMAP</a></p></div>`);
             } else {
                 htmlResult = `Please specify which gene(s) you want to check expression for.`;
             }
@@ -3412,10 +3424,9 @@ window.handleAIQuery = async function (query) {
                 }
             }
 
-            const finalGenes = genes.length > 0 ? genes : ['FOXJ1']; // Default if no gene/complex found
-            const geneSymbol = isComplex ? targetTerm : finalGenes[0]; // Term to display
+            const finalGenes = genes.length > 0 ? genes : ['WDR31']; // FIXED Default
+            const geneSymbol = isComplex ? targetTerm : finalGenes[0]; 
             
-            // Check for "zoom to" instruction
             const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i);
             const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
 
@@ -3425,7 +3436,7 @@ window.handleAIQuery = async function (query) {
             htmlResult = `<div class="ai-result-card">
                 <p>Displaying Lung scRNA-seq UMAP for **${geneSymbol}** (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
                 ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster boundaries.</p>` : ''}
-                <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="downloadUMAPDataAsCSV('${geneSymbol}')">⬇️ Download UMAP Data (CSV)</a></p>
+                <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')">⬇️ Download UMAP Data (CSV)</a></p>
             </div>`;
         }
 
@@ -3466,18 +3477,15 @@ window.handleAIQuery = async function (query) {
         // = ( 14 ) = INTENT: ADVANCED EXPRESSION ANALYSIS (Fold Change)
         // =======================================================
         else if (htmlResult === null) {
-            // Look for "compare [complex] in [cellTypeA] vs [cellTypeB]"
             const foldChangeMatch = qLower.match(/compare\s+(.+)\s+in\s+(.+)\s+vs\s+(.+)/i);
             
             if (foldChangeMatch) {
                 window.log('Routing via: Intent (Fold Change Complex/Cell Type)');
                 
-                // Extract terms
                 const complexTerm = foldChangeMatch[1].trim().toUpperCase();
                 const cellTypeA = foldChangeMatch[2].trim();
                 const cellTypeB = foldChangeMatch[3].trim();
 
-                // Assuming calculateFoldChangeForComplex is defined elsewhere
                 const result = window.calculateFoldChangeForComplex(complexTerm, cellTypeA, cellTypeB);
 
                 if (result.error) {
@@ -3504,19 +3512,16 @@ window.handleAIQuery = async function (query) {
         // = ( 15 ) = INTENT: COMPLEX PHYLOGENETIC OVERLAP
         // =======================================================
         else if (htmlResult === null) {
-            // Look for "species overlap between [classA] and [classB]"
             const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
 
-            if (classOverlapMatch && qLower.includes('li')) { // Force Li for now
+            if (classOverlapMatch && qLower.includes('li')) { 
                 window.log('Routing via: Intent (Phylogenetic Class Overlap)');
                 const classA = classOverlapMatch[1].trim();
                 const classB = classOverlapMatch[2].trim();
                 
-                // Assuming ensurePhylogenyDataLoaded is defined elsewhere
                 const dataLoaded = await window.ensurePhylogenyDataLoaded();
 
                 if (dataLoaded) {
-                    // Assuming getPhylogenyClassSpeciesOverlap is defined elsewhere
                     const result = window.getPhylogenyClassSpeciesOverlap(classA, classB, 'li');
 
                     if (result.error) {
@@ -3527,7 +3532,7 @@ window.handleAIQuery = async function (query) {
                                 <h4>Species Overlap: ${result.classA} vs ${result.classB} (Li et al. 2014)</h4>
                                 <p>Found **${result.sharedCount}** species that contain at least one gene from **both** phylogenetic classes.</p>
                                 <p style="font-size: 12px;">**Shared Species:** ${result.sharedSpecies.slice(0, 10).join(', ')}${result.sharedSpecies.length > 10 ? '... (+ ' + (result.sharedSpecies.length - 10) + ' more)' : ''}</p>
-                                <p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-table-view" data-genes="${result.sharedSpecies.join(',')}" data-title="Shared Species">📋 View Full Species List</a></p>
+                                <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="window.showDataInLeftPanel('Shared Species', ${JSON.stringify(result.sharedSpecies.map(s => ({Species: s})))})">📋 View Full Species List</a></p>
                             </div>`;
                     }
                 } else {
@@ -3545,7 +3550,7 @@ window.handleAIQuery = async function (query) {
         if (enrichmentMatch) {
             window.log('Routing via: Intent (Gene Set Enrichment)');
             const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
-            const terms = window.getEnrichedGOTerms(geneList); // Assuming getEnrichedGOTerms is defined
+            const terms = window.getEnrichedGOTerms(geneList); 
             
             if (terms.length === 0) {
                 htmlResult = "Not enough genes provided, or no significant enrichment found.";
@@ -3565,7 +3570,7 @@ window.handleAIQuery = async function (query) {
             const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
             const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
 
-            const jaccardIndex = window.calculateJaccard(setA, setB); // Assuming calculateJaccard is defined
+            const jaccardIndex = window.calculateJaccard(setA, setB); 
             const overlapCount = Math.round(jaccardIndex * (setA.length + setB.length));
             
             htmlResult = `<div class="ai-result-card"><h4>Gene Set Comparison: ${termA} vs. ${termB}</h4><p><strong>Genes in ${termA}:</strong> ${setA.length}</p><p><strong>Genes in ${termB}:</strong> ${setB.length}</p><p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p><p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p></div>`;
