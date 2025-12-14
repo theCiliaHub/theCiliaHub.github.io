@@ -3960,3 +3960,316 @@ window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
 if (typeof handleDomainQuery === 'function') {
     window.handleDomainQuery = handleDomainQuery;
 }
+
+/* ==============================================================
+ * MODULE: ADVANCED SEARCH & FILTERS (v9.0)
+ * ============================================================== */
+
+// --- 1. SEARCH STATE MANAGEMENT ---
+window.SearchState = {
+    history: JSON.parse(localStorage.getItem('ciliai_search_history') || '[]'),
+    saved: JSON.parse(localStorage.getItem('ciliai_saved_queries') || '[]'),
+    
+    addToHistory: function(query) {
+        if (!query) return;
+        // Remove duplicate if exists, add to top
+        this.history = this.history.filter(q => q !== query);
+        this.history.unshift(query);
+        if (this.history.length > 20) this.history.pop(); // Keep last 20
+        localStorage.setItem('ciliai_search_history', JSON.stringify(this.history));
+        this.renderHistory();
+    },
+
+    saveQuery: function(query) {
+        if (!query || this.saved.includes(query)) return;
+        this.saved.push(query);
+        localStorage.setItem('ciliai_saved_queries', JSON.stringify(this.saved));
+        this.renderSaved();
+        alert('Search saved!');
+    },
+
+    renderHistory: function() {
+        const container = document.getElementById('search-history-list');
+        if (!container) return;
+        container.innerHTML = this.history.map(q => 
+            `<div class="history-item" onclick="window.setSearch('${q}')">🕒 ${q}</div>`
+        ).join('');
+    },
+
+    renderSaved: function() {
+        const container = document.getElementById('search-saved-list');
+        if (!container) return;
+        container.innerHTML = this.saved.map(q => 
+            `<div class="history-item" onclick="window.setSearch('${q}')">⭐ ${q}</div>`
+        ).join('');
+    }
+};
+
+// --- 2. BOOLEAN SEARCH ENGINE ---
+window.executeBooleanSearch = function(queryStr, filters = {}) {
+    if (!window.CiliAI.masterData) return [];
+
+    let results = window.CiliAI.masterData;
+    const q = queryStr.trim();
+
+    // A. Text Search with Boolean Logic (AND, OR, NOT)
+    if (q) {
+        // 1. Handle NOT (Exclude)
+        const notParts = q.split(/\s+NOT\s+/i);
+        const positivePart = notParts[0]; // The part before the first NOT
+        const negativeParts = notParts.slice(1); // Everything else is excluded
+
+        // Filter out negatives
+        if (negativeParts.length > 0) {
+            results = results.filter(gene => {
+                const str = JSON.stringify(gene).toUpperCase();
+                return !negativeParts.some(neg => str.includes(neg.trim().toUpperCase()));
+            });
+        }
+
+        // 2. Handle OR (Union) within the positive part
+        if (positivePart.includes(' OR ')) {
+            const orTerms = positivePart.split(/\s+OR\s+/i).map(t => t.trim().toUpperCase());
+            results = results.filter(gene => {
+                const str = JSON.stringify(gene).toUpperCase();
+                return orTerms.some(term => str.includes(term));
+            });
+        } 
+        // 3. Handle AND (Intersection) - Default behavior for spaces if not OR
+        else {
+            const andTerms = positivePart.split(/\s+(?:AND\s+)?/i).map(t => t.trim().toUpperCase());
+            results = results.filter(gene => {
+                const str = JSON.stringify(gene).toUpperCase();
+                return andTerms.every(term => str.includes(term));
+            });
+        }
+    }
+
+    // B. Apply Dropdown Filters
+    
+    // Localization
+    if (filters.localization && filters.localization !== 'All') {
+        results = results.filter(g => (g.Localization || '').includes(filters.localization));
+    }
+
+    // Ciliopathy
+    if (filters.disease && filters.disease !== 'All') {
+        results = results.filter(g => {
+            const diseases = g.Ciliopathies || []; // Assuming array or string
+            return JSON.stringify(diseases).includes(filters.disease);
+        });
+    }
+
+    // C. Apply Expression Range Filter
+    if (filters.minExpr > 0) {
+        results = results.filter(g => {
+            if (!g.expression || !g.expression.scRNA) return false;
+            // Get max expression value for this gene
+            const vals = Object.values(g.expression.scRNA);
+            const maxVal = Math.max(...vals, 0);
+            return maxVal >= filters.minExpr;
+        });
+    }
+
+    return results;
+};
+
+// --- 3. AUTOCOMPLETE LOGIC ---
+window.setupAutocomplete = function(inputId, suggestionsId) {
+    const input = document.getElementById(inputId);
+    const box = document.getElementById(suggestionsId);
+    if (!input || !box) return;
+
+    input.addEventListener('input', function() {
+        const val = this.value.toUpperCase();
+        if (val.length < 2) { box.style.display = 'none'; return; }
+
+        // Search gene symbols + synonyms (if you have them)
+        const matches = Object.keys(window.CiliAI.lookups.geneMap || {})
+            .filter(k => k.startsWith(val))
+            .slice(0, 10);
+
+        if (matches.length === 0) { box.style.display = 'none'; return; }
+
+        box.innerHTML = matches.map(gene => 
+            `<div class="ac-item" onclick="window.setSearch('${gene}')">${gene}</div>`
+        ).join('');
+        box.style.display = 'block';
+    });
+
+    // Hide when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target !== input && e.target !== box) box.style.display = 'none';
+    });
+};
+
+window.setSearch = function(val) {
+    const input = document.getElementById('adv-search-input');
+    if (input) {
+        input.value = val;
+        document.getElementById('adv-suggestions').style.display = 'none';
+        window.runDashboardSearch(); // Auto-run
+    }
+};
+
+
+/* ==============================================================
+ * MODULE: SEARCH UI INJECTION
+ * ============================================================== */
+
+window.injectSearchDashboardStyles = function() {
+    const css = `
+        .search-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; justify-content: center; align-items: flex-start; padding-top: 50px; backdrop-filter: blur(2px); }
+        .search-panel { background: white; width: 800px; max-width: 95%; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; font-family: 'Inter', sans-serif; }
+        .search-header { padding: 20px; background: #f7fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .search-body { padding: 20px; overflow-y: auto; display: flex; gap: 20px; }
+        .search-sidebar { width: 250px; border-right: 1px solid #e2e8f0; padding-right: 20px; }
+        .search-main { flex: 1; }
+        
+        /* Controls */
+        .filter-group { margin-bottom: 15px; }
+        .filter-label { display: block; font-size: 12px; font-weight: 700; color: #4a5568; margin-bottom: 5px; text-transform: uppercase; }
+        .cilia-input, .cilia-select { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; }
+        .cilia-range { width: 100%; }
+        
+        /* Autocomplete */
+        .ac-box { position: absolute; background: white; border: 1px solid #cbd5e0; width: 100%; max-height: 200px; overflow-y: auto; z-index: 10; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .ac-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f7fafc; }
+        .ac-item:hover { background: #ebf8ff; }
+
+        /* History */
+        .history-item { padding: 6px 10px; font-size: 13px; color: #2b6cb0; cursor: pointer; border-radius: 4px; margin-bottom: 2px; }
+        .history-item:hover { background: #ebf8ff; }
+
+        /* Results */
+        .result-item { padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 10px; transition: all 0.2s; cursor: pointer; }
+        .result-item:hover { border-color: #bee3f8; background: #ebf8ff; }
+        .result-badges { margin-top: 5px; }
+        .res-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #edf2f7; color: #4a5568; margin-right: 5px; }
+    `;
+    const style = document.createElement('style');
+    style.textContent = css;
+    document.head.appendChild(style);
+};
+
+window.openSearchDashboard = function() {
+    // 1. Inject Styles
+    window.injectSearchDashboardStyles();
+
+    // 2. Inject HTML if missing
+    if (!document.getElementById('cilia-search-modal')) {
+        const modal = document.createElement('div');
+        modal.id = 'cilia-search-modal';
+        modal.className = 'search-modal';
+        modal.innerHTML = `
+            <div class="search-panel">
+                <div class="search-header">
+                    <h2 style="margin:0; color:#2d3748;">🔍 Advanced Search</h2>
+                    <button onclick="document.getElementById('cilia-search-modal').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+                </div>
+                <div class="search-body">
+                    <div class="search-sidebar">
+                        <div class="filter-group">
+                            <label class="filter-label">Localization</label>
+                            <select id="filter-loc" class="cilia-select">
+                                <option value="All">All Locations</option>
+                                <option value="Transition Zone">Transition Zone</option>
+                                <option value="Basal Body">Basal Body</option>
+                                <option value="Axoneme">Axoneme</option>
+                                <option value="Centrosome">Centrosome</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Ciliopathy</label>
+                            <select id="filter-dis" class="cilia-select">
+                                <option value="All">All Diseases</option>
+                                <option value="Joubert">Joubert Syndrome</option>
+                                <option value="BBS">Bardet-Biedl (BBS)</option>
+                                <option value="MKS">Meckel-Gruber (MKS)</option>
+                                <option value="PCD">PCD</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Min Expression (TPM)</label>
+                            <input type="range" id="filter-expr" class="cilia-range" min="0" max="100" value="0" oninput="document.getElementById('expr-val').textContent = this.value">
+                            <span style="font-size:12px; color:#666;">Min: <span id="expr-val">0</span> TPM</span>
+                        </div>
+                        <hr style="border:0; border-top:1px solid #eee; margin: 15px 0;">
+                        <div class="filter-group">
+                            <label class="filter-label">Search History</label>
+                            <div id="search-history-list"></div>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Saved Queries</label>
+                            <div id="search-saved-list"></div>
+                        </div>
+                    </div>
+
+                    <div class="search-main">
+                        <div style="position:relative; margin-bottom: 20px; display:flex; gap:10px;">
+                            <div style="flex:1; position:relative;">
+                                <input type="text" id="adv-search-input" class="cilia-input" placeholder="e.g., IFT88 OR BBS (Boolean supported)...">
+                                <div id="adv-suggestions" class="ac-box"></div>
+                            </div>
+                            <button class="ciliai-button" onclick="window.runDashboardSearch()">Search</button>
+                            <button class="ciliai-button" style="background:#ecc94b; color:#744210;" onclick="window.SearchState.saveQuery(document.getElementById('adv-search-input').value)">★</button>
+                        </div>
+                        <div style="margin-bottom:10px; font-size:12px; color:#718096;">
+                            <strong>Tip:</strong> Use AND, OR, NOT for complex logic.
+                        </div>
+                        <div id="adv-search-results" style="height: 400px; overflow-y:auto;">
+                            <div style="text-align:center; padding-top:50px; color:#a0aec0;">
+                                Search for genes, diseases, or phenotypes...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Initialize Autocomplete
+        window.setupAutocomplete('adv-search-input', 'adv-suggestions');
+        
+        // Render History
+        window.SearchState.renderHistory();
+        window.SearchState.renderSaved();
+    }
+
+    // Show Modal
+    document.getElementById('cilia-search-modal').style.display = 'flex';
+};
+
+window.runDashboardSearch = function() {
+    const query = document.getElementById('adv-search-input').value;
+    const filters = {
+        localization: document.getElementById('filter-loc').value,
+        disease: document.getElementById('filter-dis').value,
+        minExpr: parseInt(document.getElementById('filter-expr').value)
+    };
+
+    const results = window.executeBooleanSearch(query, filters);
+    
+    // Save to history
+    if(query) window.SearchState.addToHistory(query);
+
+    // Render Results
+    const container = document.getElementById('adv-search-results');
+    if (results.length === 0) {
+        container.innerHTML = `<div style="padding:20px; text-align:center;">No results found.</div>`;
+        return;
+    }
+
+    container.innerHTML = `<div style="margin-bottom:10px; font-weight:bold;">Found ${results.length} results:</div>` + 
+        results.slice(0, 50).map(g => {
+            return `
+            <div class="result-item" onclick="window.displayFullGeneInfo('${g.Gene}'); document.getElementById('cilia-search-modal').style.display='none';">
+                <div style="font-weight:bold; color:#2b6cb0;">${g.Gene}</div>
+                <div style="font-size:12px; color:#4a5568;">${g['Gene.Description'] || 'No description'}</div>
+                <div class="result-badges">
+                    ${g.Localization ? `<span class="res-badge">📍 ${g.Localization}</span>` : ''}
+                    ${g.Ortholog_Mouse ? `<span class="res-badge">🐭 Mouse Ortholog</span>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+};
