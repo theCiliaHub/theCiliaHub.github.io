@@ -3236,7 +3236,44 @@ window.handleAIQuery = async function (query) {
 
         let htmlResult = null;
         let match;
+        // 1. Visualizations
+        if (qLower.includes('plot') || qLower.includes('display') || qLower.includes('heatmap') || qLower.includes('umap')) {
+            if (qLower.includes('umap') || qLower.includes('expression')) {
+                let target = 'WDR31';
+                match = qLower.match(/(?:for|of)\s+(.+)/i);
+                if (match) target = match[1].trim();
+                const genes = window.extractMultipleGenes(target);
+                const gene = genes.length > 0 ? genes[0] : 'WDR31';
+                window.renderUMAPPlot(gene, [gene]);
+                htmlResult = `<div class="ai-result-card"><p>Displaying UMAP for <strong>${gene}</strong>.</p></div>`;
+            } 
+            else if (qLower.includes('phylogen') || qLower.includes('evolution')) {
+                let genes = window.extractMultipleGenes(query);
+                if (genes.length === 0) genes = DEFAULT_PHYLO_GENES;
+                await window.handlePhylogenyVisualizationQuery(genes, 'li'); 
+                htmlResult = `<div class="ai-result-card"><p>Displaying phylogeny heatmap.</p></div>`;
+            }
+        }
 
+        // 2. Comparative
+        else if (qLower.includes('compare') || qLower.includes(' vs ')) {
+            htmlResult = await window.handleComparativeDashboard(query);
+        }
+
+        // 3. Variants
+        else if (qLower.includes('variant') || qLower.includes('mutation')) {
+            const genes = window.extractMultipleGenes(query);
+            if(genes.length > 0) htmlResult = await window.fetchVariantData(genes[0]);
+        }
+
+        // 4. Batch (Comma separated)
+        else if (query.includes(',') && window.extractMultipleGenes(query).length > 1) {
+            htmlResult = window.handleBatchQuery(query);
+        }
+
+       
+
+        
         // =======================================================
         // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
         // =======================================================
@@ -3812,66 +3849,6 @@ if (qLower.includes('compare') && qLower.includes('vs')) {
 }
 
 
-async function handleComparativeDashboard(genesText) {
-    // Parse genes
-    const genes = genesText.split(/vs|VS|Vs/).map(g => g.trim().toUpperCase());
-    
-    // Create side-by-side comparison dashboard
-    return `
-    <div class="comparison-dashboard">
-        <div class="comparison-header">
-            <h3>🔬 Comparative Analysis: ${genes.join(' vs ')}</h3>
-        </div>
-        <div class="comparison-grid">
-            ${genes.map(gene => `
-                <div class="gene-panel">
-                    <h4>${gene}</h4>
-                    <!-- Gene summary cards -->
-                </div>
-            `).join('')}
-        </div>
-        <div class="comparison-metrics">
-            <!-- Similarity scores, Jaccard index, etc. -->
-        </div>
-        <button onclick="window.exportComparison('${genes.join(',')}')">📊 Export Comparison</button>
-    </div>`;
-}
-
-
-// Process multiple genes at once
-window.handleBatchQuery = function(geneList, analysisType = 'summary') {
-    const genes = geneList.split(/[,\s]+/).filter(g => g);
-    
-    return `
-    <div class="batch-results">
-        <h4>📋 Batch Analysis (${genes.length} genes)</h4>
-        <div class="batch-controls">
-            <button onclick="window.exportBatch('${geneList}')">📥 Export All</button>
-            <button onclick="window.compareBatch('${geneList}')">📊 Compare</button>
-            <select onchange="window.changeBatchView(this.value, '${geneList}')">
-                <option value="summary">Summary</option>
-                <option value="expression">Expression</option>
-                <option value="evolution">Evolution</option>
-            </select>
-        </div>
-        <div class="batch-table">
-            <table>
-                <thead><tr><th>Gene</th><th>Localization</th><th>Diseases</th><th>Conservation</th></tr></thead>
-                <tbody>
-                    ${genes.slice(0, 20).map(gene => {
-                        const data = window.CiliAI.lookups.geneMap[gene];
-                        return `<tr>
-                            <td><strong>${gene}</strong></td>
-                            <td>${data?.Localization || '—'}</td>
-                            <td>${(data?.Ciliopathies || []).slice(0, 2).join(', ')}</td>
-                            <td>${data?.phylogeny?.li?.class || '—'}</td>
-                        </tr>`;
-                    }).join('')}
-                </tbody>
-            </table>
-        </div>
-    </div>`;
-};
 
 // Add sharing and collaboration
 window.SharingManager = {
@@ -3916,94 +3893,65 @@ window.SharingManager = {
     }
 };
 
-
-// Responsive enhancements
-window.MobileUI = {
-    init: function() {
-        this.injectMobileStyles();
-        this.setupTouchGestures();
-        this.optimizeForScreenSize();
-    },
-    
-    injectMobileStyles: function() {
-        const css = `
-        @media (max-width: 768px) {
-            .three-column-layout {
-                flex-direction: column !important;
-            }
-            
-            .chat-input {
-                position: fixed !important;
-                bottom: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
-                z-index: 1000 !important;
-            }
-            
-            .gene-badge {
-                padding: 4px 8px !important;
-                font-size: 11px !important;
-                margin: 2px !important;
-            }
-            
-            .ciliai-table-container {
-                max-height: 60vh !important;
-            }
-            
-            /* Swipe gestures for tabs */
-            .tab-content {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-            }
-        }
+window.fetchVariantData = async function(geneSymbol) {
+    try {
+        const response = await fetch(`https://mygene.info/v3/query?q=${geneSymbol}&fields=clinvar,gnomad`);
+        const data = await response.json();
+        const hits = data.hits?.[0] || {};
         
-        /* Touch-friendly buttons */
-        .touch-button {
-            min-height: 44px !important;
-            min-width: 44px !important;
-        }
-        
-        /* Better tap targets */
-        .gene-badge, .ai-action, .ciliai-button {
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-        }
-        `;
-        
-        const style = document.createElement('style');
-        style.textContent = css;
-        document.head.appendChild(style);
-    },
-    
-    setupTouchGestures: function() {
-        // Swipe between tabs on mobile
-        let startX = 0;
-        document.addEventListener('touchstart', e => {
-            startX = e.touches[0].clientX;
-        });
-        
-        document.addEventListener('touchend', e => {
-            const endX = e.changedTouches[0].clientX;
-            const diff = startX - endX;
-            
-            if (Math.abs(diff) > 50) {
-                // Swipe detected - switch tabs
-                const currentTab = document.querySelector('.cilia-tab-btn.active');
-                const tabs = Array.from(document.querySelectorAll('.cilia-tab-btn'));
-                const currentIndex = tabs.indexOf(currentTab);
-                
-                if (diff > 0 && currentIndex < tabs.length - 1) {
-                    // Swipe left - next tab
-                    tabs[currentIndex + 1].click();
-                } else if (diff < 0 && currentIndex > 0) {
-                    // Swipe right - previous tab
-                    tabs[currentIndex - 1].click();
-                }
-            }
-        });
+        return `
+        <div class="variant-panel">
+            <h4>🧬 Variants for ${geneSymbol}</h4>
+            <div class="variant-stats">
+                <div class="stat-card"><span class="stat-value">${hits.clinvar?.pathogenic_count || 0}</span> Pathogenic</div>
+                <div class="stat-card"><span class="stat-value">${hits.gnomad?.pLI?.toFixed(3) || 'N/A'}</span> pLI Score</div>
+            </div>
+            <p style="font-size:11px; color:#666;">Data Source: MyGene.info (ClinVar/gnomAD)</p>
+        </div>`;
+    } catch (e) {
+        return `<p>Variant data unavailable for ${geneSymbol}</p>`;
     }
 };
 
+window.handleComparativeDashboard = async function(genesText) {
+    const genes = genesText.split(/vs|VS|Vs|and|,/).map(g => g.trim().toUpperCase());
+    
+    return `
+    <div class="comparison-dashboard">
+        <div class="comparison-header"><h3>🔬 Comparing: ${genes.join(' vs ')}</h3></div>
+        <div class="comparison-grid">
+            ${genes.map(gene => {
+                const data = window.CiliAI.lookups.geneMap[gene] || {};
+                return `
+                <div class="gene-panel">
+                    <h4 style="color:#2b6cb0;">${gene}</h4>
+                    <p style="font-size:12px;"><strong>Loc:</strong> ${data.Localization || '-'}</p>
+                    <p style="font-size:12px;"><strong>Disease:</strong> ${(data.Ciliopathies || []).slice(0,1).join(',')}</p>
+                </div>`;
+            }).join('')}
+        </div>
+        <button class="ciliai-button" onclick="window.handleBatchQuery('${genes.join(',')}')">📊 Full Table</button>
+    </div>`;
+};
+
+window.handleBatchQuery = function(geneList) {
+    const genes = geneList.split(/[,\s]+/).map(g => g.trim().toUpperCase()).filter(g => g);
+    const dataObjects = genes.map(g => ({ gene: g })); 
+    window.showDataInLeftPanel(`Batch Analysis (${genes.length})`, dataObjects);
+    return `<div class="ai-result-card"><p>Generated batch table for ${genes.length} genes.</p></div>`;
+};
+
+window.handleScreenReferenceFollowup = function() {
+    return `<div class="ai-result-card">
+        <h4>Screen References</h4>
+        <ul class="reference-list">
+            <li class="reference-item"><strong>Kim et al. (2016)</strong>: IMCD3 RNAi screen.</li>
+            <li class="reference-item"><strong>Wheway et al. (2015)</strong>: RPE1 siRNA screen.</li>
+            <li class="reference-item"><strong>Roosing et al. (2015)</strong>: hTERT-RPE1 screen.</li>
+            <li class="reference-item"><strong>Breslow et al. (2018)</strong>: Hedgehog CRISPR screen.</li>
+        </ul>
+    </div>`;
+};
 // Track and display references for all data
 window.CitationManager = {
     references: new Map(),
