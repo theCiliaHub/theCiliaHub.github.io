@@ -3791,6 +3791,15 @@ window.handleAIQuery = async function (query) {
             }
         }
 
+// Add to handleAIQuery routing
+if (qLower.includes('compare') && qLower.includes('vs')) {
+    const matches = query.match(/([A-Z0-9]+)\s+vs\s+([A-Z0-9]+)/gi);
+    if (matches) {
+        return handleComparativeDashboard(matches[0]);
+    }
+}
+
+        
         // Send the final result to chat
         if (htmlResult) {
             window.addChatMessage(htmlResult, false);
@@ -3801,6 +3810,233 @@ window.handleAIQuery = async function (query) {
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
+
+
+async function handleComparativeDashboard(genesText) {
+    // Parse genes
+    const genes = genesText.split(/vs|VS|Vs/).map(g => g.trim().toUpperCase());
+    
+    // Create side-by-side comparison dashboard
+    return `
+    <div class="comparison-dashboard">
+        <div class="comparison-header">
+            <h3>🔬 Comparative Analysis: ${genes.join(' vs ')}</h3>
+        </div>
+        <div class="comparison-grid">
+            ${genes.map(gene => `
+                <div class="gene-panel">
+                    <h4>${gene}</h4>
+                    <!-- Gene summary cards -->
+                </div>
+            `).join('')}
+        </div>
+        <div class="comparison-metrics">
+            <!-- Similarity scores, Jaccard index, etc. -->
+        </div>
+        <button onclick="window.exportComparison('${genes.join(',')}')">📊 Export Comparison</button>
+    </div>`;
+}
+
+
+// Process multiple genes at once
+window.handleBatchQuery = function(geneList, analysisType = 'summary') {
+    const genes = geneList.split(/[,\s]+/).filter(g => g);
+    
+    return `
+    <div class="batch-results">
+        <h4>📋 Batch Analysis (${genes.length} genes)</h4>
+        <div class="batch-controls">
+            <button onclick="window.exportBatch('${geneList}')">📥 Export All</button>
+            <button onclick="window.compareBatch('${geneList}')">📊 Compare</button>
+            <select onchange="window.changeBatchView(this.value, '${geneList}')">
+                <option value="summary">Summary</option>
+                <option value="expression">Expression</option>
+                <option value="evolution">Evolution</option>
+            </select>
+        </div>
+        <div class="batch-table">
+            <table>
+                <thead><tr><th>Gene</th><th>Localization</th><th>Diseases</th><th>Conservation</th></tr></thead>
+                <tbody>
+                    ${genes.slice(0, 20).map(gene => {
+                        const data = window.CiliAI.lookups.geneMap[gene];
+                        return `<tr>
+                            <td><strong>${gene}</strong></td>
+                            <td>${data?.Localization || '—'}</td>
+                            <td>${(data?.Ciliopathies || []).slice(0, 2).join(', ')}</td>
+                            <td>${data?.phylogeny?.li?.class || '—'}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>`;
+};
+
+// Add sharing and collaboration
+window.SharingManager = {
+    generateShareableLink: function(state) {
+        // Compress state into URL
+        const encoded = btoa(JSON.stringify(state));
+        return `${window.location.origin}?state=${encoded}`;
+    },
+    
+    createSession: function(name) {
+        const sessionId = Date.now().toString(36);
+        localStorage.setItem(`session_${sessionId}`, JSON.stringify({
+            name,
+            queries: [],
+            timestamp: new Date().toISOString()
+        }));
+        return sessionId;
+    },
+    
+    exportSession: function(sessionId) {
+        const session = JSON.parse(localStorage.getItem(`session_${sessionId}`));
+        return `
+        <div class="session-report">
+            <h4>📋 Session Report: ${session.name}</h4>
+            <div class="session-meta">
+                <span>📅 ${new Date(session.timestamp).toLocaleString()}</span>
+                <span>🔢 ${session.queries.length} queries</span>
+            </div>
+            <div class="session-queries">
+                ${session.queries.map(q => `
+                    <div class="query-item">
+                        <div class="query-text">${q.query}</div>
+                        <div class="query-result">${q.resultCount || 0} results</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="session-actions">
+                <button onclick="window.downloadSession('${sessionId}')">📥 Download Session</button>
+                <button onclick="window.shareSession('${sessionId}')">🔗 Share Link</button>
+            </div>
+        </div>`;
+    }
+};
+
+
+// Responsive enhancements
+window.MobileUI = {
+    init: function() {
+        this.injectMobileStyles();
+        this.setupTouchGestures();
+        this.optimizeForScreenSize();
+    },
+    
+    injectMobileStyles: function() {
+        const css = `
+        @media (max-width: 768px) {
+            .three-column-layout {
+                flex-direction: column !important;
+            }
+            
+            .chat-input {
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 1000 !important;
+            }
+            
+            .gene-badge {
+                padding: 4px 8px !important;
+                font-size: 11px !important;
+                margin: 2px !important;
+            }
+            
+            .ciliai-table-container {
+                max-height: 60vh !important;
+            }
+            
+            /* Swipe gestures for tabs */
+            .tab-content {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+        
+        /* Touch-friendly buttons */
+        .touch-button {
+            min-height: 44px !important;
+            min-width: 44px !important;
+        }
+        
+        /* Better tap targets */
+        .gene-badge, .ai-action, .ciliai-button {
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        `;
+        
+        const style = document.createElement('style');
+        style.textContent = css;
+        document.head.appendChild(style);
+    },
+    
+    setupTouchGestures: function() {
+        // Swipe between tabs on mobile
+        let startX = 0;
+        document.addEventListener('touchstart', e => {
+            startX = e.touches[0].clientX;
+        });
+        
+        document.addEventListener('touchend', e => {
+            const endX = e.changedTouches[0].clientX;
+            const diff = startX - endX;
+            
+            if (Math.abs(diff) > 50) {
+                // Swipe detected - switch tabs
+                const currentTab = document.querySelector('.cilia-tab-btn.active');
+                const tabs = Array.from(document.querySelectorAll('.cilia-tab-btn'));
+                const currentIndex = tabs.indexOf(currentTab);
+                
+                if (diff > 0 && currentIndex < tabs.length - 1) {
+                    // Swipe left - next tab
+                    tabs[currentIndex + 1].click();
+                } else if (diff < 0 && currentIndex > 0) {
+                    // Swipe right - previous tab
+                    tabs[currentIndex - 1].click();
+                }
+            }
+        });
+    }
+};
+
+// Track and display references for all data
+window.CitationManager = {
+    references: new Map(),
+    
+    addReference: function(source, pmid, citation) {
+        this.references.set(pmid, {source, citation});
+    },
+    
+    showReferences: function(geneSymbol) {
+        const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+        const refs = [];
+        
+        // Collect references from various data sources
+        if (geneData?.screens) refs.push(...geneData.screens.map(s => s.source));
+        if (geneData?.phylogeny?.li) refs.push("PMID: 24995987"); // Li et al. 2014
+        
+        return `
+        <div class="references-panel">
+            <h4>📚 References for ${geneSymbol}</h4>
+            <ul class="reference-list">
+                ${refs.slice(0, 10).map(ref => `
+                    <li class="reference-item">
+                        <a href="https://pubmed.ncbi.nlm.nih.gov/${ref.replace('PMID: ', '')}" target="_blank">
+                            ${ref}
+                        </a>
+                        <button onclick="window.saveReference('${ref}')">⭐</button>
+                    </li>
+                `).join('')}
+            </ul>
+            <button onclick="window.exportReferences('${geneSymbol}')">📥 Export References (BibTeX)</button>
+        </div>`;
+    }
+};
 
     
 /**
