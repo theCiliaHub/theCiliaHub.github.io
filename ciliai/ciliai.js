@@ -1342,17 +1342,20 @@ function injectCiliAIStyles() {
 // ==========================================================
 // PATCH 2: UMAP VISUALIZATION (Colors, Switching, Cluster View)
 // ==========================================================
+// ==========================================================
+// PATCH: VISUALIZATION (WDR31 Default + Large Hover Text)
+// ==========================================================
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
     injectCiliAIStyles();
     
     // Determine active dataset
-    const datasetKey = window.CiliAI.activeDataset;
+    const datasetKey = window.CiliAI.activeDataset || 'lung';
     const dataset = window.CiliAI.datasets[datasetKey];
     const umapData = dataset.umap;
 
     let plotDiv = document.getElementById(plotDivId);
-    if (!plotDiv) { console.warn('UMAP Container not found.'); return; }
+    if (!plotDiv) return;
 
     if (!umapData) {
         if (window.addChatMessage) window.addChatMessage(`⚠️ ${dataset.name} data is loading...`, false);
@@ -1365,13 +1368,13 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const gene = displayName.toUpperCase();
     const isClusterView = displayName === 'CLUSTER_VIEW';
 
-    // Fetch Expression Data based on active dataset
+    // Fetch Expression Data
     let expressionMap = {};
     if (!isClusterView) {
         if (datasetKey === 'kidney') {
             expressionMap = dataset.expression ? (dataset.expression[gene] || {}) : {};
         } else {
-            // Lung fallback to global cache (legacy support)
+            // Lung fallback to global cache
             expressionMap = window.CiliAI.cellDataCache[gene] || {};
         }
     }
@@ -1383,7 +1386,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const x = [], y = [], color = [], text = [], size = [];
     let maxExpr = 0;
     
-    // Cluster Colors (for "Show ciliary cells")
     const clusterColors = {
         'Ciliated': '#E63946', 'Basal': '#457B9D', 'Club': '#1D3557', 
         'Goblet': '#A8DADC', 'Neuroendocrine': '#F1FAEE', 'Ionocyte': '#F4A261'
@@ -1392,44 +1394,54 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     for (const point of sourceData) {
         x.push(point.x);
         y.push(point.y);
-        text.push(point.cell_type);
+        
+        // --- UPDATED HOVER TEXT (Bold & Size 24) ---
+        const exprVal = expressionMap[point.cell_type] || 0;
+        text.push(`<span style="font-size:24px; font-weight:bold;">${point.cell_type}</span><br>Expr: ${exprVal.toFixed(2)}`);
 
         if (isClusterView) {
             color.push(clusterColors[point.cell_type] || '#ccc');
             size.push(4);
         } else {
-            const val = expressionMap[point.cell_type] || 0;
-            color.push(val);
-            size.push(val > 0 ? 8 : 4); 
-            if(val > maxExpr) maxExpr = val;
+            color.push(exprVal);
+            size.push(exprVal > 0 ? 8 : 4); 
+            if(exprVal > maxExpr) maxExpr = exprVal;
         }
     }
 
     const scaleMax = maxExpr > 0 ? maxExpr : 1;
     
-    // Trace Configuration
     const trace = {
         x: x, y: y, text: text,
-        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
-        marker: { size: size, opacity: 0.8, line: { color: 'white', width: 0.5 } }
+        mode: 'markers',
+        type: 'scattergl',
+        hoverinfo: 'text', // Forces usage of our custom HTML text
+        marker: { 
+            size: size, 
+            opacity: 0.8, 
+            line: { color: 'white', width: 0.5 } 
+        }
     };
 
     if (!isClusterView) {
         trace.marker.color = color;
-        // Use Dataset-specific Color Scale (Red for Lung, Blue for Kidney)
         trace.marker.colorscale = dataset.colorScale; 
         trace.marker.cmin = 0;
         trace.marker.cmax = scaleMax;
         trace.marker.colorbar = { title: 'TPM', len: 0.5 };
     } else {
-        trace.marker.color = color; // Use categorical colors
+        trace.marker.color = color; 
     }
 
     const layout = {
         title: { text: `<b>${isClusterView ? 'Cell Clusters' : gene} (${dataset.name})</b>`, font: { size: 14, color: '#2d3748' }, x: 0.05 },
-        xaxis: { visible: false }, yaxis: { visible: false },
-        hovermode: 'closest', margin: { t: 50, b: 40, l: 20, r: 20 },
-        plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff', showlegend: false,
+        xaxis: { visible: false },
+        yaxis: { visible: false },
+        hovermode: 'closest',
+        margin: { t: 50, b: 40, l: 20, r: 20 },
+        plot_bgcolor: '#ffffff',
+        paper_bgcolor: '#ffffff',
+        showlegend: false,
         annotations: [{
             x: 0.5, y: -0.1, xref: 'paper', yref: 'paper',
             text: `Source: ${dataset.citation}`,
@@ -1439,13 +1451,11 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     await Plotly.newPlot(plotDivId, [trace], layout, { responsive: true, displaylogo: false });
 
-    // --- CONTROLS: Add Switch Button ---
+    // Controls (Switch/Close)
     const parent = plotDiv.parentElement;
     if (parent) {
-        // Clear old buttons
         parent.querySelectorAll('.ciliai-plot-btn').forEach(b => b.remove());
 
-        // Close Button
         const closeBtn = document.createElement('button');
         closeBtn.className = 'ciliai-button ciliai-plot-btn';
         closeBtn.textContent = '✕ Close';
@@ -1453,21 +1463,18 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         closeBtn.onclick = () => window.generateAndInjectSVG();
         parent.appendChild(closeBtn);
 
-        // Switch Dataset Button
         const switchBtn = document.createElement('button');
         switchBtn.className = 'ciliai-button ciliai-plot-btn';
         const nextDataset = datasetKey === 'lung' ? 'kidney' : 'lung';
-        const nextColor = nextDataset === 'lung' ? 'red' : 'blue';
-        switchBtn.textContent = `Switch to ${window.CiliAI.datasets[nextDataset].name.split(' ')[1]} (${nextDataset === 'lung' ? 'Lung' : 'Kidney'})`; 
-        switchBtn.style.cssText = `position: absolute; top: 10px; left: 10px; width: auto; z-index: 10; background: white; color: ${nextDataset === 'lung' ? '#c53030' : '#2b6cb0'}; border: 1px solid #ccc;`;
+        switchBtn.textContent = `Switch to ${window.CiliAI.datasets[nextDataset].name.split(' ')[1]}`; 
+        switchBtn.style.cssText = 'position: absolute; top: 10px; left: 10px; width: auto; z-index: 10; background: white; color: #2b6cb0; border: 1px solid #bee3f8;';
         switchBtn.onclick = () => {
             window.CiliAI.activeDataset = nextDataset;
-            window.renderUMAPPlot(displayName, targetGenes, zoomToCellType); // Re-render with new dataset
+            window.renderUMAPPlot(displayName, targetGenes, zoomToCellType); 
         };
         parent.appendChild(switchBtn);
     }
 };
-
 /**
  * Calculates the bounding box (min/max UMAP coordinates) for a specified cell type cluster.
  * Also calculates the center point for potential annotation placement.
@@ -4351,14 +4358,18 @@ window.getGenesByComplex = getGenesByComplex;
 window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
 
 // ==========================================================
-// AUTO-STARTUP (Force WDR31 Default)
+// PATCH: AUTO-START (Force WDR31 Default)
 // ==========================================================
 (function() {
-    // If data is already loaded (from index.html), trigger the default plot immediately
-    if (window.CiliAI && window.CiliAI.ready && window.renderUMAPPlot) {
-        window.log("Auto-launching WDR31 default...");
-        window.renderUMAPPlot('WDR31', ['WDR31']);
-    }
+    // Check every 500ms if data is ready, then plot WDR31
+    const checkReady = setInterval(() => {
+        if (window.CiliAI && window.CiliAI.ready && window.renderUMAPPlot) {
+            clearInterval(checkReady);
+            window.log("Auto-launching default view (WDR31)...");
+            // Force WDR31 plot on startup
+            window.renderUMAPPlot('WDR31', ['WDR31']);
+        }
+    }, 500);
 })();
 
 // Expose optional additional handlers if defined
