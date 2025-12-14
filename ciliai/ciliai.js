@@ -632,88 +632,180 @@ function findAndMergeGenes(userInputArray) {
     return { foundGenes };
 }    
     
-   // --- 4B. Table & Panel Display ---
-    
-    /**
-     * (MODIFIED) Renders a dynamic table in the left panel.
-     * The columns are now built automatically from the keys in the geneList objects.
-     */
-    function showDataInLeftPanel(title, geneList) {
-        const container = document.getElementById('cilia-svg'); 
-        if (!container) {
-            console.error("Cannot find 'cilia-svg' container to draw table in.");
-            return;
-        }
-        const wrapper = container.closest('.interactive-cilium');
-        if (wrapper) wrapper.classList.add('table-view-active');
+// --- 4B. Table & Panel Display ---   
+ /**
+ * Renders a Sortable, Filterable Table with Extended Gene Info (ENSG, Loc, Disease)
+ */
+window.showDataInLeftPanel = function(title, geneList) {
+    const container = document.getElementById('cilia-svg'); 
+    if (!container) {
+        console.error("Cannot find 'cilia-svg' container.");
+        return;
+    }
+    const wrapper = container.closest('.interactive-cilium');
+    if (wrapper) wrapper.classList.add('table-view-active');
 
-        if (!geneList || geneList.length === 0) {
-            container.innerHTML = `
-                <div class="ciliai-table-container">
-                    <h3>${title}</h3>
-                    <p style="padding: 20px;">No genes found matching this criteria.</p>
-                    <button id="ciliai-back-btn" class="ciliai-button" style="background: #718096; margin-left: 10px;">Back to Diagram</button>
-                </div>
-            `;
-            document.getElementById('ciliai-back-btn').addEventListener('click', () => {
-                generateAndInjectSVG();
-            });
-            return;
-        }
-
-        // Dynamically get headers from the first object's keys
-        const keys = Object.keys(geneList[0]);
-        const headers = keys.map(k => k.charAt(0).toUpperCase() + k.slice(1)); // Capitalize
-
-        let tableHTML = `<table class="ciliai-data-table"><thead><tr>`;
-        headers.forEach(h => {
-            tableHTML += `<th>${h}</th>`;
-        });
-        tableHTML += `</tr></thead><tbody>`;
-
-        geneList.forEach(item => {
-            tableHTML += `<tr>`;
-            keys.forEach(key => {
-                // Use '—' for any null or undefined values
-                const value = item[key] !== null && item[key] !== undefined ? item[key] : '—';
-                if (key === 'gene') {
-                    tableHTML += `<td><strong>${value}</strong></td>`;
-                } else {
-                    tableHTML += `<td>${value}</td>`;
-                }
-            });
-            tableHTML += `</tr>`;
-        });
-        tableHTML += `</tbody></table>`;
-
-        const downloadButton = `<button id="ciliai-download-btn" class="ciliai-button">Download as CSV</button>`;
-        const backButton = `<button id="ciliai-back-btn" class="ciliai-button" style="background: #718096;">Back to Diagram</button>`;
-
-        container.innerHTML = `
-            <div class="ciliai-table-container">
-                <h3>${title} (${geneList.length} genes)</h3>
-                <div>
-                    ${downloadButton}
-                    ${backButton}
-                </div>
-                <div class="ciliai-table-scroll-wrapper">
-                    ${tableHTML}
-                </div>
-            </div>
-        `;
-
-        injectTableCSS();
-
-        // MODIFIED: Removed descriptionHeader from the CSV download function call
-        document.getElementById('ciliai-download-btn').addEventListener('click', () => {
-            downloadTableAsCSV(title, geneList);
-        });
-        document.getElementById('ciliai-back-btn').addEventListener('click', () => {
-            generateAndInjectSVG();
-        });
+    if (!geneList || geneList.length === 0) {
+        container.innerHTML = `<div class="ciliai-table-container"><h3>${title}</h3><p style="padding:20px;">No genes found.</p><button id="ciliai-back-btn" class="ciliai-button" style="background:#718096;">Back</button></div>`;
+        document.getElementById('ciliai-back-btn').addEventListener('click', () => window.generateAndInjectSVG());
+        return;
     }
 
+    // 1. Augment Data with ENSG, Localization, Diseases
+    const augmentedList = geneList.map(item => {
+        // Handle varied input formats (sometimes item is just string, sometimes object)
+        const geneSymbol = (typeof item === 'string' ? item : (item.gene || item.Gene || item.GENE || 'Unknown')).toUpperCase();
+        
+        // Lookup full details from master map
+        const fullData = window.CiliAI.lookups.geneMap[geneSymbol] || {};
+        
+        // Extract Diseases (handle arrays or strings)
+        let diseases = 'None listed';
+        if (Array.isArray(fullData.Ciliopathies)) diseases = fullData.Ciliopathies.join(', ');
+        else if (fullData.Ciliopathies) diseases = fullData.Ciliopathies;
+        else if (fullData['Ciliopathy']) diseases = fullData['Ciliopathy'];
 
+        // Create new object with forced order: Gene, ENSG, Loc, Disease, then others
+        const newItem = {
+            Gene: geneSymbol,
+            ENSG: fullData['Ensembl ID'] || fullData['Ensembl.ID'] || '—',
+            Localization: fullData['Localization'] || '—',
+            Diseases: diseases,
+            ...item // Add original specific data (e.g. expression, p-value)
+        };
+        
+        // Cleanup: Remove redundant 'gene' key if we added 'Gene'
+        if(newItem.gene) delete newItem.gene;
+        
+        return newItem;
+    });
+
+    // 2. Dynamic Headers
+    const keys = Object.keys(augmentedList[0]);
+    const headers = keys.map(k => k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' ')); 
+
+    // 3. Build Table HTML
+    let tableHTML = `
+        <div style="padding: 0 10px 10px 10px;">
+            <input type="text" id="ciliai-table-filter" placeholder="Filter table (e.g., 'kidney' or 'IFT')..." 
+                   style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 13px;">
+        </div>
+        <table class="ciliai-data-table sortable" id="ciliai-dynamic-table">
+            <thead>
+                <tr>
+                    ${keys.map((k, i) => `
+                        <th onclick="window.sortTable('ciliai-dynamic-table', ${i})" style="cursor:pointer; user-select:none;">
+                            ${headers[i]} <span style="font-size:10px; color:#666;">▼</span>
+                        </th>
+                    `).join('')}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    augmentedList.forEach(item => {
+        tableHTML += `<tr>`;
+        keys.forEach(key => {
+            let value = item[key] !== null && item[key] !== undefined ? item[key] : '—';
+            // Truncate very long disease lists
+            if (key === 'Diseases' && value.length > 50) {
+                value = `<span title="${value}">${value.substring(0, 50)}...</span>`;
+            }
+            // Make Gene clickable
+            if (key === 'Gene') {
+                tableHTML += `<td><strong style="color:#2b6cb0; cursor:pointer;" onclick="window.displayFullGeneInfo('${value}')">${value}</strong></td>`;
+            } else {
+                tableHTML += `<td>${value}</td>`;
+            }
+        });
+        tableHTML += `</tr>`;
+    });
+    tableHTML += `</tbody></table>`;
+
+    // 4. Render Container
+    container.innerHTML = `
+        <div class="ciliai-table-container">
+            <h3>${title} (${augmentedList.length} genes)</h3>
+            <div>
+                <button id="ciliai-download-btn" class="ciliai-button">Download CSV</button>
+                <button id="ciliai-back-btn" class="ciliai-button" style="background: #718096;">Back</button>
+            </div>
+            <div class="ciliai-table-scroll-wrapper">
+                ${tableHTML}
+            </div>
+        </div>
+    `;
+
+    window.injectTableCSS(); // Ensure styles exist
+
+    // 5. Attach Filter Listener
+    document.getElementById('ciliai-table-filter').addEventListener('keyup', function() {
+        const filter = this.value.toUpperCase();
+        const rows = document.getElementById("ciliai-dynamic-table").getElementsByTagName("tr");
+        for (let i = 1; i < rows.length; i++) {
+            let txtValue = rows[i].textContent || rows[i].innerText;
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                rows[i].style.display = "";
+            } else {
+                rows[i].style.display = "none";
+            }
+        }
+    });
+
+    // 6. Attach Button Listeners
+    document.getElementById('ciliai-download-btn').addEventListener('click', () => {
+        window.downloadTableAsCSV(title, augmentedList);
+    });
+    document.getElementById('ciliai-back-btn').addEventListener('click', () => {
+        window.generateAndInjectSVG();
+    });
+};
+
+/**
+ * Sorts an HTML Table by column index
+ */
+window.sortTable = function(tableId, n) {
+    const table = document.getElementById(tableId);
+    let switching = true, shouldSwitch, dir = "asc", switchcount = 0;
+    let i, x, y, rows = table.rows;
+
+    while (switching) {
+        switching = false;
+        for (i = 1; i < (rows.length - 1); i++) {
+            shouldSwitch = false;
+            x = rows[i].getElementsByTagName("TD")[n];
+            y = rows[i + 1].getElementsByTagName("TD")[n];
+            
+            let xContent = x.innerText.toLowerCase();
+            let yContent = y.innerText.toLowerCase();
+            const xNum = parseFloat(xContent);
+            const yNum = parseFloat(yContent);
+            const isNumeric = !isNaN(xNum) && !isNaN(yNum);
+
+            if (dir == "asc") {
+                if (isNumeric ? (xNum > yNum) : (xContent > yContent)) {
+                    shouldSwitch = true;
+                    break;
+                }
+            } else if (dir == "desc") {
+                if (isNumeric ? (xNum < yNum) : (xContent < yContent)) {
+                    shouldSwitch = true;
+                    break;
+                }
+            }
+        }
+        if (shouldSwitch) {
+            rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+            switching = true;
+            switchcount++;
+        } else {
+            if (switchcount == 0 && dir == "asc") {
+                dir = "desc";
+                switching = true;
+            }
+        }
+    }
+};   
 function react(type) {
     const userMessages = Array.from(document.querySelectorAll('.ciliai-message.user'));
     const lastQuestion = userMessages.length > 0 
