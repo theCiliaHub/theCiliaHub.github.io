@@ -232,6 +232,11 @@
     <script>
         // 1. Initialize Global State
         window.CiliAI = {
+            activeDataset: 'lung',
+            datasets: {
+                lung: { name: 'Human Lung Organoid', umap: null, colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] },
+                kidney: { name: 'Human Kidney', umap: null, expression: null, colorScale: [[0, '#e2e8f0'], [0.1, '#bee3f8'], [1, '#2b6cb0']] }
+            },
             data: { umap: [] },
             masterData: [],
             ready: false,
@@ -270,15 +275,22 @@
             }
         };
 
-        // Data Loading Logic 
+        // Data Loading Logic (UPDATED WITH KIDNEY JSON)
         window.loadCiliAIData = async function(timeoutMs = 60000) {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
             const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
             const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
+            // NEW: Kidney Data URL
+            const kidneyUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/kidney_data_all_genes.json';
             
             try {
-                window.log(`Fetching main database: ${mainDbUrl}`);
-                const [mainRes, lookupsRes] = await Promise.all([fetch(mainDbUrl), fetch(lookupsUrl)]);
+                window.log(`Fetching databases...`);
+                // Added fetch for kidneyUrl
+                const [mainRes, lookupsRes, kidneyRes] = await Promise.all([
+                    fetch(mainDbUrl), 
+                    fetch(lookupsUrl),
+                    fetch(kidneyUrl)
+                ]);
 
                 if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
                 if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
@@ -290,6 +302,17 @@
                 window.CiliAI.lookups = lookupData.lookups || {};
                 window.CiliAI_UMAP = mainData.umapData || [];
                 window.CiliAI.data.umap = mainData.umapData || [];
+                window.CiliAI.datasets.lung.umap = mainData.umapData;
+
+                // Process Kidney Data
+                if (kidneyRes.ok) {
+                    const kidneyData = await kidneyRes.json();
+                    window.CiliAI.datasets.kidney.umap = kidneyData.umap;
+                    window.CiliAI.datasets.kidney.expression = kidneyData.expression;
+                    window.log("Kidney dataset loaded.");
+                } else {
+                    console.warn("Kidney data failed to load");
+                }
                 
                 // Build fast lookup maps
                 window.CiliAI.lookups.umapByGene = {};
