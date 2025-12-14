@@ -221,27 +221,68 @@ function getComplexPhylogenyTableMap() {
 // 6. CILIA ANALYSIS PAGE (CRITICAL DEFINITIONS)
 // ==========================================================
 
-// --- Definition for the specialized analysis data loader ---
+// ==========================================================
+// PATCH: DATA LOADING (Safe Update for Lung + Kidney)
+// ==========================================================
+
+// Global state for active dataset
+window.CiliAI.activeDataset = 'lung'; // Default remains Lung
+window.CiliAI.datasets = {
+    lung: { name: 'Human Lung Organoid', umap: null, expression: null },
+    kidney: { name: 'Human Kidney (GSE131685)', umap: null, expression: null }
+};
+
 async function loadAnalysisData() { 
     const analysisBaseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+    
     try {
-        window.log("Fetching specialized analysis data...");
-        const [ciliaryGenesResponse, screenDataResponse] = await Promise.all([
+        window.log("Fetching datasets...");
+        
+        // 1. Fetch Core Data (Lung Logic - UNCHANGED)
+        // We keep fetching ciliahub_data.json and cilia_screens_data.json as before
+        const [genesRes, screensRes] = await Promise.all([
             fetch(analysisBaseUrl + 'ciliahub_data.json'),
             fetch(analysisBaseUrl + 'cilia_screens_data.json')
         ]);
 
-        const ciliaryGeneArray = await ciliaryGenesResponse.json();
-        window.screenDatabase = await screenDataResponse.json(); 
+        window.CiliAI.masterData = await genesRes.json();
+        window.screenDatabase = await screensRes.json();
         
-        window.ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene])); 
-        window.log(`Successfully loaded ${window.ciliaryGeneMap.size} ciliary genes for analysis.`);
+        // Populate Global Map (Existing Logic)
+        window.ciliaryGeneMap = new Map(window.CiliAI.masterData.map(gene => [gene.gene.toUpperCase(), gene])); 
+        window.CiliAI.lookups.geneMap = Object.fromEntries(window.ciliaryGeneMap);
+
+        // 2. Fetch UMAPs & New Kidney Data
+        // We fetch the existing lung UMAP and the NEW kidney file in parallel
+        const [lungUmap, kidneyData] = await Promise.all([
+            fetch(analysisBaseUrl + 'umap_data.json').then(r => r.json()),
+            fetch(analysisBaseUrl + 'kidney_data_all_genes.json')
+                .then(r => r.json())
+                .catch(e => {
+                    console.error("Kidney data load failed:", e);
+                    return null;
+                })
+        ]);
+
+        // Store Lung Data (Standard Setup)
+        window.CiliAI.datasets.lung.umap = lungUmap;
+        // Lung expression is already inside window.CiliAI.masterData / cellDataCache from Step 1.
+        // We don't need to load a separate lung expression file because your current code works fine without it.
+
+        // Store Kidney Data (New Setup)
+        if (kidneyData) {
+            window.CiliAI.datasets.kidney.umap = kidneyData.umap;
+            window.CiliAI.datasets.kidney.expression = kidneyData.expression;
+            window.log("Kidney dataset loaded successfully.");
+        }
+
+        window.CiliAI.ready = true;
+        window.log("All systems ready.");
 
     } catch (error) {
-        window.log(`Failed to load a required analysis data file: ${error.message}`, 'error');
+        window.log(`Dataset Load Error: ${error.message}`, 'error');
     }
 }
-
 /**
  * Initializes the analysis page: loads data and sets up event listeners.
  */
@@ -1296,106 +1337,136 @@ function injectCiliAIStyles() {
     styleEl.textContent = css;
     document.head.appendChild(styleEl);
 }
-/**
- * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
- */
+
+
+// ==========================================================
+// PATCH 2: UMAP VISUALIZATION (Colors, Switching, Cluster View)
+// ==========================================================
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
-    const plotDivId = 'cilia-svg'; // Targets your left-panel container
-    const umapData = window.CiliAI_UMAP;
-    
-    // Ensure styles are present
+    const plotDivId = 'cilia-svg';
     injectCiliAIStyles();
+    
+    // Determine active dataset
+    const datasetKey = window.CiliAI.activeDataset;
+    const dataset = window.CiliAI.datasets[datasetKey];
+    const umapData = dataset.umap;
 
     let plotDiv = document.getElementById(plotDivId);
-    if (!plotDiv) {
-        console.warn('UMAP Container (cilia-svg) not found.');
+    if (!plotDiv) { console.warn('UMAP Container not found.'); return; }
+
+    if (!umapData) {
+        if (window.addChatMessage) window.addChatMessage(`⚠️ ${dataset.name} data is loading...`, false);
         return;
     }
-
+    
+    // Handle inputs
     if (typeof targetGenes === 'string') targetGenes = [targetGenes];
     if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
-
     const gene = displayName.toUpperCase();
-    if (!umapData) {
-        if (window.addChatMessage) window.addChatMessage('⚠️ UMAP data is still loading...', false);
-        return;
+    const isClusterView = displayName === 'CLUSTER_VIEW';
+
+    // Fetch Expression Data based on active dataset
+    let expressionMap = {};
+    if (!isClusterView) {
+        if (datasetKey === 'kidney') {
+            expressionMap = dataset.expression ? (dataset.expression[gene] || {}) : {};
+        } else {
+            // Lung fallback to global cache (legacy support)
+            expressionMap = window.CiliAI.cellDataCache[gene] || {};
+        }
     }
 
-    let expressionMap = window.CiliAI.cellDataCache[gene] || {};
-
-    // --- Prepare Data for Plotly ---
-    const sampleSize = 10000; // Limit points for performance
+    // Prepare Plotly Data
+    const sampleSize = 15000; 
     const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
     
-    const sampledData = [];
-    const colorArray = [];
-    const sizeArray = [];
-    
+    const x = [], y = [], color = [], text = [], size = [];
     let maxExpr = 0;
     
-    for (const point of sourceData) {
-        const val = expressionMap[point.cell_type] || 0;
-        sampledData.push(point);
-        colorArray.push(val);
-        
-        // Logic: Bigger circles (8px) if expressed, smaller (4px) if background
-        sizeArray.push(val > 0 ? 8 : 4); 
-        if(val > maxExpr) maxExpr = val;
-    }
-
-    // --- Custom Color Scale (Viridis-like) ---
-    const scaleMax = maxExpr > 0 ? maxExpr : 1;
-    const colorScale = [
-        [0, '#e2e8f0'],   // Grey for 0 expression
-        [0.1, '#fed7d7'], // Light red for low
-        [1, '#c53030']    // Deep red for high
-    ];
-
-    const plotData = [{
-        x: sampledData.map(p => p.x),
-        y: sampledData.map(p => p.y),
-        customdata: sampledData.map(p => p.cell_type),
-        text: sampledData.map((p, i) => `<b>${p.cell_type}</b><br>Expr: ${colorArray[i].toFixed(2)}`),
-        mode: 'markers',
-        type: 'scattergl', // GL for performance
-        hoverinfo: 'text',
-        marker: {
-            color: colorArray,
-            colorscale: colorScale, 
-            cmin: 0,
-            cmax: scaleMax,
-            colorbar: { title: 'TPM', len: 0.5, thickness: 10 },
-            size: sizeArray,
-            opacity: 0.8,
-            line: { color: 'white', width: 0.5 } // White border makes points pop
-        }
-    }];
-
-    const layout = {
-        title: { text: `<b>${gene} Expression</b>`, font: { size: 16, color: '#2d3748' }, x: 0.05 },
-        xaxis: { visible: false },
-        yaxis: { visible: false },
-        hovermode: 'closest',
-        margin: { t: 50, b: 20, l: 20, r: 20 },
-        plot_bgcolor: '#ffffff',
-        paper_bgcolor: '#ffffff',
-        showlegend: false
+    // Cluster Colors (for "Show ciliary cells")
+    const clusterColors = {
+        'Ciliated': '#E63946', 'Basal': '#457B9D', 'Club': '#1D3557', 
+        'Goblet': '#A8DADC', 'Neuroendocrine': '#F1FAEE', 'Ionocyte': '#F4A261'
     };
 
-    // Render Plot
-    await Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displaylogo: false });
+    for (const point of sourceData) {
+        x.push(point.x);
+        y.push(point.y);
+        text.push(point.cell_type);
 
-    // Add Close Button (to return to SVG view)
-    if (!document.getElementById('ciliai-back-btn')) {
-        const btn = document.createElement('button');
-        btn.id = 'ciliai-back-btn';
-        btn.style.cssText = 'position: absolute; top: 15px; right: 15px; background: white; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: #4a5568; font-size: 11px; z-index:10;';
-        btn.textContent = '✕ Close Plot';
-        btn.onclick = () => window.generateAndInjectSVG(); // Your existing function to reset view
-        if(plotDiv.parentElement) plotDiv.parentElement.appendChild(btn); 
+        if (isClusterView) {
+            color.push(clusterColors[point.cell_type] || '#ccc');
+            size.push(4);
+        } else {
+            const val = expressionMap[point.cell_type] || 0;
+            color.push(val);
+            size.push(val > 0 ? 8 : 4); 
+            if(val > maxExpr) maxExpr = val;
+        }
     }
-}
 
+    const scaleMax = maxExpr > 0 ? maxExpr : 1;
+    
+    // Trace Configuration
+    const trace = {
+        x: x, y: y, text: text,
+        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+        marker: { size: size, opacity: 0.8, line: { color: 'white', width: 0.5 } }
+    };
+
+    if (!isClusterView) {
+        trace.marker.color = color;
+        // Use Dataset-specific Color Scale (Red for Lung, Blue for Kidney)
+        trace.marker.colorscale = dataset.colorScale; 
+        trace.marker.cmin = 0;
+        trace.marker.cmax = scaleMax;
+        trace.marker.colorbar = { title: 'TPM', len: 0.5 };
+    } else {
+        trace.marker.color = color; // Use categorical colors
+    }
+
+    const layout = {
+        title: { text: `<b>${isClusterView ? 'Cell Clusters' : gene} (${dataset.name})</b>`, font: { size: 14, color: '#2d3748' }, x: 0.05 },
+        xaxis: { visible: false }, yaxis: { visible: false },
+        hovermode: 'closest', margin: { t: 50, b: 40, l: 20, r: 20 },
+        plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff', showlegend: false,
+        annotations: [{
+            x: 0.5, y: -0.1, xref: 'paper', yref: 'paper',
+            text: `Source: ${dataset.citation}`,
+            showarrow: false, font: { size: 10, color: '#718096' }
+        }]
+    };
+
+    await Plotly.newPlot(plotDivId, [trace], layout, { responsive: true, displaylogo: false });
+
+    // --- CONTROLS: Add Switch Button ---
+    const parent = plotDiv.parentElement;
+    if (parent) {
+        // Clear old buttons
+        parent.querySelectorAll('.ciliai-plot-btn').forEach(b => b.remove());
+
+        // Close Button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'ciliai-button ciliai-plot-btn';
+        closeBtn.textContent = '✕ Close';
+        closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; width: auto; z-index: 10; background: white;';
+        closeBtn.onclick = () => window.generateAndInjectSVG();
+        parent.appendChild(closeBtn);
+
+        // Switch Dataset Button
+        const switchBtn = document.createElement('button');
+        switchBtn.className = 'ciliai-button ciliai-plot-btn';
+        const nextDataset = datasetKey === 'lung' ? 'kidney' : 'lung';
+        const nextColor = nextDataset === 'lung' ? 'red' : 'blue';
+        switchBtn.textContent = `Switch to ${window.CiliAI.datasets[nextDataset].name.split(' ')[1]} (${nextDataset === 'lung' ? 'Lung' : 'Kidney'})`; 
+        switchBtn.style.cssText = `position: absolute; top: 10px; left: 10px; width: auto; z-index: 10; background: white; color: ${nextDataset === 'lung' ? '#c53030' : '#2b6cb0'}; border: 1px solid #ccc;`;
+        switchBtn.onclick = () => {
+            window.CiliAI.activeDataset = nextDataset;
+            window.renderUMAPPlot(displayName, targetGenes, zoomToCellType); // Re-render with new dataset
+        };
+        parent.appendChild(switchBtn);
+    }
+};
 
 /**
  * Calculates the bounding box (min/max UMAP coordinates) for a specified cell type cluster.
@@ -3826,6 +3897,38 @@ window.handleAIQuery = async function (query) {
             } else {
                 htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
             }
+        }
+
+        // =======================================================
+        // =( 18 )= INTENT: SHOW CILIARY CELLS & TOP 500
+        // =======================================================
+        // 1. "Show Ciliary Cells" (Cluster View)
+        else if (htmlResult === null && qLower.includes('show') && qLower.includes('ciliary cells')) {
+            window.renderUMAPPlot('CLUSTER_VIEW');
+            
+            // Set context so the next "Yes" triggers the top 500 list
+            window.CiliAI.lastQueryContext = { type: 'top_500_ciliary' };
+            
+            htmlResult = `
+                <div class="ai-result-card">
+                    <p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p>
+                    <p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p>
+                </div>`;
+        }
+
+        // 2. Follow-up Handler for "Yes" (Specific to Top 500)
+        else if (htmlResult === null && /^(yes|sure|show list)/i.test(qLower) && window.CiliAI.lastQueryContext.type === 'top_500_ciliary') {
+            
+            // Logic to generate the Top 500 list from your master data
+            const top500 = window.CiliAI.masterData.slice(0, 500).map(g => ({ 
+                Gene: g.Gene, 
+                Localization: g.Localization || '-',
+                Description: g['Gene.Description'] || '-'
+            }));
+            
+            window.showDataInLeftPanel('Top 500 Ciliary Genes', top500);
+            htmlResult = "I've loaded the top 500 ciliary genes into the main panel.";
+            window.CiliAI.lastQueryContext = { type: null }; // Clear context so "Yes" doesn't trigger this again
         }
 
 // Add to handleAIQuery routing
