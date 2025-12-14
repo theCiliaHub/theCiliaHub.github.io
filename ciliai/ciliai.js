@@ -2595,30 +2595,48 @@ function renderMiniComplexList(data) {
 }
 
     
-    function getGenesByLocalization(term) {
-        let normTerm = term.toLowerCase();
-        const L = window.CiliAI.lookups;
-        const geneMap = L.geneMap;
-        let matchingGenes = new Set(); 
+ /**
+ * ROBUST LOCALIZATION SEARCH
+ * Scans both the lookup maps AND the raw master database column.
+ */
+function getGenesByLocalization(term) {
+    if (!term) return [];
+    let normTerm = term.toLowerCase().trim();
+    
+    const L = window.CiliAI.lookups;
+    const geneMap = L.geneMap || {};
+    let matchingGenes = new Set(); 
 
-        const allLocKeys = Object.keys(L.byLocalization);
-        allLocKeys.forEach(key => {
+    // 1. Search in pre-defined localization sets (Fast lookup)
+    if (L.byLocalization) {
+        Object.keys(L.byLocalization).forEach(key => {
             if (key.toLowerCase().includes(normTerm)) {
                 L.byLocalization[key].forEach(geneSymbol => {
-                    matchingGenes.add(geneSymbol);
+                    matchingGenes.add(geneSymbol.toUpperCase());
                 });
             }
         });
+    }
 
-        return Array.from(matchingGenes).map(gene => {
-            const geneData = geneMap[gene];
-            // (MODIFIED) Return a 'localization' field instead of 'description'
-            return {
-                gene: gene,
-                localization: geneData?.Localization || `Found in ${term}`
-            };
+    // 2. CRITICAL FIX: Scan the Master Data 'Localization' column directly
+    // This ensures we catch everything "Transition Zone" even if the lookup map is incomplete.
+    if (window.CiliAI.masterData) {
+        window.CiliAI.masterData.forEach(g => {
+            if (g.Gene && g.Localization && g.Localization.toLowerCase().includes(normTerm)) {
+                matchingGenes.add(g.Gene.toUpperCase());
+            }
         });
     }
+
+    // Return formatted objects
+    return Array.from(matchingGenes).map(gene => {
+        const geneData = geneMap[gene];
+        return {
+            gene: gene,
+            localization: geneData?.Localization || `Found in ${term}`
+        };
+    });
+}
 
     function getGenesByDomain(domainTerm, query) {
         const normTerm = normalizeTerm(domainTerm);
@@ -3108,16 +3126,6 @@ window.terminologyQueries = {
 // ==========================================================
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
-
-
-// ==========================================================
-// 5. QUERY ROUTER (THE BRAIN) - COMPLETE & FIXED v9.0
-// ==========================================================
-// ==========================================================
-// 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
-// ==========================================================
-
-
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
@@ -3234,43 +3242,51 @@ window.handleAIQuery = async function (query) {
 // =======================================================
 // =( 2.2 )= INTENT: LIST GENES (e.g. "list transition zone genes")
 // =======================================================
-if (
-    htmlResult === null &&
-    (match = qLower.match(/^(?:list|show|display)\s+(?:all\s+)?(.+?)\s+genes$/i))
-) {
-    const term = match[1].trim().toUpperCase();
-    window.log(`Routing via: Intent (List Genes: ${term})`);
+// Matches "List transition zone genes", "Show all basal body genes", etc.
+        else if (htmlResult === null && (match = qLower.match(/^(?:list|show|display|find|give me)\s+(?:all\s+)?(.+?)\s+genes$/i))) {
+            const term = match[1].trim();
+            const termUpper = term.toUpperCase();
+            window.log(`Routing via: Intent (List Genes: ${term})`);
 
-    // Try known compartment / module lookup
-    let genes = [];
+            let genes = [];
+            
+            // A. Check Localization Logic FIRST (The fix)
+            // This ensures "Transition Zone" hits the full search, not the old complex map
+            const locList = window.getGenesByLocalization(term);
+            if (locList.length > 0) {
+                genes = locList.map(g => g.gene);
+            }
 
-    if (window.CiliAI.lookups.byCompartment?.[term]) {
-        genes = window.CiliAI.lookups.byCompartment[term];
-    } 
-    else if (window.CiliAI.lookups.byModuleOrComplex?.[term]) {
-        genes = window.CiliAI.lookups.byModuleOrComplex[term];
-    }
+            // B. If no localization found, try Modules/Complexes
+            if (genes.length === 0) {
+                if (window.CiliAI.lookups.byCompartment?.[termUpper]) {
+                    genes = window.CiliAI.lookups.byCompartment[termUpper];
+                }
+                else if (window.CiliAI.lookups.byModuleOrComplex?.[termUpper]) {
+                    genes = window.CiliAI.lookups.byModuleOrComplex[termUpper];
+                }
+            }
 
-    if (genes.length > 0) {
-        const rows = genes.map(g => ({ gene: g }));
+            if (genes.length > 0) {
+                const rows = genes.map(g => ({ gene: g }));
+                
+                // 🔴 CRITICAL: set follow-up context so "Yes" works next
+                window.CiliAI.lastQueryContext = {
+                    type: 'list_followup',
+                    term: `${term} genes`,
+                    data: rows
+                };
 
-        // 🔴 CRITICAL: set follow-up context
-        window.CiliAI.lastQueryContext = {
-            type: 'list_followup',
-            term: `${term} genes`,
-            data: rows
-        };
-
-        htmlResult = `
-            <div class="ai-result-card">
-                <p>Found <strong>${genes.length}</strong> genes associated with <strong>${term}</strong>.</p>
-                <p>Would you like to <strong>view the full list</strong>?</p>
-            </div>
-        `;
-    } else {
-        htmlResult = `I couldn't find a predefined gene set for <strong>${term}</strong>.`;
-    }
-}
+                htmlResult = `
+                    <div class="ai-result-card">
+                        <p>Found <strong>${genes.length}</strong> genes associated with <strong>${term}</strong>.</p>
+                        <p>Would you like to <strong>view the full list</strong>?</p>
+                    </div>
+                `;
+            } else {
+                htmlResult = `I couldn't find a gene set for <strong>${term}</strong> in the database.`;
+            }
+        }
 
         
      // =======================================================
