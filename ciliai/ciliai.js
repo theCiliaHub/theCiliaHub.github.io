@@ -1163,32 +1163,83 @@ function extractEvolutionIntent(qLower) {
     }
     
 /**
- * Renders UMAP with Bigger Circles, White Borders, and Interactive Labels
+ * INJECTS CSS FOR TABS, BADGES, AND UMAP PLOTS
+ * Call this once when the gene page or plot is loaded.
  */
-async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = null) {
-    const plotDivId = 'cilia-svg';
+function injectCiliAIStyles() {
+    const styleId = 'ciliai-core-styles';
+    if (document.getElementById(styleId)) return;
+    const css = `
+        /* Tabs Styling */
+        .cilia-tabs { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 15px; }
+        .cilia-tab-btn {
+            padding: 10px 20px; border: none; background: none; font-weight: 600; color: #718096;
+            cursor: pointer; transition: all 0.2s; border-bottom: 2px solid transparent;
+        }
+        .cilia-tab-btn:hover { color: #2b6cb0; background: #ebf8ff; }
+        .cilia-tab-btn.active { color: #2b6cb0; border-bottom: 2px solid #2b6cb0; }
+        
+        /* Tab Content Animation */
+        .cilia-tab-content { display: none; animation: fadeIn 0.2s ease-in; }
+        .cilia-tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Confidence Badges */
+        .cilia-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; margin-left: 10px; vertical-align: middle; }
+        .badge-gold { background: #fefcbf; color: #744210; border: 1px solid #d69e2e; }
+        .badge-silver { background: #edf2f7; color: #2d3748; border: 1px solid #cbd5e0; }
+        .badge-bronze { background: #fff5f5; color: #742a2a; border: 1px solid #feb2b2; }
+
+        /* Data Tables */
+        .fancy-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; border-radius: 6px; overflow: hidden; border: 1px solid #e2e8f0; }
+        .fancy-table th { background: #ebf8ff; color: #2c5282; padding: 6px 8px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+        .fancy-table td { padding: 6px 8px; border-bottom: 1px solid #E2E8F0; color: #4a5568; }
+        .fancy-table tr:last-child td { border-bottom: none; }
+        .fancy-table tr:hover { background: #f7fafc; }
+
+        /* Section Headers */
+        .section-header { margin-top: 1.2rem; font-size: 13px; font-weight: 700; color: #2d3748; border-bottom: 2px solid #edf2f7; padding-bottom: 4px; margin-bottom: 8px; }
+        .data-source-note { font-size: 10px; color: #718096; margin-top: 4px; font-style: italic; }
+    `;
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = css;
+    document.head.appendChild(styleEl);
+}
+/**
+ * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
+ */
+window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
+    const plotDivId = 'cilia-svg'; // Targets your left-panel container
     const umapData = window.CiliAI_UMAP;
-    const plotDiv = document.getElementById(plotDivId);
+    
+    // Ensure styles are present
+    injectCiliAIStyles();
+
+    let plotDiv = document.getElementById(plotDivId);
+    if (!plotDiv) {
+        console.warn('UMAP Container (cilia-svg) not found.');
+        return;
+    }
 
     if (typeof targetGenes === 'string') targetGenes = [targetGenes];
     if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
 
     const gene = displayName.toUpperCase();
-    if (!plotDiv || !umapData) {
-        if (window.addChatMessage) window.addChatMessage('UMAP data is not available.', false);
+    if (!umapData) {
+        if (window.addChatMessage) window.addChatMessage('⚠️ UMAP data is still loading...', false);
         return;
     }
 
-    let expressionMap = window.CiliAI.cellDataCache[targetGenes[0].toUpperCase()] || {};
+    let expressionMap = window.CiliAI.cellDataCache[gene] || {};
 
-    // 1. Prepare Data & Calculate Centroids
-    const sampleSize = 10000;
+    // --- Prepare Data for Plotly ---
+    const sampleSize = 10000; // Limit points for performance
+    const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
+    
     const sampledData = [];
     const colorArray = [];
     const sizeArray = [];
-    const clusterSums = {}; 
-    
-    const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
     
     let maxExpr = 0;
     
@@ -1197,35 +1248,18 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
         sampledData.push(point);
         colorArray.push(val);
         
-        // --- UPDATED SIZE LOGIC (Bigger Circles) ---
-        // Points with expression are 10px, background points are 6px
-        sizeArray.push(val > 0 ? 10 : 6); 
-        
+        // Logic: Bigger circles (8px) if expressed, smaller (4px) if background
+        sizeArray.push(val > 0 ? 8 : 4); 
         if(val > maxExpr) maxExpr = val;
-
-        // Centroid Calculation
-        if (!clusterSums[point.cell_type]) clusterSums[point.cell_type] = { x: 0, y: 0, count: 0 };
-        clusterSums[point.cell_type].x += point.x;
-        clusterSums[point.cell_type].y += point.y;
-        clusterSums[point.cell_type].count++;
     }
 
-    // Generate Annotations
-    const annotations = Object.keys(clusterSums).map(cellType => {
-        const c = clusterSums[cellType];
-        return {
-            x: c.x / c.count,
-            y: c.y / c.count,
-            text: cellType,
-            showarrow: false,
-            font: { size: 10, color: 'rgba(50, 50, 50, 0.6)', family: 'Inter, sans-serif' },
-            bgcolor: 'rgba(255,255,255,0.4)',
-            name: cellType 
-        };
-    });
-
+    // --- Custom Color Scale (Viridis-like) ---
     const scaleMax = maxExpr > 0 ? maxExpr : 1;
-    const redColorScale = [[0, '#F8F8F8'], [0.0001, '#FFDAD0'], [1, '#E60000']];
+    const colorScale = [
+        [0, '#e2e8f0'],   // Grey for 0 expression
+        [0.1, '#fed7d7'], // Light red for low
+        [1, '#c53030']    // Deep red for high
+    ];
 
     const plotData = [{
         x: sampledData.map(p => p.x),
@@ -1233,78 +1267,42 @@ async function renderUMAPPlot(displayName, targetGenes = [], zoomToCellType = nu
         customdata: sampledData.map(p => p.cell_type),
         text: sampledData.map((p, i) => `<b>${p.cell_type}</b><br>Expr: ${colorArray[i].toFixed(2)}`),
         mode: 'markers',
-        type: 'scattergl',
+        type: 'scattergl', // GL for performance
         hoverinfo: 'text',
         marker: {
             color: colorArray,
-            colorscale: redColorScale, 
+            colorscale: colorScale, 
             cmin: 0,
             cmax: scaleMax,
             colorbar: { title: 'TPM', len: 0.5, thickness: 10 },
             size: sizeArray,
-            opacity: 0.9, // Higher opacity for visibility
-            // --- UPDATED BORDER (White Surrounding) ---
-            line: {
-                color: 'white',
-                width: 1
-            }
+            opacity: 0.8,
+            line: { color: 'white', width: 0.5 } // White border makes points pop
         }
     }];
 
     const layout = {
-        title: { text: `<b>${gene} Expression (Lung scRNA)</b>`, font: { size: 16, color: '#2d3748' }, x: 0.05 },
+        title: { text: `<b>${gene} Expression</b>`, font: { size: 16, color: '#2d3748' }, x: 0.05 },
         xaxis: { visible: false },
         yaxis: { visible: false },
         hovermode: 'closest',
         margin: { t: 50, b: 20, l: 20, r: 20 },
         plot_bgcolor: '#ffffff',
         paper_bgcolor: '#ffffff',
-        showlegend: false,
-        annotations: annotations
+        showlegend: false
     };
 
+    // Render Plot
     await Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displaylogo: false });
 
-    // Interactive Label Logic
-    plotDiv.on('plotly_hover', function(data){
-        if (!data || !data.points || !data.points.length) return;
-        const point = data.points[0];
-        if(!point || !point.customdata) return;
-
-        const hoveredType = point.customdata;
-
-        // Make hovered label Bold & Large
-        const newAnns = annotations.map(ann => {
-            if (ann.text === hoveredType) {
-                return { 
-                    ...ann, 
-                    font: { size: 16, color: '#000000', weight: 'bold', family: 'Inter, sans-serif' },
-                    bgcolor: 'rgba(255,255,255,0.95)',
-                    bordercolor: '#333'
-                };
-            }
-            return ann;
-        });
-        
-        requestAnimationFrame(() => {
-            Plotly.relayout(plotDivId, { annotations: newAnns });
-        });
-    });
-
-    plotDiv.on('plotly_unhover', function(data){
-        requestAnimationFrame(() => {
-            Plotly.relayout(plotDivId, { annotations: annotations });
-        });
-    });
-
-    // Close Button
+    // Add Close Button (to return to SVG view)
     if (!document.getElementById('ciliai-back-btn')) {
         const btn = document.createElement('button');
         btn.id = 'ciliai-back-btn';
         btn.style.cssText = 'position: absolute; top: 15px; right: 15px; background: white; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: #4a5568; font-size: 11px; z-index:10;';
         btn.textContent = '✕ Close Plot';
-        btn.onclick = () => window.generateAndInjectSVG();
-        plotDiv.prepend(btn);
+        btn.onclick = () => window.generateAndInjectSVG(); // Your existing function to reset view
+        if(plotDiv.parentElement) plotDiv.parentElement.appendChild(btn); 
     }
 }
 
@@ -2409,16 +2407,33 @@ function performMultiCriteriaFilter(query, intents) {
     }
 
 // --- 4F. Data Getter Helpers ---
-/**
- * Fancy Dashboard Version (v6.0 - Cell Whisperer Style)
- * Renders a comprehensive "Gene Dashboard" in the left/main panel
- * while keeping the chat stream clean.
 
-/**
- * Unified Gene Dashboard (v8.0)
- * Combines Cell Whisperer Design + GTDB Badge System + Detailed Data Tables
- */
+// --- Tab Switching Logic ---
+window.openTab = function(evt, tabName) {
+    const tabContents = document.getElementsByClassName("cilia-tab-content");
+    for (let i = 0; i < tabContents.length; i++) {
+        tabContents[i].classList.remove("active");
+    }
+    const tabLinks = document.getElementsByClassName("cilia-tab-btn");
+    for (let i = 0; i < tabLinks.length; i++) {
+        tabLinks[i].classList.remove("active");
+    }
+    document.getElementById(`tab-${tabName}`).classList.add("active");
+    evt.currentTarget.classList.add("active");
+    
+    // Auto-trigger UMAP if switching to Expression tab
+    if (tabName === 'expression') {
+        const geneName = document.getElementById('current-gene-name')?.textContent;
+        if (geneName && window.renderUMAPPlot) {
+            setTimeout(() => window.renderUMAPPlot(geneName, [geneName]), 100);
+        }
+    }
+};
+
+// --- Main Display Function ---
 window.displayFullGeneInfo = async function(geneSymbol) {
+    injectCiliAIStyles();
+    
     const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
     if (!gm || !gm[geneSymbol]) {
         return `<div class="ai-result-card">No data found for gene <strong>${geneSymbol}</strong></div>`;
@@ -2427,121 +2442,121 @@ window.displayFullGeneInfo = async function(geneSymbol) {
     const safeVal = (v) => (v && v !== 'N/A' && v !== '0') ? v : '<span style="color:#ccc">—</span>';
     const scRNA = g.expression?.scRNA || {};
 
-    // --- 1. CALCULATE CILIARY CONFIDENCE SCORE (GTDB Style) ---
+    // Calculate Confidence Score for Badge
     let score = 0;
-    // +1 per positive screen
     if (g.screens) score += g.screens.length; 
-    // +2 for Ciliopathy link
     if (g.Ciliopathies && g.Ciliopathies.length > 0) score += 2;
-    // +1 for C. elegans Ortholog (Evolutionary conservation)
     if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') score += 1; 
 
     let badge = '';
-    if (score >= 4) badge = `<span class="cilia-badge badge-gold" title="High Confidence: Multiple screens + Disease link">🥇 High Confidence</span>`;
-    else if (score >= 2) badge = `<span class="cilia-badge badge-silver" title="Verified: Found in multiple datasets">🥈 Verified</span>`;
-    else badge = `<span class="cilia-badge badge-bronze" title="Candidate: Limited data">🥉 Candidate</span>`;
+    if (score >= 4) badge = `<span class="cilia-badge badge-gold">🥇 High Confidence</span>`;
+    else if (score >= 2) badge = `<span class="cilia-badge badge-silver">🥈 Verified</span>`;
+    else badge = `<span class="cilia-badge badge-bronze">🥉 Candidate</span>`;
 
-    // --- 2. CSS STYLES (Inline for portability) ---
-    const styles = `
-        <style>
-            .cilia-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; margin-left: 10px; vertical-align: middle; }
-            .badge-gold { background: #fefcbf; color: #744210; border: 1px solid #d69e2e; }
-            .badge-silver { background: #edf2f7; color: #2d3748; border: 1px solid #cbd5e0; }
-            .badge-bronze { background: #fff5f5; color: #742a2a; border: 1px solid #feb2b2; }
-            
-            .fancy-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; border-radius: 6px; overflow: hidden; border: 1px solid #e2e8f0; }
-            .fancy-table th { background: #ebf8ff; color: #2c5282; padding: 6px 8px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; }
-            .fancy-table td { padding: 6px 8px; border-bottom: 1px solid #E2E8F0; color: #4a5568; }
-            .fancy-table tr:last-child td { border-bottom: none; }
-            .fancy-table tr:hover { background: #f7fafc; }
-            
-            .section-header { margin-top: 1.2rem; font-size: 13px; font-weight: 700; color: #2d3748; border-bottom: 2px solid #edf2f7; padding-bottom: 4px; margin-bottom: 8px; }
-            .data-source-note { font-size: 10px; color: #718096; margin-top: 4px; font-style: italic; }
-        </style>
-    `;
-
-    // --- 3. BUILD HTML ---
-    let html = `${styles}<div class="ai-result-card" style="font-family: 'Inter', sans-serif;">`;
+    // --- BUILD HTML ---
+    let html = `<div class="ai-result-card" style="font-family: 'Inter', sans-serif;">`;
     
-    // Header
+    // 1. Header
     html += `<div style="display:flex; align-items:center; margin-bottom:10px;">
-                <h2 style="margin:0; color:#2b6cb0;">${geneSymbol}</h2>
+                <h2 id="current-gene-name" style="margin:0; color:#2b6cb0;">${geneSymbol}</h2>
                 ${badge}
              </div>`;
-             
-    html += `<p><strong>Description:</strong> ${g['Gene.Description'] || 'No description available'}</p>`;
-    html += `<p><strong>Localization:</strong> ${g.Localization || 'Unknown'}</p>`;
 
-    // Key Stats Box (v6.0 Style)
-    html += `<div style="background:#f7fafc; padding:10px; border-radius:8px; margin:10px 0; font-size: 0.95em; border: 1px solid #edf2f7;">
-                <p style="margin:3px 0;"><strong>Mouse Ortholog:</strong> ${safeVal(g.Ortholog_Mouse)}</p>
-                <p style="margin:3px 0;"><strong>Phenotype (LoF):</strong> ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</p>
-                <p style="margin:3px 0;"><strong>OMIM:</strong> ${safeVal(g.OMIM?.ID)}</p>
+    // 2. Navigation Tabs
+    html += `
+        <div class="cilia-tabs">
+            <button class="cilia-tab-btn active" onclick="window.openTab(event, 'overview')">Overview</button>
+            <button class="cilia-tab-btn" onclick="window.openTab(event, 'expression')">Expression</button>
+            <button class="cilia-tab-btn" onclick="window.openTab(event, 'screens')">Screens</button>
+            <button class="cilia-tab-btn" onclick="window.openTab(event, 'evolution')">Evolution</button>
+        </div>
+    `;
+
+    // 3. Tab Contents
+    
+    // -- OVERVIEW --
+    html += `<div id="tab-overview" class="cilia-tab-content active">
+                <p><strong>Description:</strong> ${g['Gene.Description'] || 'No description available'}</p>
+                <p><strong>Localization:</strong> ${g.Localization || 'Unknown'}</p>
+                <div style="background:#f7fafc; padding:10px; border-radius:8px; margin:10px 0; font-size: 0.95em; border: 1px solid #edf2f7;">
+                    <p style="margin:3px 0;"><strong>Mouse Ortholog:</strong> ${safeVal(g.Ortholog_Mouse)}</p>
+                    <p style="margin:3px 0;"><strong>Phenotype (LoF):</strong> ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</p>
+                    <p style="margin:3px 0;"><strong>OMIM:</strong> ${safeVal(g.OMIM?.ID)}</p>
+                </div>
+                ${g.complex_components ? renderComplexTable(g.complex_components) : ''}
              </div>`;
 
-    // --- MERGED DETAILED TABLES (v5.1 Style) ---
+    // -- EXPRESSION --
+    html += `<div id="tab-expression" class="cilia-tab-content">
+                <div style="margin-bottom: 10px;">
+                    <button class="ciliai-button" onclick="window.renderUMAPPlot('${geneSymbol}')">🔄 Refresh UMAP Plot</button>
+                </div>
+                ${Object.keys(scRNA).length > 0 ? renderScRNATable(scRNA) : '<p>No scRNA data.</p>'}
+             </div>`;
 
-    // 1. Cilia Effects Table
-    html += `<div class="section-header">Cilia Effects</div>`;
-    html += `<table class="fancy-table">
+    // -- SCREENS --
+    html += `<div id="tab-screens" class="cilia-tab-content">
+                ${renderCiliaEffectsTable(g)}
+                ${Array.isArray(g.screens) && g.screens.length > 0 ? renderScreensTable(g.screens) : '<p>No screen data available.</p>'}
+             </div>`;
+
+    // -- EVOLUTION --
+    html += `<div id="tab-evolution" class="cilia-tab-content">
+                ${g.phylogeny ? renderPhyloTable(g.phylogeny) : '<p>No phylogeny data.</p>'}
+                <div style="margin-top:10px;">
+                    <button class="ciliai-button" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">View Phylogeny Heatmap</button>
+                </div>
+             </div>`;
+
+    html += `</div>`; 
+    return html;
+};
+
+function renderComplexTable(components) {
+    let html = `<div class="section-header">Protein Complexes</div>
+                <table class="fancy-table"><tr><th>Complex</th><th>Members</th></tr>`;
+    for (const [cname, members] of Object.entries(components)) {
+        html += `<tr><td>${cname}</td><td>${members.join(', ')}</td></tr>`;
+    }
+    return html + `</table>`;
+}
+
+function renderScRNATable(scRNA) {
+    let html = `<table class="fancy-table"><tr><th>Cell Type</th><th>TPM</th></tr>`;
+    Object.entries(scRNA).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([k,v]) => {
+         html += `<tr><td>${k}</td><td><strong>${Number(v).toFixed(2)}</strong></td></tr>`;
+    });
+    return html + `</table><div class="data-source-note">Source: human lung organoid cell atlas.</div>`;
+}
+
+function renderCiliaEffectsTable(g) {
+    const safeVal = (v) => (v && v !== 'N/A' && v !== '0') ? v : '—';
+    return `<div class="section-header">Cilia Effects</div>
+            <table class="fancy-table">
                 <tr><th>Effect Type</th><th>Result</th></tr>
                 <tr><td>Overexpression</td><td>${safeVal(g['Overexpression effects on cilia length (increase/decrease/no effect)'])}</td></tr>
                 <tr><td>Loss-of-Function</td><td>${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</td></tr>
                 <tr><td>% Ciliated</td><td>${safeVal(g['Percentage of ciliated cells (increase/decrease/no effect)'])}</td></tr>
-             </table>`;
+            </table>`;
+}
 
-    // 2. Screens Table
-    if (Array.isArray(g.screens) && g.screens.length > 0) {
-        html += `<div class="section-header">Screen Results</div>`;
-        html += `<table class="fancy-table"><tr><th>Source</th><th>Result</th></tr>`;
-        g.screens.forEach(s => {
-            html += `<tr><td><strong>${s.source}</strong></td><td>${s.result}</td></tr>`;
-        });
-        html += `</table>`;
+function renderScreensTable(screens) {
+    let html = `<div class="section-header">Screen Results</div><table class="fancy-table"><tr><th>Source</th><th>Result</th></tr>`;
+    screens.forEach(s => {
+        html += `<tr><td><strong>${s.source}</strong></td><td>${s.result}</td></tr>`;
+    });
+    return html + `</table>`;
+}
+
+function renderPhyloTable(phylogeny) {
+    let html = `<div class="section-header">Evolutionary History</div>
+                <table class="fancy-table"><tr><th>Dataset</th><th>Class</th><th>Species Count</th></tr>`;
+    for (const [pkey, pval] of Object.entries(phylogeny)) {
+         const safeP = pval || {};
+         html += `<tr><td>${pkey}</td><td>${safeP.class || '-'}</td><td>${safeP.species_data?.length || 0}</td></tr>`;
     }
-
-    // 3. scRNA Expression Table
-    if (Object.keys(scRNA).length > 0) {
-        html += `<div class="section-header">scRNA Expression (Lung Organoid)</div>`;
-        html += `<table class="fancy-table"><tr><th>Cell Type</th><th>TPM</th></tr>`;
-        // Top 5 cell types
-        Object.entries(scRNA).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([k,v]) => {
-             html += `<tr><td>${k}</td><td><strong>${Number(v).toFixed(2)}</strong></td></tr>`;
-        });
-        html += `</table>`;
-        html += `<div class="data-source-note">Source: human lung organoid cell atlas (AnnData v0.10). [Download Source H5AD]</div>`;
-    }
-
-    // 4. Complexes Table
-    if (g.complex_components) {
-        html += `<div class="section-header">Protein Complexes</div>`;
-        html += `<table class="fancy-table"><tr><th>Complex</th><th>Members</th></tr>`;
-        for (const [cname, members] of Object.entries(g.complex_components)) {
-            html += `<tr><td>${cname}</td><td>${members.join(', ')}</td></tr>`;
-        }
-        html += `</table>`;
-    }
-
-    // 5. Phylogeny Table
-    if (g.phylogeny) {
-        html += `<div class="section-header">Evolutionary History</div>`;
-        html += `<table class="fancy-table"><tr><th>Dataset</th><th>Class</th><th>Species Count</th></tr>`;
-        for (const [pkey, pval] of Object.entries(g.phylogeny)) {
-             const safeP = pval || {};
-             html += `<tr><td>${pkey}</td><td>${safeP.class || '-'}</td><td>${safeP.species_data?.length || 0}</td></tr>`;
-        }
-        html += `</table>`;
-    }
-
-    // --- ACTIONS (v6.0 Buttons) ---
-    html += `<div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px; display:flex; gap:10px;">
-                <span class="gene-badge" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">Show Evolution</span>
-                <span class="gene-badge" onclick="window.handleAIQuery('plot umap for ${geneSymbol}')">Show UMAP</span>
-             </div>`;
-    
-    html += `</div>`; // Close card
-    return html;
-};
+    return html + `</table>`;
+}
 
 // Helpers for the Dashboard (Add these adjacent to displayFullGeneInfo)
 function renderMiniExpressionTable(data) {
