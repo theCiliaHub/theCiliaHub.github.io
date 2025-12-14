@@ -200,33 +200,8 @@ function getComplexPhylogenyTableMap() {
 // 2. DATA LOADING & PROCESSING
 // ==========================================================
   
-/* ==============================================================
- * CiliAI – Unified Explorer (v6.0 - CELL WHISPERER INSPIRED DESIGN)
- * ==============================================================
- * Features: Three-column layout (Nav | Vis | Chat), Blue Branding, Organized Menus.
- * ============================================================== */
-
 // ==========================================================
-// 1. SAFE FALLBACKS & GLOBAL STATE (Keep as is)
-// ... (The entire SAFE FALLBACKS block remains unchanged from previous step) ...
-// ... (The entire GLOBAL STATE block remains unchanged from previous step) ...
-// ... (The entire Data Maps and Constants block remains unchanged from previous step) ...
-// ... (The entire CILIBRAIN and Plotting Logic sections remain defined locally) ...
-
-    
-/**
- * Loads the external data files required only by the Cilia Analysis Page plots.
- */
-// ==========================================================
-// 6. CILIA ANALYSIS PAGE (CRITICAL DEFINITIONS)
-// ==========================================================
-
-// ==========================================================
-// PATCH: DATA LOADING (Safe Update for Lung + Kidney)
-// ==========================================================
-
-// ==========================================================
-// PATCH 1: DATA LOADING (Lung + Kidney)
+// PATCH 1: DATA LOADING (Original Logic + Kidney Addition)
 // ==========================================================
 
 // Global state for active dataset
@@ -248,49 +223,47 @@ async function loadAnalysisData() {
     const analysisBaseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
     
     try {
-        window.log("Fetching datasets (Lung + Kidney)...");
+        window.log("Fetching specialized analysis data...");
         
-        // 1. Fetch Core Metadata
-        const [genesRes, screensRes] = await Promise.all([
+        // 1. Fetch Core Data + Kidney (Single Promise Block)
+        // We removed 'umap_data.json' from here as requested.
+        const [ciliaryGenesResponse, screenDataResponse, kidneyResponse] = await Promise.all([
             fetch(analysisBaseUrl + 'ciliahub_data.json'),
-            fetch(analysisBaseUrl + 'cilia_screens_data.json')
+            fetch(analysisBaseUrl + 'cilia_screens_data.json'),
+            fetch(analysisBaseUrl + 'kidney_data_all_genes.json')
         ]);
 
-        window.CiliAI.masterData = await genesRes.json();
-        window.screenDatabase = await screensRes.json();
+        // Process Lung/Master Data
+        const ciliaryGeneArray = await ciliaryGenesResponse.json();
+        window.screenDatabase = await screenDataResponse.json();
         
-        window.ciliaryGeneMap = new Map(window.CiliAI.masterData.map(g => [g.gene.toUpperCase(), g])); 
+        window.ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene])); 
+        window.CiliAI.masterData = ciliaryGeneArray;
         window.CiliAI.lookups.geneMap = Object.fromEntries(window.ciliaryGeneMap);
 
-        // 2. Fetch Visualization Datasets
-        // Fetch Lung UMAP + New Kidney Data
-        const [lungUmap, kidneyData] = await Promise.all([
-            fetch(analysisBaseUrl + 'umap_data.json').then(r => r.json()),
-            fetch(analysisBaseUrl + 'kidney_data_all_genes.json')
-                .then(r => r.json())
-                .catch(e => { console.error("Kidney load error:", e); return null; })
-        ]);
-
-        // Store Lung
-        window.CiliAI.datasets.lung.umap = lungUmap;
-        
-        // Store Kidney
-        if (kidneyData) {
+        // Process Kidney Data
+        if (kidneyResponse.ok) {
+            const kidneyData = await kidneyResponse.json();
             window.CiliAI.datasets.kidney.umap = kidneyData.umap;
             window.CiliAI.datasets.kidney.expression = kidneyData.expression;
-            window.log("Kidney dataset loaded.");
+            window.log("Kidney dataset loaded successfully.");
         } else {
-            window.log("Kidney dataset failed to load (check URL).");
+            window.log("Kidney data fetch failed.", "warn");
+        }
+
+        // Note: Assuming Lung UMAP is loaded elsewhere or cached, 
+        // we ensure the dataset object points to it if it exists globally.
+        if (window.CiliAI_UMAP) {
+            window.CiliAI.datasets.lung.umap = window.CiliAI_UMAP;
         }
 
         window.CiliAI.ready = true;
-        window.log(`Successfully loaded ${window.ciliaryGeneMap.size} genes and visualization data.`);
+        window.log(`Successfully loaded ${window.ciliaryGeneMap.size} ciliary genes.`);
 
     } catch (error) {
-        window.log(`Dataset Load Error: ${error.message}`, 'error');
+        window.log(`Failed to load analysis data: ${error.message}`, 'error');
     }
 }
-
 
 /**
  * Initializes the analysis page: loads data and sets up event listeners.
