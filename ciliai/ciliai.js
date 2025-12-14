@@ -110,59 +110,57 @@ window.CiliAI_UMAP = null; // This will be populated from the master DB
         "V.vinifera", "C.parvum", "E.histolytica", "E.cuniculi"
     ];
     
-    function getComplexPhylogenyTableMap() {
-        return {
-            // --- Core IFT machinery ---
-            "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-            "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
-            "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-            "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"],
-            "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-            
-            //    NEW/UPDATED MOTOR COMPLEX (Combines IFT MOTORS and INTRAFLAGELLAR TRANSPORT MOTORS)
-            "IFT MOTOR COMPLEX": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"],
-            "INTRAFLAGELLAR TRANSPORT MOTORS": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"],
-            
-            // --- BBSome and trafficking ---
-            "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
-            "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
+// --- 1. FIXED COMPLEX MAP (Removed Broad Locations) ---
+function getComplexPhylogenyTableMap() {
+    return {
+        // --- Core IFT machinery ---
+        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"],
+        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        
+        "IFT MOTOR COMPLEX": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"],
+        "INTRAFLAGELLAR TRANSPORT MOTORS": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"],
+        
+        // --- BBSome and trafficking ---
+        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+        "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
 
-            // --- Transition zone modules ---
-            "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
-            "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
-            "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
+        // --- Specific Modules (Keep these) ---
+        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
 
-            // --- Basal body & appendage components (Consolidated) ---
-            "BASAL BODY": ["CEP164", "CEP83", "SCLT1", "CEP89", "LRRC45", "ODF2", "CEP128", "CEP135", "CETN2", "CETN3", "POC1B", "FBF1", "CCDC41", "CCDC120", "OFD1"],
-            "CENTRIOLE DISTAL APPENDAGES": ["CEP164", "SCLT1", "CEP89", "LRRC45", "CEP123", "ANKRD26", "FOPNL", "CEP128", "CEP135", "FBF1", "CCDC41", "CCDC120"],
-            "CENTRIOLAR SATELLITES": ["PCM1", "CEP131", "CEP290", "OFD1", "AZI1", "CEP72", "SSX2IP"],
-            
-            // --- Transition fiber & ciliary gate ---
-            "TRANSITION FIBER": ["CEP164", "CEP83", "SCLT1", "CEP89", "LRRC45", "CEP123", "CEP350", "CEP44"],
+        // --- Appendages & Satellites ---
+        "CENTRIOLE DISTAL APPENDAGES": ["CEP164", "SCLT1", "CEP89", "LRRC45", "CEP123", "ANKRD26", "FOPNL", "CEP128", "CEP135", "FBF1", "CCDC41", "CCDC120"],
+        "CENTRIOLAR SATELLITES": ["PCM1", "CEP131", "CEP290", "OFD1", "AZI1", "CEP72", "SSX2IP"],
+        "TRANSITION FIBER": ["CEP164", "CEP83", "SCLT1", "CEP89", "LRRC45", "CEP123", "CEP350", "CEP44"],
 
-            // --- Axonemal and motility machinery ---
-            "CILIARY TIP": ["HYDIN", "IQCA1", "CATSPER2", "KIF19A", "KIF7", "CCDC78", "CCDC33", "SPEF1", "CEP104", "CSPP1", "TOGARAM1", "ARMC9", "MAPRE1", "MAPRE3", "CCDC66"],
-            "RADIAL SPOKE": ["RSPH1", "RSPH3", "RSPH4A", "RSPH6A", "RSPH9", "RSPH10B", "RSPH23", "RSPH16", "DRC1", "DRC3", "DRC4", "DRC5"],
-            "CENTRAL PAIR": ["HYDIN", "SPAG6", "SPAG16", "SPAG17", "POC1A", "CEP131", "CFAP43", "CFAP44", "CFAP45", "CFAP47"],
-            "DYNEIN ARM": ["DNAH1", "DNAH2", "DNAH5", "DNAH6", "DNAH7", "DNAH8", "DNAH9", "DNAH10", "DNAH11", "DNALI1", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103"],
-            "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAH18", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103", "WDR63"],
-            "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"],
-            "NEXIN-DYNEIN REGULATORY COMPLEX": ["GAS8", "GAS2L2", "CCDC39", "CCDC40", "CCDC164", "CCDC65"],
-            
-            // --- Ciliary rootlet & anchoring ---
-            "ROOTLETIN COMPLEX": ["CROCC", "CROCC2", "CEP68", "CEP44", "ODF2"],
-            "CENTRIOLE LINKER": ["CEP68", "CEP250", "C-NAP1", "ROCK1", "NEK2"],
+        // --- Axonemal and motility machinery ---
+        "RADIAL SPOKE": ["RSPH1", "RSPH3", "RSPH4A", "RSPH6A", "RSPH9", "RSPH10B", "RSPH23", "RSPH16", "DRC1", "DRC3", "DRC4", "DRC5"],
+        "CENTRAL PAIR": ["HYDIN", "SPAG6", "SPAG16", "SPAG17", "POC1A", "CEP131", "CFAP43", "CFAP44", "CFAP45", "CFAP47"],
+        "DYNEIN ARM": ["DNAH1", "DNAH2", "DNAH5", "DNAH6", "DNAH7", "DNAH8", "DNAH9", "DNAH10", "DNAH11", "DNALI1", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103"],
+        "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAH18", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103", "WDR63"],
+        "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"],
+        "NEXIN-DYNEIN REGULATORY COMPLEX": ["GAS8", "GAS2L2", "CCDC39", "CCDC40", "CCDC164", "CCDC65"],
+        
+        // --- Ciliary rootlet & anchoring ---
+        "ROOTLETIN COMPLEX": ["CROCC", "CROCC2", "CEP68", "CEP44", "ODF2"],
+        "CENTRIOLE LINKER": ["CEP68", "CEP250", "C-NAP1", "ROCK1", "NEK2"],
 
-            // --- Ciliary signaling hubs ---
-            "SHH SIGNALING": ["SMO", "PTCH1", "GLI1", "GLI2", "GLI3", "SUFU", "KIF7", "TULP3", "IFT172", "IFT81", "ARL13B"],
-            "GPCR COMPLEX": ["GPR161", "GPR175", "GPR22", "GPR83", "ADCY3", "RXFP2", "SSTR3", "NPY2R", "HTR6"],
-            "HEDGEHOG TRAFFICKING COMPLEX": ["ARL13B", "INPP5E", "TULP3", "IFT172", "KIF7", "BBS4", "BBS5", "SMO"],
+        // --- Ciliary signaling hubs ---
+        "SHH SIGNALING": ["SMO", "PTCH1", "GLI1", "GLI2", "GLI3", "SUFU", "KIF7", "TULP3", "IFT172", "IFT81", "ARL13B"],
+        "GPCR COMPLEX": ["GPR161", "GPR175", "GPR22", "GPR83", "ADCY3", "RXFP2", "SSTR3", "NPY2R", "HTR6"],
+        "HEDGEHOG TRAFFICKING COMPLEX": ["ARL13B", "INPP5E", "TULP3", "IFT172", "KIF7", "BBS4", "BBS5", "SMO"],
 
-            // --- Centrosome & PCM components ---
-            "CENTROSOME": ["CEP152", "CEP192", "PLK4", "STIL", "SAS6", "CEP135", "CETN2", "PCNT", "CDK5RAP2", "CEP215"],
-            "PEROXISOMAL COMPLEX": ["PEX1", "PEX2", "PEX3", "PEX5", "PEX6", "PEX10", "PEX12", "PEX13", "PEX14", "PEX19"]
-        };
-    }
+        // --- !!! CRITICAL FIX !!! ---
+        // Removed "TRANSITION ZONE", "BASAL BODY", "CILIARY TIP", "CENTROSOME" keys
+        // so the AI falls back to searching the full database 'Localization' column
+        // instead of using these short static lists.
+        
+        "PEROXISOMAL COMPLEX": ["PEX1", "PEX2", "PEX3", "PEX5", "PEX6", "PEX10", "PEX12", "PEX13", "PEX14", "PEX19"]
+    };
+}
 
     function getDiseaseClassificationMap() {
         return {
@@ -2803,74 +2801,86 @@ function renderMiniComplexList(data) {
 
     // --- 4G. Main "Brain" (Query Routers) ---
 
-    function flexibleIntentParser(query) {
-        const qLower = query.toLowerCase().trim();
-        
-        const diseaseMap = getDiseaseClassificationMap();
-        let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
-        for (const classification in diseaseMap) {
-            allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
-        }
-        
-        const classificationKeywords = Object.keys(window.CiliAI.lookups.byClassification || {});
-        classificationKeywords.push(...Object.keys(diseaseMap)); 
+    // --- 4G. Main "Brain" (Query Routers) ---
 
-        const complexKeywords = Object.keys(window.CiliAI.lookups.byModuleOrComplex || {});
-        complexKeywords.push(...Object.keys(getComplexPhylogenyTableMap())); 
-
-        const entityKeywords = [
-            {
-                type: 'CLASSIFICATION', 
-                keywords: classificationKeywords,
-                handler: handleClassificationQuery 
-            },
-            {
-                type: 'COMPLEX',
-                keywords: complexKeywords,
-                handler: handleComplexQuery 
-            },
-            {
-                type: 'LOCALIZATION',
-                keywords: [
-                    'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
-                    'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
-                    'lysosome', 'lysosomes', 'Ciliary associated gene', 'Ciliary associated genes', 
-                    'Microbody', 'Peroxisome', 'flagella'
-                ],
-                handler: handleLocalizationQuery 
-            },
-            {
-                type: 'CILIOPATHY',
-                keywords: allDiseaseKeywords, 
-                handler: (term, query) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes, getCiliopathyGenes(term).description)
-            },
-            {
-                type: 'DOMAIN',
-                keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand', 'TPR', 'AAA+ ATPase', 'AAA domain', 'ATPase domain', 'WD40 repeat'],
-                handler: getGenesByDomain 
-            },
-            {
-                type: 'META', // For "what can you do?"
-                keywords: ['about yourself', 'what can you do', 'help me', 'information do you have', 'datasets', 'capabilities', 'questions can i ask', 'overview of your features'],
-                handler: tellAboutCiliAI
-            }
-        ];
-
-        const normalizedQuery = normalizeTerm(query);
-        for (const entityType of entityKeywords) {
-            const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
-            for (const keyword of sortedKeywords) {
-                const normKeyword = normalizeTerm(keyword);
-                if (!normKeyword) continue;
-                
-                if (normalizedQuery.includes(normKeyword)) { 
-                    if (qLower.includes('not in') || qLower.includes('except')) continue;
-                    return { type: entityType.type, entity: keyword, handler: entityType.handler };
-                }
-            }
-        }
-        return null;
+function flexibleIntentParser(query) {
+    const qLower = query.toLowerCase().trim();
+    
+    // 1. Prepare Disease Keywords
+    const diseaseMap = getDiseaseClassificationMap();
+    let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
+    for (const classification in diseaseMap) {
+        allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
     }
+    
+    // 2. Prepare Classification Keywords
+    const classificationKeywords = Object.keys(window.CiliAI.lookups.byClassification || {});
+    classificationKeywords.push(...Object.keys(diseaseMap)); 
+
+    // 3. Prepare Complex Keywords
+    // NOTE: "Transition Zone" is no longer here, so it won't be trapped as a complex.
+    const complexKeywords = Object.keys(window.CiliAI.lookups.byModuleOrComplex || {});
+    complexKeywords.push(...Object.keys(getComplexPhylogenyTableMap())); 
+
+    // 4. Define Search Priorities (Order Matters!)
+    const entityKeywords = [
+        {
+            type: 'CLASSIFICATION', 
+            keywords: classificationKeywords,
+            handler: handleClassificationQuery 
+        },
+        {
+            type: 'COMPLEX',
+            keywords: complexKeywords,
+            handler: handleComplexQuery 
+        },
+        {
+            type: 'LOCALIZATION',
+            // "Transition Zone" is explicitly caught here now
+            keywords: [
+                'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
+                'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
+                'lysosome', 'lysosomes', 'ciliary associated gene', 'microbody', 'peroxisome', 'flagella'
+            ],
+            handler: handleLocalizationQuery 
+        },
+        {
+            type: 'CILIOPATHY',
+            keywords: allDiseaseKeywords, 
+            handler: (term, query) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes, getCiliopathyGenes(term).description)
+        },
+        {
+            type: 'DOMAIN',
+            keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand', 'TPR', 'AAA+ ATPase', 'AAA domain'],
+            handler: getGenesByDomain 
+        },
+        {
+            type: 'META',
+            keywords: ['about yourself', 'what can you do', 'help me', 'capabilities'],
+            handler: tellAboutCiliAI
+        }
+    ];
+
+    // 5. Execute Logic
+    const normalizedQuery = normalizeTerm(query);
+    for (const entityType of entityKeywords) {
+        // Sort by length to match longest terms first (e.g., "Transition Zone" before "Zone")
+        const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
+        
+        for (const keyword of sortedKeywords) {
+            const normKeyword = normalizeTerm(keyword);
+            if (!normKeyword) continue;
+            
+            if (normalizedQuery.includes(normKeyword)) { 
+                // Ignore negative queries (e.g. "not in transition zone")
+                if (qLower.includes('not in') || qLower.includes('except')) continue;
+                
+                return { type: entityType.type, entity: keyword, handler: entityType.handler };
+            }
+        }
+    }
+    return null;
+}
 
 function getCiliopathyGenes(term) {
     // This is a minimal placeholder structure to prevent crashes.
@@ -4273,3 +4283,64 @@ window.runDashboardSearch = function() {
             </div>`;
         }).join('');
 };
+
+/* ==============================================================
+ * MODULE: UI LAYOUT FIXES (Prevents Overflow)
+ * ============================================================== */
+(function applyLayoutFixes() {
+    const styleId = 'ciliai-layout-fixes';
+    if (document.getElementById(styleId)) return;
+    
+    const css = `
+        /* 1. Ensure Chat Message Bubble Contains Content */
+        .ciliai-message-content {
+            max-width: 100%;
+            overflow-x: auto; /* Adds scrollbar if content is too wide */
+            box-sizing: border-box;
+        }
+
+        /* 2. Constrain the Gene Card */
+        .ai-result-card {
+            width: 100%;
+            max-width: 600px; /* Prevents it from getting too huge */
+            box-sizing: border-box;
+            background: #fff;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+            margin-top: 5px;
+        }
+
+        /* 3. Make Tables Scrollable (Critical for Mobile/Small Screens) */
+        .cilia-tab-content {
+            width: 100%;
+            overflow-x: auto; /* Forces table to scroll inside the tab */
+        }
+        
+        .fancy-table {
+            width: 100%;
+            min-width: 300px; /* Ensures table doesn't crush too small */
+            table-layout: auto;
+        }
+
+        /* 4. Fix Tab Button Wrapping */
+        .cilia-tabs {
+            flex-wrap: wrap; /* Allows tabs to wrap on small screens */
+            gap: 5px;
+        }
+        
+        .cilia-tab-btn {
+            flex: 1 1 auto; /* Tabs grow/shrink to fit */
+            text-align: center;
+            min-width: 80px;
+        }
+    `;
+    
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = css;
+    document.head.appendChild(style);
+    
+    console.log("CiliAI Layout Fixes Applied.");
+})();
