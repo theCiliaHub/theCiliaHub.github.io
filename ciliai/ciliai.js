@@ -1225,15 +1225,18 @@ function injectCiliAIStyles() {
 /**
  * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
  */
+/**
+ * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
+ */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
     if(typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
 
-    // 1. Get Active Dataset (Defined in index.html)
+    // 1. Get Active Dataset (Initialized in index.html)
     const datasetKey = window.CiliAI.activeDataset || 'lung';
     const dataset = window.CiliAI.datasets[datasetKey];
     
-    // Safety check: if dataset hasn't loaded yet
+    // Safety check
     if (!dataset || !dataset.umap) {
         if (window.addChatMessage) window.addChatMessage(`⚠️ ${dataset ? dataset.name : 'Dataset'} data is loading...`, false);
         return;
@@ -1244,27 +1247,38 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     if (!plotDiv) return;
 
     // 2. Setup Inputs
-    if (!displayName) displayName = 'WDR31';
+    if (!displayName) displayName = 'WDR31'; // Default
     if (typeof targetGenes === 'string') targetGenes = [targetGenes];
     if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
 
     const gene = displayName.toUpperCase();
     const isClusterView = displayName === 'CLUSTER_VIEW';
 
-    // 3. Fetch Expression Data
+    // 3. Fetch Expression Data - FIXED FOR KIDNEY STRUCTURE
     let expressionMap = {};
     if (!isClusterView) {
         if (datasetKey === 'kidney') {
-            // Kidney: Expression is in the dataset object
-            expressionMap = dataset.expression ? (dataset.expression[gene] || {}) : {};
+            // KIDNEY: Different data structure - gene values are arrays matching umap cell types
+            expressionMap = {};
+            if (dataset.expression && dataset.expression[gene]) {
+                const exprArray = dataset.expression[gene];
+                
+                // Map expression values to cell types based on umap order
+                umapData.forEach((cell, index) => {
+                    const cellType = Array.isArray(cell.cell_type) ? cell.cell_type[0] : cell.cell_type;
+                    const exprVal = exprArray[index];
+                    // Handle "NA" values
+                    expressionMap[cellType] = (exprVal === "NA" || exprVal === "na") ? 0 : parseFloat(exprVal) || 0;
+                });
+            }
         } else {
-            // Lung: Expression is in the cache (loaded by index.html)
+            // LUNG: Expression is in the cache (loaded by index.html)
             expressionMap = window.CiliAI.cellDataCache[gene] || {};
         }
     }
 
     // 4. Prepare Plot Data
-    const sampleSize = 15000;
+    const sampleSize = 15000; 
     const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
     
     const x = [], y = [], color = [], text = [], size = [];
@@ -1272,19 +1286,33 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     const clusterColors = {
         'Ciliated': '#E63946', 'Basal': '#457B9D', 'Club': '#1D3557', 
-        'Goblet': '#A8DADC', 'Neuroendocrine': '#F1FAEE', 'Ionocyte': '#F4A261'
+        'Goblet': '#A8DADC', 'Neuroendocrine': '#F1FAEE', 'Ionocyte': '#F4A261',
+        // Kidney-specific cell types
+        'Proximal Tubule Cell': '#3B82F6', 
+        'Thick Ascending Limb Cell': '#60A5FA', 
+        'Distal Convoluted Tubule Cell': '#93C5FD',
+        'Collecting Duct Principal Cell': '#BFDBFE', 
+        'Collecting Duct Intercalated Cell': '#DBEAFE', 
+        'Endothelial Cell': '#2563EB',
+        'Fibroblast': '#1D4ED8',
+        'Podocyte': '#1E40AF',
+        'Immune Cell': '#1E3A8A',
+        'Cycling Cell': '#172554'
     };
 
     for (const point of sourceData) {
         x.push(point.x);
         y.push(point.y);
         
-        // Bold Hover Text (Size 24)
-        const exprVal = expressionMap[point.cell_type] || 0;
-        text.push(`<span style="font-size:24px; font-weight:bold;">${point.cell_type}</span><br>Expr: ${exprVal.toFixed(2)}`);
+        // Extract cell type (handle array format in kidney data)
+        const cellType = Array.isArray(point.cell_type) ? point.cell_type[0] : point.cell_type;
+        
+        // Bold Hover Text (Size 24) - Keep same style as Lung
+        const exprVal = expressionMap[cellType] || 0;
+        text.push(`<span style="font-size:24px; font-weight:bold;">${cellType}</span><br>Expr: ${exprVal.toFixed(2)}`);
 
         if (isClusterView) {
-            color.push(clusterColors[point.cell_type] || '#ccc');
+            color.push(clusterColors[cellType] || '#ccc');
             size.push(4);
         } else {
             color.push(exprVal);
@@ -1304,7 +1332,12 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     if (!isClusterView) {
         trace.marker.color = color;
         // USE DATASET COLOR SCALE (Red for Lung, Blue for Kidney)
-        trace.marker.colorscale = dataset.colorScale || [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']];
+        // Default to blue scale for kidney if not defined
+        trace.marker.colorscale = dataset.colorScale || 
+            (datasetKey === 'kidney' ? 
+                [[0, '#EBF8FF'], [0.1, '#93C5FD'], [0.5, '#3B82F6'], [1, '#1E3A8A']] : // Blue scale for kidney
+                [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] // Red scale for lung
+            );
         trace.marker.cmin = 0;
         trace.marker.cmax = scaleMax;
         trace.marker.colorbar = { title: 'TPM', len: 0.5 };
@@ -1330,7 +1363,10 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         closeBtn.className = 'ciliai-button ciliai-plot-btn';
         closeBtn.textContent = '✕ Close';
         closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; width: auto; z-index: 10; background: white;';
-        closeBtn.onclick = () => { if(window.generateAndInjectSVG) window.generateAndInjectSVG(); };
+        closeBtn.onclick = () => { 
+            if(window.generateAndInjectSVG) window.generateAndInjectSVG(); 
+            else plotDiv.innerHTML = ''; 
+        };
         parent.appendChild(closeBtn);
 
         const switchBtn = document.createElement('button');
@@ -1347,8 +1383,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         parent.appendChild(switchBtn);
     }
 };
-
-
 /**
  * Calculates the bounding box (min/max UMAP coordinates) for a specified cell type cluster.
  * Also calculates the center point for potential annotation placement.
