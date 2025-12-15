@@ -281,19 +281,21 @@
             const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
             const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
             
-            // Kidney Data Files (Structure + Expression)
+            // Kidney Data Files (Structure + Split Expression)
             const kidneyStructUrl = baseUrl + 'kidney_structure.json';
-            const kidneyExprUrl = baseUrl + 'kidney_expression.json';
+            const kidneyExpr1Url = baseUrl + 'kidney_expression_part1.json';
+            const kidneyExpr2Url = baseUrl + 'kidney_expression_part2.json';
             
             try {
                 window.log(`Fetching databases...`);
                 
-                // Fetch all 4 files in parallel
-                const [mainRes, lookupsRes, kStructRes, kExprRes] = await Promise.all([
+                // Fetch all 5 files in parallel
+                const [mainRes, lookupsRes, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
                     fetch(mainDbUrl), 
                     fetch(lookupsUrl),
                     fetch(kidneyStructUrl),
-                    fetch(kidneyExprUrl)
+                    fetch(kidneyExpr1Url),
+                    fetch(kidneyExpr2Url)
                 ]);
 
                 if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
@@ -310,18 +312,22 @@
                 window.CiliAI.datasets.lung.umap = mainData.umapData; // Lung is inside master DB
 
                 // Process Kidney Data (Merge Split Files)
-                if (kStructRes.ok && kExprRes.ok) {
+                if (kStructRes.ok && kExpr1Res.ok && kExpr2Res.ok) {
                     const kStruct = await kStructRes.json();
-                    const kExpr = await kExprRes.json();
+                    const kExpr1 = await kExpr1Res.json();
+                    const kExpr2 = await kExpr2Res.json();
+                    
+                    // Merge expression parts
+                    const fullExpression = { ...kExpr1, ...kExpr2 };
                     
                     window.CiliAI.datasets.kidney = {
                         name: "Human Kidney",
                         umap: kStruct.umap,
-                        expression: kExpr, // Sparse array map from R
+                        expression: fullExpression, // Merged Sparse Map
                         metadata: kStruct.metadata,
                         colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']]
                     };
-                    window.log(`Kidney dataset loaded: ${kStruct.metadata?.n_cells || 'N/A'} cells.`);
+                    window.log(`Kidney dataset loaded: ${kStruct.metadata?.n_cells || 'N/A'} cells, ${Object.keys(fullExpression).length} genes.`);
                 } else {
                     console.warn("Kidney data files failed to load (check file names/locations).");
                 }
