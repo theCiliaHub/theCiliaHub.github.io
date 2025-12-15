@@ -3048,7 +3048,7 @@ window.terminologyQueries = {
     "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
 };
 
-/// ==========================================================
+// ==========================================================
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 window.handleAIQuery = async function (query) {
@@ -3109,10 +3109,13 @@ window.handleAIQuery = async function (query) {
         // =======================================================
         // =( 3 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes", "Show list")
         // =======================================================
+        // 🔴 CRITICAL FIX: Ensure complex queries (UMAP, Expression) are NOT trapped here.
+        const isComplexQuery = qLower.includes('expression') || qLower.includes('plot') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('kidney') || qLower.includes('lung') || qLower.includes('evolution');
+        
         const yesRegex = /^(yes|yeah|sure|ok|okay|yep|show|view|list|show list|view list|display)/i;
         
-        // Check global context window.CiliAI.lastQueryContext
-        if (htmlResult === null && yesRegex.test(qLower) && window.CiliAI.lastQueryContext && window.CiliAI.lastQueryContext.type) {
+        // Only trigger follow-up if it's NOT a complex query
+        if (!isComplexQuery && htmlResult === null && yesRegex.test(qLower) && window.CiliAI.lastQueryContext && window.CiliAI.lastQueryContext.type) {
             
             // 3A: General List Follow-up
             if (window.CiliAI.lastQueryContext.type === 'list_followup') {
@@ -3161,51 +3164,49 @@ window.handleAIQuery = async function (query) {
         // =======================================================
         // =( 4 )= INTENT: LIST GENES (e.g. "list transition zone genes")
         // =======================================================
+        // 🔴 FIX: Tightened regex to ensure it ends with 'genes' so it doesn't match "Display expression..."
         if (htmlResult === null && (match = qLower.match(/^(?:list|show|display|find|give me)\s+(?:all\s+)?(.+?)\s+genes$/i))) {
             const term = match[1].trim();
             const termUpper = term.toUpperCase();
             
-            // Skip if this is likely a UMAP or Phylogeny request masquerading as a list request
-            if (!term.includes('evolution') && !term.includes('umap') && !term.includes('scrna')) {
-                window.log(`Routing via: Intent 4 (List Genes: ${term})`);
+            window.log(`Routing via: Intent 4 (List Genes: ${term})`);
 
-                let genes = [];
+            let genes = [];
+            
+            // A. Check Localization Logic FIRST
+            const locList = window.getGenesByLocalization(term);
+            if (locList.length > 0) {
+                genes = locList.map(g => g.gene);
+            }
+
+            // B. If no localization found, try Modules/Complexes
+            if (genes.length === 0) {
+                if (window.CiliAI.lookups.byCompartment?.[termUpper]) {
+                    genes = window.CiliAI.lookups.byCompartment[termUpper];
+                }
+                else if (window.CiliAI.lookups.byModuleOrComplex?.[termUpper]) {
+                    genes = window.CiliAI.lookups.byModuleOrComplex[termUpper];
+                }
+            }
+
+            if (genes.length > 0) {
+                const rows = genes.map(g => ({ gene: g }));
                 
-                // A. Check Localization Logic FIRST
-                const locList = window.getGenesByLocalization(term);
-                if (locList.length > 0) {
-                    genes = locList.map(g => g.gene);
-                }
+                // Set follow-up context
+                window.CiliAI.lastQueryContext = {
+                    type: 'list_followup',
+                    term: `${term} genes`,
+                    data: rows
+                };
 
-                // B. If no localization found, try Modules/Complexes
-                if (genes.length === 0) {
-                    if (window.CiliAI.lookups.byCompartment?.[termUpper]) {
-                        genes = window.CiliAI.lookups.byCompartment[termUpper];
-                    }
-                    else if (window.CiliAI.lookups.byModuleOrComplex?.[termUpper]) {
-                        genes = window.CiliAI.lookups.byModuleOrComplex[termUpper];
-                    }
-                }
-
-                if (genes.length > 0) {
-                    const rows = genes.map(g => ({ gene: g }));
-                    
-                    // Set follow-up context
-                    window.CiliAI.lastQueryContext = {
-                        type: 'list_followup',
-                        term: `${term} genes`,
-                        data: rows
-                    };
-
-                    htmlResult = `
-                        <div class="ai-result-card">
-                            <p>Found <strong>${genes.length}</strong> genes associated with <strong>${term}</strong>.</p>
-                            <p>Would you like to <strong>view the full list</strong>?</p>
-                        </div>
-                    `;
-                } else {
-                    htmlResult = `I couldn't find a gene set for <strong>${term}</strong> in the database.`;
-                }
+                htmlResult = `
+                    <div class="ai-result-card">
+                        <p>Found <strong>${genes.length}</strong> genes associated with <strong>${term}</strong>.</p>
+                        <p>Would you like to <strong>view the full list</strong>?</p>
+                    </div>
+                `;
+            } else {
+                htmlResult = `I couldn't find a gene set for <strong>${term}</strong> in the database.`;
             }
         }
 
@@ -3814,7 +3815,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         parent.appendChild(switchBtn);
     }
 };
-
 
 // Add sharing and collaboration
 window.SharingManager = {
