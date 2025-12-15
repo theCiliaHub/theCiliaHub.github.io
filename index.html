@@ -146,7 +146,7 @@
             border-radius: 6px; 
             font-size: 12px; 
             font-weight: 600; 
-            transition: background 0.3s;
+            transition: background 0.3s; 
         }
         .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
         .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
@@ -275,21 +275,25 @@
             }
         };
 
-        // Data Loading Logic (UPDATED WITH KIDNEY JSON)
+        // Data Loading Logic (UPDATED WITH SPLIT KIDNEY JSON)
         window.loadCiliAIData = async function(timeoutMs = 60000) {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
             const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
             const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
-            // NEW: Kidney Data URL
-            const kidneyUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/kidney_data_all_genes.json';
+            
+            // Kidney Data Files (Structure + Expression)
+            const kidneyStructUrl = baseUrl + 'kidney_structure.json';
+            const kidneyExprUrl = baseUrl + 'kidney_expression.json';
             
             try {
                 window.log(`Fetching databases...`);
-                // Added fetch for kidneyUrl
-                const [mainRes, lookupsRes, kidneyRes] = await Promise.all([
+                
+                // Fetch all 4 files in parallel
+                const [mainRes, lookupsRes, kStructRes, kExprRes] = await Promise.all([
                     fetch(mainDbUrl), 
                     fetch(lookupsUrl),
-                    fetch(kidneyUrl)
+                    fetch(kidneyStructUrl),
+                    fetch(kidneyExprUrl)
                 ]);
 
                 if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
@@ -298,32 +302,41 @@
                 const mainData = await mainRes.json();
                 const lookupData = await lookupsRes.json();
 
+                // Initialize Core Data
                 window.CiliAI.masterData = mainData.masterData || [];
                 window.CiliAI.lookups = lookupData.lookups || {};
                 window.CiliAI_UMAP = mainData.umapData || [];
                 window.CiliAI.data.umap = mainData.umapData || [];
-                window.CiliAI.datasets.lung.umap = mainData.umapData;
+                window.CiliAI.datasets.lung.umap = mainData.umapData; // Lung is inside master DB
 
-                // Process Kidney Data
-                if (kidneyRes.ok) {
-                    const kidneyData = await kidneyRes.json();
-                    window.CiliAI.datasets.kidney.umap = kidneyData.umap;
-                    window.CiliAI.datasets.kidney.expression = kidneyData.expression;
-                    window.log("Kidney dataset loaded.");
+                // Process Kidney Data (Merge Split Files)
+                if (kStructRes.ok && kExprRes.ok) {
+                    const kStruct = await kStructRes.json();
+                    const kExpr = await kExprRes.json();
+                    
+                    window.CiliAI.datasets.kidney = {
+                        name: "Human Kidney",
+                        umap: kStruct.umap,
+                        expression: kExpr, // Sparse array map from R
+                        metadata: kStruct.metadata,
+                        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']]
+                    };
+                    window.log(`Kidney dataset loaded: ${kStruct.metadata?.n_cells || 'N/A'} cells.`);
                 } else {
-                    console.warn("Kidney data failed to load");
+                    console.warn("Kidney data files failed to load (check file names/locations).");
                 }
                 
-                // Build fast lookup maps
+                // Build Fast Lookups
                 window.CiliAI.lookups.umapByGene = {};
                 window.CiliAI.lookups.geneMap = {};
-                window.CiliAI.cellDataCache = {};
+                window.CiliAI.cellDataCache = {}; // Lung cache
                 
                 if (Array.isArray(window.CiliAI_UMAP)) {
                     window.CiliAI_UMAP.forEach(point => {
                         if (point.Gene) window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
                     });
                 }
+                
                 mainData.masterData.forEach(gene => {
                     if (gene.Gene) {
                         window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
@@ -336,8 +349,9 @@
                 window.CiliAI.ready = true;
                 window.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
                 return true;
+
             } catch (err) {
-                console.error("Failed to load CiliAI master database:", err);
+                console.error("Failed to load CiliAI databases:", err);
                 window.log(`Load error: ${err.message}`);
                 window.updateStatus('Load failed', 'error');
                 window.CiliAI.ready = false;
