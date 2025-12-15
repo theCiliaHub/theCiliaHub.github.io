@@ -1222,13 +1222,6 @@ function injectCiliAIStyles() {
     styleEl.textContent = css;
     document.head.appendChild(styleEl);
 }
-/**
- * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
- */
-/**
- * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
- */
-
 
 /**
  * Calculates the bounding box (min/max UMAP coordinates) for a specified cell type cluster.
@@ -3625,54 +3618,47 @@ window.handleAIQuery = async function (query) {
 };
 
 
+
 /**
  * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
- * UPDATED: Handles Switch Button, Array coordinates, and NA/Missing data robustly.
+ * FULL + FIXED for new Kidney UMAP format
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
-    if(typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
+    if (typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
 
-    // 1. Get Active Dataset
+    /* 1. Active dataset */
     const datasetKey = window.CiliAI.activeDataset || 'lung';
-    const dataset = window.CiliAI.datasets[datasetKey];
-    
-    // Safety check
-    if (!dataset || !dataset.umap) {
-        if (window.addChatMessage) window.addChatMessage(`⚠️ ${dataset ? dataset.name : 'Dataset'} data is loading...`, false);
+    const dataset = window.CiliAI.datasets?.[datasetKey];
+
+    if (!dataset || !Array.isArray(dataset.umap)) {
+        window.addChatMessage?.(`⚠️ ${datasetKey} UMAP not available`, false);
         return;
     }
 
-    let plotDiv = document.getElementById(plotDivId);
+    const plotDiv = document.getElementById(plotDivId);
     if (!plotDiv) return;
 
-    // 🔴 FIX 1: Explicitly purge previous plot (clears Lung before showing Kidney)
+    /* 2. Purge previous plot */
     try {
-        if (window.Plotly) Plotly.purge(plotDivId);
-        plotDiv.innerHTML = ''; 
-    } catch (e) {
-        console.warn("Could not purge plot:", e);
-    }
+        Plotly?.purge(plotDivId);
+        plotDiv.innerHTML = '';
+    } catch {}
 
-    // 2. Setup Inputs
+    /* 3. Inputs */
     if (!displayName) displayName = 'WDR31';
     if (typeof targetGenes === 'string') targetGenes = [targetGenes];
-    if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
+    if (!targetGenes?.length) targetGenes = [displayName];
 
     const gene = displayName.toUpperCase();
     const isClusterView = displayName === 'CLUSTER_VIEW';
 
-    // 3. Prepare Data
-    // We iterate through the raw UMAP array and build the plot arrays directly
-    // This is more efficient and allows index-based expression lookup
-    const sourceData = dataset.umap; // Use full data
-    
-    // Optimization: limit points if dataset is massive (optional, set high for now)
-    const maxPoints = 20000; 
-    const indices = Array.from({length: sourceData.length}, (_, i) => i);
-    
-    // Shuffle indices for better rendering if we have to slice (random sampling)
-    if (sourceData.length > maxPoints) {
+    /* 4. Prepare data */
+    const sourceData = dataset.umap;
+    const maxPoints = 20000;
+
+    const indices = Array.from({ length: sourceData.length }, (_, i) => i);
+    if (indices.length > maxPoints) {
         for (let i = indices.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -3683,181 +3669,142 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const x = [], y = [], color = [], text = [], size = [];
     let maxExpr = 0;
 
-    // 🔴 FIX 2: Check if gene exists in Kidney expression data
+    /* 5. Expression source */
     let exprArray = null;
     if (!isClusterView && datasetKey === 'kidney') {
-        if (dataset.expression && dataset.expression[gene]) {
-            exprArray = dataset.expression[gene];
-        } else {
-            // If missing, exprArray remains null, loop will treat as 0
-        }
+        exprArray = dataset.expression?.[gene] || null;
     } else if (!isClusterView && datasetKey === 'lung') {
-        // Lung uses the cache map
-        exprArray = window.CiliAI.cellDataCache[gene] || {};
+        exprArray = window.CiliAI.cellDataCache?.[gene] || {};
     }
 
     const clusterColors = {
-        'Ciliated': '#E63946', 'Basal': '#457B9D', 'Club': '#1D3557', 
-        'Goblet': '#A8DADC', 'Neuroendocrine': '#F1FAEE', 'Ionocyte': '#F4A261',
-        'Proximal Tubule Cell': '#3B82F6', 'Thick Ascending Limb Cell': '#60A5FA', 
-        'Distal Convoluted Tubule Cell': '#93C5FD', 'Collecting Duct Principal Cell': '#BFDBFE', 
-        'Collecting Duct Intercalated Cell': '#DBEAFE', 'Endothelial Cell': '#2563EB',
-        'Fibroblast': '#1D4ED8', 'Podocyte': '#1E40AF', 'Immune Cell': '#1E3A8A',
+        'Proximal Tubule Cell': '#3B82F6',
+        'Thick Ascending Limb Cell': '#60A5FA',
+        'Distal Convoluted Tubule Cell': '#93C5FD',
+        'Collecting Duct Principal Cell': '#BFDBFE',
+        'Collecting Duct Intercalated Cell': '#DBEAFE',
+        'Podocyte': '#1E40AF',
+        'Fibroblast': '#1D4ED8',
+        'Endothelial Cell': '#2563EB',
+        'Immune Cell': '#1E3A8A',
         'Cycling Cell': '#172554'
     };
 
-    // 4. Build Traces
+    /* 6. Build plot */
     for (const i of renderIndices) {
-        const point = sourceData[i];
-        
-        // 🔴 FIX 3: Unwrap Arrays safely
-        // Kidney data has x: [val], y: [val], cell_type: ["Type"]
-        const px = Array.isArray(point.x) ? point.x[0] : point.x;
-        const py = Array.isArray(point.y) ? point.y[0] : point.y;
-        const cellType = Array.isArray(point.cell_type) ? point.cell_type[0] : point.cell_type;
+        const p = sourceData[i];
+        if (!p) continue;
+
+        const px = Array.isArray(p.x) ? p.x[0] : p.x;
+        const py = Array.isArray(p.y) ? p.y[0] : p.y;
+        const cellType = Array.isArray(p.cell_type) ? p.cell_type[0] : p.cell_type;
+
+        if (px == null || py == null) continue;
 
         x.push(px);
         y.push(py);
 
-        // Calculate Expression Value
         let exprVal = 0;
         if (!isClusterView) {
             if (datasetKey === 'kidney') {
-                if (exprArray) {
-                    const val = exprArray[i]; // Access by Index
-                    // Handle "NA" string or missing values
-                    exprVal = (val === "NA" || val === "na" || val === null || val === undefined) ? 0 : parseFloat(val);
-                } else {
-                    exprVal = 0; // Gene missing from dataset
-                }
+                const v = exprArray?.[i];
+                exprVal = (v == null || v === 'NA') ? 0 : Number(v) || 0;
             } else {
-                // Lung logic (Map based)
                 exprVal = exprArray[cellType] || 0;
             }
         }
 
-        // Add Hover Text
-        text.push(`<span style="font-size:24px; font-weight:bold;">${cellType}</span><br>Expr: ${exprVal.toFixed(2)}`);
+        text.push(
+            `<b>${cellType}</b><br>${isClusterView ? '' : `Expr: ${exprVal.toFixed(2)}`}`
+        );
 
-        // Add Color/Size
         if (isClusterView) {
-            color.push(clusterColors[cellType] || '#ccc');
+            color.push(clusterColors[cellType] || '#CBD5E1');
             size.push(4);
         } else {
             color.push(exprVal);
-            size.push(exprVal > 0 ? 8 : 4); 
-            if(exprVal > maxExpr) maxExpr = exprVal;
+            size.push(exprVal > 0 ? 8 : 4);
+            if (exprVal > maxExpr) maxExpr = exprVal;
         }
     }
 
-    const scaleMax = maxExpr > 0 ? maxExpr : 1;
-    
     const trace = {
-        x: x, y: y, text: text,
-        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
-        marker: { size: size, opacity: 0.8, line: { color: 'white', width: 0.5 } }
+        x,
+        y,
+        text,
+        mode: 'markers',
+        type: 'scattergl',
+        hoverinfo: 'text',
+        marker: {
+            size,
+            opacity: 0.85,
+            line: { color: 'white', width: 0.5 }
+        }
     };
 
     if (!isClusterView) {
         trace.marker.color = color;
-        // 🔴 FIX 4: Ensure color scale is appropriate for dataset
-        trace.marker.colorscale = dataset.colorScale || 
-            (datasetKey === 'kidney' ? 
-                [[0, '#EBF8FF'], [0.1, '#93C5FD'], [0.5, '#3B82F6'], [1, '#1E3A8A']] : // Blue
-                [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] // Red
-            );
         trace.marker.cmin = 0;
-        trace.marker.cmax = scaleMax;
+        trace.marker.cmax = maxExpr || 1;
+        trace.marker.colorscale = dataset.colorScale || [
+            [0, '#EBF8FF'],
+            [0.3, '#93C5FD'],
+            [0.6, '#3B82F6'],
+            [1, '#1E3A8A']
+        ];
         trace.marker.colorbar = { title: 'TPM', len: 0.5 };
     } else {
-        trace.marker.color = color; 
+        trace.marker.color = color;
     }
 
     const layout = {
-        title: { text: `<b>${isClusterView ? 'Cell Clusters' : gene} (${dataset.name})</b>`, font: { size: 14, color: '#2d3748' }, x: 0.05 },
-        xaxis: { visible: false }, yaxis: { visible: false },
-        hovermode: 'closest', margin: { t: 50, b: 40, l: 20, r: 20 },
-        plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff', showlegend: false
+        title: `<b>${isClusterView ? 'Cell Types' : gene} (${dataset.name})</b>`,
+        xaxis: { visible: false },
+        yaxis: { visible: false },
+        hovermode: 'closest',
+        margin: { t: 50, b: 40, l: 20, r: 20 },
+        plot_bgcolor: '#fff',
+        paper_bgcolor: '#fff',
+        showlegend: false
     };
 
-    await Plotly.newPlot(plotDivId, [trace], layout, { responsive: true, displaylogo: false });
+    await Plotly.newPlot(plotDivId, [trace], layout, {
+        responsive: true,
+        displaylogo: false
+    });
 
-    // 5. Add Controls
+    /* 7. Controls */
     const parent = plotDiv.parentElement;
-    if (parent) {
-        parent.querySelectorAll('.ciliai-plot-btn').forEach(b => b.remove());
+    if (!parent) return;
 
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'ciliai-button ciliai-plot-btn';
-        closeBtn.textContent = '✕ Close';
-        closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; width: auto; z-index: 10; background: white;';
-        closeBtn.onclick = () => { 
-            if(window.Plotly) Plotly.purge(plotDivId);
-            if(window.generateAndInjectSVG) window.generateAndInjectSVG(); 
-            else plotDiv.innerHTML = ''; 
-        };
-        parent.appendChild(closeBtn);
+    parent.querySelectorAll('.ciliai-plot-btn').forEach(b => b.remove());
 
-        const switchBtn = document.createElement('button');
-        switchBtn.className = 'ciliai-button ciliai-plot-btn';
-        const nextDataset = datasetKey === 'lung' ? 'kidney' : 'lung';
-        
-        // Use simpler labeling for better readability
-        const nextLabel = nextDataset === 'lung' ? 'Lung' : 'Kidney';
-        
-        switchBtn.textContent = `Switch to ${nextLabel}`; 
-        switchBtn.style.cssText = `position: absolute; top: 10px; left: 10px; width: auto; z-index: 10; background: white; color: ${nextDataset === 'lung' ? '#c53030' : '#2b6cb0'}; border: 1px solid #ccc;`;
-        switchBtn.onclick = () => {
-            window.CiliAI.activeDataset = nextDataset;
-            // Recursively call render to redraw with new dataset
-            window.renderUMAPPlot(displayName, targetGenes, zoomToCellType); 
-        };
-        parent.appendChild(switchBtn);
-    }
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'ciliai-button ciliai-plot-btn';
+    closeBtn.textContent = '✕ Close';
+    closeBtn.style.cssText =
+        'position:absolute;top:10px;right:10px;z-index:10;background:white;';
+    closeBtn.onclick = () => {
+        Plotly?.purge(plotDivId);
+        window.generateAndInjectSVG?.();
+        plotDiv.innerHTML = '';
+    };
+    parent.appendChild(closeBtn);
+
+    const switchBtn = document.createElement('button');
+    switchBtn.className = 'ciliai-button ciliai-plot-btn';
+    const next = datasetKey === 'lung' ? 'kidney' : 'lung';
+    switchBtn.textContent = `Switch to ${next}`;
+    switchBtn.style.cssText =
+        'position:absolute;top:10px;left:10px;z-index:10;background:white;';
+    switchBtn.onclick = () => {
+        window.CiliAI.activeDataset = next;
+        window.renderUMAPPlot(displayName, targetGenes, zoomToCellType);
+    };
+    parent.appendChild(switchBtn);
 };
 
-// Add sharing and collaboration
-window.SharingManager = {
-    generateShareableLink: function(state) {
-        // Compress state into URL
-        const encoded = btoa(JSON.stringify(state));
-        return `${window.location.origin}?state=${encoded}`;
-    },
-    
-    createSession: function(name) {
-        const sessionId = Date.now().toString(36);
-        localStorage.setItem(`session_${sessionId}`, JSON.stringify({
-            name,
-            queries: [],
-            timestamp: new Date().toISOString()
-        }));
-        return sessionId;
-    },
-    
-    exportSession: function(sessionId) {
-        const session = JSON.parse(localStorage.getItem(`session_${sessionId}`));
-        return `
-        <div class="session-report">
-            <h4>📋 Session Report: ${session.name}</h4>
-            <div class="session-meta">
-                <span>📅 ${new Date(session.timestamp).toLocaleString()}</span>
-                <span>🔢 ${session.queries.length} queries</span>
-            </div>
-            <div class="session-queries">
-                ${session.queries.map(q => `
-                    <div class="query-item">
-                        <div class="query-text">${q.query}</div>
-                        <div class="query-result">${q.resultCount || 0} results</div>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="session-actions">
-                <button onclick="window.downloadSession('${sessionId}')">📥 Download Session</button>
-                <button onclick="window.shareSession('${sessionId}')">🔗 Share Link</button>
-            </div>
-        </div>`;
-    }
-};
+
 
 window.fetchVariantData = async function(geneSymbol) {
     try {
