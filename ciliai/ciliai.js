@@ -3047,9 +3047,7 @@ window.terminologyQueries = {
 
 
 /**
- * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
- * - Handles 'Lung' (Cluster Averages) and 'Kidney' (Sparse Arrays)
- * - REMOVED: Overlay buttons (Close/Switch)
+ * Renders Interactive UMAP (Fixed for Sparse Kidney Data)
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
@@ -3083,7 +3081,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     /* 4. Prepare data */
     const sourceData = dataset.umap;
-    // Use all available points (assuming R subsampled correctly)
     const renderIndices = Array.from({ length: sourceData.length }, (_, i) => i);
 
     const x = [], y = [], color = [], text = [], size = [];
@@ -3092,6 +3089,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     /* 5. Expression Handling (Sparse vs Dictionary) */
     let exprData = null;
     let isSparseArray = false;
+    let geneFound = true;
 
     // Helper: Decode [index, value, index, value...] to dense array
     const decodeSparse = (sparse, total) => {
@@ -3109,18 +3107,28 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     if (!isClusterView) {
         if (datasetKey === 'kidney') {
             // Kidney = Sparse Array (Per Cell)
-            const raw = dataset.expression?.[gene];
-            if (raw) {
+            // Check direct match OR try stripping whitespace
+            let raw = dataset.expression?.[gene];
+            
+            if (!raw) {
+                // Fallback: Check if gene exists in metadata list but data is missing
+                console.warn(`[UMAP] Gene ${gene} not found in Kidney expression matrix.`);
+                geneFound = false;
+                exprData = new Float32Array(sourceData.length).fill(0);
+            } else {
                 exprData = decodeSparse(raw, sourceData.length);
                 isSparseArray = true;
-            } else {
-                exprData = new Float32Array(sourceData.length).fill(0);
             }
         } else {
             // Lung = Dictionary (Per Cluster Name)
             exprData = window.CiliAI.cellDataCache?.[gene] || {};
             isSparseArray = false;
+            if (Object.keys(exprData).length === 0) geneFound = false;
         }
+    }
+
+    if (!isClusterView && !geneFound) {
+        if(window.addChatMessage) window.addChatMessage(`⚠️ **${gene}** is not in the ${dataset.name} dataset. Displaying structure only.`, false);
     }
 
     const clusterColors = {
@@ -3134,7 +3142,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         'Endothelial Cell': '#2563EB',
         'Immune Cell': '#1E3A8A',
         'Cycling Cell': '#172554',
-        'Ciliated Cell': '#E11D48' // Specific for Lung
+        'Ciliated Cell': '#E11D48'
     };
 
     /* 6. Build plot arrays */
@@ -3148,12 +3156,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
         // Apply Zoom Filter if requested
         if (zoomToCellType) {
-            const bounds = window.getClusterBoundaries ? window.getClusterBoundaries(zoomToCellType) : null;
-            if (bounds) {
-                if (px < bounds.xMin || px > bounds.xMax || py < bounds.yMin || py > bounds.yMax) continue;
-            } else if (cellType !== zoomToCellType) {
-                continue; // Fallback simple filter
-            }
+            if (cellType !== zoomToCellType) continue; 
         }
 
         x.push(px);
@@ -3177,8 +3180,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
             size.push(4);
         } else {
             color.push(exprVal);
-            // Highlight expressing cells slightly
-            size.push(exprVal > 0 ? 6 : 4);
+            size.push(exprVal > 0 ? 6 : 3); // Slightly larger for expressing cells
             if (exprVal > maxExpr) maxExpr = exprVal;
         }
     }
@@ -3190,8 +3192,8 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         hoverinfo: 'text',
         marker: {
             size,
-            opacity: 0.85,
-            line: { width: 0 } // No border for performance
+            opacity: 0.8,
+            line: { width: 0 }
         }
     };
 
@@ -3221,11 +3223,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         displaylogo: false,
         modeBarButtonsToRemove: ['lasso2d', 'select2d']
     });
-
-    // NOTE: Controls (Close/Switch buttons) are intentionally REMOVED here.
-    // They are now handled in the Chat Window via handleAIQuery.
 };
-
 
 
 
