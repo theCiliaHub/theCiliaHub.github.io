@@ -1179,12 +1179,13 @@ function extractEvolutionIntent(qLower) {
     }
     
 /**
- * INJECTS CSS FOR TABS, BADGES, AND UMAP PLOTS
+ * INJECTS CSS FOR TABS, BADGES, TABLES, AND UMAP SWITCH BUTTONS
  * Call this once when the gene page or plot is loaded.
  */
 function injectCiliAIStyles() {
     const styleId = 'ciliai-core-styles';
     if (document.getElementById(styleId)) return;
+    
     const css = `
         /* Tabs Styling */
         .cilia-tabs { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 15px; }
@@ -1216,13 +1217,35 @@ function injectCiliAIStyles() {
         /* Section Headers */
         .section-header { margin-top: 1.2rem; font-size: 13px; font-weight: 700; color: #2d3748; border-bottom: 2px solid #edf2f7; padding-bottom: 4px; margin-bottom: 8px; }
         .data-source-note { font-size: 10px; color: #718096; margin-top: 4px; font-style: italic; }
+
+        /* NEW: UMAP Dataset Switch Button */
+        .ciliai-umap-switch {
+            background: #ffffff;
+            border: 1px solid #cbd5e0;
+            color: #4a5568;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-right: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .ciliai-umap-switch:hover {
+            background: #ebf8ff;
+            color: #2b6cb0;
+            border-color: #2b6cb0;
+        }
     `;
     const styleEl = document.createElement('style');
     styleEl.id = styleId;
     styleEl.textContent = css;
     document.head.appendChild(styleEl);
 }
-
 /**
  * Calculates the bounding box (min/max UMAP coordinates) for a specified cell type cluster.
  * Also calculates the center point for potential annotation placement.
