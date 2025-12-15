@@ -3395,11 +3395,10 @@ window.handleAIQuery = async function (query) {
             else htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
         }
 
+       // =======================================================
+        // =( 12 )= INTENT: UMAP & EXPRESSION (With Dynamic Switch Button)
         // =======================================================
-        // =( 12 )= INTENT: UMAP / VISUALIZATIONS (Single Gene or Complex)
-        // =======================================================
-        // UPDATED: Now includes Chat-based Switch Button
-        if (htmlResult === null && (
+        else if (htmlResult === null && (
             qLower.includes('plot') || qLower.includes('display') || qLower.includes('heatmap') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('expression')
         )) {
             // 1. Detect requested dataset
@@ -3410,7 +3409,6 @@ window.handleAIQuery = async function (query) {
             let target = 'WDR31'; 
             match = qLower.match(/(?:for|of|in)\s+(.+)/i);
             if (match) {
-                // Clean up query noise
                 target = match[1].replace(/lung|kidney|scrna-seq|scrna|expression|in/gi, '').trim();
                 if(target.length < 2) target = 'WDR31'; 
             }
@@ -3419,7 +3417,6 @@ window.handleAIQuery = async function (query) {
             let isComplex = false;
             let finalTargetTerm = target;
 
-            // Check for complex if single gene not found
             if (genes.length === 0 && target) {
                 const complexName = window.extractComplexIntent(target);
                 if (complexName) {
@@ -3435,23 +3432,22 @@ window.handleAIQuery = async function (query) {
             const finalGenes = genes.length > 0 ? genes : ['WDR31']; 
             const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0]; 
             
-            // Check for Cell Type Zoom
             const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i);
             const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
 
-            // 3. Render Plot
+            // 3. Render
             await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
 
-            // 4. Generate Chat Response with Switch Button
+            // 4. Generate Chat Response with Contextual Switch Button
             const currentDS = window.CiliAI.activeDataset || 'lung';
             const dsName = window.CiliAI.datasets[currentDS] ? window.CiliAI.datasets[currentDS].name : 'scRNA-seq';
             
-            // Determine the "Next" dataset for the button
+            // Toggle Logic: If Lung -> show Kidney button. If Kidney -> show Lung button.
             const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
-            const nextDSLabel = nextDS.charAt(0).toUpperCase() + nextDS.slice(1);
+            const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
 
             htmlResult = `<div class="ai-result-card">
-                <p>Displaying <strong>${dsName}</strong> scRNA-seq UMAP for <strong>${geneSymbol}</strong> on the left.</p>
+                <p>Displaying <strong>${dsName}</strong> scRNA-seq UMAP for <strong>${geneSymbol}</strong> (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
                 ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster.</p>` : ''}
                 
                 <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
@@ -3460,7 +3456,7 @@ window.handleAIQuery = async function (query) {
                         🔄 Switch to ${nextDSLabel}
                     </button>
                     
-                    <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" style="margin-left:5px;">⬇️ CSV</a>
+                    <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" style="margin-left:5px; font-weight:600;">⬇️ CSV</a>
                 </div>
             </div>`;
         }
