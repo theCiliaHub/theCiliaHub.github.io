@@ -3047,9 +3047,9 @@ window.terminologyQueries = {
 
 
 /**
- * 1. UPDATED RENDER FUNCTION
- * - Removed "Close" button overlay.
- * - Removed "Switch" button overlay (moved to chat).
+ * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
+ * - Handles 'Lung' (Cluster Averages) and 'Kidney' (Sparse Arrays)
+ * - REMOVED: Overlay buttons (Close/Switch)
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
@@ -3060,7 +3060,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const dataset = window.CiliAI.datasets?.[datasetKey];
 
     if (!dataset || !Array.isArray(dataset.umap)) {
-        if (window.addChatMessage) window.addChatMessage(`⚠️ ${datasetKey} UMAP not available`, false);
+        if (window.addChatMessage) window.addChatMessage(`⚠️ ${datasetKey} UMAP data not loaded yet.`, false);
         return;
     }
 
@@ -3083,20 +3083,43 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     /* 4. Prepare data */
     const sourceData = dataset.umap;
-    const maxPoints = 20000;
-
-    const renderIndices = Array.from({ length: Math.min(sourceData.length, maxPoints) }, (_, i) => i);
+    // Use all available points (assuming R subsampled correctly)
+    const renderIndices = Array.from({ length: sourceData.length }, (_, i) => i);
 
     const x = [], y = [], color = [], text = [], size = [];
     let maxExpr = 0;
 
-    /* 5. Expression source */
-    let exprArray = null;
+    /* 5. Expression Handling (Sparse vs Dictionary) */
+    let exprData = null;
+    let isSparseArray = false;
+
+    // Helper: Decode [index, value, index, value...] to dense array
+    const decodeSparse = (sparse, total) => {
+        const dense = new Float32Array(total).fill(0);
+        if (!sparse) return dense;
+        if (sparse.length === total) return sparse; // Already dense
+        for (let k = 0; k < sparse.length; k += 2) {
+            const idx = sparse[k];
+            const val = sparse[k + 1];
+            if (idx < total) dense[idx] = val;
+        }
+        return dense;
+    };
+
     if (!isClusterView) {
         if (datasetKey === 'kidney') {
-            exprArray = dataset.expression?.[gene] || null;
-        } else if (datasetKey === 'lung') {
-            exprArray = window.CiliAI.cellDataCache?.[gene] || {};
+            // Kidney = Sparse Array (Per Cell)
+            const raw = dataset.expression?.[gene];
+            if (raw) {
+                exprData = decodeSparse(raw, sourceData.length);
+                isSparseArray = true;
+            } else {
+                exprData = new Float32Array(sourceData.length).fill(0);
+            }
+        } else {
+            // Lung = Dictionary (Per Cluster Name)
+            exprData = window.CiliAI.cellDataCache?.[gene] || {};
+            isSparseArray = false;
         }
     }
 
@@ -3110,30 +3133,38 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         'Fibroblast': '#1D4ED8',
         'Endothelial Cell': '#2563EB',
         'Immune Cell': '#1E3A8A',
-        'Cycling Cell': '#172554'
+        'Cycling Cell': '#172554',
+        'Ciliated Cell': '#E11D48' // Specific for Lung
     };
 
-    /* 6. Build plot */
+    /* 6. Build plot arrays */
     for (const i of renderIndices) {
         const p = sourceData[i];
         if (!p) continue;
 
-        const px = Array.isArray(p.x) ? p.x[0] : p.x;
-        const py = Array.isArray(p.y) ? p.y[0] : p.y;
-        const cellType = Array.isArray(p.cell_type) ? p.cell_type[0] : p.cell_type;
+        const px = p.x;
+        const py = p.y;
+        const cellType = p.cell_type;
 
-        if (px == null || py == null) continue;
+        // Apply Zoom Filter if requested
+        if (zoomToCellType) {
+            const bounds = window.getClusterBoundaries ? window.getClusterBoundaries(zoomToCellType) : null;
+            if (bounds) {
+                if (px < bounds.xMin || px > bounds.xMax || py < bounds.yMin || py > bounds.yMax) continue;
+            } else if (cellType !== zoomToCellType) {
+                continue; // Fallback simple filter
+            }
+        }
 
         x.push(px);
         y.push(py);
 
         let exprVal = 0;
         if (!isClusterView) {
-            if (datasetKey === 'kidney') {
-                const v = exprArray?.[i];
-                exprVal = (v == null || v === 'NA') ? 0 : Number(v) || 0;
+            if (isSparseArray) {
+                exprVal = exprData[i]; // Array access (Kidney)
             } else {
-                exprVal = exprArray[cellType] || 0;
+                exprVal = exprData[cellType] || 0; // Dictionary access (Lung)
             }
         }
 
@@ -3142,11 +3173,12 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         );
 
         if (isClusterView) {
-            color.push(clusterColors[cellType] || '#CBD5E1');
+            color.push(clusterColors[cellType] || '#94A3B8');
             size.push(4);
         } else {
             color.push(exprVal);
-            size.push(exprVal > 0 ? 8 : 4);
+            // Highlight expressing cells slightly
+            size.push(exprVal > 0 ? 6 : 4);
             if (exprVal > maxExpr) maxExpr = exprVal;
         }
     }
@@ -3159,20 +3191,15 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         marker: {
             size,
             opacity: 0.85,
-            line: { color: 'white', width: 0.5 }
+            line: { width: 0 } // No border for performance
         }
     };
 
     if (!isClusterView) {
         trace.marker.color = color;
         trace.marker.cmin = 0;
-        trace.marker.cmax = maxExpr || 1;
-        trace.marker.colorscale = dataset.colorScale || [
-            [0, '#EBF8FF'],
-            [0.3, '#93C5FD'],
-            [0.6, '#3B82F6'],
-            [1, '#1E3A8A']
-        ];
+        trace.marker.cmax = maxExpr > 0 ? maxExpr : 1;
+        trace.marker.colorscale = dataset.colorScale || 'Viridis';
         trace.marker.colorbar = { title: 'TPM', len: 0.5 };
     } else {
         trace.marker.color = color;
@@ -3180,10 +3207,10 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     const layout = {
         title: `<b>${isClusterView ? 'Cell Types' : gene} (${dataset.name})</b>`,
-        xaxis: { visible: false },
-        yaxis: { visible: false },
+        xaxis: { visible: false, automargin: true },
+        yaxis: { visible: false, automargin: true },
         hovermode: 'closest',
-        margin: { t: 50, b: 40, l: 20, r: 20 },
+        margin: { t: 40, b: 20, l: 20, r: 20 },
         plot_bgcolor: '#fff',
         paper_bgcolor: '#fff',
         showlegend: false
@@ -3191,16 +3218,16 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     await Plotly.newPlot(plotDivId, [trace], layout, {
         responsive: true,
-        displaylogo: false
+        displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d']
     });
 
-    /* 7. Controls - BUTTONS REMOVED */
-    const parent = plotDiv.parentElement;
-    if (parent) {
-        // Clear any old buttons just in case
-        parent.querySelectorAll('.ciliai-plot-btn').forEach(b => b.remove());
-    }
+    // NOTE: Controls (Close/Switch buttons) are intentionally REMOVED here.
+    // They are now handled in the Chat Window via handleAIQuery.
 };
+
+
+
 
 /**
  * 2. UPDATED QUERY HANDLER
@@ -3374,15 +3401,18 @@ window.handleAIQuery = async function (query) {
         // =( 12 )= INTENT: UMAP / VISUALIZATIONS (Single Gene or Complex)
         // =======================================================
         // UPDATED: Now includes Chat-based Switch Button
-        else if (htmlResult === null && (
+        if (htmlResult === null && (
             qLower.includes('plot') || qLower.includes('display') || qLower.includes('heatmap') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('expression')
         )) {
+            // 1. Detect requested dataset
             if (qLower.includes('kidney')) window.CiliAI.activeDataset = 'kidney';
             else if (qLower.includes('lung')) window.CiliAI.activeDataset = 'lung';
-
+            
+            // 2. Extract Gene
             let target = 'WDR31'; 
             match = qLower.match(/(?:for|of|in)\s+(.+)/i);
             if (match) {
+                // Clean up query noise
                 target = match[1].replace(/lung|kidney|scrna-seq|scrna|expression|in/gi, '').trim();
                 if(target.length < 2) target = 'WDR31'; 
             }
@@ -3391,6 +3421,7 @@ window.handleAIQuery = async function (query) {
             let isComplex = false;
             let finalTargetTerm = target;
 
+            // Check for complex if single gene not found
             if (genes.length === 0 && target) {
                 const complexName = window.extractComplexIntent(target);
                 if (complexName) {
@@ -3406,33 +3437,36 @@ window.handleAIQuery = async function (query) {
             const finalGenes = genes.length > 0 ? genes : ['WDR31']; 
             const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0]; 
             
+            // Check for Cell Type Zoom
             const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i);
             const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
 
-            // Render
+            // 3. Render Plot
             await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
 
-            // Generate Result Text with Switch Button
+            // 4. Generate Chat Response with Switch Button
             const currentDS = window.CiliAI.activeDataset || 'lung';
             const dsName = window.CiliAI.datasets[currentDS] ? window.CiliAI.datasets[currentDS].name : 'scRNA-seq';
             
-            // Logic for the switch button
+            // Determine the "Next" dataset for the button
             const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
             const nextDSLabel = nextDS.charAt(0).toUpperCase() + nextDS.slice(1);
 
             htmlResult = `<div class="ai-result-card">
-                <p>Displaying ${dsName} scRNA-seq UMAP for <strong>${geneSymbol}</strong> (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
-                ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster boundaries.</p>` : ''}
+                <p>Displaying <strong>${dsName}</strong> scRNA-seq UMAP for <strong>${geneSymbol}</strong> on the left.</p>
+                ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster.</p>` : ''}
                 
-                <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button class="ciliai-button" style="width:auto; margin:0;" onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${geneSymbol}', [], '${zoomToCellType || ''}'); window.addChatMessage('Switched to ${nextDSLabel} data.', false);">
+                <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                    <button class="ciliai-button" style="width:auto; margin:0; background:#4a5568;" 
+                        onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${geneSymbol}', [], '${zoomToCellType || ''}'); window.addChatMessage('Switched to ${nextDSLabel} data.', true); window.handleAIQuery('plot umap for ${geneSymbol} in ${nextDS}');">
                         🔄 Switch to ${nextDSLabel}
                     </button>
-                    <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" style="align-self:center; margin-left:5px;">⬇️ Download CSV</a>
+                    
+                    <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" style="margin-left:5px;">⬇️ CSV</a>
                 </div>
             </div>`;
         }
-
+            
         // Intent 13: Comparative
         else if (htmlResult === null && (qLower.includes('compare') || qLower.includes(' vs '))) {
             const matches = query.match(/([A-Z0-9]+)\s+vs\s+([A-Z0-9]+)/gi);
@@ -3516,6 +3550,7 @@ window.handleAIQuery = async function (query) {
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 };
+
 
 window.fetchVariantData = async function(geneSymbol) {
     try {
