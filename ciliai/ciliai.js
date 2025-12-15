@@ -1228,161 +1228,8 @@ function injectCiliAIStyles() {
 /**
  * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
  */
-window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
-    const plotDivId = 'cilia-svg';
-    if(typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
 
-    // 1. Get Active Dataset (Initialized in index.html)
-    const datasetKey = window.CiliAI.activeDataset || 'lung';
-    const dataset = window.CiliAI.datasets[datasetKey];
-    
-    // Safety check
-    if (!dataset || !dataset.umap) {
-        if (window.addChatMessage) window.addChatMessage(`⚠️ ${dataset ? dataset.name : 'Dataset'} data is loading...`, false);
-        return;
-    }
 
-    const umapData = dataset.umap;
-    let plotDiv = document.getElementById(plotDivId);
-    if (!plotDiv) return;
-
-    // 2. Setup Inputs
-    if (!displayName) displayName = 'WDR31'; // Default
-    if (typeof targetGenes === 'string') targetGenes = [targetGenes];
-    if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
-
-    const gene = displayName.toUpperCase();
-    const isClusterView = displayName === 'CLUSTER_VIEW';
-
-    // 3. Fetch Expression Data - FIXED FOR KIDNEY STRUCTURE
-    let expressionMap = {};
-    if (!isClusterView) {
-        if (datasetKey === 'kidney') {
-            // KIDNEY: Different data structure - gene values are arrays matching umap cell types
-            expressionMap = {};
-            if (dataset.expression && dataset.expression[gene]) {
-                const exprArray = dataset.expression[gene];
-                
-                // Map expression values to cell types based on umap order
-                umapData.forEach((cell, index) => {
-                    const cellType = Array.isArray(cell.cell_type) ? cell.cell_type[0] : cell.cell_type;
-                    const exprVal = exprArray[index];
-                    // Handle "NA" values
-                    expressionMap[cellType] = (exprVal === "NA" || exprVal === "na") ? 0 : parseFloat(exprVal) || 0;
-                });
-            }
-        } else {
-            // LUNG: Expression is in the cache (loaded by index.html)
-            expressionMap = window.CiliAI.cellDataCache[gene] || {};
-        }
-    }
-
-    // 4. Prepare Plot Data
-    const sampleSize = 15000; 
-    const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
-    
-    const x = [], y = [], color = [], text = [], size = [];
-    let maxExpr = 0;
-
-    const clusterColors = {
-        'Ciliated': '#E63946', 'Basal': '#457B9D', 'Club': '#1D3557', 
-        'Goblet': '#A8DADC', 'Neuroendocrine': '#F1FAEE', 'Ionocyte': '#F4A261',
-        // Kidney-specific cell types
-        'Proximal Tubule Cell': '#3B82F6', 
-        'Thick Ascending Limb Cell': '#60A5FA', 
-        'Distal Convoluted Tubule Cell': '#93C5FD',
-        'Collecting Duct Principal Cell': '#BFDBFE', 
-        'Collecting Duct Intercalated Cell': '#DBEAFE', 
-        'Endothelial Cell': '#2563EB',
-        'Fibroblast': '#1D4ED8',
-        'Podocyte': '#1E40AF',
-        'Immune Cell': '#1E3A8A',
-        'Cycling Cell': '#172554'
-    };
-
-    for (const point of sourceData) {
-        x.push(point.x);
-        y.push(point.y);
-        
-        // Extract cell type (handle array format in kidney data)
-        const cellType = Array.isArray(point.cell_type) ? point.cell_type[0] : point.cell_type;
-        
-        // Bold Hover Text (Size 24) - Keep same style as Lung
-        const exprVal = expressionMap[cellType] || 0;
-        text.push(`<span style="font-size:24px; font-weight:bold;">${cellType}</span><br>Expr: ${exprVal.toFixed(2)}`);
-
-        if (isClusterView) {
-            color.push(clusterColors[cellType] || '#ccc');
-            size.push(4);
-        } else {
-            color.push(exprVal);
-            size.push(exprVal > 0 ? 8 : 4); 
-            if(exprVal > maxExpr) maxExpr = exprVal;
-        }
-    }
-
-    const scaleMax = maxExpr > 0 ? maxExpr : 1;
-    
-    const trace = {
-        x: x, y: y, text: text,
-        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
-        marker: { size: size, opacity: 0.8, line: { color: 'white', width: 0.5 } }
-    };
-
-    if (!isClusterView) {
-        trace.marker.color = color;
-        // USE DATASET COLOR SCALE (Red for Lung, Blue for Kidney)
-        // Default to blue scale for kidney if not defined
-        trace.marker.colorscale = dataset.colorScale || 
-            (datasetKey === 'kidney' ? 
-                [[0, '#EBF8FF'], [0.1, '#93C5FD'], [0.5, '#3B82F6'], [1, '#1E3A8A']] : // Blue scale for kidney
-                [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] // Red scale for lung
-            );
-        trace.marker.cmin = 0;
-        trace.marker.cmax = scaleMax;
-        trace.marker.colorbar = { title: 'TPM', len: 0.5 };
-    } else {
-        trace.marker.color = color; 
-    }
-
-    const layout = {
-        title: { text: `<b>${isClusterView ? 'Cell Clusters' : gene} (${dataset.name})</b>`, font: { size: 14, color: '#2d3748' }, x: 0.05 },
-        xaxis: { visible: false }, yaxis: { visible: false },
-        hovermode: 'closest', margin: { t: 50, b: 40, l: 20, r: 20 },
-        plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff', showlegend: false
-    };
-
-    await Plotly.newPlot(plotDivId, [trace], layout, { responsive: true, displaylogo: false });
-
-    // 5. Add Controls (Switch & Close)
-    const parent = plotDiv.parentElement;
-    if (parent) {
-        parent.querySelectorAll('.ciliai-plot-btn').forEach(b => b.remove());
-
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'ciliai-button ciliai-plot-btn';
-        closeBtn.textContent = '✕ Close';
-        closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; width: auto; z-index: 10; background: white;';
-        closeBtn.onclick = () => { 
-            if(window.generateAndInjectSVG) window.generateAndInjectSVG(); 
-            else plotDiv.innerHTML = ''; 
-        };
-        parent.appendChild(closeBtn);
-
-        const switchBtn = document.createElement('button');
-        switchBtn.className = 'ciliai-button ciliai-plot-btn';
-        const nextDataset = datasetKey === 'lung' ? 'kidney' : 'lung';
-        const nextName = window.CiliAI.datasets[nextDataset] ? window.CiliAI.datasets[nextDataset].name.split(' ')[1] : 'Dataset';
-        
-        switchBtn.textContent = `Switch to ${nextName}`; 
-        switchBtn.style.cssText = `position: absolute; top: 10px; left: 10px; width: auto; z-index: 10; background: white; color: ${nextDataset === 'lung' ? '#c53030' : '#2b6cb0'}; border: 1px solid #ccc;`;
-        switchBtn.onclick = () => {
-            window.CiliAI.activeDataset = nextDataset;
-            window.renderUMAPPlot(displayName, targetGenes, zoomToCellType); 
-        };
-        parent.appendChild(switchBtn);
-    }
-};
 /**
  * Calculates the bounding box (min/max UMAP coordinates) for a specified cell type cluster.
  * Also calculates the center point for potential annotation placement.
@@ -3204,6 +3051,9 @@ window.terminologyQueries = {
 // ==========================================================
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
+// ==========================================================
+// 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
+// ==========================================================
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
@@ -3215,348 +3065,199 @@ window.handleAIQuery = async function (query) {
     window.log(`Routing query: ${query}`);
 
     try {
-        if (!window.CiliAI.ready) {
+        if (!window.CiliAI || !window.CiliAI.ready) {
             window.addChatMessage("Data is still loading, please wait...", false);
             return;
         }
 
         let htmlResult = null;
         let match;
-        // 1. Visualizations
-        if (qLower.includes('plot') || qLower.includes('display') || qLower.includes('heatmap') || qLower.includes('umap')) {
-            if (qLower.includes('umap') || qLower.includes('expression')) {
-                let target = 'WDR31';
-                match = qLower.match(/(?:for|of)\s+(.+)/i);
-                if (match) target = match[1].trim();
-                const genes = window.extractMultipleGenes(target);
-                const gene = genes.length > 0 ? genes[0] : 'WDR31';
-                window.renderUMAPPlot(gene, [gene]);
-                htmlResult = `<div class="ai-result-card"><p>Displaying UMAP for <strong>${gene}</strong>.</p></div>`;
-            } 
-            else if (qLower.includes('phylogen') || qLower.includes('evolution')) {
-                let genes = window.extractMultipleGenes(query);
-                if (genes.length === 0) genes = DEFAULT_PHYLO_GENES;
-                await window.handlePhylogenyVisualizationQuery(genes, 'li'); 
-                htmlResult = `<div class="ai-result-card"><p>Displaying phylogeny heatmap.</p></div>`;
-            }
-        }
 
-        // 2. Comparative
-        else if (qLower.includes('compare') || qLower.includes(' vs ')) {
-            htmlResult = await window.handleComparativeDashboard(query);
-        }
-
-        // 3. Variants
-        else if (qLower.includes('variant') || qLower.includes('mutation')) {
-            const genes = window.extractMultipleGenes(query);
-            if(genes.length > 0) htmlResult = await window.fetchVariantData(genes[0]);
-        }
-
-        // 4. Batch (Comma separated)
-        else if (query.includes(',') && window.extractMultipleGenes(query).length > 1) {
-            htmlResult = window.handleBatchQuery(query);
-        }
-
-       
-
-        
         // =======================================================
-        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
+        // =( 1 )= INTENT: GREETINGS & TERMINOLOGY
         // =======================================================
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
         const terminologyQueries = window.terminologyQueries || {};
         
         if (simpleGreetings.includes(qLower)) {
-            window.log('Routing via: Intent (Greeting)');
+            window.log('Routing via: Intent 1 (Greeting)');
             window.addChatMessage("Hello! I'm CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
             return;
         }
         
         if (terminologyQueries[qLower]) {
-            window.log('Routing via: Intent (Terminology)');
+            window.log('Routing via: Intent 1 (Terminology)');
             window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
             return;
         }
 
-        // --- High Priority Plot Buttons (Immediate Actions) ---
+        // =======================================================
+        // =( 2 )= INTENT: IMMEDIATE PLOT ACTIONS (Buttons)
+        // =======================================================
         if (qLower === 'plot default umap') {
-            window.log('Routing via: Intent (Default UMAP Plot)');
-            window.renderUMAPPlot('WDR31', ['WDR31']); // Fixed default to WDR31
-            htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>WDR31</strong> on the left.</p></div>`;
+            window.log('Routing via: Intent 2 (Default UMAP Plot)');
+            // Ensure dataset is set (default to lung if not set)
+            if (!window.CiliAI.activeDataset) window.CiliAI.activeDataset = 'lung';
+            
+            window.renderUMAPPlot('WDR31', ['WDR31']); 
+            const dsName = window.CiliAI.datasets[window.CiliAI.activeDataset].name;
+            htmlResult = `<div class="ai-result-card"><p>Displaying ${dsName} scRNA-seq UMAP for <strong>WDR31</strong> on the left.</p></div>`;
         }
         else if (qLower === 'plot default phylogeny') {
-            window.log('Routing via: Intent (Default Phylogeny Plot)');
+            window.log('Routing via: Intent 2 (Default Phylogeny Plot)');
             htmlResult = await window.handleAIQuery(`show nevers plot for ${DEFAULT_PHYLO_GENES.join(',')}`);
             return; // handleAIQuery called recursively, stop here
         }
-        
-       // =======================================================
-    // =( 1 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes", "Show list")
-    // =======================================================
-    // Fixed regex and context path
-    const yesRegex = /^(yes|yeah|sure|ok|okay|yep|show|view|list|show list|view list|display)/i;
-    
-    // Check global context window.CiliAI.lastQueryContext
-    if (htmlResult === null && yesRegex.test(qLower) && window.CiliAI.lastQueryContext && window.CiliAI.lastQueryContext.type) {
-        
-        if (window.CiliAI.lastQueryContext.type === 'list_followup') {
-            window.log('Routing via: Intent (Follow-up: Show List - FIXED)');
-            
-            if (typeof window.showDataInLeftPanel === 'function') {
-                window.showDataInLeftPanel(
-                    window.CiliAI.lastQueryContext.term || 'Gene List', 
-                    window.CiliAI.lastQueryContext.data || []
-                );
-                window.addChatMessage(`Displaying <strong>${window.CiliAI.lastQueryContext.term}</strong> in the main panel.`, false);
-            } else {
-                window.addChatMessage("Error: Unable to display table.", false);
-            }
-            
-            // Clear context immediately
-            window.CiliAI.lastQueryContext = { type: null, data: [], term: null };
-            return; 
-        }
-        
-        else if (window.CiliAI.lastQueryContext.type === 'screen_references') {
-            window.log('Routing via: Intent (Follow-up: Screen References)');
-            htmlResult = window.handleScreenReferenceFollowup();
-            window.CiliAI.lastQueryContext = { type: null, data: [], term: null };
-        }
-    }
-        // =======================================================
-        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes") - FIXED
-        // =======================================================
-        // Use regex for loose matching of "yes", "sure", "ok", "show list"
-        const isFollowUp = /^(yes|yeah|sure|ok|okay|yep|show list|view list)/i.test(qLower) &&
-                           !qLower.includes('phylogen') && !qLower.includes('umap') && !qLower.includes('scrna');
 
-        if (htmlResult === null && isFollowUp && window.lastQueryContext) { 
-            // 2A: List Follow-up (Prioritize general list)
-            if (window.lastQueryContext.type === 'list_followup') {
-                window.log('Routing via: Intent (Follow-up: Show List)');
+        // =======================================================
+        // =( 3 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes", "Show list")
+        // =======================================================
+        const yesRegex = /^(yes|yeah|sure|ok|okay|yep|show|view|list|show list|view list|display)/i;
+        
+        // Check global context window.CiliAI.lastQueryContext
+        if (htmlResult === null && yesRegex.test(qLower) && window.CiliAI.lastQueryContext && window.CiliAI.lastQueryContext.type) {
+            
+            // 3A: General List Follow-up
+            if (window.CiliAI.lastQueryContext.type === 'list_followup') {
+                window.log('Routing via: Intent 3 (Follow-up: Show List)');
                 
-                // CRITICAL: Ensure showDataInLeftPanel exists before calling
                 if (typeof window.showDataInLeftPanel === 'function') {
-                    window.showDataInLeftPanel(window.lastQueryContext.term, window.lastQueryContext.data);
-                    window.addChatMessage(`I've displayed the list for <strong>${window.lastQueryContext.term}</strong> in the main panel.`, false);
+                    window.showDataInLeftPanel(
+                        window.CiliAI.lastQueryContext.term || 'Gene List', 
+                        window.CiliAI.lastQueryContext.data || []
+                    );
+                    window.addChatMessage(`Displaying <strong>${window.CiliAI.lastQueryContext.term}</strong> in the main panel.`, false);
                 } else {
-                    window.log("Error: showDataInLeftPanel not found.");
-                    window.addChatMessage("Error displaying list table.", false);
+                    window.addChatMessage("Error: Unable to display table.", false);
                 }
                 
-                window.lastQueryContext = { type: null, data: [], term: null }; // Clears list context
-                return; // Stop execution immediately after showing the list.
+                // Clear context immediately
+                window.CiliAI.lastQueryContext = { type: null, data: [], term: null };
+                return; 
             }
             
-            // 2B: Screen References Follow-up
-            else if (window.lastQueryContext.type === 'screen_references') {
-                window.log('Routing via: Intent (Follow-up: Screen References)');
+            // 3B: Screen References Follow-up
+            else if (window.CiliAI.lastQueryContext.type === 'screen_references') {
+                window.log('Routing via: Intent 3 (Follow-up: Screen References)');
                 htmlResult = window.handleScreenReferenceFollowup();
+                window.CiliAI.lastQueryContext = { type: null, data: [], term: null };
+            }
+
+            // 3C: Top 500 Ciliary Genes Follow-up
+            else if (window.CiliAI.lastQueryContext.type === 'top_500_ciliary') {
+                window.log('Routing via: Intent 3 (Follow-up: Top 500)');
+                // Placeholder logic: Slice the first 500 genes (in real app, sort by enrichment)
+                const top500 = window.CiliAI.masterData.slice(0, 500).map(g => ({ 
+                    Gene: g.Gene, 
+                    Localization: g.Localization || '-',
+                    Description: g['Gene.Description'] || '-'
+                }));
+                
+                if (typeof window.showDataInLeftPanel === 'function') {
+                    window.showDataInLeftPanel('Top 500 Ciliary Genes', top500);
+                    htmlResult = "I've loaded the top 500 ciliary genes into the main panel.";
+                }
+                window.CiliAI.lastQueryContext = { type: null };
             }
         }
-// =======================================================
-// =( 2.2 )= INTENT: LIST GENES (e.g. "list transition zone genes")
-// =======================================================
-// Matches "List transition zone genes", "Show all basal body genes", etc.
-        else if (htmlResult === null && (match = qLower.match(/^(?:list|show|display|find|give me)\s+(?:all\s+)?(.+?)\s+genes$/i))) {
+
+        // =======================================================
+        // =( 4 )= INTENT: LIST GENES (e.g. "list transition zone genes")
+        // =======================================================
+        if (htmlResult === null && (match = qLower.match(/^(?:list|show|display|find|give me)\s+(?:all\s+)?(.+?)\s+genes$/i))) {
             const term = match[1].trim();
             const termUpper = term.toUpperCase();
-            window.log(`Routing via: Intent (List Genes: ${term})`);
-
-            let genes = [];
             
-            // A. Check Localization Logic FIRST (The fix)
-            // This ensures "Transition Zone" hits the full search, not the old complex map
-            const locList = window.getGenesByLocalization(term);
-            if (locList.length > 0) {
-                genes = locList.map(g => g.gene);
-            }
+            // Skip if this is likely a UMAP or Phylogeny request masquerading as a list request
+            if (!term.includes('evolution') && !term.includes('umap') && !term.includes('scrna')) {
+                window.log(`Routing via: Intent 4 (List Genes: ${term})`);
 
-            // B. If no localization found, try Modules/Complexes
-            if (genes.length === 0) {
-                if (window.CiliAI.lookups.byCompartment?.[termUpper]) {
-                    genes = window.CiliAI.lookups.byCompartment[termUpper];
-                }
-                else if (window.CiliAI.lookups.byModuleOrComplex?.[termUpper]) {
-                    genes = window.CiliAI.lookups.byModuleOrComplex[termUpper];
-                }
-            }
-
-            if (genes.length > 0) {
-                const rows = genes.map(g => ({ gene: g }));
+                let genes = [];
                 
-                // 🔴 CRITICAL: set follow-up context so "Yes" works next
-                window.CiliAI.lastQueryContext = {
-                    type: 'list_followup',
-                    term: `${term} genes`,
-                    data: rows
-                };
+                // A. Check Localization Logic FIRST
+                const locList = window.getGenesByLocalization(term);
+                if (locList.length > 0) {
+                    genes = locList.map(g => g.gene);
+                }
 
-                htmlResult = `
-                    <div class="ai-result-card">
-                        <p>Found <strong>${genes.length}</strong> genes associated with <strong>${term}</strong>.</p>
-                        <p>Would you like to <strong>view the full list</strong>?</p>
-                    </div>
-                `;
-            } else {
-                htmlResult = `I couldn't find a gene set for <strong>${term}</strong> in the database.`;
-            }
-        }
-
-        
-     // =======================================================
-    // =( 2.5 )= INTENT: PHYLOGENY / EVOLUTION (High Priority)
-    // =======================================================
-    // Catches "Show evolution of BBS1" before it falls back to generic info
-    if (htmlResult === null && (
-        qLower.includes('evolution') || 
-        qLower.includes('conservation') || 
-        qLower.includes('phylogenetic') || 
-        qLower.includes('phylogeny') ||
-        qLower.includes('evo of') ||
-        qLower.match(/show.+evolution/i)
-    )) {
-        window.log('Routing via: Intent (Phylogeny Engine - High Priority)');
-        
-        let genes = window.extractMultipleGenes(query);
-        
-        // Fallback: try to extract gene from query manually if extractor failed
-        if (genes.length === 0) {
-            const geneMatch = query.match(/[A-Z0-9]{3,}/g);
-            if (geneMatch) {
-                // Filter against valid genes in map
-                genes = geneMatch.map(g => g.toUpperCase()).filter(g => window.CiliAI.lookups.geneMap[g]);
-            }
-        }
-        
-        if (genes.length > 0) {
-            // Combine with default panel for context
-            const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-            genes = [...new Set([...definitiveDefaultGenes, ...genes])];
-            
-            // Lazy load if needed
-            if (!window.liPhylogenyCache) {
-                window.addChatMessage("Loading phylogeny datasets...", false);
-                await window.ensurePhylogenyDataLoaded();
-            }
-            
-            setTimeout(() => {
-                // Use Li heatmap as it is the standard in v7.2
-                if (window.renderLiPhylogenyHeatmap) {
-                    const res = window.renderLiPhylogenyHeatmap(genes);
-                    if (res && res.plotData) {
-                        Plotly.newPlot('cilia-svg', res.plotData, res.plotLayout);
-                        // Add Close Button
-                        const btn = document.createElement('button');
-                        btn.textContent = '✕ Close View';
-                        btn.style.cssText = 'position:absolute; top:10px; right:10px; z-index:100; padding:5px 10px; background:white; border:1px solid #ccc; cursor:pointer;';
-                        btn.onclick = () => window.generateAndInjectSVG();
-                        const container = document.getElementById('cilia-svg');
-                        if(container) container.prepend(btn);
+                // B. If no localization found, try Modules/Complexes
+                if (genes.length === 0) {
+                    if (window.CiliAI.lookups.byCompartment?.[termUpper]) {
+                        genes = window.CiliAI.lookups.byCompartment[termUpper];
+                    }
+                    else if (window.CiliAI.lookups.byModuleOrComplex?.[termUpper]) {
+                        genes = window.CiliAI.lookups.byModuleOrComplex[termUpper];
                     }
                 }
-            }, 100);
-            
-            htmlResult = `<div class="ai-result-card">
-                <p>Displaying phylogenetic conservation for <strong>${genes.length} genes</strong> in the main panel.</p>
-            </div>`;
-        } else {
-            htmlResult = "Please specify a valid gene symbol for evolutionary analysis (e.g., 'Show evolution of BBS1').";
+
+                if (genes.length > 0) {
+                    const rows = genes.map(g => ({ gene: g }));
+                    
+                    // Set follow-up context
+                    window.CiliAI.lastQueryContext = {
+                        type: 'list_followup',
+                        term: `${term} genes`,
+                        data: rows
+                    };
+
+                    htmlResult = `
+                        <div class="ai-result-card">
+                            <p>Found <strong>${genes.length}</strong> genes associated with <strong>${term}</strong>.</p>
+                            <p>Would you like to <strong>view the full list</strong>?</p>
+                        </div>
+                    `;
+                } else {
+                    htmlResult = `I couldn't find a gene set for <strong>${term}</strong> in the database.`;
+                }
+            }
         }
-    }    
 
         // =======================================================
-        // =( 3 )= INTENT: EXPLICIT SCREEN REFERENCES (FIXED)
+        // =( 5 )= INTENT: PHYLOGENY / EVOLUTION (High Priority)
         // =======================================================
-        else if (htmlResult === null && (qLower.includes('show screen reference') || qLower.includes('show publication detail') || qLower.includes('provide the paper'))) {
-            window.log('Routing via: Intent (Explicit Screen References - FIXED)');
-            // Assuming handleScreenReferenceFollowup is defined elsewhere
-            htmlResult = window.handleScreenReferenceFollowup(); 
-        }
-
-        // =======================================================
-        // =( 4 )= INTENT: SCREENS / PHENOTYPES
-        // =======================================================
-        else if (htmlResult === null && (
-            qLower.includes('loss-of-function') || qLower.includes('lof') ||
-            qLower.includes('overexpression') || qLower.includes('oe') ||
-            qLower.includes('percent ciliated') || qLower.includes('cilia length') || (qLower.includes('effect') && qLower.includes('of'))
+        // Catches "Show evolution of BBS1" before it falls back to generic info
+        if (htmlResult === null && (
+            qLower.includes('evolution') || 
+            qLower.includes('conservation') || 
+            qLower.includes('phylogenetic') || 
+            qLower.includes('phylogeny') ||
+            qLower.includes('evo of') ||
+            qLower.match(/show.+evolution/i) ||
+            (qLower.includes('show') && qLower.includes('li'))
         )) {
-            window.log('Routing via: Intent (Screens/Effects)');
-            const genes = window.extractMultipleGenes(query);
-            if (genes.length > 0) {
-                // Assuming handleScreenQuery is defined elsewhere
-                htmlResult = window.handleScreenQuery(genes[genes.length - 1]);
-            } else {
-                htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
-            }
-        }
-
-        // =======================================================
-        // =( 5 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
-        // =======================================================
-        else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
-            window.log('Routing via: Intent (High-Priority Get Details)');
-            // Assuming displayFullGeneInfo is defined elsewhere
-            htmlResult = await window.displayFullGeneInfo(match[1].toUpperCase());
-        }
-
-        // =======================================================
-        // =( 6 )= INTENT: ORTHOLOGS
-        // =======================================================
-        else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
-            window.log('Routing via: Intent (Ortholog)');
-            // Assuming handleOrthologQuery is defined elsewhere
-            htmlResult = window.handleOrthologQuery(match[1].toUpperCase(), match[2]);
-        }
-        else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
-            window.log('Routing via: Intent (Ortholog)');
-            htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
-        }
-
-        // =======================================================
-        // =( 7 )= INTENT: DOMAINS
-        // =======================================================
-        else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
-            window.log('Routing via: Intent (Domains)');
-            const genes = window.extractMultipleGenes(match[1]);
-            if (genes.length > 0) {
-                // Assuming handleDomainQuery is defined elsewhere
-                htmlResult = window.handleDomainQuery(genes);
-            }
-        }
-
-        // =======================================================
-        // =( 8 )= INTENT: PHYLOGENY / EVOLUTION (REPLACEMENT)
-        // =======================================================
-        else if (htmlResult === null && (qLower.includes('evolution') || qLower.includes('phylogen') || (qLower.includes('show') && qLower.includes('li')))) {
-            window.log('Routing via: Intent (Phylogeny Engine)');
+            window.log('Routing via: Intent 5 (Phylogeny Engine)');
+            
             let genes = window.extractMultipleGenes(query);
             
-            if (genes.length > 0) {
-                // ** INJECT DEFAULTS IF SINGLE GENE **
-                // If user asks for just one gene (e.g. "evolution of IFT88"), 
-                // we show it alongside the default panel for context.
-                if (genes.length === 1) {
-                    // Combine default list + requested gene, remove duplicates
-                    genes = [...new Set([...DEFAULT_PHYLO_GENES, genes[0]])];
+            // Fallback: try to extract gene from query manually if extractor failed
+            if (genes.length === 0) {
+                const geneMatch = query.match(/[A-Z0-9]{3,}/g);
+                if (geneMatch) {
+                    // Filter against valid genes in map
+                    genes = geneMatch.map(g => g.toUpperCase()).filter(g => window.CiliAI.lookups.geneMap[g]);
                 }
-
-                // A: Lazy Load Data if missing
+            }
+            
+            if (genes.length > 0) {
+                // If user asks for just one gene, show it alongside default context
+                if (genes.length === 1) {
+                    const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+                    genes = [...new Set([...definitiveDefaultGenes, ...genes])];
+                }
+                
+                // Lazy load if needed
                 if (!window.liPhylogenyCache) {
-                    window.addChatMessage("Loading phylogeny data... (this happens once)", false);
+                    window.addChatMessage("Loading phylogeny datasets...", false);
                     await window.ensurePhylogenyDataLoaded();
                 }
                 
-                // B: Plot the Heatmap directly to 'cilia-svg'
-                // We use a small timeout to ensure the UI is ready if data just loaded
                 setTimeout(() => {
                     if (window.renderLiPhylogenyHeatmap) {
-                         const res = window.renderLiPhylogenyHeatmap(genes);
-                         if (res) {
+                        const res = window.renderLiPhylogenyHeatmap(genes);
+                        if (res && res.plotData) {
                             Plotly.newPlot('cilia-svg', res.plotData, res.plotLayout);
                             
-                            // Add 'Add Gene' Button overlay
+                            // UI Overlays (Add Gene / Close)
                             const container = document.getElementById('cilia-svg');
                             if(container) {
                                 // Clear old buttons
@@ -3583,23 +3284,79 @@ window.handleAIQuery = async function (query) {
                                 container.prepend(closeBtn);
                                 container.prepend(addBtn);
                             }
-                         } else {
-                            window.addChatMessage("Could not render heatmap (Data missing or gene not found).", false);
-                         }
+                        }
                     }
-                }, 100); 
+                }, 100);
                 
-                htmlResult = `<div class="ai-result-card">Showing evolution heatmap for <strong>${genes.length} genes</strong> in the main panel.</div>`;
+                htmlResult = `<div class="ai-result-card">
+                    <p>Displaying phylogenetic conservation for <strong>${genes.length} genes</strong> in the main panel.</p>
+                </div>`;
             } else {
-                 htmlResult = "Please specify a gene for evolution analysis (e.g., 'Evolution of IFT88').";
+                htmlResult = "Please specify a valid gene symbol for evolutionary analysis (e.g., 'Show evolution of BBS1').";
+            }
+        }    
+
+        // =======================================================
+        // =( 6 )= INTENT: EXPLICIT SCREEN REFERENCES
+        // =======================================================
+        else if (htmlResult === null && (qLower.includes('show screen reference') || qLower.includes('show publication detail') || qLower.includes('provide the paper'))) {
+            window.log('Routing via: Intent 6 (Explicit Screen References)');
+            htmlResult = window.handleScreenReferenceFollowup(); 
+        }
+
+        // =======================================================
+        // =( 7 )= INTENT: SCREENS / PHENOTYPES
+        // =======================================================
+        else if (htmlResult === null && (
+            qLower.includes('loss-of-function') || qLower.includes('lof') ||
+            qLower.includes('overexpression') || qLower.includes('oe') ||
+            qLower.includes('percent ciliated') || qLower.includes('cilia length') || (qLower.includes('effect') && qLower.includes('of'))
+        )) {
+            window.log('Routing via: Intent 7 (Screens/Effects)');
+            const genes = window.extractMultipleGenes(query);
+            if (genes.length > 0) {
+                htmlResult = window.handleScreenQuery(genes[genes.length - 1]);
+            } else {
+                htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
             }
         }
-        
+
         // =======================================================
-        // =( 9 )= INTENT: FUNCTIONAL MODULES
+        // =( 8 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
+        // =======================================================
+        else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
+            window.log('Routing via: Intent 8 (High-Priority Get Details)');
+            htmlResult = await window.displayFullGeneInfo(match[1].toUpperCase());
+        }
+
+        // =======================================================
+        // =( 9 )= INTENT: ORTHOLOGS
+        // =======================================================
+        else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
+            window.log('Routing via: Intent 9 (Ortholog)');
+            htmlResult = window.handleOrthologQuery(match[1].toUpperCase(), match[2]);
+        }
+        else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
+            window.log('Routing via: Intent 9 (Ortholog)');
+            htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
+        }
+
+        // =======================================================
+        // =( 10 )= INTENT: DOMAINS
+        // =======================================================
+        else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
+            window.log('Routing via: Intent 10 (Domains)');
+            const genes = window.extractMultipleGenes(match[1]);
+            if (genes.length > 0) {
+                htmlResult = window.handleDomainQuery(genes);
+            }
+        }
+
+        // =======================================================
+        // =( 11 )= INTENT: FUNCTIONAL MODULES
         // =======================================================
         else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
-            window.log('Routing via: Intent (Get Modules)');
+            window.log('Routing via: Intent 11 (Get Modules)');
             const gene = match[1].toUpperCase();
             const g = window.CiliAI.lookups.geneMap[gene];
             if (g && g['Functional.category']) {
@@ -3610,101 +3367,109 @@ window.handleAIQuery = async function (query) {
         }
 
         // =======================================================
-        // =( 10 )= INTENT: scRNA Expression
+        // =( 12 )= INTENT: UMAP / VISUALIZATIONS (Single Gene or Complex)
         // =======================================================
-        else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression') || qLower.includes('expression of'))) {
-            window.log('Routing via: Intent (scRNA)');
-            const genes = window.extractMultipleGenes(query);
-            if (genes.length > 0) {
-                // Assuming handleScRnaQuery is defined elsewhere
-                htmlResult = window.handleScRnaQuery(genes);
-                htmlResult = htmlResult.replace(`</div>`,
-                    `<p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="window.handleAIQuery('plot umap for ${genes[0]}')">View ${genes[0]} on UMAP</a></p></div>`);
-            } else {
-                htmlResult = `Please specify which gene(s) you want to check expression for.`;
-            }
-        }
-        
-        // =======================================================
-        // =( 11 )= INTENT: UMAP (VISUAL) - Single Gene or Complex Plot
-        // =======================================================
-        else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+(.+)|(?: of| in)\s+(.+))?/i))) {
-            window.log('Routing via: Intent (UMAP Plot / Complex)');
-            let targetTerm = (match[1] || match[2]) ? (match[1] || match[2]).trim() : null;
+        // This handles "Plot UMAP", "Show expression in kidney", "Display lung scRNA"
+        else if (htmlResult === null && (
+            qLower.includes('plot') || qLower.includes('display') || qLower.includes('heatmap') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('expression')
+        )) {
+            window.log('Routing via: Intent 12 (UMAP/Visuals)');
             
-            let genes = targetTerm ? window.extractMultipleGenes(targetTerm) : [];
-            let isComplex = false;
+            // 1. Determine Dataset Context (Kidney vs Lung) - THE FIX
+            if (qLower.includes('kidney')) {
+                window.CiliAI.activeDataset = 'kidney';
+            } else if (qLower.includes('lung')) {
+                window.CiliAI.activeDataset = 'lung';
+            }
+            // If neither specified, keep current activeDataset, or default to Lung in renderUMAPPlot
 
-            if (genes.length === 0 && targetTerm) {
-                // Check if the term is a complex/module
-                const complexName = window.extractComplexIntent(targetTerm);
+            // 2. Extract Genes
+            let target = 'WDR31'; // Default
+            match = qLower.match(/(?:for|of|in)\s+(.+)/i);
+            
+            // Clean up the match to remove "kidney" or "lung" or "scrna-seq" if picked up
+            if (match) {
+                target = match[1].replace(/lung|kidney|scrna-seq|scrna|expression|in/gi, '').trim();
+                if(target.length < 2) target = 'WDR31'; // Fallback if user just said "expression in lung"
+            }
+
+            let genes = window.extractMultipleGenes(target);
+            let isComplex = false;
+            let finalTargetTerm = target;
+
+            // Check for Complexes if no genes found directly
+            if (genes.length === 0 && target) {
+                const complexName = window.extractComplexIntent(target);
                 if (complexName) {
                     const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
                     if (complexGenes.length > 0) {
                         genes = complexGenes;
-                        targetTerm = complexName;
+                        finalTargetTerm = complexName;
                         isComplex = true;
                     }
                 }
             }
 
-            const finalGenes = genes.length > 0 ? genes : ['WDR31']; // FIXED Default
-            const geneSymbol = isComplex ? targetTerm : finalGenes[0]; 
+            // Defaults
+            const finalGenes = genes.length > 0 ? genes : ['WDR31']; 
+            const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0]; 
             
+            // Check for Cell Type Zoom
             const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i);
             const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
 
+            // 3. Render
             window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
 
-            // Assuming downloadUMAPDataAsCSV is defined elsewhere
+            // 4. Generate Result Text using dynamic Dataset Name
+            const dsName = window.CiliAI.datasets[window.CiliAI.activeDataset] ? window.CiliAI.datasets[window.CiliAI.activeDataset].name : 'scRNA-seq';
+
             htmlResult = `<div class="ai-result-card">
-                <p>Displaying Lung scRNA-seq UMAP for **${geneSymbol}** (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
+                <p>Displaying ${dsName} scRNA-seq UMAP for <strong>${geneSymbol}</strong> (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
                 ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster boundaries.</p>` : ''}
                 <p style="margin-top: 10px;"><a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')">⬇️ Download UMAP Data (CSV)</a></p>
             </div>`;
         }
 
         // =======================================================
-        // =( 12 )= INTENT: SIMPLE KEYWORD LISTS
+        // =( 13 )= INTENT: COMPARATIVE DASHBOARD
         // =======================================================
-        else if (htmlResult === null) {
-            // Assuming flexibleIntentParser is defined elsewhere
-            const intent = window.flexibleIntentParser(query);
-            if (intent) {
-                window.log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
-                htmlResult = intent.handler(intent.entity, query);
-            }
-        }
-
-
-        // =======================================================
-        // =( 13 )= INTENT: FALLBACK (GET DETAILS)
-        // =======================================================
-        if (htmlResult === null) {
-            window.log(`Routing via: Fallback (Get Details)`);
-            let term = qLower;
-            if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
-                term = match[1];
-            }
-            term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
-            
-            const genes = window.extractMultipleGenes(term);
-            
-            if (genes.length > 0) {
-                window.log(`Final fallback, found gene: ${genes[0]}`);
-                // Assuming displayFullGeneInfo is defined elsewhere
-                htmlResult = await window.displayFullGeneInfo(genes[0]);
+        else if (htmlResult === null && (qLower.includes('compare') || qLower.includes(' vs '))) {
+            window.log('Routing via: Intent 13 (Comparative)');
+            // Check specifically for "GeneA vs GeneB" pattern
+            const matches = query.match(/([A-Z0-9]+)\s+vs\s+([A-Z0-9]+)/gi);
+            if (matches) {
+                htmlResult = await window.handleComparativeDashboard(matches[0]);
+            } else {
+                htmlResult = await window.handleComparativeDashboard(query);
             }
         }
 
         // =======================================================
-        // = ( 14 ) = INTENT: ADVANCED EXPRESSION ANALYSIS (Fold Change)
+        // =( 14 )= INTENT: VARIANTS
+        // =======================================================
+        else if (htmlResult === null && (qLower.includes('variant') || qLower.includes('mutation'))) {
+            window.log('Routing via: Intent 14 (Variants)');
+            const genes = window.extractMultipleGenes(query);
+            if(genes.length > 0) htmlResult = await window.fetchVariantData(genes[0]);
+        }
+
+        // =======================================================
+        // =( 15 )= INTENT: BATCH QUERY
+        // =======================================================
+        else if (htmlResult === null && query.includes(',') && window.extractMultipleGenes(query).length > 1) {
+            window.log('Routing via: Intent 15 (Batch)');
+            htmlResult = window.handleBatchQuery(query);
+        }
+
+        // =======================================================
+        // =( 16 )= INTENT: ADVANCED EXPRESSION (Fold Change)
         // =======================================================
         else if (htmlResult === null) {
             const foldChangeMatch = qLower.match(/compare\s+(.+)\s+in\s+(.+)\s+vs\s+(.+)/i);
             
             if (foldChangeMatch) {
-                window.log('Routing via: Intent (Fold Change Complex/Cell Type)');
+                window.log('Routing via: Intent 16 (Fold Change Complex/Cell Type)');
                 
                 const complexTerm = foldChangeMatch[1].trim().toUpperCase();
                 const cellTypeA = foldChangeMatch[2].trim();
@@ -3733,13 +3498,13 @@ window.handleAIQuery = async function (query) {
         }
 
         // =======================================================
-        // = ( 15 ) = INTENT: COMPLEX PHYLOGENETIC OVERLAP
+        // =( 17 )= INTENT: COMPLEX PHYLOGENETIC OVERLAP
         // =======================================================
         else if (htmlResult === null) {
             const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
 
             if (classOverlapMatch && qLower.includes('li')) { 
-                window.log('Routing via: Intent (Phylogenetic Class Overlap)');
+                window.log('Routing via: Intent 17 (Phylogenetic Class Overlap)');
                 const classA = classOverlapMatch[1].trim();
                 const classB = classOverlapMatch[2].trim();
                 
@@ -3766,55 +3531,47 @@ window.handleAIQuery = async function (query) {
         }
         
         // =======================================================
-        // =( 16 )= INTENT: GENE SET ANALYSIS
+        // =( 18 )= INTENT: GENE SET ANALYSIS (Enrichment/Compare)
         // =======================================================
-        const enrichmentMatch = qLower.match(/enrichment for (.+)/);
-        const compareMatch = qLower.match(/compare (.+) and (.+)/);
+        else if (htmlResult === null) {
+            const enrichmentMatch = qLower.match(/enrichment for (.+)/);
+            const compareMatch = qLower.match(/compare (.+) and (.+)/);
 
-        if (enrichmentMatch) {
-            window.log('Routing via: Intent (Gene Set Enrichment)');
-            const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
-            const terms = window.getEnrichedGOTerms(geneList); 
-            
-            if (terms.length === 0) {
-                htmlResult = "Not enough genes provided, or no significant enrichment found.";
-            } else {
-                let html = `<div class="ai-result-card"><h4>Gene Set Enrichment for ${geneList.length} Genes</h4>`;
-                html += `<p>Top enriched biological terms (simulated):</p><ul>`;
-                terms.forEach(t => { html += `<li><strong>${t.term}</strong>: Found ${t.count} genes (p-value ${t.pval.toExponential(1)})</li>`; });
-                html += `</ul></div>`;
-                htmlResult = html;
+            if (enrichmentMatch) {
+                window.log('Routing via: Intent 18 (Gene Set Enrichment)');
+                const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
+                const terms = window.getEnrichedGOTerms(geneList); 
+                
+                if (terms.length === 0) {
+                    htmlResult = "Not enough genes provided, or no significant enrichment found.";
+                } else {
+                    let html = `<div class="ai-result-card"><h4>Gene Set Enrichment for ${geneList.length} Genes</h4>`;
+                    html += `<p>Top enriched biological terms (simulated):</p><ul>`;
+                    terms.forEach(t => { html += `<li><strong>${t.term}</strong>: Found ${t.count} genes (p-value ${t.pval.toExponential(1)})</li>`; });
+                    html += `</ul></div>`;
+                    htmlResult = html;
+                }
+            }
+            else if (compareMatch) {
+                window.log('Routing via: Intent 18 (Gene Set Comparison)');
+                const termA = compareMatch[1].trim().toUpperCase();
+                const termB = compareMatch[2].trim().toUpperCase();
+                
+                const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
+                const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
+
+                const jaccardIndex = window.calculateJaccard(setA, setB); 
+                const overlapCount = Math.round(jaccardIndex * (setA.length + setB.length));
+                
+                htmlResult = `<div class="ai-result-card"><h4>Gene Set Comparison: ${termA} vs. ${termB}</h4><p><strong>Genes in ${termA}:</strong> ${setA.length}</p><p><strong>Genes in ${termB}:</strong> ${setB.length}</p><p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p><p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p></div>`;
             }
         }
-        else if (compareMatch) {
-            window.log('Routing via: Intent (Gene Set Comparison)');
-            const termA = compareMatch[1].trim().toUpperCase();
-            const termB = compareMatch[2].trim().toUpperCase();
-            
-            const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
-            const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
-
-            const jaccardIndex = window.calculateJaccard(setA, setB); 
-            const overlapCount = Math.round(jaccardIndex * (setA.length + setB.length));
-            
-            htmlResult = `<div class="ai-result-card"><h4>Gene Set Comparison: ${termA} vs. ${termB}</h4><p><strong>Genes in ${termA}:</strong> ${setA.length}</p><p><strong>Genes in ${termB}:</strong> ${setB.length}</p><p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p><p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p></div>`;
-        }
 
         // =======================================================
-        // =( 17 )= FINAL FALLBACK (ERROR)
+        // =( 19 )= INTENT: SHOW CILIARY CELLS (Special Case)
         // =======================================================
-        if (htmlResult === null) {
-            window.log(`Routing via: Final Fallback (Error)`);
-            const genes = window.extractMultipleGenes(query);
-            if (genes.length > 0) {
-                window.log(`Final fallback, found gene: ${genes[0]}`);
-                htmlResult = await window.displayFullGeneInfo(genes[0]);
-            } else {
-                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
-            }
-        }
-        // NEW INTENT: "Show Ciliary Cells"
-        else if (qLower.includes('show') && qLower.includes('ciliary cells')) {
+        else if (htmlResult === null && qLower.includes('show') && qLower.includes('ciliary cells')) {
+            window.log('Routing via: Intent 19 (Show Ciliary Cells)');
             window.renderUMAPPlot('CLUSTER_VIEW');
             // Set context for "Top 500" question
             window.CiliAI.lastQueryContext = { type: 'top_500_ciliary' };
@@ -3826,31 +3583,37 @@ window.handleAIQuery = async function (query) {
                 </div>`;
         }
 
-        // NEW FOLLOW-UP: "Yes" for Top 500
-        else if (/^(yes|sure|show list)/i.test(qLower) && window.CiliAI.lastQueryContext.type === 'top_500_ciliary') {
-            // Placeholder logic: Slice the first 500 genes (in real app, sort by enrichment)
-            const top500 = window.CiliAI.masterData.slice(0, 500).map(g => ({ 
-                Gene: g.Gene, 
-                Localization: g.Localization || '-',
-                Description: g['Gene.Description'] || '-'
-            }));
-            
-            if (typeof window.showDataInLeftPanel === 'function') {
-                window.showDataInLeftPanel('Top 500 Ciliary Genes', top500);
-                htmlResult = "I've loaded the top 500 ciliary genes into the main panel.";
+        // =======================================================
+        // =( 20 )= INTENT: SIMPLE KEYWORD & FALLBACK
+        // =======================================================
+        else if (htmlResult === null) {
+            // A: Flexible Intent Parser
+            const intent = window.flexibleIntentParser(query);
+            if (intent) {
+                window.log(`Routing via: Intent 20 (Simple Keyword: ${intent.type})`);
+                htmlResult = intent.handler(intent.entity, query);
             }
-            window.CiliAI.lastQueryContext = { type: null };
+            
+            // B: Final Fallback (Get Details)
+            if (htmlResult === null) {
+                window.log(`Routing via: Intent 20 (Fallback - Get Details)`);
+                let term = qLower;
+                if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
+                    term = match[1];
+                }
+                term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
+                
+                const genes = window.extractMultipleGenes(term);
+                
+                if (genes.length > 0) {
+                    window.log(`Final fallback, found gene: ${genes[0]}`);
+                    htmlResult = await window.displayFullGeneInfo(genes[0]);
+                } else {
+                    htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
+                }
+            }
         }
 
-// Add to handleAIQuery routing
-if (qLower.includes('compare') && qLower.includes('vs')) {
-    const matches = query.match(/([A-Z0-9]+)\s+vs\s+([A-Z0-9]+)/gi);
-    if (matches) {
-        return handleComparativeDashboard(matches[0]);
-    }
-}
-
-        
         // Send the final result to chat
         if (htmlResult) {
             window.addChatMessage(htmlResult, false);
@@ -3860,7 +3623,167 @@ if (qLower.includes('compare') && qLower.includes('vs')) {
         console.error("Error in handleAIQuery:", e);
         window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
-}
+};
+
+
+/**
+ * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
+ */
+window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
+    const plotDivId = 'cilia-svg';
+    if(typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
+
+    // 1. Get Active Dataset (Initialized in index.html)
+    const datasetKey = window.CiliAI.activeDataset || 'lung';
+    const dataset = window.CiliAI.datasets[datasetKey];
+    
+    // Safety check
+    if (!dataset || !dataset.umap) {
+        if (window.addChatMessage) window.addChatMessage(`⚠️ ${dataset ? dataset.name : 'Dataset'} data is loading...`, false);
+        return;
+    }
+
+    const umapData = dataset.umap;
+    let plotDiv = document.getElementById(plotDivId);
+    if (!plotDiv) return;
+
+    // 2. Setup Inputs
+    if (!displayName) displayName = 'WDR31'; // Default
+    if (typeof targetGenes === 'string') targetGenes = [targetGenes];
+    if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
+
+    const gene = displayName.toUpperCase();
+    const isClusterView = displayName === 'CLUSTER_VIEW';
+
+    // 3. Fetch Expression Data - FIXED FOR KIDNEY STRUCTURE
+    let expressionMap = {};
+    if (!isClusterView) {
+        if (datasetKey === 'kidney') {
+            // KIDNEY: Different data structure - gene values are arrays matching umap cell types
+            expressionMap = {};
+            if (dataset.expression && dataset.expression[gene]) {
+                const exprArray = dataset.expression[gene];
+                
+                // Map expression values to cell types based on umap order
+                umapData.forEach((cell, index) => {
+                    const cellType = Array.isArray(cell.cell_type) ? cell.cell_type[0] : cell.cell_type;
+                    const exprVal = exprArray[index];
+                    // Handle "NA" values
+                    expressionMap[cellType] = (exprVal === "NA" || exprVal === "na") ? 0 : parseFloat(exprVal) || 0;
+                });
+            }
+        } else {
+            // LUNG: Expression is in the cache (loaded by index.html)
+            expressionMap = window.CiliAI.cellDataCache[gene] || {};
+        }
+    }
+
+    // 4. Prepare Plot Data
+    const sampleSize = 15000; 
+    const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
+    
+    const x = [], y = [], color = [], text = [], size = [];
+    let maxExpr = 0;
+
+    const clusterColors = {
+        'Ciliated': '#E63946', 'Basal': '#457B9D', 'Club': '#1D3557', 
+        'Goblet': '#A8DADC', 'Neuroendocrine': '#F1FAEE', 'Ionocyte': '#F4A261',
+        // Kidney-specific cell types
+        'Proximal Tubule Cell': '#3B82F6', 
+        'Thick Ascending Limb Cell': '#60A5FA', 
+        'Distal Convoluted Tubule Cell': '#93C5FD',
+        'Collecting Duct Principal Cell': '#BFDBFE', 
+        'Collecting Duct Intercalated Cell': '#DBEAFE', 
+        'Endothelial Cell': '#2563EB',
+        'Fibroblast': '#1D4ED8',
+        'Podocyte': '#1E40AF',
+        'Immune Cell': '#1E3A8A',
+        'Cycling Cell': '#172554'
+    };
+
+    for (const point of sourceData) {
+        x.push(point.x);
+        y.push(point.y);
+        
+        // Extract cell type (handle array format in kidney data)
+        const cellType = Array.isArray(point.cell_type) ? point.cell_type[0] : point.cell_type;
+        
+        // Bold Hover Text (Size 24) - Keep same style as Lung
+        const exprVal = expressionMap[cellType] || 0;
+        text.push(`<span style="font-size:24px; font-weight:bold;">${cellType}</span><br>Expr: ${exprVal.toFixed(2)}`);
+
+        if (isClusterView) {
+            color.push(clusterColors[cellType] || '#ccc');
+            size.push(4);
+        } else {
+            color.push(exprVal);
+            size.push(exprVal > 0 ? 8 : 4); 
+            if(exprVal > maxExpr) maxExpr = exprVal;
+        }
+    }
+
+    const scaleMax = maxExpr > 0 ? maxExpr : 1;
+    
+    const trace = {
+        x: x, y: y, text: text,
+        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+        marker: { size: size, opacity: 0.8, line: { color: 'white', width: 0.5 } }
+    };
+
+    if (!isClusterView) {
+        trace.marker.color = color;
+        // USE DATASET COLOR SCALE (Red for Lung, Blue for Kidney)
+        // Default to blue scale for kidney if not defined
+        trace.marker.colorscale = dataset.colorScale || 
+            (datasetKey === 'kidney' ? 
+                [[0, '#EBF8FF'], [0.1, '#93C5FD'], [0.5, '#3B82F6'], [1, '#1E3A8A']] : // Blue scale for kidney
+                [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] // Red scale for lung
+            );
+        trace.marker.cmin = 0;
+        trace.marker.cmax = scaleMax;
+        trace.marker.colorbar = { title: 'TPM', len: 0.5 };
+    } else {
+        trace.marker.color = color; 
+    }
+
+    const layout = {
+        title: { text: `<b>${isClusterView ? 'Cell Clusters' : gene} (${dataset.name})</b>`, font: { size: 14, color: '#2d3748' }, x: 0.05 },
+        xaxis: { visible: false }, yaxis: { visible: false },
+        hovermode: 'closest', margin: { t: 50, b: 40, l: 20, r: 20 },
+        plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff', showlegend: false
+    };
+
+    await Plotly.newPlot(plotDivId, [trace], layout, { responsive: true, displaylogo: false });
+
+    // 5. Add Controls (Switch & Close)
+    const parent = plotDiv.parentElement;
+    if (parent) {
+        parent.querySelectorAll('.ciliai-plot-btn').forEach(b => b.remove());
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'ciliai-button ciliai-plot-btn';
+        closeBtn.textContent = '✕ Close';
+        closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; width: auto; z-index: 10; background: white;';
+        closeBtn.onclick = () => { 
+            if(window.generateAndInjectSVG) window.generateAndInjectSVG(); 
+            else plotDiv.innerHTML = ''; 
+        };
+        parent.appendChild(closeBtn);
+
+        const switchBtn = document.createElement('button');
+        switchBtn.className = 'ciliai-button ciliai-plot-btn';
+        const nextDataset = datasetKey === 'lung' ? 'kidney' : 'lung';
+        const nextName = window.CiliAI.datasets[nextDataset] ? window.CiliAI.datasets[nextDataset].name.split(' ')[1] : 'Dataset';
+        
+        switchBtn.textContent = `Switch to ${nextName}`; 
+        switchBtn.style.cssText = `position: absolute; top: 10px; left: 10px; width: auto; z-index: 10; background: white; color: ${nextDataset === 'lung' ? '#c53030' : '#2b6cb0'}; border: 1px solid #ccc;`;
+        switchBtn.onclick = () => {
+            window.CiliAI.activeDataset = nextDataset;
+            window.renderUMAPPlot(displayName, targetGenes, zoomToCellType); 
+        };
+        parent.appendChild(switchBtn);
+    }
+};
 
 
 
