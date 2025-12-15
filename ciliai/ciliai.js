@@ -3629,11 +3629,16 @@ window.handleAIQuery = async function (query) {
 /**
  * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
  */
+/**
+ * Renders Interactive UMAP with Zoom, Selection, and Expression Overlay
+ * FIXED: Properly clears previous plots and handles Kidney data structure correctly.
+ */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     const plotDivId = 'cilia-svg';
     if(typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
 
-    // 1. Get Active Dataset (Initialized in index.html)
+    // 1. Get Active Dataset
+    // Ensure we default to 'lung' if undefined, but respect the switch
     const datasetKey = window.CiliAI.activeDataset || 'lung';
     const dataset = window.CiliAI.datasets[datasetKey];
     
@@ -3643,9 +3648,16 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         return;
     }
 
-    const umapData = dataset.umap;
     let plotDiv = document.getElementById(plotDivId);
     if (!plotDiv) return;
+
+    // 🔴 FIX 1: Explicitly purge the previous plot to prevent "stuck" graphs
+    try {
+        if (window.Plotly) Plotly.purge(plotDivId);
+        plotDiv.innerHTML = ''; // Double ensure it's empty
+    } catch (e) {
+        console.warn("Could not purge plot:", e);
+    }
 
     // 2. Setup Inputs
     if (!displayName) displayName = 'WDR31'; // Default
@@ -3655,32 +3667,39 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const gene = displayName.toUpperCase();
     const isClusterView = displayName === 'CLUSTER_VIEW';
 
-    // 3. Fetch Expression Data - FIXED FOR KIDNEY STRUCTURE
-    let expressionMap = {};
+    // 3. Prepare Data Points with Expression
+    // We clone the UMAP data to avoid modifying the original source permanently
+    let workingData = [...dataset.umap];
+
+    // 🔴 FIX 2: Handle Kidney Data (Array-based) vs Lung Data (Map-based)
     if (!isClusterView) {
         if (datasetKey === 'kidney') {
-            // KIDNEY: Different data structure - gene values are arrays matching umap cell types
-            expressionMap = {};
+            // KIDNEY: Expression is an array [val, val, ...] matching the UMAP array order
             if (dataset.expression && dataset.expression[gene]) {
                 const exprArray = dataset.expression[gene];
-                
-                // Map expression values to cell types based on umap order
-                umapData.forEach((cell, index) => {
-                    const cellType = Array.isArray(cell.cell_type) ? cell.cell_type[0] : cell.cell_type;
-                    const exprVal = exprArray[index];
-                    // Handle "NA" values
-                    expressionMap[cellType] = (exprVal === "NA" || exprVal === "na") ? 0 : parseFloat(exprVal) || 0;
+                // Attach expression value directly to each cell point
+                workingData.forEach((point, index) => {
+                    const val = exprArray[index];
+                    point._tempExpr = (val === "NA" || val === "na") ? 0 : parseFloat(val) || 0;
                 });
+            } else {
+                // Gene not found in Kidney dataset
+                workingData.forEach(p => p._tempExpr = 0);
             }
         } else {
-            // LUNG: Expression is in the cache (loaded by index.html)
-            expressionMap = window.CiliAI.cellDataCache[gene] || {};
+            // LUNG: Expression is in the cache keyed by Cell Type (Pre-calculated averages)
+            const expressionMap = window.CiliAI.cellDataCache[gene] || {};
+            workingData.forEach(point => {
+                // Handle potentially array-wrapped cell types
+                const cType = Array.isArray(point.cell_type) ? point.cell_type[0] : point.cell_type;
+                point._tempExpr = expressionMap[cType] || 0;
+            });
         }
     }
 
-    // 4. Prepare Plot Data
+    // 4. Shuffle and Slice (Optimization)
     const sampleSize = 15000; 
-    const sourceData = umapData.length > sampleSize ? [...umapData].sort(() => 0.5 - Math.random()).slice(0, sampleSize) : umapData;
+    const sourceData = workingData.length > sampleSize ? workingData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) : workingData;
     
     const x = [], y = [], color = [], text = [], size = [];
     let maxExpr = 0;
@@ -3705,11 +3724,10 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         x.push(point.x);
         y.push(point.y);
         
-        // Extract cell type (handle array format in kidney data)
         const cellType = Array.isArray(point.cell_type) ? point.cell_type[0] : point.cell_type;
-        
-        // Bold Hover Text (Size 24) - Keep same style as Lung
-        const exprVal = expressionMap[cellType] || 0;
+        const exprVal = point._tempExpr || 0; // Use the value we attached earlier
+
+        // Bold Hover Text (Size 24)
         text.push(`<span style="font-size:24px; font-weight:bold;">${cellType}</span><br>Expr: ${exprVal.toFixed(2)}`);
 
         if (isClusterView) {
@@ -3733,11 +3751,10 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     if (!isClusterView) {
         trace.marker.color = color;
         // USE DATASET COLOR SCALE (Red for Lung, Blue for Kidney)
-        // Default to blue scale for kidney if not defined
         trace.marker.colorscale = dataset.colorScale || 
             (datasetKey === 'kidney' ? 
-                [[0, '#EBF8FF'], [0.1, '#93C5FD'], [0.5, '#3B82F6'], [1, '#1E3A8A']] : // Blue scale for kidney
-                [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] // Red scale for lung
+                [[0, '#EBF8FF'], [0.1, '#93C5FD'], [0.5, '#3B82F6'], [1, '#1E3A8A']] : // Blue scale
+                [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] // Red scale
             );
         trace.marker.cmin = 0;
         trace.marker.cmax = scaleMax;
@@ -3758,6 +3775,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     // 5. Add Controls (Switch & Close)
     const parent = plotDiv.parentElement;
     if (parent) {
+        // Clear ANY existing plot buttons first to prevent stacking
         parent.querySelectorAll('.ciliai-plot-btn').forEach(b => b.remove());
 
         const closeBtn = document.createElement('button');
@@ -3765,6 +3783,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         closeBtn.textContent = '✕ Close';
         closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; width: auto; z-index: 10; background: white;';
         closeBtn.onclick = () => { 
+            if(window.Plotly) Plotly.purge(plotDivId); // Purge on close too
             if(window.generateAndInjectSVG) window.generateAndInjectSVG(); 
             else plotDiv.innerHTML = ''; 
         };
@@ -3772,6 +3791,8 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
         const switchBtn = document.createElement('button');
         switchBtn.className = 'ciliai-button ciliai-plot-btn';
+        
+        // Toggle Logic
         const nextDataset = datasetKey === 'lung' ? 'kidney' : 'lung';
         const nextName = window.CiliAI.datasets[nextDataset] ? window.CiliAI.datasets[nextDataset].name.split(' ')[1] : 'Dataset';
         
@@ -3779,6 +3800,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         switchBtn.style.cssText = `position: absolute; top: 10px; left: 10px; width: auto; z-index: 10; background: white; color: ${nextDataset === 'lung' ? '#c53030' : '#2b6cb0'}; border: 1px solid #ccc;`;
         switchBtn.onclick = () => {
             window.CiliAI.activeDataset = nextDataset;
+            // Recursively call render to redraw with new dataset
             window.renderUMAPPlot(displayName, targetGenes, zoomToCellType); 
         };
         parent.appendChild(switchBtn);
