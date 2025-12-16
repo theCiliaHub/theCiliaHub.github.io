@@ -3040,10 +3040,7 @@ async function handleAIQuery(query) {
         let htmlResult = null;
         let match;
         
-        // 1. Greetings / Terminology (Added 
-
-[Image of X]
- tags)
+        // 1. Greetings / Terminology
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
         const terminologyQueries = {
     "what is a cilium": "A cilium is a microtubule-based organelle extending from the cell surface. Primary cilia sense extracellular signals; motile cilia generate fluid flow. (Rosenbaum & Witman 2002)",
