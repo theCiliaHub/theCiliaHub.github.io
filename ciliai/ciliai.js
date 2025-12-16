@@ -197,6 +197,18 @@ function ensureArray(value) {
     return [value];
 }
 
+
+function extractGenes(query) {
+  const tokens = query.toUpperCase().split(/[^A-Z0-9]/);
+  return tokens.filter(t =>
+    t.length >= 3 &&
+    t.length <= 10 &&
+    /^[A-Z0-9]+$/.test(t) &&
+    CILIA_GENE_SET.has(t)
+  );
+}
+
+
 /**
  * Setup page event listeners
  */
@@ -2586,6 +2598,12 @@ function flexibleIntentParser(query) {
  *************************************************/
 
 /*************************************************
+ * AXIS-BASED QUERY ENGINE FOR CiliAI
+ * 1. extractAxes(query)
+ * 2. set algebra resolver
+ *************************************************/
+
+/*************************************************
  * 1. AXIS EXTRACTION
  *************************************************/
 
@@ -2703,23 +2721,54 @@ function resolveByAlgebra(axes) {
  * 3. HOW handleAIQuery SHOULD USE THIS
  *************************************************/
 
-/*
-const axes = extractAxes(query);
+/*************************************************
+ * 3. EXPRESSION HANDLER (MISSING PIECE)
+ *************************************************/
 
-// 1. Phylogeny hard route
-if (axes.phylogeny) return routePhylogenyAnalysis(query);
+function handleExpressionQuery({ gene, tissue, source }) {
+  if (!gene || !CILIA_GENE_SET.has(gene)) {
+    return chatRespond(`Gene Not Found: ${gene}`);
+  }
 
-// 2. Expression plots
-if (axes.expression && extractMultipleGenes(query).length) {
-  return handleExpressionQuery(query);
+  chatRespond(`Showing expression of ${gene} in ${tissue} ${source}.`);
+
+  // visualization hook (already exists in your app)
+  return plotUMAPExpression({
+    gene,
+    tissue,
+    source
+  });
 }
 
-// 3. Simple disease or complex
+
+/*************************************************
+ * 4. PATCHED handleAIQuery FLOW (ORDER MATTERS)
+ *************************************************/
+
+/*
+const axes = extractAxes(query);
+const genes = extractGenes(query);
+
+// 1. Phylogeny has absolute priority
+if (axes.phylogeny) {
+  return routePhylogenyAnalysis(query);
+}
+
+// 2. Expression queries (FIXED)
+if (axes.expression && genes.length === 1) {
+  return handleExpressionQuery({
+    gene: genes[0],
+    tissue: axes.expression,
+    source: 'scRNA-seq'
+  });
+}
+
+// 3. Simple single-axis queries
 if ((axes.disease || axes.complex) && countActiveAxes(axes) === 1) {
   return listSimpleAxis(axes);
 }
 
-// 4. Multi-axis algebra
+// 4. Multi-axis algebra queries
 if (countActiveAxes(axes) >= 2) {
   const genes = resolveByAlgebra(axes);
   return showDataInLeftPanel('Filtered Gene Set', genes);
@@ -3231,7 +3280,18 @@ async function handleAIQuery(query) {
     
     if (!query) return;
     const qLower = query.toLowerCase().trim();
-    
+    const axes = extractAxes(query);
+    const genes = extractGenes(query);
+
+    /* Expression queries MUST check genes first */
+    if (axes.expression && genes.length === 1) {
+  return handleExpressionQuery({
+    gene: genes[0],
+    tissue: axes.expression,
+    source: 'scRNA-seq'
+  });
+}
+
     log(`[Query Handler] Processing: "${query}"`);
     
     try {
