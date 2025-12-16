@@ -2855,7 +2855,7 @@ function runCiliAIRegressionTests() {
 }
 
 // Expose for manual execution
-a window.runCiliAIRegressionTests = runCiliAIRegressionTests;
+window.runCiliAIRegressionTests = runCiliAIRegressionTests;
 
 
 
