@@ -3283,6 +3283,7 @@ async function handleAIQuery(query) {
   });
 }
 
+
     log(`[Query Handler] Processing: "${query}"`);
     
     try {
@@ -3319,64 +3320,6 @@ async function handleAIQuery(query) {
             return;
         }
         
-        // ============================================
-        // 2. UMAP & GENE EXPRESSION QUERIES
-        // ============================================
-        if (htmlResult === null) {
-            const umapPatterns = [
-                /(?:display|show|plot|visualize).+expression.+of\s+([a-z0-9\-]+)/i,
-                /(?:expression|umap|scrna).+(?:for|of)\s+([a-z0-9\-]+)/i,
-                /(?:where|which cell types?).+is\s+([a-z0-9\-]+).+expressed/i,
-                /(?:check|see).+expression.+of\s+([a-z0-9\-]+)/i,
-                /(?:is|are)\s+([a-z0-9\-]+).+(?:active|expressed).+(?:in|at)/i,
-                /^show\s+expression\s+(?:of|for)\s+([a-z0-9\-]+)$/i,
-                /^plot\s+umap\s+(?:for|of)\s+([a-z0-9\-]+)$/i,
-                /^display\s+([a-z0-9\-]+)\s+on\s+umap$/i
-            ];
-            
-            for (const pattern of umapPatterns) {
-                match = qLower.match(pattern);
-                if (match) {
-                    const geneSymbol = match[1].toUpperCase();
-                    
-                    // Determine dataset
-                    let dataset = 'lung';
-                    if (qLower.includes('kidney')) {
-                        dataset = 'kidney';
-                        window.CiliAI.activeDataset = 'kidney';
-                    }
-                    
-                    // Check if gene exists
-                    if (!window.CiliAI.lookups.geneMap?.[geneSymbol]) {
-                        htmlResult = `<div class="ai-result-card">
-                            <p>Gene <strong>${geneSymbol}</strong> not found in the database.</p>
-                        </div>`;
-                    } else {
-                        // Render UMAP
-                        await renderUMAPPlot(geneSymbol, [geneSymbol]);
-                        
-                        const dsName = dataset === 'lung' ? 'Lung' : 'Kidney';
-                        const otherDataset = dataset === 'lung' ? 'kidney' : 'lung';
-                        const otherDsName = dataset === 'lung' ? 'Kidney' : 'Lung';
-                        
-                        htmlResult = `<div class="ai-result-card">
-                            <p>Displaying <strong>${dsName}</strong> scRNA-seq UMAP for <strong>${geneSymbol}</strong>.</p>
-                            <div style="margin-top: 10px; display: flex; gap: 8px;">
-                                <button class="ciliai-button" style="width:auto; margin:0; background:#4a5568;" 
-                                    onclick="window.CiliAI.activeDataset='${otherDataset}'; 
-                                             window.renderUMAPPlot('${geneSymbol}', ['${geneSymbol}']); 
-                                             window.addChatMessage('Switched to ${otherDsName} data.', true);">
-                                    🔄 Switch to ${otherDsName}
-                                </button>
-                                <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" 
-                                   style="margin-left:5px; font-weight:600;">⬇️ CSV</a>
-                            </div>
-                        </div>`;
-                    }
-                    break;
-                }
-            }
-        }
         
         // ============================================
         // 3. DISEASE GENE QUERIES
