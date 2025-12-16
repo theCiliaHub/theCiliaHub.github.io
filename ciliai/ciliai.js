@@ -1890,9 +1890,7 @@ function renderNeversPhylogenyHeatmap(genes) {
     };
 }
 
-//**
- * Render Li phylogeny heatmap
- */
+
 function renderLiPhylogenyHeatmap(genes) {
     const liData = window.liPhylogenyCache;
     if (!liData) {
@@ -2586,11 +2584,6 @@ function flexibleIntentParser(query) {
 }
 
 
-/*************************************************
- * AXIS-BASED QUERY ENGINE FOR CiliAI
- * 1. extractAxes(query)
- * 2. set algebra resolver
- *************************************************/
 
 /*************************************************
  * AXIS-BASED QUERY ENGINE FOR CiliAI
