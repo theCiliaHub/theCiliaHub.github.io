@@ -1314,11 +1314,6 @@ async function ensurePhylogenyDataLoaded() {
     }
 }
 
-
-//**////
- //* Route phylogeny analysis
- //* Fixes: Ensures proper complex gene extraction (Query: "Evolution of IFT complex genes")
- *///
 async function routePhylogenyAnalysis(query) {
     const qLower = query.toLowerCase();
     const dataLoaded = await ensurePhylogenyDataLoaded();
