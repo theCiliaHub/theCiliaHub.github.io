@@ -199,14 +199,17 @@ function ensureArray(value) {
 
 
 function extractGenes(query) {
+  if (!window.CILIA_GENE_SET) return [];
+
   const tokens = query.toUpperCase().split(/[^A-Z0-9]/);
   return tokens.filter(t =>
     t.length >= 3 &&
     t.length <= 10 &&
     /^[A-Z0-9]+$/.test(t) &&
-    CILIA_GENE_SET.has(t)
+    window.CILIA_GENE_SET.has(t)
   );
 }
+
 
 
 /**
