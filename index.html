@@ -353,18 +353,8 @@
                 });
                 
                 window.CiliAI.ready = true;
-            window.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
-
-            // ✅ CANONICAL gene set for NLP + expression + UMAP
-                window.CILIA_GENE_SET = new Set(
-              window.CiliAI.masterData
-            .map(g => g.Gene)
-            .filter(Boolean)
-                .map(g => g.toUpperCase())
-            );
-
-            window.log(`CILIA_GENE_SET initialized (${window.CILIA_GENE_SET.size} genes).`);
-            return true;
+                window.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
+                return true;
 
             } catch (err) {
                 console.error("Failed to load CiliAI databases:", err);
