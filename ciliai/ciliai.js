@@ -3146,6 +3146,114 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     });
 };
 
+// Helper: Get scRNA expression map for a gene (safe)
+function getScRNAExpression(geneSymbol) {
+    const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
+    return gene?.expression?.scRNA || {};
+}
+
+// Helper: List cell types with expression > 0
+function getExpressedCellTypes(exprMap) {
+    return Object.entries(exprMap)
+        .filter(([_, tpm]) => tpm > 0)
+        .map(([cellType]) => cellType)
+        .sort();
+}
+
+// Helper: Is gene restricted to ciliary cells?
+function isCiliaRestricted(exprMap) {
+    const expressed = getExpressedCellTypes(exprMap);
+    if (expressed.length === 0) return false;
+    return expressed.every(ct => ct.toLowerCase().includes('ciliated'));
+}
+
+// Helper: Is gene specific to multiciliated cells?
+function isSpecificToMulticiliated(exprMap) {
+    const expressed = getExpressedCellTypes(exprMap);
+    return expressed.length === 1 && expressed[0].toLowerCase().includes('multiciliated');
+}
+
+// NEW: Generalized Cell-Type Question Handler
+window.handleCellTypeQuestion = function(query) {
+    const qLower = query.toLowerCase().trim();
+
+    // Extract gene using robust extractor
+    const genes = extractMultipleGenes(query);
+    if (genes.length === 0) return null; // Not a gene question
+    const geneSymbol = genes[0]; // Use first gene (or enhance for multi-gene later)
+
+    const exprMap = getScRNAExpression(geneSymbol);
+    if (Object.keys(exprMap).length === 0) {
+        return `<div class="ai-result-card">
+            <p>No scRNA-seq expression data available for <strong>${geneSymbol}</strong> in the current dataset.</p>
+        </div>`;
+    }
+
+    const expressedTypes = getExpressedCellTypes(exprMap);
+    const maxTPM = Math.max(...Object.values(exprMap), 0);
+    const highestCellTypes = Object.entries(exprMap)
+        .filter(([_, tpm]) => Math.abs(tpm - maxTPM) < 0.01)
+        .map(([ct]) => ct);
+
+    let html = `<div class="ai-result-card"><h4>${geneSymbol} Expression Profile</h4>`;
+
+    // 1. Which cell types express GENE?
+    if (qLower.includes('which cell types express') || qLower.includes('cell types express')) {
+        if (expressedTypes.length === 0) {
+            html += `<p><strong>${geneSymbol}</strong> shows no detectable expression in any lung cell type.</p>`;
+        } else {
+            html += `<p>Expressed in: <strong>${expressedTypes.join(', ')}</strong></p>`;
+        }
+    }
+
+    // 2. Is GENE active in ciliated cells?
+    else if (qLower.includes('active in ciliated') || qLower.includes('expressed in ciliated')) {
+        const tpm = exprMap['ciliated cell'] || 0;
+        const active = tpm > 0;
+        html += `<p>${active ? 'Yes' : 'No'}, ${geneSymbol} is ${active ? '' : '<strong>not</strong>'} active in ciliated cells (${tpm.toFixed(2)} TPM).</p>`;
+    }
+
+    // 3. Cilia-restricted expression?
+    else if (qLower.includes('cilia-restricted') || qLower.includes('ciliary-restricted') || qLower.includes('cilia restricted')) {
+        const restricted = isCiliaRestricted(exprMap);
+        html += `<p>${restricted ? 'Yes' : 'No'}, ${geneSymbol} ${restricted ? 'shows' : 'does <strong>not</strong> show'} cilia-restricted expression.</p>`;
+        if (!restricted && expressedTypes.length > 0) {
+            html += `<p>Highest in: <strong>${highestCellTypes.join(', ')}</strong> (${maxTPM.toFixed(2)} TPM)</p>`;
+        }
+    }
+
+    // 4. Specific to multiciliated cells?
+    else if (qLower.includes('specific to multiciliated') || qLower.includes('multiciliated cells')) {
+        const specific = isSpecificToMulticiliated(exprMap);
+        html += `<p>${specific ? 'Yes' : 'No'}, ${geneSymbol} is ${specific ? '' : '<strong>not</strong>'} specific to multiciliated cells.</p>`;
+        if (specific) {
+            html += `<p>Detected only in multiciliated cells.</p>`;
+        }
+    }
+
+    // 5. TPM in specific cell type (e.g., basal cell)
+    else if (qLower.match(/tpm of .* in .* cell/)) {
+        const match = qLower.match(/in (basal|ciliated|club|goblet|neuroendocrine|alveolar.*|secretory) cell/);
+        if (match) {
+            const cellType = match[1] === 'alveolar' ? 'pulmonary alveolar type 2 cell' : `${match[1]} cell`;
+            const normalizedKey = Object.keys(exprMap).find(k => k.toLowerCase().includes(cellType)) || cellType;
+            const tpm = exprMap[normalizedKey] || 0;
+            html += `<p><strong>${tpm.toFixed(2)} TPM</strong> in ${normalizedKey}.</p>`;
+        }
+    }
+
+    // Default: Show summary if pattern matches but no specific sub-question
+    else if (qLower.includes(geneSymbol.toLowerCase()) && (
+        qLower.includes('cell') || qLower.includes('expression') || qLower.includes('tpm')
+    )) {
+        html += `<p>Expressed in: <strong>${expressedTypes.join(', ')}</strong></p>`;
+        html += `<p>Highest: <strong>${highestCellTypes.join(', ')}</strong> (${maxTPM.toFixed(2)} TPM)</p>`;
+    }
+
+    html += `</div>`;
+    return html;
+};
+
 
 /**
  * 2. UPDATED QUERY HANDLER
@@ -3153,10 +3261,27 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
  */
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
+    
     if (!chatWindow) return;
 
     if (!query) return;
     const qLower = query.toLowerCase().trim();
+
+    // === NEW: Generalized Cell-Type Questions (PRIORITY) ===
+    if (qLower.includes('cell') && (
+        qLower.includes('express') || 
+        qLower.includes('active in') || 
+        qLower.includes('cilia-restricted') || 
+        qLower.includes('multiciliated') || 
+        qLower.includes('tpm') || 
+        qLower.includes('expression in')
+    )) {
+        const result = window.handleCellTypeQuestion(query);
+        if (result) {
+            window.addChatMessage(result, false);
+            return;
+        }
+    }
 
     if (window.log) window.log(`Routing query: ${query}`);
 
@@ -3439,77 +3564,7 @@ window.handleAIQuery = async function (query) {
             window.CiliAI.lastQueryContext = { type: 'top_500_ciliary' };
             htmlResult = `<div class="ai-result-card"><p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p><p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p></div>`;
         }
-        // --- 1. MKS1 expression ---
-    if (qLower.includes('which cell types express mks1')) {
-        const gene = window.CiliAI.lookups.geneMap['MKS1'];
-        const expr = gene?.expression?.scRNA || {};
-        const expressed = Object.entries(expr)
-            .filter(([type, tpm]) => tpm > 0)
-            .map(([type]) => type)
-            .sort();
-
-        if (expressed.length === 0) {
-            htmlResult = `<div class="ai-result-card">MKS1 shows no detectable expression in the lung scRNA-seq dataset.</div>`;
-        } else {
-            htmlResult = `<div class="ai-result-card">
-                <h4>MKS1 Expression in Lung Cell Types</h4>
-                <p>Detected in: <strong>${expressed.join(', ')}</strong></p>
-            </div>`;
-        }
-    }
-
-    // --- 2. RPGRIP1L in ciliated cells ---
-    else if (qLower.includes('rpgrip1l') && qLower.includes('ciliated cells')) {
-        const tpm = getTPMInCellType('RPGRIP1L', 'ciliated cell');
-        const isActive = tpm > 0;
-        htmlResult = `<div class="ai-result-card">
-            <h4>RPGRIP1L in Ciliated Cells</h4>
-            <p>Yes, RPGRIP1L is <strong>active</strong> in ciliated cells (${tpm.toFixed(2)} TPM).</p>
-        </div>`;
-    }
-
-    // --- 3. TTC21B cilia-restricted expression (FIXED) ---
-    else if (qLower.includes('ttc21b') && (qLower.includes('cilia-restricted') || qLower.includes('ciliary restricted'))) {
-        const gene = window.CiliAI.lookups.geneMap['TTC21B'];
-        const expr = gene?.expression?.scRNA || {};
-        const maxTPM = Math.max(...Object.values(expr), 0);
-        const highestCellType = Object.entries(expr)
-            .filter(([_, tpm]) => tpm === maxTPM)
-            .map(([type]) => type)[0] || 'unknown';
-
-        htmlResult = `<div class="ai-result-card">
-            <h4>TTC21B Expression Pattern</h4>
-            <p>TTC21B is <strong>not cilia-restricted</strong>. It is broadly expressed across many cell types.</p>
-            <p>Highest expression: <strong>${highestCellType}</strong> (${maxTPM.toFixed(2)} TPM)</p>
-        </div>`;
-    }
-
-    // --- 4. FOXJ1 specificity to multiciliated cells ---
-    else if (qLower.includes('foxj1') && qLower.includes('multiciliated')) {
-        const gene = window.CiliAI.lookups.geneMap['FOXJ1'];
-        const expr = gene?.expression?.scRNA || {};
-        const expressedTypes = Object.entries(expr)
-            .filter(([_, tpm]) => tpm > 0)
-            .map(([type]) => type);
-
-        const isSpecific = expressedTypes.length === 1 && expressedTypes[0].toLowerCase().includes('multiciliated');
-
-        htmlResult = `<div class="ai-result-card">
-            <h4>FOXJ1 Specificity</h4>
-            <p>Yes, FOXJ1 is <strong>specific to multiciliated cells</strong> in the lung dataset.</p>
-            <p>Expression detected only in: <strong>multiciliated cells</strong></p>
-        </div>`;
-    }
-
-    // --- 5. AAAS TPM in basal cell ---
-    else if (qLower.includes('aaas') && qLower.includes('basal cell')) {
-        const tpm = getTPMInCellType('AAAS', 'basal cell');
-        htmlResult = `<div class="ai-result-card">
-            <h4>AAAS Expression in Basal Cells</h4>
-            <p><strong>${tpm.toFixed(2)} TPM</strong> in basal cells.</p>
-        </div>`;
-    } 
-
+   
         // Intent 20: Fallback
         else if (htmlResult === null) {
             const intent = window.flexibleIntentParser(query);
