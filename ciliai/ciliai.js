@@ -7,7 +7,7 @@
 // 5. Ensure these are exposed globally
 window.extractMultipleGenes = extractMultipleGenes;
 window.getTPMInCellType = getTPMInCellType;
-window.handleAIQuery = handleAIQuery;
+
 
 // 6. Auto-run the fixed router
 console.log("CiliAI v7.2 – Cell-Type Questions FIXED & Fully Supported");
