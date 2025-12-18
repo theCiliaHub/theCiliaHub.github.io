@@ -3530,30 +3530,19 @@ window.handleAIQuery = async function (query) {
         }
 
         // === D. C. elegans orthologs — now shows directly on "yes" ===
-        if ((qLower === 'yes' || qLower === 'y' || qLower === 'show' || qLower === 'list') && 
-            lastQueryContext && lastQueryContext.type === 'list_followup' && 
-            qLower.includes('ortholog')) {
+         // === SAFE "yes" HANDLER FOR LIST FOLLOW-UP ===
+        if ((qLower === 'yes' || qLower === 'y' || qLower === 'sure' || qLower === 'show' || qLower === 'list') && 
+            lastQueryContext && lastQueryContext.type === 'list_followup') {
 
-            const geneList = lastQueryContext.data.map(o => o.gene);
-            const orthologs = geneList
-                .map(g => {
-                    const geneData = window.CiliAI.lookups.geneMap[g];
-                    const ce = geneData?.Ortholog_C_elegans;
-                    return ce && ce !== 'N/A' && ce !== '' ? { human: g, worm: ce } : null;
-                })
-                .filter(Boolean);
-
-            if (orthologs.length === 0) {
-                htmlResult = `<div class="ai-result-card"><p>No C. elegans orthologs found for these genes.</p></div>`;
+            if (lastQueryContext.data && lastQueryContext.data.length > 0) {
+                window.showDataInLeftPanel(lastQueryContext.term || 'Gene List', lastQueryContext.data);
+                window.addChatMessage(`Displaying <strong>${lastQueryContext.term}</strong> (${lastQueryContext.data.length} genes) in the main panel.`, false);
             } else {
-                const listHtml = orthologs.map(o => `<li><strong>${o.human}</strong> → <em>${o.worm}</em></li>`).join('');
-                htmlResult = `<div class="ai-result-card">
-                    <h4>C. elegans Orthologs (${orthologs.length} found)</h4>
-                    <ul>${listHtml}</ul>
-                </div>`;
+                window.addChatMessage(`No genes to display for <strong>${lastQueryContext.term}</strong>.`, false);
             }
-            window.addChatMessage(htmlResult, false);
-            lastQueryContext = { type: null }; // Clear context
+
+            // Clear context to prevent reuse
+            lastQueryContext = { type: null, data: [], term: null };
             return;
         }
 
@@ -3680,38 +3669,65 @@ window.handleAIQuery = async function (query) {
             }
         }
                 // === G. Disease implicated by a gene (e.g., ARL13B → Joubert Syndrome) ===
-        if (qLower.includes('disease') && qLower.includes('implicated') || 
-            qLower.includes('disease') && qLower.includes('associated') && qLower.includes('with')) {
+               // === G. REVERSE: Disease(s) implicated by a gene (e.g., ARL13B → Joubert Syndrome) ===
+        if ((qLower.includes('disease') || qLower.includes('ciliopathy')) && 
+            (qLower.includes('implicated') || qLower.includes('associated') || qLower.includes('linked') || qLower.includes('cause')) && 
+            qLower.includes('with')) {
 
             const genes = extractMultipleGenes(query);
-            if (genes.length > 0) {
-                const geneSymbol = genes[0];
-                const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+            if (genes.length === 0) return; // not a gene query
 
-                if (!geneData || !geneData.Ciliopathies) {
-                    htmlResult = `<div class="ai-result-card">
-                        <p><strong>${geneSymbol}</strong> is not directly linked to any ciliopathy in the current database.</p>
-                    </div>`;
-                } else {
-                    const diseases = Array.isArray(geneData.Ciliopathies) 
-                        ? geneData.Ciliopathies 
-                        : [geneData.Ciliopathies];
+            const geneSymbol = genes[0];
+            const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
 
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>Disease Association: ${geneSymbol}</h4>
-                        <p><strong>${geneSymbol}</strong> is implicated in:</p>
-                        <ul>
-                            ${diseases.map(d => `<li><strong>${d}</strong></li>`).join('')}
-                        </ul>
-                        <p>Most commonly associated with <strong>Joubert Syndrome</strong> (classic ciliary transition zone defect).</p>
-                    </div>`;
-                }
-
+            if (!geneData) {
+                htmlResult = `<div class="ai-result-card">
+                    <p>Gene <strong>${geneSymbol}</strong> not found in the database.</p>
+                </div>`;
                 window.addChatMessage(htmlResult, false);
                 return;
             }
-        }
 
+            // Search in byCiliopathy lookup (reverse search)
+            let associatedDiseases = [];
+            Object.keys(window.CiliAI.lookups.byCiliopathy).forEach(normKey => {
+                const diseaseGenes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                if (diseaseGenes.includes(geneSymbol)) {
+                    // Find original disease name from classificationMap
+                    let foundName = normKey;
+                    Object.values(classificationMap).flat().forEach(d => {
+                        if (normalizeTerm(d) === normKey) foundName = d;
+                    });
+                    associatedDiseases.push(foundName);
+                }
+            });
+
+            // Fallback to direct field if exists
+            if (associatedDiseases.length === 0 && geneData.Ciliopathies) {
+                associatedDiseases = Array.isArray(geneData.Ciliopathies) 
+                    ? geneData.Ciliopathies 
+                    : [geneData.Ciliopathies];
+            }
+
+            if (associatedDiseases.length === 0) {
+                htmlResult = `<div class="ai-result-card">
+                    <p><strong>${geneSymbol}</strong> is a known ciliary gene but not yet directly linked to a specific ciliopathy in the current database.</p>
+                    <p>It localizes to the <strong>${geneData.Localization || 'cilium'}</strong> and is highly conserved.</p>
+                </div>`;
+            } else {
+                htmlResult = `<div class="ai-result-card">
+                    <h4>Disease Associations: ${geneSymbol}</h4>
+                    <p><strong>${geneSymbol}</strong> is implicated in the following ciliopathies:</p>
+                    <ul>
+                        ${associatedDiseases.map(d => `<li><strong>${d}</strong></li>`).join('')}
+                    </ul>
+                    <p>These are typically <strong>transition zone</strong> disorders with overlapping phenotypes (brain, retina, kidney).</p>
+                </div>`;
+            }
+
+            window.addChatMessage(htmlResult, false);
+            return;
+        }
 
         
         // Intent 1: Greetings
