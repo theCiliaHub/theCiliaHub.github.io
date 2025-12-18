@@ -3568,43 +3568,59 @@ window.handleAIQuery = async function (query) {
             );
         }
 // === E. Total unique genes across ciliopathies (Primary + Motile + Atypical only) ===
-        if (qLower.includes('how many') || qLower.includes('number of') || qLower.includes('total')) {
-            if (qLower.includes('unique') && (qLower.includes('genes') || qLower.includes('gene')) && 
-                (qLower.includes('ciliopathies') || qLower.includes('ciliopathy'))) {
+ // === E. TOTAL UNIQUE GENES IN CILIOPATHIES (ALL COMMON PHRASINGS) ===
+        const ciliopathyQueryPatterns = [
+            'how many unique genes.*ciliopathies',
+            'how many unique.*ciliopathy genes',
+            'how many.*unique genes.*ciliopathies',
+            'total unique genes.*ciliopathies',
+            'total.*unique.*ciliopathy genes',
+            'number of unique genes.*ciliopathies',
+            'unique genes in ciliopathies',
+            'ciliopathies unique genes count',
+            'how many genes are in ciliopathies'  // even without "unique" — still give unique count
+        ];
 
-                const includedClasses = [
-                    'Primary Ciliopathies',
-                    'Motile Ciliopathies',
-                    'Atypical Ciliopathies'
-                ];
+        const matchesCiliopathyCount = ciliopathyQueryPatterns.some(pattern => 
+            new RegExp(pattern, 'i').test(query)
+        );
 
-                let allUniqueGenes = new Set();
+        if (matchesCiliopathyCount || 
+            (qLower.includes('how many') && qLower.includes('unique') && qLower.includes('genes') && qLower.includes('ciliopathies'))) {
 
-                includedClasses.forEach(className => {
-                    const diseases = classificationMap[className] || [];
-                    diseases.forEach(disease => {
-                        const normKey = normalizeTerm(disease);
-                        const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
-                        genes.forEach(g => allUniqueGenes.add(g));
-                    });
+            const includedClasses = [
+                'Primary Ciliopathies',
+                'Motile Ciliopathies',
+                'Atypical Ciliopathies'
+            ];
+
+            let allUniqueGenes = new Set();
+
+            includedClasses.forEach(className => {
+                const diseases = classificationMap[className] || [];
+                diseases.forEach(disease => {
+                    const normKey = normalizeTerm(disease);
+                    const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                    genes.forEach(g => allUniqueGenes.add(g));
                 });
+            });
 
-                const totalCount = allUniqueGenes.size;
+            const totalCount = allUniqueGenes.size;
 
-                htmlResult = `<div class="ai-result-card">
-                    <h4>Total Unique Genes in Ciliopathies</h4>
-                    <p>Across <strong>Primary, Motile, and Atypical Ciliopathies</strong>:</p>
-                    <p style="font-size:18px; font-weight:bold; color:#2b6cb0; margin:15px 0;">
-                        <strong>${totalCount}</strong> unique genes
-                    </p>
-                    <p>This includes all known causative and associated genes from ${includedClasses.join(', ')}.</p>
-                    <p>(Secondary diseases excluded from this count)</p>
-                </div>`;
+            htmlResult = `<div class="ai-result-card">
+                <h4>Total Unique Genes in Ciliopathies</h4>
+                <p>Across <strong>Primary, Motile, and Atypical Ciliopathies</strong>:</p>
+                <p style="font-size:22px; font-weight:bold; color:#2b6cb0; margin:20px 0;">
+                    <strong>${totalCount}</strong> unique genes
+                </p>
+                <p>This count includes all known causative and associated genes from the three core ciliopathy classes.</p>
+                <p><em>(Secondary diseases are excluded from this total.)</em></p>
+            </div>`;
 
-                window.addChatMessage(htmlResult, false);
-                return;
-            }
+            window.addChatMessage(htmlResult, false);
+            return;
         }
+        
         // Intent 1: Greetings
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
         const terminologyQueries = window.terminologyQueries || {};
