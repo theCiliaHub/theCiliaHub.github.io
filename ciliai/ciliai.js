@@ -3560,6 +3560,45 @@ window.handleAIQuery = async function (query) {
                 );
             }
         }
+                // === ORTHOLOG QUESTIONS (Mouse, Drosophila, C. elegans) ===
+        if (qLower.includes('ortholog') || qLower.includes('orthologue')) {
+            const genes = extractMultipleGenes(query);
+            if (genes.length === 0) {
+                window.addChatMessage(`<div class="ai-result-card"><p>Please specify a gene (e.g., "ortholog of ARL13B").</p></div>`, false);
+                return;
+            }
+
+            const geneSymbol = genes[0];
+            const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+
+            if (!geneData) {
+                window.addChatMessage(`<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in database.</p></div>`, false);
+                return;
+            }
+
+            const mouse = geneData.Ortholog_Mouse || 'Not reported';
+            const drosophila = geneData.Ortholog_Drosophila || 'Not reported';
+            const celegans = geneData.Ortholog_C_elegans || 'Not reported';
+
+            let response = `<div class="ai-result-card">
+                <h4>Orthologs of ${geneSymbol}</h4>
+                <ul style="margin: 10px 0;">`;
+
+            if (qLower.includes('mouse') || qLower.includes('all')) {
+                response += `<li><strong>Mouse:</strong> ${mouse}</li>`;
+            }
+            if (qLower.includes('drosophila') || qLower.includes('fly') || qLower.includes('all')) {
+                response += `<li><strong>Drosophila:</strong> ${drosophila}</li>`;
+            }
+            if (qLower.includes('c. elegans') || qLower.includes('worm') || qLower.includes('all')) {
+                response += `<li><strong>C. elegans:</strong> ${celegans}</li>`;
+            }
+
+            response += `</ul></div>`;
+
+            window.addChatMessage(response, false);
+            return;
+        }
 // === E. Total unique genes across ciliopathies (Primary + Motile + Atypical only) ===
  // === E. TOTAL UNIQUE GENES IN CILIOPATHIES (ALL COMMON PHRASINGS) ===
         const ciliopathyQueryPatterns = [
@@ -3729,7 +3768,30 @@ window.handleAIQuery = async function (query) {
             return;
         }
 
-        
+                // === Mouse Knockout Phenotype Handler ===
+        if (qLower.includes('mouse') && (qLower.includes('knockout') || qLower.includes('phenotype')) && qLower.includes('of')) {
+            const genes = extractMultipleGenes(query);
+            if (genes.length > 0) {
+                const gene = genes[0];
+                const data = window.CiliAI.lookups.geneMap[gene];
+
+                if (data && (data.mouse_phenotype || data.mouse_ciliopathy_phenotype)) {
+                    const pheno = data.mouse_phenotype || 'Ciliopathy-related phenotype observed';
+                    const model = data.Ortholog_Mouse ? ` (${data.Ortholog_Mouse} mouse model)` : '';
+                    htmlResult = `<div class="ai-result-card">
+                        <h4>Mouse Knockout Phenotype: ${gene}${model}</h4>
+                        <p><strong>Phenotype:</strong> ${pheno}</p>
+                        ${data.mouse_ciliopathy_phenotype ? '<p>Known ciliopathy model.</p>' : ''}
+                    </div>`;
+                } else {
+                    htmlResult = `<div class="ai-result-card">
+                        <p>No mouse knockout phenotype data available for <strong>${gene}</strong> in current database.</p>
+                    </div>`;
+                }
+                window.addChatMessage(htmlResult, false);
+                return;
+            }
+        }
         // Intent 1: Greetings
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
         const terminologyQueries = window.terminologyQueries || {};
