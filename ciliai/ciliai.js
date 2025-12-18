@@ -3384,48 +3384,126 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-              // === 3. FULLY FIXED CILIOPATHY CLASSIFICATION, OVERLAP & ORTHOLOG HANDLER ===
-        const classificationMap = getDiseaseClassificationMap();
-
-        // Extended keyword mapping (includes common variations)
-        const classificationKeywords = {
-            'primary ciliopathies': 'Primary Ciliopathies',
-            'primary': 'Primary Ciliopathies',
-            'motile ciliopathies': 'Motile Ciliopathies',
-            'motile': 'Motile Ciliopathies',
-            'secondary diseases': 'Secondary Diseases',
-            'secondary': 'Secondary Diseases',
-            'atypical ciliopathies': 'Atypical Ciliopathies',
-            'atypical': 'Atypical Ciliopathies'
+        // === 3. CILIOPATHY / DISEASE QUERIES ===
+        const diseaseKeywords = {
+            'joubert syndrome': 'Joubert Syndrome',
+            'joubert': 'Joubert Syndrome',
+            'primary ciliary dyskinesia': 'Primary Ciliary Dyskinesia',
+            'pcd': 'Primary Ciliary Dyskinesia',
+            'senior-løken syndrome': 'Senior-Løken Syndrome',
+            'senior-loken syndrome': 'Senior-Løken Syndrome',
+            'senior löken': 'Senior-Løken Syndrome',
+            'senior loken': 'Senior-Løken Syndrome',
+            'slsn': 'Senior-Løken Syndrome',
+            'meckel-gruber syndrome': 'Meckel–Gruber Syndrome',
+            'meckel gruber': 'Meckel–Gruber Syndrome',
+            'mks': 'Meckel–Gruber Syndrome',
+            'nephronophthisis': 'Nephronophthisis',
+            'nphp': 'Nephronophthisis',
+            'bardet-biedl syndrome': 'Bardet–Biedl Syndrome',
+            'bardet biedl': 'Bardet–Biedl Syndrome',
+            'bbs': 'Bardet–Biedl Syndrome'
         };
 
-        let matchedClassification = null;
-        for (const [kw, full] of Object.entries(classificationKeywords)) {
-            if (qLower.includes(kw)) {
-                matchedClassification = full;
+        let matchedDisease = null;
+        for (const [keyword, fullName] of Object.entries(diseaseKeywords)) {
+            if (qLower.includes(keyword)) {
+                matchedDisease = fullName;
                 break;
             }
         }
 
-        // === A. List diseases in classification ===
-        if (matchedClassification && !qLower.includes('genes')) {
+        if (matchedDisease) {
+            const normKey = normalizeTerm(matchedDisease);
+            const geneList = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+
+            if (geneList.length === 0) {
+                htmlResult = `<div class="ai-result-card">
+                    <p>No genes currently listed for <strong>${matchedDisease}</strong>.</p>
+                </div>`;
+            } else {
+                const geneObjects = geneList.map(g => ({
+                    gene: g,
+                    description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Ciliopathy gene'
+                }));
+
+                lastQueryContext = {
+                    type: 'list_followup',
+                    data: geneObjects,
+                    term: `Genes causing ${matchedDisease}`
+                };
+
+                htmlResult = `<div class="ai-result-card">
+                    <h4>Genes Associated with ${matchedDisease}</h4>
+                    <p>Found <strong>${geneList.length}</strong> genes in the database.</p>
+                    <p>Would you like to <strong>view the full list</strong>?</p>
+                </div>`;
+            }
+
+            window.addChatMessage(htmlResult, false);
+            return;
+        }
+
+ // === 3. ENHANCED CILIOPATHY CLASSIFICATION & ORTHOLOG HANDLER ===
+    const classificationMap = getDiseaseClassificationMap();
+    const classificationKeywords = {
+        'primary ciliopathies': 'Primary Ciliopathies',
+        'primary': 'Primary Ciliopathies',
+        'motile ciliopathies': 'Motile Ciliopathies',
+        'motile': 'Motile Ciliopathies',
+        'secondary diseases': 'Secondary Diseases',
+        'secondary': 'Secondary Diseases',
+        'atypical ciliopathies': 'Atypical Ciliopathies',
+        'atypical': 'Atypical Ciliopathies'
+    };
+
+    // Detect classification queries
+    let matchedClassification = null;
+    for (const [kw, full] of Object.entries(classificationKeywords)) {
+        if (qLower.includes(kw)) {
+            matchedClassification = full;
+            break;
+        }
+    }
+
+    // === A. List diseases in a classification + count ===
+    if (matchedClassification || qLower.includes('how many') && qLower.includes('primary ciliopathies')) {
+        if (qLower.includes('how many') && qLower.includes('primary ciliopathies')) {
+            const count = classificationMap['Primary Ciliopathies'].length;
+            htmlResult = `<div class="ai-result-card">
+                <h4>Number of Primary Ciliopathies</h4>
+                <p>There are <strong>${count}</strong> recognized primary ciliopathies in the current classification.</p>
+            </div>`;
+            window.addChatMessage(htmlResult, false);
+            return;
+        }
+
+        if (matchedClassification) {
             const diseases = classificationMap[matchedClassification];
             htmlResult = `<div class="ai-result-card">
                 <h4>${matchedClassification} (${diseases.length} diseases)</h4>
-                <ul style="columns: 2; font-size: 13px; line-height: 1.5;">
+                <ul style="columns: 2; font-size: 13px;">
                     ${diseases.map(d => `<li>${d}</li>`).join('')}
                 </ul>
             </div>`;
             window.addChatMessage(htmlResult, false);
             return;
         }
+    }
 
-        // === B. Genes in a classification (Primary, Secondary, etc.) ===
-        if (qLower.includes('genes') && matchedClassification) {
-            const diseases = classificationMap[matchedClassification];
+    // === B. Genes associated with a classification (e.g., primary ciliopathies) ===
+    if (qLower.includes('genes') && (qLower.includes('primary ciliopathies') || qLower.includes('secondary') || qLower.includes('motile') || qLower.includes('atypical'))) {
+        let targetClass = null;
+        if (qLower.includes('primary ciliopathies')) targetClass = 'Primary Ciliopathies';
+        else if (qLower.includes('secondary')) targetClass = 'Secondary Diseases';
+        else if (qLower.includes('motile')) targetClass = 'Motile Ciliopathies';
+        else if (qLower.includes('atypical')) targetClass = 'Atypical Ciliopathies';
+
+        if (targetClass) {
+            const allDiseases = classificationMap[targetClass];
             let allGenes = new Set();
 
-            diseases.forEach(disease => {
+            allDiseases.forEach(disease => {
                 const normKey = normalizeTerm(disease);
                 const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
                 genes.forEach(g => allGenes.add(g));
@@ -3434,7 +3512,7 @@ window.handleAIQuery = async function (query) {
             const geneList = Array.from(allGenes);
 
             if (geneList.length === 0) {
-                htmlResult = `<div class="ai-result-card"><p>No genes found for <strong>${matchedClassification}</strong>.</p></div>`;
+                htmlResult = `<div class="ai-result-card"><p>No genes found for <strong>${targetClass}</strong>.</p></div>`;
             } else {
                 const geneObjects = geneList.map(g => ({
                     gene: g,
@@ -3444,11 +3522,11 @@ window.handleAIQuery = async function (query) {
                 lastQueryContext = {
                     type: 'list_followup',
                     data: geneObjects,
-                    term: `Genes in ${matchedClassification}`
+                    term: `Genes in ${targetClass}`
                 };
 
                 htmlResult = `<div class="ai-result-card">
-                    <h4>Genes Associated with ${matchedClassification}</h4>
+                    <h4>Genes Associated with ${targetClass}</h4>
                     <p>Found <strong>${geneList.length}</strong> unique genes across all related diseases.</p>
                     <p>Would you like to <strong>view the full list</strong>?</p>
                 </div>`;
@@ -3456,90 +3534,87 @@ window.handleAIQuery = async function (query) {
             window.addChatMessage(htmlResult, false);
             return;
         }
+    }
 
-        // === C. Shared genes between any two classifications or diseases (e.g., MKS and NPHP, Primary and Secondary) ===
-        if (qLower.includes('shared') || qLower.includes('overlap') || qLower.includes('common') || qLower.includes('between')) {
-            let set1 = null, set2 = null;
-            let name1 = '', name2 = '';
+    // === C. Shared genes between classifications (e.g., primary and secondary) ===
+    if (qLower.includes('shared') && qLower.includes('primary') && qLower.includes('secondary')) {
+        const primaryDiseases = classificationMap['Primary Ciliopathies'];
+        const secondaryDiseases = classificationMap['Secondary Diseases'];
 
-            // Detect two classifications
-            const foundClasses = Object.keys(classificationKeywords).filter(k => qLower.includes(k));
-            if (foundClasses.length >= 2) {
-                name1 = classificationKeywords[foundClasses[0]];
-                name2 = classificationKeywords[foundClasses[1]];
-                const diseases1 = classificationMap[name1];
-                const diseases2 = classificationMap[name2];
+        let primaryGenes = new Set();
+        let secondaryGenes = new Set();
 
-                set1 = new Set();
-                set2 = new Set();
+        primaryDiseases.forEach(d => {
+            const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+            genes.forEach(g => primaryGenes.add(g));
+        });
+        secondaryDiseases.forEach(d => {
+            const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+            genes.forEach(g => secondaryGenes.add(g));
+        });
 
-                diseases1.forEach(d => {
-                    const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
-                    genes.forEach(g => set1.add(g));
-                });
-                diseases2.forEach(d => {
-                    const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
-                    genes.forEach(g => set2.add(g));
-                });
-            } 
-            // Or two specific diseases (e.g., MKS and NPHP)
-            else {
-                const diseaseKeywords = {
-                    'mks': 'Meckel–Gruber Syndrome', 'meckel': 'Meckel–Gruber Syndrome',
-                    'nphp': 'Nephronophthisis', 'nephronophthisis': 'Nephronophthisis',
-                    'joubert': 'Joubert Syndrome', 'bbs': 'Bardet–Biedl Syndrome',
-                    'pcd': 'Primary Ciliary Dyskinesia', 'senior': 'Senior-Løken Syndrome'
-                };
+        const overlap = [...primaryGenes].filter(g => secondaryGenes.has(g));
 
-                const foundDiseases = Object.keys(diseaseKeywords).filter(k => qLower.includes(k));
-                if (foundDiseases.length >= 2) {
-                    name1 = diseaseKeywords[foundDiseases[0]];
-                    name2 = diseaseKeywords[foundDiseases[1]];
-                    set1 = new Set(window.CiliAI.lookups.byCiliopathy[normalizeTerm(name1)] || []);
-                    set2 = new Set(window.CiliAI.lookups.byCiliopathy[normalizeTerm(name2)] || []);
+        if (overlap.length === 0) {
+            htmlResult = `<div class="ai-result-card"><p>No shared genes between Primary and Secondary ciliopathies.</p></div>`;
+        } else {
+            const geneObjects = overlap.map(g => ({ gene: g }));
+            lastQueryContext = {
+                type: 'list_followup',
+                data: geneObjects,
+                term: 'Shared: Primary ∩ Secondary Ciliopathies'
+            };
+            htmlResult = `<div class="ai-result-card">
+                <h4>Shared Genes: Primary & Secondary Ciliopathies</h4>
+                <p><strong>${overlap.length}</strong> genes in common: <strong>${overlap.join(', ')}</strong></p>
+                <p>View details?</p>
+            </div>`;
+        }
+        window.addChatMessage(htmlResult, false);
+        return;
+    }
+
+    // === D. C. elegans orthologs for genes in a classification or disease ===
+    if (qLower.includes('ortholog') && qLower.includes('c. elegans')) {
+        let targetGenes = [];
+
+        // Detect classification
+        if (qLower.includes('primary ciliopathies')) {
+            const diseases = classificationMap['Primary Ciliopathies'];
+            let set = new Set();
+            diseases.forEach(d => {
+                const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+                genes.forEach(g => set.add(g));
+            });
+            targetGenes = Array.from(set);
+        } else if (qLower.includes('secondary')) {
+            const diseases = classificationMap['Secondary Diseases'];
+            let set = new Set();
+            diseases.forEach(d => {
+                const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+                genes.forEach(g => set.add(g));
+            });
+            targetGenes = Array.from(set);
+        }
+        // Or single disease
+        else {
+            for (const [kw, full] of Object.entries(diseaseKeywords)) {
+                if (qLower.includes(kw)) {
+                    const norm = normalizeTerm(full);
+                    targetGenes = window.CiliAI.lookups.byCiliopathy[norm] || [];
+                    break;
                 }
-            }
-
-            if (set1 && set2) {
-                const overlap = [...set1].filter(g => set2.has(g));
-
-                if (overlap.length === 0) {
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>No Shared Genes</h4>
-                        <p>No overlapping genes found between <strong>${name1}</strong> and <strong>${name2}</strong>.</p>
-                    </div>`;
-                } else {
-                    const geneObjects = overlap.map(g => ({ gene: g }));
-                    lastQueryContext = {
-                        type: 'list_followup',
-                        data: geneObjects,
-                        term: `Shared: ${name1} ∩ ${name2}`
-                    };
-
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>Shared Genes: ${name1} ∩ ${name2}</h4>
-                        <p><strong>${overlap.length}</strong> gene(s) in common:</p>
-                        <p><strong>${overlap.join(', ')}</strong></p>
-                        <p>(These are often allelic — same gene, different severity)</p>
-                        <p>Would you like to <strong>view details</strong>?</p>
-                    </div>`;
-                }
-                window.addChatMessage(htmlResult, false);
-                return;
             }
         }
 
-        // === D. C. elegans orthologs — now shows directly on "yes" ===
-        if ((qLower === 'yes' || qLower === 'y' || qLower === 'show' || qLower === 'list') && 
-            lastQueryContext && lastQueryContext.type === 'list_followup' && 
-            qLower.includes('ortholog')) {
-
-            const geneList = lastQueryContext.data.map(o => o.gene);
-            const orthologs = geneList
+        if (targetGenes.length === 0) {
+            htmlResult = `<div class="ai-result-card"><p>No genes found for ortholog query.</p></div>`;
+        } else {
+            const orthologs = targetGenes
                 .map(g => {
                     const geneData = window.CiliAI.lookups.geneMap[g];
-                    const ce = geneData?.Ortholog_C_elegans;
-                    return ce && ce !== 'N/A' && ce !== '' ? { human: g, worm: ce } : null;
+                    const ceOrtho = geneData?.Ortholog_C_elegans;
+                    return ceOrtho && ceOrtho !== 'N/A' ? { human: g, worm: ceOrtho } : null;
                 })
                 .filter(Boolean);
 
@@ -3548,61 +3623,16 @@ window.handleAIQuery = async function (query) {
             } else {
                 const listHtml = orthologs.map(o => `<li><strong>${o.human}</strong> → <em>${o.worm}</em></li>`).join('');
                 htmlResult = `<div class="ai-result-card">
-                    <h4>C. elegans Orthologs (${orthologs.length} found)</h4>
+                    <h4>C. elegans Orthologs</h4>
+                    <p>Found <strong>${orthologs.length}</strong> orthologs:</p>
                     <ul>${listHtml}</ul>
                 </div>`;
             }
-            window.addChatMessage(htmlResult, false);
-            lastQueryContext = { type: null }; // Clear context
-            return;
         }
+        window.addChatMessage(htmlResult, false);
+        return;
+    }
 
-        // Trigger ortholog offer for disease/classification gene lists
-        if (lastQueryContext && lastQueryContext.type === 'list_followup' && 
-            (lastQueryContext.term.includes('Joubert') || lastQueryContext.term.includes('MKS') || 
-             lastQueryContext.term.includes('Primary') || lastQueryContext.term.includes('BBS'))) {
-
-            htmlResult = htmlResult.replace(
-                '</div>',
-                `<p style="margin-top:10px; font-size:13px;">Would you also like to see <strong>C. elegans orthologs</strong> for these genes?</p></div>`
-            );
-        }
-                // === E. Total unique genes across ciliopathies (Primary + Motile + Atypical only) ===
-        if (qLower.includes('total') && qLower.includes('unique') && qLower.includes('genes') && 
-            (qLower.includes('ciliopathies') || qLower.includes('ciliopathy'))) {
-
-            const includedClasses = [
-                'Primary Ciliopathies',
-                'Motile Ciliopathies',
-                'Atypical Ciliopathies'
-            ];
-
-            let allUniqueGenes = new Set();
-
-            includedClasses.forEach(className => {
-                const diseases = classificationMap[className] || [];
-                diseases.forEach(disease => {
-                    const normKey = normalizeTerm(disease);
-                    const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
-                    genes.forEach(g => allUniqueGenes.add(g));
-                });
-            });
-
-            const totalCount = allUniqueGenes.size;
-
-            htmlResult = `<div class="ai-result-card">
-                <h4>Total Unique Genes in Ciliopathies</h4>
-                <p>Across <strong>Primary, Motile, and Atypical Ciliopathies</strong>:</p>
-                <p style="font-size:18px; font-weight:bold; color:#2b6cb0; margin:15px 0;">
-                    <strong>${totalCount}</strong> unique genes
-                </p>
-                <p>This includes all known causative and associated genes from ${includedClasses.join(', ')}.</p>
-                <p>(Secondary diseases excluded from this count as requested.)</p>
-            </div>`;
-
-            window.addChatMessage(htmlResult, false);
-            return;
-        }
         // Intent 1: Greetings
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
         const terminologyQueries = window.terminologyQueries || {};
