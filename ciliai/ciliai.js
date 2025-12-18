@@ -3261,25 +3261,23 @@ window.handleCellTypeQuestion = function(query) {
  */
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
-    
     if (!chatWindow) return;
-
     if (!query) return;
-   const qLower = query.toLowerCase().trim();
 
-    // === HIGHEST PRIORITY: Force cell-type questions even if "show" or phylogeny keywords present ===
-    if (qLower.includes('cilia-restricted') || 
-        qLower.includes('cilia restricted') || 
+    const qLower = query.toLowerCase().trim();
+
+    // === 1. HIGHEST PRIORITY: Cell-type specific questions (your existing fix) ===
+    if (qLower.includes('cilia-restricted') ||
+        qLower.includes('cilia restricted') ||
         qLower.includes('ciliary-restricted') ||
         qLower.includes('specific to') ||
-        qLower.includes('express') && qLower.includes('cell') ||
+        (qLower.includes('express') && qLower.includes('cell')) ||
         qLower.includes('active in') ||
-        qLower.includes('tpm') && qLower.includes('cell')) {
-
+        (qLower.includes('tpm') && qLower.includes('cell'))) {
         const result = window.handleCellTypeQuestion(query);
         if (result) {
             window.addChatMessage(result, false);
-            return; // Stop further routing
+            return;
         }
     }
 
@@ -3293,6 +3291,179 @@ window.handleAIQuery = async function (query) {
 
         let htmlResult = null;
         let match;
+
+        // === 2. GENERALIZED: "Where is [GENE] expressed?" for ANY ciliary gene ===
+        if (qLower.includes('where is') && qLower.includes('expressed')) {
+            const genes = extractMultipleGenes(query);
+            if (genes.length > 0) {
+                const geneSymbol = genes[0];
+                const gene = window.CiliAI.lookups.geneMap[geneSymbol];
+
+                if (!gene) {
+                    htmlResult = `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in database.</p></div>`;
+                } else {
+                    const loc = gene.Localization || 'Not specified';
+                    let expressionInfo = '';
+                    let scrnaSummary = '';
+
+                    if (gene.expression?.scRNA) {
+                        const expressed = getExpressedCellTypes(gene.expression.scRNA);
+                        if (expressed.length > 0) {
+                            scrnaSummary = `<p><strong>scRNA-seq (lung):</strong> Expressed in: <strong>${expressed.join(', ')}</strong></p>`;
+                        }
+                    }
+
+                    // Detect motile cilia genes
+                    const isMotile = loc.toLowerCase().includes('axoneme') ||
+                                     loc.toLowerCase().includes('dynein') ||
+                                     loc.toLowerCase().includes('radial spoke') ||
+                                     geneSymbol.startsWith('DNAH') ||
+                                     geneSymbol.startsWith('DNAI') ||
+                                     geneSymbol.includes('DNAAF') ||
+                                     (gene.Ciliopathies && gene.Ciliopathies.includes('Primary Ciliary Dyskinesia'));
+
+                    const isMulticiliatedMarker = geneSymbol === 'FOXJ1' || loc.toLowerCase().includes('multiciliated');
+
+                    if (isMotile) {
+                        expressionInfo = `
+                            <p><strong>${geneSymbol}</strong> is expressed in <strong>cells with motile cilia</strong>:</p>
+                            <ul>
+                                <li>Multiciliated respiratory epithelium (lungs, trachea, bronchi)</li>
+                                <li>Fallopian tube epithelium</li>
+                                <li>Testicular sperm flagella</li>
+                            </ul>
+                            <p><strong>Localization:</strong> ${loc}</p>
+                            <p>Defects often cause <strong>Primary Ciliary Dyskinesia (PCD)</strong>.</p>
+                        `;
+                    } else if (isMulticiliatedMarker) {
+                        expressionInfo = `
+                            <p><strong>${geneSymbol}</strong> is a master regulator of <strong>multiciliogenesis</strong>.</p>
+                            <p>Specifically expressed in <strong>multiciliated cells</strong> (e.g., airway epithelium).</p>
+                            ${scrnaSummary}
+                        `;
+                    } else {
+                        expressionInfo = `
+                            <p><strong>${geneSymbol}</strong> is expressed in cells with <strong>primary cilia</strong> (most vertebrate cell types).</p>
+                            <p>Enriched in:</p>
+                            <ul>
+                                <li>Kidney tubules and collecting ducts</li>
+                                <li>Brain (neurons, cerebellum)</li>
+                                <li>Retina (photoreceptors)</li>
+                                <li>Liver, pancreas, and other organs</li>
+                            </ul>
+                            <p><strong>Localization:</strong> ${loc}</p>
+                            ${scrnaSummary}
+                        `;
+                    }
+
+                    htmlResult = `
+                        <div class="ai-result-card">
+                            <h4>Expression of ${geneSymbol}</h4>
+                            ${expressionInfo}
+                        </div>
+                    `;
+                }
+
+                if (htmlResult) {
+                    window.addChatMessage(htmlResult, false);
+                    return;
+                }
+            }
+        }
+
+        // === 3. CILIOPATHY / DISEASE QUERIES ===
+        const diseaseKeywords = {
+            'joubert syndrome': 'Joubert Syndrome',
+            'joubert': 'Joubert Syndrome',
+            'primary ciliary dyskinesia': 'Primary Ciliary Dyskinesia',
+            'pcd': 'Primary Ciliary Dyskinesia',
+            'senior-løken syndrome': 'Senior-Løken Syndrome',
+            'senior-loken syndrome': 'Senior-Løken Syndrome',
+            'senior löken': 'Senior-Løken Syndrome',
+            'senior loken': 'Senior-Løken Syndrome',
+            'slsn': 'Senior-Løken Syndrome',
+            'meckel-gruber syndrome': 'Meckel–Gruber Syndrome',
+            'meckel gruber': 'Meckel–Gruber Syndrome',
+            'mks': 'Meckel–Gruber Syndrome',
+            'nephronophthisis': 'Nephronophthisis',
+            'nphp': 'Nephronophthisis',
+            'bardet-biedl syndrome': 'Bardet–Biedl Syndrome',
+            'bardet biedl': 'Bardet–Biedl Syndrome',
+            'bbs': 'Bardet–Biedl Syndrome'
+        };
+
+        let matchedDisease = null;
+        for (const [keyword, fullName] of Object.entries(diseaseKeywords)) {
+            if (qLower.includes(keyword)) {
+                matchedDisease = fullName;
+                break;
+            }
+        }
+
+        if (matchedDisease) {
+            const normKey = normalizeTerm(matchedDisease);
+            const geneList = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+
+            if (geneList.length === 0) {
+                htmlResult = `<div class="ai-result-card">
+                    <p>No genes currently listed for <strong>${matchedDisease}</strong>.</p>
+                </div>`;
+            } else {
+                const geneObjects = geneList.map(g => ({
+                    gene: g,
+                    description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Ciliopathy gene'
+                }));
+
+                lastQueryContext = {
+                    type: 'list_followup',
+                    data: geneObjects,
+                    term: `Genes causing ${matchedDisease}`
+                };
+
+                htmlResult = `<div class="ai-result-card">
+                    <h4>Genes Associated with ${matchedDisease}</h4>
+                    <p>Found <strong>${geneList.length}</strong> genes in the database.</p>
+                    <p>Would you like to <strong>view the full list</strong>?</p>
+                </div>`;
+            }
+
+            window.addChatMessage(htmlResult, false);
+            return;
+        }
+
+        // === 4. OVERLAP BETWEEN TWO CILIOPATHIES ===
+        if (qLower.includes('shared') || qLower.includes('overlap') || qLower.includes('common') || qLower.includes('between')) {
+            const syndromeKeys = Object.keys(diseaseKeywords);
+            const found = syndromeKeys.filter(k => qLower.includes(k));
+            if (found.length >= 2) {
+                const name1 = diseaseKeywords[found[0]];
+                const name2 = diseaseKeywords[found[1]];
+                const genes1 = window.CiliAI.lookups.byCiliopathy[normalizeTerm(name1)] || [];
+                const genes2 = window.CiliAI.lookups.byCiliopathy[normalizeTerm(name2)] || [];
+                const overlap = genes1.filter(g => genes2.includes(g));
+
+                if (overlap.length === 0) {
+                    htmlResult = `<div class="ai-result-card">
+                        <p>No shared genes found between <strong>${name1}</strong> and <strong>${name2}</strong>.</p>
+                    </div>`;
+                } else {
+                    const geneObjects = overlap.map(g => ({ gene: g }));
+                    lastQueryContext = {
+                        type: 'list_followup',
+                        data: geneObjects,
+                        term: `Shared genes: ${name1} ∩ ${name2}`
+                    };
+                    htmlResult = `<div class="ai-result-card">
+                        <h4>Shared Genes</h4>
+                        <p><strong>${overlap.length}</strong> genes shared between <strong>${name1}</strong> and <strong>${name2}</strong>:</p>
+                        <p><strong>${overlap.join(', ')}</strong></p>
+                        <p>View details?</p>
+                    </div>`;
+                }
+                window.addChatMessage(htmlResult, false);
+                return;
+            }
+        }
 
         // Intent 1: Greetings
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
