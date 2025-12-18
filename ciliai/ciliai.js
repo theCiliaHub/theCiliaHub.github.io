@@ -3265,21 +3265,21 @@ window.handleAIQuery = async function (query) {
     if (!chatWindow) return;
 
     if (!query) return;
-    const qLower = query.toLowerCase().trim();
+   const qLower = query.toLowerCase().trim();
 
-    // === NEW: Generalized Cell-Type Questions (PRIORITY) ===
-    if (qLower.includes('cell') && (
-        qLower.includes('express') || 
-        qLower.includes('active in') || 
-        qLower.includes('cilia-restricted') || 
-        qLower.includes('multiciliated') || 
-        qLower.includes('tpm') || 
-        qLower.includes('expression in')
-    )) {
+    // === HIGHEST PRIORITY: Force cell-type questions even if "show" or phylogeny keywords present ===
+    if (qLower.includes('cilia-restricted') || 
+        qLower.includes('cilia restricted') || 
+        qLower.includes('ciliary-restricted') ||
+        qLower.includes('specific to') ||
+        qLower.includes('express') && qLower.includes('cell') ||
+        qLower.includes('active in') ||
+        qLower.includes('tpm') && qLower.includes('cell')) {
+
         const result = window.handleCellTypeQuestion(query);
         if (result) {
             window.addChatMessage(result, false);
-            return;
+            return; // Stop further routing
         }
     }
 
