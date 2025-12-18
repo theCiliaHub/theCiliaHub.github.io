@@ -3557,15 +3557,19 @@ window.handleAIQuery = async function (query) {
             return;
         }
 
-        // Trigger ortholog offer for disease/classification gene lists
-        if (lastQueryContext && lastQueryContext.type === 'list_followup' && 
-            (lastQueryContext.term.includes('Joubert') || lastQueryContext.term.includes('MKS') || 
-             lastQueryContext.term.includes('Primary') || lastQueryContext.term.includes('BBS'))) {
+        // === Offer C. elegans orthologs for relevant gene lists ===
+        if (lastQueryContext && lastQueryContext.type === 'list_followup' && htmlResult) {
+            const term = lastQueryContext.term || '';
+            if (term.includes('Joubert') || term.includes('MKS') || term.includes('Primary') || 
+                term.includes('BBS') || term.includes('Nephronophthisis') || term.includes('Meckel')) {
 
-            htmlResult = htmlResult.replace(
-                '</div>',
-                `<p style="margin-top:10px; font-size:13px;">Would you also like to see <strong>C. elegans orthologs</strong> for these genes?</p></div>`
-            );
+                htmlResult = htmlResult.replace(
+                    '</div>',
+                    `<p style="margin-top:12px; font-size:13px; color:#666;">
+                        Would you also like to see the <strong>C. elegans orthologs</strong> for these genes?
+                    </p></div>`
+                );
+            }
         }
 // === E. Total unique genes across ciliopathies (Primary + Motile + Atypical only) ===
  // === E. TOTAL UNIQUE GENES IN CILIOPATHIES (ALL COMMON PHRASINGS) ===
@@ -3620,6 +3624,95 @@ window.handleAIQuery = async function (query) {
             window.addChatMessage(htmlResult, false);
             return;
         }
+                // === F. "How many genes are in [disease/classification]?" ===
+        if (qLower.match(/how many.*genes.*(in|for|are|associated with)/i)) {
+            let target = null;
+
+            // Single disease
+            if (qLower.includes('joubert')) target = 'Joubert Syndrome';
+            else if (qLower.includes('mks') || qLower.includes('meckel')) target = 'Meckel–Gruber Syndrome';
+            else if (qLower.includes('bbs')) target = 'Bardet–Biedl Syndrome';
+            else if (qLower.includes('nphp') || qLower.includes('nephronophthisis')) target = 'Nephronophthisis';
+            else if (qLower.includes('pcd')) target = 'Primary Ciliary Dyskinesia';
+            else if (qLower.includes('senior')) target = 'Senior-Løken Syndrome';
+
+            // Classification
+            else if (qLower.includes('primary ciliopathies')) target = 'Primary Ciliopathies';
+            else if (qLower.includes('motile ciliopathies')) target = 'Motile Ciliopathies';
+            else if (qLower.includes('atypical ciliopathies')) target = 'Atypical Ciliopathies';
+
+            if (target) {
+                let geneList = [];
+
+                if (target === 'Primary Ciliopathies' || target === 'Motile Ciliopathies' || target === 'Atypical Ciliopathies') {
+                    const diseases = classificationMap[target] || [];
+                    let set = new Set();
+                    diseases.forEach(d => {
+                        const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+                        genes.forEach(g => set.add(g));
+                    });
+                    geneList = Array.from(set);
+                } else {
+                    const normKey = normalizeTerm(target);
+                    geneList = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                }
+
+                const count = geneList.length;
+
+                htmlResult = `<div class="ai-result-card">
+                    <h4>Genes in ${target}</h4>
+                    <p style="font-size:18px; font-weight:bold; color:#2b6cb0; margin:15px 0;">
+                        <strong>${count}</strong> unique gene${count === 1 ? '' : 's'}
+                    </p>
+                    <p>These are all known causative/associated genes in the database.</p>
+                    <p>Would you like to <strong>view the full list</strong>?</p>
+                </div>`;
+
+                // Save context for "yes"
+                lastQueryContext = {
+                    type: 'list_followup',
+                    data: geneList.map(g => ({ gene: g })),
+                    term: `Genes in ${target}`
+                };
+
+                window.addChatMessage(htmlResult, false);
+                return;
+            }
+        }
+                // === G. Disease implicated by a gene (e.g., ARL13B → Joubert Syndrome) ===
+        if (qLower.includes('disease') && qLower.includes('implicated') || 
+            qLower.includes('disease') && qLower.includes('associated') && qLower.includes('with')) {
+
+            const genes = extractMultipleGenes(query);
+            if (genes.length > 0) {
+                const geneSymbol = genes[0];
+                const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+
+                if (!geneData || !geneData.Ciliopathies) {
+                    htmlResult = `<div class="ai-result-card">
+                        <p><strong>${geneSymbol}</strong> is not directly linked to any ciliopathy in the current database.</p>
+                    </div>`;
+                } else {
+                    const diseases = Array.isArray(geneData.Ciliopathies) 
+                        ? geneData.Ciliopathies 
+                        : [geneData.Ciliopathies];
+
+                    htmlResult = `<div class="ai-result-card">
+                        <h4>Disease Association: ${geneSymbol}</h4>
+                        <p><strong>${geneSymbol}</strong> is implicated in:</p>
+                        <ul>
+                            ${diseases.map(d => `<li><strong>${d}</strong></li>`).join('')}
+                        </ul>
+                        <p>Most commonly associated with <strong>Joubert Syndrome</strong> (classic ciliary transition zone defect).</p>
+                    </div>`;
+                }
+
+                window.addChatMessage(htmlResult, false);
+                return;
+            }
+        }
+
+
         
         // Intent 1: Greetings
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
