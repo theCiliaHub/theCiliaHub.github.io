@@ -160,32 +160,45 @@ function getComplexPhylogenyTableMap() {
     };
 }
 
-    function getDiseaseClassificationMap() {
+function getDiseaseClassificationMap() {
         return {
             "Primary Ciliopathies": [
                 "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
                 "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "Bardet Biedel Syndrome",
-                "COACH Syndrome", "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
-                "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
-                "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
-                "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
-                "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
-                "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
-                "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus"
+                "COACH Syndrome", "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome",
+                "Infantile Polycystic Kidney Disease", "Joubert Syndrome", "Leber Congenital Amaurosis",
+                "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
+                "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy",
+                "Syndromic Ciliopathy", "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome",
+                "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
+                "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia",
+                "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
+                "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease",
+                "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
+                "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome",
+                "Weyers Acrofacial Dysostosis", "Hydrocephalus"
             ],
             "Motile Ciliopathies": [
                 "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy"
             ],
             "Secondary Diseases": [
-                "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome",
-                "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome",
-                "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy"
+                "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy",
+                "Cornelia de Lange Syndrome", "Holoprosencephaly", "Juvenile Myoclonic Epilepsy",
+                "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome",
+                "Lowe Oculocerebrorenal Syndrome", "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome",
+                "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy"
             ],
             "Atypical Ciliopathies": [
-                "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy"
+                "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy",
+                "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy",
+                "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3",
+                "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis",
+                "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy"
             ]
         };
     }
+
+   
 
     function ensureArray(value) {
         if (Array.isArray(value)) return value;
@@ -3431,74 +3444,194 @@ window.handleAIQuery = async function (query) {
             return;
         }
 
-            // === 4. OVERLAP / SHARED GENES BETWEEN TWO CILIOPATHIES (IMPROVED) ===
-        if (qLower.includes('shared') || qLower.includes('overlap') || qLower.includes('common') || 
-            qLower.includes('between') || qLower.includes('both')) {
+ // === 3. ENHANCED CILIOPATHY CLASSIFICATION & ORTHOLOG HANDLER ===
+    const classificationMap = getDiseaseClassificationMap();
+    const classificationKeywords = {
+        'primary ciliopathies': 'Primary Ciliopathies',
+        'primary': 'Primary Ciliopathies',
+        'motile ciliopathies': 'Motile Ciliopathies',
+        'motile': 'Motile Ciliopathies',
+        'secondary diseases': 'Secondary Diseases',
+        'secondary': 'Secondary Diseases',
+        'atypical ciliopathies': 'Atypical Ciliopathies',
+        'atypical': 'Atypical Ciliopathies'
+    };
 
-            // Map common abbreviations and variations to canonical names
-            const syndromeMap = {
-                'mks': 'Meckel–Gruber Syndrome',
-                'meckel': 'Meckel–Gruber Syndrome',
-                'meckel-gruber': 'Meckel–Gruber Syndrome',
-                'nphp': 'Nephronophthisis',
-                'nephronophthisis': 'Nephronophthisis',
-                'joubert': 'Joubert Syndrome',
-                'bbs': 'Bardet–Biedl Syndrome',
-                'bardet': 'Bardet–Biedl Syndrome',
-                'pcd': 'Primary Ciliary Dyskinesia',
-                'senior': 'Senior-Løken Syndrome',
-                'loken': 'Senior-Løken Syndrome'
-            };
+    // Detect classification queries
+    let matchedClassification = null;
+    for (const [kw, full] of Object.entries(classificationKeywords)) {
+        if (qLower.includes(kw)) {
+            matchedClassification = full;
+            break;
+        }
+    }
 
-            let syndrome1 = null;
-            let syndrome2 = null;
+    // === A. List diseases in a classification + count ===
+    if (matchedClassification || qLower.includes('how many') && qLower.includes('primary ciliopathies')) {
+        if (qLower.includes('how many') && qLower.includes('primary ciliopathies')) {
+            const count = classificationMap['Primary Ciliopathies'].length;
+            htmlResult = `<div class="ai-result-card">
+                <h4>Number of Primary Ciliopathies</h4>
+                <p>There are <strong>${count}</strong> recognized primary ciliopathies in the current classification.</p>
+            </div>`;
+            window.addChatMessage(htmlResult, false);
+            return;
+        }
 
-            for (const [abbr, full] of Object.entries(syndromeMap)) {
-                if (qLower.includes(abbr)) {
-                    if (!syndrome1) syndrome1 = full;
-                    else if (!syndrome2) syndrome2 = full;
-                }
+        if (matchedClassification) {
+            const diseases = classificationMap[matchedClassification];
+            htmlResult = `<div class="ai-result-card">
+                <h4>${matchedClassification} (${diseases.length} diseases)</h4>
+                <ul style="columns: 2; font-size: 13px;">
+                    ${diseases.map(d => `<li>${d}</li>`).join('')}
+                </ul>
+            </div>`;
+            window.addChatMessage(htmlResult, false);
+            return;
+        }
+    }
+
+    // === B. Genes associated with a classification (e.g., primary ciliopathies) ===
+    if (qLower.includes('genes') && (qLower.includes('primary ciliopathies') || qLower.includes('secondary') || qLower.includes('motile') || qLower.includes('atypical'))) {
+        let targetClass = null;
+        if (qLower.includes('primary ciliopathies')) targetClass = 'Primary Ciliopathies';
+        else if (qLower.includes('secondary')) targetClass = 'Secondary Diseases';
+        else if (qLower.includes('motile')) targetClass = 'Motile Ciliopathies';
+        else if (qLower.includes('atypical')) targetClass = 'Atypical Ciliopathies';
+
+        if (targetClass) {
+            const allDiseases = classificationMap[targetClass];
+            let allGenes = new Set();
+
+            allDiseases.forEach(disease => {
+                const normKey = normalizeTerm(disease);
+                const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                genes.forEach(g => allGenes.add(g));
+            });
+
+            const geneList = Array.from(allGenes);
+
+            if (geneList.length === 0) {
+                htmlResult = `<div class="ai-result-card"><p>No genes found for <strong>${targetClass}</strong>.</p></div>`;
+            } else {
+                const geneObjects = geneList.map(g => ({
+                    gene: g,
+                    description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Ciliary protein'
+                }));
+
+                lastQueryContext = {
+                    type: 'list_followup',
+                    data: geneObjects,
+                    term: `Genes in ${targetClass}`
+                };
+
+                htmlResult = `<div class="ai-result-card">
+                    <h4>Genes Associated with ${targetClass}</h4>
+                    <p>Found <strong>${geneList.length}</strong> unique genes across all related diseases.</p>
+                    <p>Would you like to <strong>view the full list</strong>?</p>
+                </div>`;
             }
+            window.addChatMessage(htmlResult, false);
+            return;
+        }
+    }
 
-            if (syndrome1 && syndrome2 && syndrome1 !== syndrome2) {
-                const key1 = normalizeTerm(syndrome1);
-                const key2 = normalizeTerm(syndrome2);
+    // === C. Shared genes between classifications (e.g., primary and secondary) ===
+    if (qLower.includes('shared') && qLower.includes('primary') && qLower.includes('secondary')) {
+        const primaryDiseases = classificationMap['Primary Ciliopathies'];
+        const secondaryDiseases = classificationMap['Secondary Diseases'];
 
-                const genes1 = new Set(window.CiliAI.lookups.byCiliopathy[key1] || []);
-                const genes2 = new Set(window.CiliAI.lookups.byCiliopathy[key2] || []);
+        let primaryGenes = new Set();
+        let secondaryGenes = new Set();
 
-                const overlap = [...genes1].filter(g => genes2.has(g));
+        primaryDiseases.forEach(d => {
+            const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+            genes.forEach(g => primaryGenes.add(g));
+        });
+        secondaryDiseases.forEach(d => {
+            const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+            genes.forEach(g => secondaryGenes.add(g));
+        });
 
-                if (overlap.length === 0) {
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>Gene Overlap</h4>
-                        <p>No shared genes found between <strong>${syndrome1}</strong> and <strong>${syndrome2}</strong> in the current database.</p>
-                    </div>`;
-                } else {
-                    const geneObjects = overlap.map(g => ({
-                        gene: g,
-                        description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Transition zone protein'
-                    }));
+        const overlap = [...primaryGenes].filter(g => secondaryGenes.has(g));
 
-                    lastQueryContext = {
-                        type: 'list_followup',
-                        data: geneObjects,
-                        term: `Shared genes: ${syndrome1} ∩ ${syndrome2}`
-                    };
+        if (overlap.length === 0) {
+            htmlResult = `<div class="ai-result-card"><p>No shared genes between Primary and Secondary ciliopathies.</p></div>`;
+        } else {
+            const geneObjects = overlap.map(g => ({ gene: g }));
+            lastQueryContext = {
+                type: 'list_followup',
+                data: geneObjects,
+                term: 'Shared: Primary ∩ Secondary Ciliopathies'
+            };
+            htmlResult = `<div class="ai-result-card">
+                <h4>Shared Genes: Primary & Secondary Ciliopathies</h4>
+                <p><strong>${overlap.length}</strong> genes in common: <strong>${overlap.join(', ')}</strong></p>
+                <p>View details?</p>
+            </div>`;
+        }
+        window.addChatMessage(htmlResult, false);
+        return;
+    }
 
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>Shared Genes Between ${syndrome1} and ${syndrome2}</h4>
-                        <p>Found <strong>${overlap.length}</strong> overlapping gene(s):</p>
-                        <p><strong>${overlap.join(', ')}</strong></p>
-                        <p>These genes are known to cause both syndromes depending on mutation severity (allelic disorders).</p>
-                        <p>Would you like to <strong>view details</strong> (localization, references)?</p>
-                    </div>`;
+    // === D. C. elegans orthologs for genes in a classification or disease ===
+    if (qLower.includes('ortholog') && qLower.includes('c. elegans')) {
+        let targetGenes = [];
+
+        // Detect classification
+        if (qLower.includes('primary ciliopathies')) {
+            const diseases = classificationMap['Primary Ciliopathies'];
+            let set = new Set();
+            diseases.forEach(d => {
+                const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+                genes.forEach(g => set.add(g));
+            });
+            targetGenes = Array.from(set);
+        } else if (qLower.includes('secondary')) {
+            const diseases = classificationMap['Secondary Diseases'];
+            let set = new Set();
+            diseases.forEach(d => {
+                const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+                genes.forEach(g => set.add(g));
+            });
+            targetGenes = Array.from(set);
+        }
+        // Or single disease
+        else {
+            for (const [kw, full] of Object.entries(diseaseKeywords)) {
+                if (qLower.includes(kw)) {
+                    const norm = normalizeTerm(full);
+                    targetGenes = window.CiliAI.lookups.byCiliopathy[norm] || [];
+                    break;
                 }
-
-                window.addChatMessage(htmlResult, false);
-                return;
             }
         }
+
+        if (targetGenes.length === 0) {
+            htmlResult = `<div class="ai-result-card"><p>No genes found for ortholog query.</p></div>`;
+        } else {
+            const orthologs = targetGenes
+                .map(g => {
+                    const geneData = window.CiliAI.lookups.geneMap[g];
+                    const ceOrtho = geneData?.Ortholog_C_elegans;
+                    return ceOrtho && ceOrtho !== 'N/A' ? { human: g, worm: ceOrtho } : null;
+                })
+                .filter(Boolean);
+
+            if (orthologs.length === 0) {
+                htmlResult = `<div class="ai-result-card"><p>No C. elegans orthologs found for these genes.</p></div>`;
+            } else {
+                const listHtml = orthologs.map(o => `<li><strong>${o.human}</strong> → <em>${o.worm}</em></li>`).join('');
+                htmlResult = `<div class="ai-result-card">
+                    <h4>C. elegans Orthologs</h4>
+                    <p>Found <strong>${orthologs.length}</strong> orthologs:</p>
+                    <ul>${listHtml}</ul>
+                </div>`;
+            }
+        }
+        window.addChatMessage(htmlResult, false);
+        return;
+    }
 
         // Intent 1: Greetings
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
