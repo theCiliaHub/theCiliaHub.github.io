@@ -3567,41 +3567,43 @@ window.handleAIQuery = async function (query) {
                 `<p style="margin-top:10px; font-size:13px;">Would you also like to see <strong>C. elegans orthologs</strong> for these genes?</p></div>`
             );
         }
-                // === E. Total unique genes across ciliopathies (Primary + Motile + Atypical only) ===
-        if (qLower.includes('total') && qLower.includes('unique') && qLower.includes('genes') && 
-            (qLower.includes('ciliopathies') || qLower.includes('ciliopathy'))) {
+// === E. Total unique genes across ciliopathies (Primary + Motile + Atypical only) ===
+        if (qLower.includes('how many') || qLower.includes('number of') || qLower.includes('total')) {
+            if (qLower.includes('unique') && (qLower.includes('genes') || qLower.includes('gene')) && 
+                (qLower.includes('ciliopathies') || qLower.includes('ciliopathy'))) {
 
-            const includedClasses = [
-                'Primary Ciliopathies',
-                'Motile Ciliopathies',
-                'Atypical Ciliopathies'
-            ];
+                const includedClasses = [
+                    'Primary Ciliopathies',
+                    'Motile Ciliopathies',
+                    'Atypical Ciliopathies'
+                ];
 
-            let allUniqueGenes = new Set();
+                let allUniqueGenes = new Set();
 
-            includedClasses.forEach(className => {
-                const diseases = classificationMap[className] || [];
-                diseases.forEach(disease => {
-                    const normKey = normalizeTerm(disease);
-                    const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
-                    genes.forEach(g => allUniqueGenes.add(g));
+                includedClasses.forEach(className => {
+                    const diseases = classificationMap[className] || [];
+                    diseases.forEach(disease => {
+                        const normKey = normalizeTerm(disease);
+                        const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                        genes.forEach(g => allUniqueGenes.add(g));
+                    });
                 });
-            });
 
-            const totalCount = allUniqueGenes.size;
+                const totalCount = allUniqueGenes.size;
 
-            htmlResult = `<div class="ai-result-card">
-                <h4>Total Unique Genes in Ciliopathies</h4>
-                <p>Across <strong>Primary, Motile, and Atypical Ciliopathies</strong>:</p>
-                <p style="font-size:18px; font-weight:bold; color:#2b6cb0; margin:15px 0;">
-                    <strong>${totalCount}</strong> unique genes
-                </p>
-                <p>This includes all known causative and associated genes from ${includedClasses.join(', ')}.</p>
-                <p>(Secondary diseases excluded from this count as requested.)</p>
-            </div>`;
+                htmlResult = `<div class="ai-result-card">
+                    <h4>Total Unique Genes in Ciliopathies</h4>
+                    <p>Across <strong>Primary, Motile, and Atypical Ciliopathies</strong>:</p>
+                    <p style="font-size:18px; font-weight:bold; color:#2b6cb0; margin:15px 0;">
+                        <strong>${totalCount}</strong> unique genes
+                    </p>
+                    <p>This includes all known causative and associated genes from ${includedClasses.join(', ')}.</p>
+                    <p>(Secondary diseases excluded from this count)</p>
+                </div>`;
 
-            window.addChatMessage(htmlResult, false);
-            return;
+                window.addChatMessage(htmlResult, false);
+                return;
+            }
         }
         // Intent 1: Greetings
         const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
