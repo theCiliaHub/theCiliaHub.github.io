@@ -3431,35 +3431,70 @@ window.handleAIQuery = async function (query) {
             return;
         }
 
-        // === 4. OVERLAP BETWEEN TWO CILIOPATHIES ===
-        if (qLower.includes('shared') || qLower.includes('overlap') || qLower.includes('common') || qLower.includes('between')) {
-            const syndromeKeys = Object.keys(diseaseKeywords);
-            const found = syndromeKeys.filter(k => qLower.includes(k));
-            if (found.length >= 2) {
-                const name1 = diseaseKeywords[found[0]];
-                const name2 = diseaseKeywords[found[1]];
-                const genes1 = window.CiliAI.lookups.byCiliopathy[normalizeTerm(name1)] || [];
-                const genes2 = window.CiliAI.lookups.byCiliopathy[normalizeTerm(name2)] || [];
-                const overlap = genes1.filter(g => genes2.includes(g));
+            // === 4. OVERLAP / SHARED GENES BETWEEN TWO CILIOPATHIES (IMPROVED) ===
+        if (qLower.includes('shared') || qLower.includes('overlap') || qLower.includes('common') || 
+            qLower.includes('between') || qLower.includes('both')) {
+
+            // Map common abbreviations and variations to canonical names
+            const syndromeMap = {
+                'mks': 'Meckel–Gruber Syndrome',
+                'meckel': 'Meckel–Gruber Syndrome',
+                'meckel-gruber': 'Meckel–Gruber Syndrome',
+                'nphp': 'Nephronophthisis',
+                'nephronophthisis': 'Nephronophthisis',
+                'joubert': 'Joubert Syndrome',
+                'bbs': 'Bardet–Biedl Syndrome',
+                'bardet': 'Bardet–Biedl Syndrome',
+                'pcd': 'Primary Ciliary Dyskinesia',
+                'senior': 'Senior-Løken Syndrome',
+                'loken': 'Senior-Løken Syndrome'
+            };
+
+            let syndrome1 = null;
+            let syndrome2 = null;
+
+            for (const [abbr, full] of Object.entries(syndromeMap)) {
+                if (qLower.includes(abbr)) {
+                    if (!syndrome1) syndrome1 = full;
+                    else if (!syndrome2) syndrome2 = full;
+                }
+            }
+
+            if (syndrome1 && syndrome2 && syndrome1 !== syndrome2) {
+                const key1 = normalizeTerm(syndrome1);
+                const key2 = normalizeTerm(syndrome2);
+
+                const genes1 = new Set(window.CiliAI.lookups.byCiliopathy[key1] || []);
+                const genes2 = new Set(window.CiliAI.lookups.byCiliopathy[key2] || []);
+
+                const overlap = [...genes1].filter(g => genes2.has(g));
 
                 if (overlap.length === 0) {
                     htmlResult = `<div class="ai-result-card">
-                        <p>No shared genes found between <strong>${name1}</strong> and <strong>${name2}</strong>.</p>
+                        <h4>Gene Overlap</h4>
+                        <p>No shared genes found between <strong>${syndrome1}</strong> and <strong>${syndrome2}</strong> in the current database.</p>
                     </div>`;
                 } else {
-                    const geneObjects = overlap.map(g => ({ gene: g }));
+                    const geneObjects = overlap.map(g => ({
+                        gene: g,
+                        description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Transition zone protein'
+                    }));
+
                     lastQueryContext = {
                         type: 'list_followup',
                         data: geneObjects,
-                        term: `Shared genes: ${name1} ∩ ${name2}`
+                        term: `Shared genes: ${syndrome1} ∩ ${syndrome2}`
                     };
+
                     htmlResult = `<div class="ai-result-card">
-                        <h4>Shared Genes</h4>
-                        <p><strong>${overlap.length}</strong> genes shared between <strong>${name1}</strong> and <strong>${name2}</strong>:</p>
+                        <h4>Shared Genes Between ${syndrome1} and ${syndrome2}</h4>
+                        <p>Found <strong>${overlap.length}</strong> overlapping gene(s):</p>
                         <p><strong>${overlap.join(', ')}</strong></p>
-                        <p>View details?</p>
+                        <p>These genes are known to cause both syndromes depending on mutation severity (allelic disorders).</p>
+                        <p>Would you like to <strong>view details</strong> (localization, references)?</p>
                     </div>`;
                 }
+
                 window.addChatMessage(htmlResult, false);
                 return;
             }
