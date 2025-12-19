@@ -3788,13 +3788,15 @@ window.handleAIQuery = async function (query) {
                 break;
             }
         }
-
+        // 3. GROUP ORTHOLOG QUESTIONS (ALL 5 SPECIES) - MOVE THIS HERE (high priority)
         if (requestedOrganism && 
-            (qLower.includes('joubert') || qLower.includes('primary ciliopathy') || 
-             qLower.includes('motile ciliopathy') || qLower.includes('atypical ciliopathy') || 
-             qLower.includes('all ciliopathy') || qLower.includes('ciliopathies'))) {
+        (qLower.includes('joubert') || qLower.includes('primary ciliopathy') || 
+         qLower.includes('motile ciliopathy') || qLower.includes('atypical ciliopathy') || 
+         qLower.includes('all ciliopathy') || qLower.includes('ciliopathies'))) {
+        let targetGenes = new Set();
+        return; // important: return so it doesn't fall through
+        }
 
-            let targetGenes = new Set();
 
             // Collect human genes from the group
             if (qLower.includes('all ciliopathy') || qLower.includes('ciliopathies')) {
