@@ -3768,7 +3768,6 @@ window.handleAIQuery = async function (query) {
             return;
         }
                // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
-              // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
        // === 2. GROUP ORTHOLOGS (MUST BE BEFORE GENERAL DISEASE LIST) ===
         const organismKeywords = {
             'mouse': 'Mouse',
@@ -3790,10 +3789,18 @@ window.handleAIQuery = async function (query) {
             }
         }
 
+        // Only run if a model organism is mentioned AND a ciliopathy group is mentioned
         if (requestedOrganism && 
-            (qLower.includes('joubert') || qLower.includes('primary ciliopathy') || 
-             qLower.includes('motile ciliopathy') || qLower.includes('atypical ciliopathy') || 
-             qLower.includes('all ciliopathy') || qLower.includes('ciliopathies'))) {
+            (qLower.includes('senior løken') || 
+             qLower.includes('bardet biedl') || 
+             qLower.includes('meckel gruber') || 
+             qLower.includes('joubert') || 
+             qLower.includes('primary ciliopathy') || 
+             qLower.includes('motile ciliopathy') || 
+             qLower.includes('atypical ciliopathy') || 
+             qLower.includes('all ciliopathy') || 
+             qLower.includes('ciliopathies') ||
+             qLower.includes('ciliopathy genes'))) {
 
             let targetGenes = new Set();
 
