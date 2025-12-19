@@ -3768,26 +3768,6 @@ window.handleAIQuery = async function (query) {
             return;
         }
                // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
-        // Handles: "mouse corresponding genes in Joubert", "Drosophila homologs of primary ciliopathy genes", etc.
-        const organismKeywords = {
-            'mouse': 'Mouse',
-            'drosophila': 'Drosophila',
-            'fly': 'Drosophila',
-            'c. elegans': 'C_elegans',
-            'worm': 'C_elegans',
-            'zebrafish': 'Zebrafish',
-            'fish': 'Zebrafish',
-            'xenopus': 'Xenopus',
-            'frog': 'Xenopus'
-        };
-
-        let requestedOrganism = null;
-        for (const [keyword, field] of Object.entries(organismKeywords)) {
-            if (qLower.includes(keyword)) {
-                requestedOrganism = field;
-                break;
-            }
-        }
               // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
         // Handles: "mouse corresponding genes in Joubert", "Drosophila homologs of primary ciliopathy genes", etc.
         const organismKeywords = {
