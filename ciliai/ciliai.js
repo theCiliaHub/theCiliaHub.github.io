@@ -3788,15 +3788,34 @@ window.handleAIQuery = async function (query) {
                 break;
             }
         }
-        // 3. GROUP ORTHOLOG QUESTIONS (ALL 5 SPECIES) - MOVE THIS HERE (high priority)
-        if (requestedOrganism && 
-        (qLower.includes('joubert') || qLower.includes('primary ciliopathy') || 
-         qLower.includes('motile ciliopathy') || qLower.includes('atypical ciliopathy') || 
-         qLower.includes('all ciliopathy') || qLower.includes('ciliopathies'))) {
-        let targetGenes = new Set();
-        return; // important: return so it doesn't fall through
+              // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
+        // Handles: "mouse corresponding genes in Joubert", "Drosophila homologs of primary ciliopathy genes", etc.
+        const organismKeywords = {
+            'mouse': 'Mouse',
+            'drosophila': 'Drosophila',
+            'fly': 'Drosophila',
+            'c. elegans': 'C_elegans',
+            'worm': 'C_elegans',
+            'zebrafish': 'Zebrafish',
+            'fish': 'Zebrafish',
+            'xenopus': 'Xenopus',
+            'frog': 'Xenopus'
+        };
+
+        let requestedOrganism = null;
+        for (const [keyword, field] of Object.entries(organismKeywords)) {
+            if (qLower.includes(keyword)) {
+                requestedOrganism = field;
+                break;
+            }
         }
 
+        if (requestedOrganism && 
+            (qLower.includes('joubert') || qLower.includes('primary ciliopathy') || 
+             qLower.includes('motile ciliopathy') || qLower.includes('atypical ciliopathy') || 
+             qLower.includes('all ciliopathy') || qLower.includes('ciliopathies'))) {
+
+            let targetGenes = new Set();
 
             // Collect human genes from the group
             if (qLower.includes('all ciliopathy') || qLower.includes('ciliopathies')) {
