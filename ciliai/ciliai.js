@@ -3407,6 +3407,120 @@ window.handleAIQuery = async function (query) {
             }
         }
 
+                  // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
+       // === 2. GROUP ORTHOLOGS (MUST BE BEFORE GENERAL DISEASE LIST) ==
+
+        const organismKeywords = {
+            'mouse': 'Mouse',
+            'drosophila': 'Drosophila',
+            'fly': 'Drosophila',
+            'c. elegans': 'C_elegans',
+            'worm': 'C_elegans',
+            'zebrafish': 'Zebrafish',
+            'fish': 'Zebrafish',
+            'xenopus': 'Xenopus',
+            'frog': 'Xenopus'
+        };
+
+        let requestedOrganism = null;
+        for (const [keyword, field] of Object.entries(organismKeywords)) {
+            if (qLower.includes(keyword)) {
+                requestedOrganism = field;
+                break;
+            }
+        }
+
+        // Only run if a model organism is mentioned AND a ciliopathy group is mentioned
+        if (requestedOrganism && 
+            (qLower.includes('senior løken') || 
+             qLower.includes('bardet biedl') || 
+             qLower.includes('meckel gruber') || 
+             qLower.includes('joubert') || 
+             qLower.includes('primary ciliopathy') || 
+             qLower.includes('motile ciliopathy') || 
+             qLower.includes('atypical ciliopathy') || 
+             qLower.includes('all ciliopathy') || 
+             qLower.includes('ciliopathies') ||
+             qLower.includes('ciliopathy genes'))) {
+
+            let targetGenes = new Set();
+
+            // Collect human genes
+            if (qLower.includes('all ciliopathy') || qLower.includes('ciliopathies')) {
+                ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'].forEach(className => {
+                    window.CiliAI.masterData.forEach(gene => {
+                        if (gene.ciliopathy_classification === className) {
+                            targetGenes.add(gene.Gene);
+                        }
+                    });
+                });
+            } else if (qLower.includes('primary ciliopathy')) {
+                window.CiliAI.masterData.forEach(gene => {
+                    if (gene.ciliopathy_classification === 'Primary Ciliopathies') {
+                        targetGenes.add(gene.Gene);
+                    }
+                });
+            } else if (qLower.includes('motile ciliopathy')) {
+                window.CiliAI.masterData.forEach(gene => {
+                    if (gene.ciliopathy_classification === 'Motile Ciliopathies') {
+                        targetGenes.add(gene.Gene);
+                    }
+                });
+            } else if (qLower.includes('atypical ciliopathy')) {
+                window.CiliAI.masterData.forEach(gene => {
+                    if (gene.ciliopathy_classification === 'Atypical Ciliopathies') {
+                        targetGenes.add(gene.Gene);
+                    }
+                });
+            } else if (qLower.includes('joubert')) {
+                window.CiliAI.masterData.forEach(gene => {
+                    if (gene.Ciliopathy && normalizeTerm(gene.Ciliopathy).includes('joubert')) {
+                        targetGenes.add(gene.Gene);
+                    }
+                });
+            }
+
+            if (targetGenes.size === 0) {
+                window.addChatMessage(`<div class="ai-result-card"><p>No genes found for the requested group.</p></div>`, false);
+                return;
+            }
+
+            const mappings = [];
+            targetGenes.forEach(humanGene => {
+                const geneData = window.CiliAI.lookups.geneMap[humanGene];
+                if (geneData) {
+                    const orthoField = `Ortholog_${requestedOrganism}`;
+                    const ortholog = geneData[orthoField];
+                    if (ortholog && ortholog !== 'null' && ortholog.trim()) {
+                        mappings.push({ human: humanGene, ortholog: ortholog.trim() });
+                    }
+                }
+            });
+
+            if (mappings.length === 0) {
+                const orgName = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
+                window.addChatMessage(`<div class="ai-result-card"><p>No ${orgName} orthologs found.</p></div>`, false);
+                return;
+            }
+
+            mappings.sort((a, b) => a.human.localeCompare(b.human));
+            const listHtml = mappings.map(m => `<li><strong>${m.human}</strong> → <em>${m.ortholog}</em></li>`).join('');
+
+            const groupName = qLower.includes('all') ? 'All Ciliopathies' :
+                              qLower.includes('joubert') ? 'Joubert Syndrome' :
+                              qLower.includes('primary') ? 'Primary Ciliopathies' :
+                              qLower.includes('motile') ? 'Motile Ciliopathies' :
+                              qLower.includes('atypical') ? 'Atypical Ciliopathies' : 'Group';
+
+            const orgDisplay = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
+
+            window.addChatMessage(`<div class="ai-result-card">
+                <h4>${orgDisplay} Orthologs: ${groupName}</h4>
+                <p><strong>${mappings.length}</strong> mappings:</p>
+                <ul style="columns: 2;">${listHtml}</ul>
+            </div>`, false);
+            return; // Critical: stop further processing
+        }
         // === A. List diseases in classification ===
         if (matchedClassification && !qLower.includes('genes')) {
             const diseases = classificationMap[matchedClassification];
@@ -3767,119 +3881,7 @@ window.handleAIQuery = async function (query) {
             window.addChatMessage(htmlResult, false);
             return;
         }
-               // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
-       // === 2. GROUP ORTHOLOGS (MUST BE BEFORE GENERAL DISEASE LIST) ===
-        const organismKeywords = {
-            'mouse': 'Mouse',
-            'drosophila': 'Drosophila',
-            'fly': 'Drosophila',
-            'c. elegans': 'C_elegans',
-            'worm': 'C_elegans',
-            'zebrafish': 'Zebrafish',
-            'fish': 'Zebrafish',
-            'xenopus': 'Xenopus',
-            'frog': 'Xenopus'
-        };
-
-        let requestedOrganism = null;
-        for (const [keyword, field] of Object.entries(organismKeywords)) {
-            if (qLower.includes(keyword)) {
-                requestedOrganism = field;
-                break;
-            }
-        }
-
-        // Only run if a model organism is mentioned AND a ciliopathy group is mentioned
-        if (requestedOrganism && 
-            (qLower.includes('senior løken') || 
-             qLower.includes('bardet biedl') || 
-             qLower.includes('meckel gruber') || 
-             qLower.includes('joubert') || 
-             qLower.includes('primary ciliopathy') || 
-             qLower.includes('motile ciliopathy') || 
-             qLower.includes('atypical ciliopathy') || 
-             qLower.includes('all ciliopathy') || 
-             qLower.includes('ciliopathies') ||
-             qLower.includes('ciliopathy genes'))) {
-
-            let targetGenes = new Set();
-
-            // Collect human genes
-            if (qLower.includes('all ciliopathy') || qLower.includes('ciliopathies')) {
-                ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'].forEach(className => {
-                    window.CiliAI.masterData.forEach(gene => {
-                        if (gene.ciliopathy_classification === className) {
-                            targetGenes.add(gene.Gene);
-                        }
-                    });
-                });
-            } else if (qLower.includes('primary ciliopathy')) {
-                window.CiliAI.masterData.forEach(gene => {
-                    if (gene.ciliopathy_classification === 'Primary Ciliopathies') {
-                        targetGenes.add(gene.Gene);
-                    }
-                });
-            } else if (qLower.includes('motile ciliopathy')) {
-                window.CiliAI.masterData.forEach(gene => {
-                    if (gene.ciliopathy_classification === 'Motile Ciliopathies') {
-                        targetGenes.add(gene.Gene);
-                    }
-                });
-            } else if (qLower.includes('atypical ciliopathy')) {
-                window.CiliAI.masterData.forEach(gene => {
-                    if (gene.ciliopathy_classification === 'Atypical Ciliopathies') {
-                        targetGenes.add(gene.Gene);
-                    }
-                });
-            } else if (qLower.includes('joubert')) {
-                window.CiliAI.masterData.forEach(gene => {
-                    if (gene.Ciliopathy && normalizeTerm(gene.Ciliopathy).includes('joubert')) {
-                        targetGenes.add(gene.Gene);
-                    }
-                });
-            }
-
-            if (targetGenes.size === 0) {
-                window.addChatMessage(`<div class="ai-result-card"><p>No genes found for the requested group.</p></div>`, false);
-                return;
-            }
-
-            const mappings = [];
-            targetGenes.forEach(humanGene => {
-                const geneData = window.CiliAI.lookups.geneMap[humanGene];
-                if (geneData) {
-                    const orthoField = `Ortholog_${requestedOrganism}`;
-                    const ortholog = geneData[orthoField];
-                    if (ortholog && ortholog !== 'null' && ortholog.trim()) {
-                        mappings.push({ human: humanGene, ortholog: ortholog.trim() });
-                    }
-                }
-            });
-
-            if (mappings.length === 0) {
-                const orgName = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
-                window.addChatMessage(`<div class="ai-result-card"><p>No ${orgName} orthologs found.</p></div>`, false);
-                return;
-            }
-
-            mappings.sort((a, b) => a.human.localeCompare(b.human));
-            const listHtml = mappings.map(m => `<li><strong>${m.human}</strong> → <em>${m.ortholog}</em></li>`).join('');
-
-            const groupName = qLower.includes('all') ? 'All Ciliopathies' :
-                              qLower.includes('joubert') ? 'Joubert Syndrome' :
-                              qLower.includes('primary') ? 'Primary Ciliopathies' :
-                              qLower.includes('motile') ? 'Motile Ciliopathies' :
-                              qLower.includes('atypical') ? 'Atypical Ciliopathies' : 'Group';
-
-            const orgDisplay = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
-
-            window.addChatMessage(`<div class="ai-result-card">
-                <h4>${orgDisplay} Orthologs: ${groupName}</h4>
-                <p><strong>${mappings.length}</strong> mappings:</p>
-                <ul style="columns: 2;">${listHtml}</ul>
-            </div>`, false);
-            return; // Critical: stop further processing
-        }
+    
         
                 // === Mouse Knockout Phenotype Handler ===
         if (qLower.includes('mouse') && (qLower.includes('knockout') || qLower.includes('phenotype')) && qLower.includes('of')) {
