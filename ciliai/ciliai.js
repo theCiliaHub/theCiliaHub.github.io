@@ -3769,7 +3769,7 @@ window.handleAIQuery = async function (query) {
         }
                // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
               // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
-        // Handles: "mouse corresponding genes in Joubert", "Drosophila homologs of primary ciliopathy genes", etc.
+       // === 2. GROUP ORTHOLOGS (MUST BE BEFORE GENERAL DISEASE LIST) ===
         const organismKeywords = {
             'mouse': 'Mouse',
             'drosophila': 'Drosophila',
@@ -3797,7 +3797,7 @@ window.handleAIQuery = async function (query) {
 
             let targetGenes = new Set();
 
-            // Collect human genes from the group
+            // Collect human genes
             if (qLower.includes('all ciliopathy') || qLower.includes('ciliopathies')) {
                 ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'].forEach(className => {
                     window.CiliAI.masterData.forEach(gene => {
@@ -3833,57 +3833,45 @@ window.handleAIQuery = async function (query) {
             }
 
             if (targetGenes.size === 0) {
-                window.addChatMessage(`<div class="ai-result-card"><p>No human genes found for the requested ciliopathy group.</p></div>`, false);
+                window.addChatMessage(`<div class="ai-result-card"><p>No genes found for the requested group.</p></div>`, false);
                 return;
             }
 
-            // Collect orthologs for the requested organism
             const mappings = [];
             targetGenes.forEach(humanGene => {
                 const geneData = window.CiliAI.lookups.geneMap[humanGene];
                 if (geneData) {
                     const orthoField = `Ortholog_${requestedOrganism}`;
                     const ortholog = geneData[orthoField];
-                    if (ortholog && ortholog !== 'null' && ortholog.trim() !== '') {
-                        mappings.push({
-                            human: humanGene,
-                            ortholog: ortholog.trim()
-                        });
+                    if (ortholog && ortholog !== 'null' && ortholog.trim()) {
+                        mappings.push({ human: humanGene, ortholog: ortholog.trim() });
                     }
                 }
             });
 
             if (mappings.length === 0) {
-                const orgName = requestedOrganism === 'C_elegans' ? 'C. elegans' :
-                                requestedOrganism === 'Drosophila' ? 'Drosophila' :
-                                requestedOrganism;
-                window.addChatMessage(`<div class="ai-result-card">
-                    <p>No ${orgName} orthologs found for genes in this ciliopathy group.</p>
-                </div>`, false);
+                const orgName = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
+                window.addChatMessage(`<div class="ai-result-card"><p>No ${orgName} orthologs found.</p></div>`, false);
                 return;
             }
 
-            // Sort and build list
             mappings.sort((a, b) => a.human.localeCompare(b.human));
-
-            const listHtml = mappings.map(m => 
-                `<li><strong>${m.human}</strong> → <em>${m.ortholog}</em></li>`
-            ).join('');
+            const listHtml = mappings.map(m => `<li><strong>${m.human}</strong> → <em>${m.ortholog}</em></li>`).join('');
 
             const groupName = qLower.includes('all') ? 'All Ciliopathies' :
                               qLower.includes('joubert') ? 'Joubert Syndrome' :
                               qLower.includes('primary') ? 'Primary Ciliopathies' :
                               qLower.includes('motile') ? 'Motile Ciliopathies' :
-                              qLower.includes('atypical') ? 'Atypical Ciliopathies' : 'Selected Group';
+                              qLower.includes('atypical') ? 'Atypical Ciliopathies' : 'Group';
 
             const orgDisplay = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
 
             window.addChatMessage(`<div class="ai-result-card">
                 <h4>${orgDisplay} Orthologs: ${groupName}</h4>
-                <p>Found <strong>${mappings.length}</strong> mappings from <strong>${targetGenes.size}</strong> human genes:</p>
-                <ul style="columns: 2; font-size: 13px;">${listHtml}</ul>
+                <p><strong>${mappings.length}</strong> mappings:</p>
+                <ul style="columns: 2;">${listHtml}</ul>
             </div>`, false);
-            return;
+            return; // Critical: stop further processing
         }
         
                 // === Mouse Knockout Phenotype Handler ===
