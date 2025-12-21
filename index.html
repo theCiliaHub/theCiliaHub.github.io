@@ -16,6 +16,7 @@
             --status-loading-bg: #e3f2fd;
             --status-ready-bg: #e8f5e9;
             --status-error-bg: #ffebee;
+            --highlight-gold: #f6e05e;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -98,6 +99,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
         }
 
         .viz-header {
@@ -106,13 +108,25 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: white;
+            z-index: 10;
         }
 
         .viz-title { font-size: 15px; font-weight: 600; color: var(--accent-text); }
         .save-btn { border: none; background: var(--secondary-blue); color: var(--primary-blue); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .save-btn:hover { background: var(--primary-blue); color: white; }
 
-        #cilia-svg { flex: 1; width: 100%; height: 100%; position: relative; overflow: auto; }
+        #cilia-svg { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+
+        /* Spatial Highlight Effects */
+        .cilia-part { cursor: pointer; transition: all 0.3s ease; fill: #cbd5e0; stroke: #4a5568; stroke-width: 1; }
+        .cilia-part:hover { fill: #a0aec0; }
+        .cilia-part.active-highlight { 
+            fill: var(--highlight-gold) !important; 
+            stroke: var(--primary-blue); 
+            stroke-width: 2.5; 
+            filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8)); 
+        }
 
         /* --- Right Panel: Chat --- */
         .right-panel {
@@ -152,7 +166,19 @@
         .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
         .status.error { background: var(--status-error-bg); color: #c62828; }
 
-        svg { width: 100%; height: auto; }
+        .gene-badge {
+            background: var(--secondary-blue);
+            color: var(--primary-blue);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .gene-badge:hover { background: var(--primary-blue); color: white; }
+
+        .spatial-hint { font-size: 11px; color: var(--primary-blue); margin-top: 8px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
     </style>
 </head>
 <body>
@@ -185,10 +211,11 @@
             
             <div class="viz-card">
                 <div class="viz-header">
-                    <div class="viz-title">Visualization</div>
+                    <div class="viz-title" id="current-viz-title">Diagram: Spatial Intelligence</div>
                     <button class="save-btn" onclick="window.downloadPlot('cilia-svg', 'ciliai-plot')">📷 Save</button>
                 </div>
-                <div id="cilia-svg"></div>
+                <div id="cilia-svg">
+                    </div>
             </div>
         </div>
 
@@ -205,16 +232,15 @@
                             👋 Welcome to CiliAI
                         </div>
                         <p style="margin: 0 0 10px 0; color: #4a5568;">
-                            I am your research assistant for ciliary biology. I can visualize gene expression (scRNA), analyze phylogenetic conservation, and retrieve screen data.
+                            I am your research assistant for ciliary biology. Click parts of the diagram or ask me questions to explore.
                         </p>
                         <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.5px;">
                             Try asking:
                         </p>
                         <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                             <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">What is IFT88?</span>
-                            <span class="gene-badge" onclick="window.handleAIQuery('plot umap for FOXJ1')">Display expression of FOXJ1 in Lung scRNA-seq</span>
-                            <span class="gene-badge" onclick="window.handleAIQuery('Show evolution of BBS1')">Show the evolutionary conservarion of BBS1</span>
                             <span class="gene-badge" onclick="window.handleAIQuery('List transition zone genes')">List transition zone genes</span>
+                            <span class="gene-badge" onclick="window.handleAIQuery('plot umap for FOXJ1')">scRNA-seq for FOXJ1</span>
                         </div>
                     </div>
                 </div>
@@ -240,17 +266,84 @@
             data: { umap: [] },
             masterData: [],
             ready: false,
-            lookups: {},
+            lookups: {
+                geneMap: {},
+                umapByGene: {}
+            },
             cellDataCache: {},
             lastQueryContext: { type: null, data: [], term: null }, 
             CiliAI_UMAP: null 
         };
 
-        // 2. Define Helper Functions 
-        if (typeof window.log !== "function") {
-            window.log = (msg) => console.log(`[CiliAI] ${msg}`);
-        }
+        // 2. SPATIAL INTELLIGENCE MANAGER
+        const SpatialManager = {
+            locMap: {
+                "transition zone": "transition-zone",
+                "tz": "transition-zone",
+                "axoneme": "axoneme",
+                "axonemal": "axoneme",
+                "basal body": "basal-body",
+                "centriole": "basal-body",
+                "ciliary tip": "ciliary-tip",
+                "membrane": "ciliary-membrane",
+                "ciliary membrane": "ciliary-membrane"
+            },
+            highlight: function(locTerm) {
+                if (!locTerm) return false;
+                const container = document.getElementById('cilia-svg');
+                if (!container.querySelector('svg')) window.generateAndInjectSVG();
 
+                const svgId = this.locMap[locTerm.toLowerCase().trim()];
+                document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+                
+                if (svgId) {
+                    const element = document.getElementById(svgId);
+                    if (element) {
+                        element.classList.add('active-highlight');
+                        this.zoomTo(element);
+                        return true;
+                    }
+                }
+                return false;
+            },
+            zoomTo: function(element) {
+                const viewport = document.getElementById('viewport-group');
+                if (!viewport) return;
+                const box = element.getBBox();
+                const centerX = box.x + box.width / 2;
+                const centerY = box.y + box.height / 2;
+                const dx = 150 - centerX;
+                const dy = 200 - centerY;
+                viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
+                viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+                viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
+            },
+            resetZoom: function() {
+                const viewport = document.getElementById('viewport-group');
+                if (viewport) viewport.style.transform = `translate(0, 0) scale(1)`;
+                document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+            }
+        };
+
+        window.generateAndInjectSVG = function() {
+            const container = document.getElementById('cilia-svg');
+            document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+            container.innerHTML = `
+                <svg id="cilia-diagram" viewBox="0 0 300 450" width="100%" height="100%" style="background:white">
+                    <g id="viewport-group">
+                        <path id="ciliary-membrane" class="cilia-part" d="M110,40 Q150,10 190,40 L190,320 Q240,320 240,380 L60,380 Q60,320 110,320 Z" fill-opacity="0.05" />
+                        <path id="ciliary-tip" class="cilia-part" d="M125,40 Q150,20 175,40 L175,60 L125,60 Z" />
+                        <rect id="axoneme" class="cilia-part" x="130" y="60" width="40" height="260" />
+                        <rect id="transition-zone" class="cilia-part" x="125" y="320" width="50" height="30" />
+                        <rect id="basal-body" class="cilia-part" x="115" y="350" width="70" height="50" rx="4" />
+                    </g>
+                </svg>
+            `;
+            // Attach reset listener
+            container.onclick = (e) => { if(e.target.id === 'cilia-diagram') SpatialManager.resetZoom(); };
+        };
+
+        // 3. Define Helper Functions 
         window.addChatMessage = function(html, isUser = false) {
             const messages = document.getElementById('messages');
             if (!messages) return;
@@ -268,176 +361,108 @@
                 statusEl.className = `status-badge status ${state}`; 
             }
         };
-        
-        window.downloadPlot = function(divId, filename) {
-            if (typeof Plotly !== 'undefined') {
-                Plotly.downloadImage(divId, {format: 'png', filename: filename});
-            }
-        };
 
-        // Data Loading Logic (UPDATED WITH SPLIT KIDNEY JSON)
-        window.loadCiliAIData = async function(timeoutMs = 60000) {
+        // Updated Data Loading Logic
+        window.loadCiliAIData = async function() {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-            const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-            const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
-            
-            // Kidney Data Files (Structure + Split Expression)
-            const kidneyStructUrl = baseUrl + 'kidney_structure.json';
-            const kidneyExpr1Url = baseUrl + 'kidney_expression_part1.json';
-            const kidneyExpr2Url = baseUrl + 'kidney_expression_part2.json';
-            
             try {
-                window.log(`Fetching databases...`);
-                
-                // Fetch all 5 files in parallel
-                const [mainRes, lookupsRes, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
-                    fetch(mainDbUrl), 
-                    fetch(lookupsUrl),
-                    fetch(kidneyStructUrl),
-                    fetch(kidneyExpr1Url),
-                    fetch(kidneyExpr2Url)
+                const [mainRes, lookupsRes] = await Promise.all([
+                    fetch(baseUrl + 'ciliAI_master_database.json'), 
+                    fetch(baseUrl + 'ciliAI_lookups.json')
                 ]);
-
-                if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
-                if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
-
                 const mainData = await mainRes.json();
                 const lookupData = await lookupsRes.json();
 
-                // Initialize Core Data
                 window.CiliAI.masterData = mainData.masterData || [];
                 window.CiliAI.lookups = lookupData.lookups || {};
                 window.CiliAI_UMAP = mainData.umapData || [];
-                window.CiliAI.data.umap = mainData.umapData || [];
-                window.CiliAI.datasets.lung.umap = mainData.umapData; // Lung is inside master DB
+                window.CiliAI.datasets.lung.umap = mainData.umapData;
 
-                // Process Kidney Data (Merge Split Files)
-                if (kStructRes.ok && kExpr1Res.ok && kExpr2Res.ok) {
-                    const kStruct = await kStructRes.json();
-                    const kExpr1 = await kExpr1Res.json();
-                    const kExpr2 = await kExpr2Res.json();
-                    
-                    // Merge expression parts
-                    const fullExpression = { ...kExpr1, ...kExpr2 };
-                    
-                    window.CiliAI.datasets.kidney = {
-                        name: "Human Kidney",
-                        umap: kStruct.umap,
-                        expression: fullExpression, // Merged Sparse Map
-                        metadata: kStruct.metadata,
-                        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']]
-                    };
-                    window.log(`Kidney dataset loaded: ${kStruct.metadata?.n_cells || 'N/A'} cells, ${Object.keys(fullExpression).length} genes.`);
-                } else {
-                    console.warn("Kidney data files failed to load (check file names/locations).");
-                }
-                
-                // Build Fast Lookups
-                window.CiliAI.lookups.umapByGene = {};
-                window.CiliAI.lookups.geneMap = {};
-                window.CiliAI.cellDataCache = {}; // Lung cache
-                
-                if (Array.isArray(window.CiliAI_UMAP)) {
-                    window.CiliAI_UMAP.forEach(point => {
-                        if (point.Gene) window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
-                    });
-                }
-                
                 mainData.masterData.forEach(gene => {
                     if (gene.Gene) {
-                        window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
-                        if (gene.expression?.scRNA) {
-                            window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
-                        }
+                        const symbol = gene.Gene.toUpperCase();
+                        window.CiliAI.lookups.geneMap[symbol] = gene;
+                        if (gene.expression?.scRNA) window.CiliAI.cellDataCache[symbol] = gene.expression.scRNA;
                     }
                 });
                 
                 window.CiliAI.ready = true;
-                window.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
                 return true;
-
             } catch (err) {
                 console.error("Failed to load CiliAI databases:", err);
-                window.log(`Load error: ${err.message}`);
                 window.updateStatus('Load failed', 'error');
-                window.CiliAI.ready = false;
                 return false;
             }
         };
 
-        // 3. Define UI Handlers (These bridge the HTML events to the core logic in ciliAI.js)
+        // UI Routing Handlers
         window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
-            if (!input || !input.value.trim()) return;
             const query = input.value.trim();
+            if (!query) return;
             window.addChatMessage(query, true);
             input.value = '';
-            
-            if (typeof window.handleAIQuery === 'function') {
-                window.handleAIQuery(query);
-            } else {
-                window.addChatMessage('CiliAI logic engine not yet loaded. Please wait.', false);
-            }
+            window.handleAIQuery(query);
         };
 
         window.searchGene = function() {
             const input = document.getElementById('geneSearch');
-            if (!input || !input.value.trim()) return;
             const gene = input.value.trim().toUpperCase();
+            if (!gene) return;
             window.addChatMessage(`Tell me about ${gene}`, true);
-            
-            if (typeof window.handleAIQuery === 'function') {
-                window.handleAIQuery(`What is ${gene}?`);
-            } else {
-                window.addChatMessage('CiliAI logic engine not yet loaded. Please wait.', false);
-            }
+            window.handleAIQuery(`What is ${gene}?`);
         };
 
-        window.showDefaultUMAP = function() {
-            window.addChatMessage('Loading UMAP visualization for WDR31...', false);
+        // Patch handleAIQuery to include Spatial feedback
+        const originalHandleAIQuery = window.handleAIQuery;
+        window.handleAIQuery = async function(query) {
+            // 1. Core Logic (ciliai.js will handle the bulk)
+            if (typeof window.processAIResponse === 'function') {
+                // If using the processAIResponse from the snippet logic
+            }
             
-            if (typeof window.renderUMAPPlot === 'function') {
-                window.renderUMAPPlot('WDR31');
+            // 2. Spatial Intelligence Interceptor
+            const qLower = query.toLowerCase();
+            const genesFound = query.toUpperCase().match(/\b([A-Z0-9]{3,})\b/g) || [];
+            let locToHighlight = null;
+
+            // Check if query is about a location
+            Object.keys(SpatialManager.locMap).forEach(loc => {
+                if (qLower.includes(loc)) locToHighlight = loc;
+            });
+
+            // Check if query is about a gene with known location
+            if (!locToHighlight && genesFound.length > 0) {
+                const geneData = window.CiliAI.lookups.geneMap[genesFound[0]];
+                if (geneData && geneData.Localization) locToHighlight = geneData.Localization;
             }
+
+            if (locToHighlight) {
+                const success = SpatialManager.highlight(locToHighlight);
+                if (success) {
+                    setTimeout(() => {
+                        const lastMsg = document.querySelector('.messages-area .assistant:last-child .ciliai-message-content');
+                        if (lastMsg) lastMsg.innerHTML += `<div class="spatial-hint">✨ Diagram auto-zoomed to ${locToHighlight}</div>`;
+                    }, 500);
+                }
+            }
+
+            // Call external logic engine
+            if (typeof window.executeLogic === 'function') window.executeLogic(query);
+            else if (originalHandleAIQuery) originalHandleAIQuery(query);
         };
-        
-        // Enter key press to send message
-        document.getElementById('chatInput').addEventListener('keydown', function(event) {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault(); 
-                window.handleUserSend();
-            }
-        });
 
-
-        // 4. Initialization
         async function init() {
             window.updateStatus('Loading databases...', 'loading');
+            window.generateAndInjectSVG();
             const loaded = await window.loadCiliAIData();
-            
             if (loaded) {
                 window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-                window.addChatMessage(`✅ Database loaded with ${window.CiliAI.masterData.length} genes!`, false);
-                
-                // Render the initial UMAP plot
-                if (typeof window.renderUMAPPlot === 'function') {
-                    window.showDefaultUMAP();
-                } else {
-                    window.addChatMessage('Plotting engine is loading...', false);
-                }
-            } else {
-                window.updateStatus('Failed to load', 'error');
             }
         }
 
-        // Start on page load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
-        }
+        init();
     </script>
-    
     <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
 </body>
 </html>
