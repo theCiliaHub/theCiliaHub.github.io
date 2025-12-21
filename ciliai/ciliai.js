@@ -3269,8 +3269,9 @@ window.handleCellTypeQuestion = function(query) {
 
 
 /**
- * 2. UPDATED QUERY HANDLER
- * - Injects "Switch to Kidney/Lung" button directly into the chat response (Intent 12).
+ * UPDATED QUERY HANDLER
+ * Supports: Cell-types, GO Terms, Domains, Spatial Intelligence, 
+ * UMAP/Dataset Switching, and Comparative Analytics.
  */
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
@@ -3279,7 +3280,7 @@ window.handleAIQuery = async function (query) {
 
     const qLower = query.toLowerCase().trim();
 
-    // === 1. HIGHEST PRIORITY: Cell-type specific questions (your existing fix) ===
+    // === 1. HIGHEST PRIORITY: Cell-type specific questions ===
     if (qLower.includes('cilia-restricted') ||
         qLower.includes('cilia restricted') ||
         qLower.includes('ciliary-restricted') ||
@@ -3304,6 +3305,112 @@ window.handleAIQuery = async function (query) {
 
         let htmlResult = null;
         let match;
+        const genes = extractMultipleGenes(query);
+
+        // === 2. NEW INTENT: GO TERMS (e.g., "GO: intraflagellar transport") ===
+        if (qLower.includes('go:') || qLower.includes('go term')) {
+            const goTerm = qLower.replace(/go:|go term:/g, '').trim();
+            // Look up in the goMap built from masterData
+            const geneList = window.CiliAI.lookups.goMap[goTerm] || 
+                             window.CiliAI.lookups.goMap[goTerm.toUpperCase()];
+            
+            if (geneList && geneList.length > 0) {
+                const dataObjects = geneList.map(g => ({ gene: g }));
+                window.CiliAI.lastQueryContext = { 
+                    type: 'list_followup', 
+                    data: dataObjects, 
+                    term: `GO: ${goTerm}` 
+                };
+                htmlResult = `<div class="ai-result-card">
+                    <h4>Gene Ontology: ${goTerm}</h4>
+                    <p>I found <strong>${geneList.length}</strong> genes associated with this term.</p>
+                    <p>Would you like to <strong>view the list</strong> in the main panel?</p>
+                </div>`;
+            } else {
+                htmlResult = `<div class="ai-result-card"><p>No genes found for GO term: <strong>${goTerm}</strong>.</p></div>`;
+            }
+        }
+
+        // === 3. NEW INTENT: PROTEIN DOMAINS (e.g., "Domains for IFT88") ===
+        else if (qLower.includes('domain')) {
+            const targetGene = genes.length > 0 ? genes[0] : null;
+            if (targetGene) {
+                const pfamData = window.CiliAI.lookups.pfamByGene[targetGene];
+                htmlResult = `<div class="ai-result-card">
+                    <h4>Domain Architecture: ${targetGene}</h4>
+                    <p>Analyzing Pfam domains and sequence motifs...</p>
+                    <button class="ciliai-button" onclick="window.showDomainViewer('${targetGene}')">
+                        🧬 Launch Domain Viewer
+                    </button>
+                </div>`;
+            }
+        }
+
+        // === 4. UPDATED SPATIAL INTENT: High-Precision Localization (PCM1, TMEM17, etc.) ===
+        if (htmlResult === null) {
+            let locMatch = null;
+            // Scan SpatialManager for precise markers or structures
+            if (window.SpatialManager && window.SpatialManager.locMap) {
+                Object.keys(window.SpatialManager.locMap).forEach(loc => {
+                    if (qLower.includes(loc)) locMatch = loc;
+                });
+            }
+
+            if (locMatch) {
+                // Trigger Visual Zoom
+                if (window.showDiagram && window.SpatialManager) {
+                    window.showDiagram();
+                    window.SpatialManager.highlight(locMatch);
+                    htmlResult = `<div class="ai-result-card">
+                        <p>✨ I have highlighted the <strong>${locMatch}</strong> in the ciliary diagram and auto-zoomed to the structure.</p>
+                    </div>`;
+                }
+            }
+        }
+
+        // === 5. GENERALIZED: Expression/Location queries ===
+        if (htmlResult === null && qLower.includes('where is') && qLower.includes('expressed')) {
+            if (genes.length > 0) {
+                const geneSymbol = genes[0];
+                const gene = window.CiliAI.lookups.geneMap[geneSymbol];
+                if (!gene) {
+                    htmlResult = `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found.</p></div>`;
+                } else {
+                    const loc = gene.Localization || 'Not specified';
+                    htmlResult = `<div class="ai-result-card">
+                        <h4>Expression of ${geneSymbol}</h4>
+                        <p><strong>Primary Localization:</strong> ${loc}</p>
+                        <p>${geneSymbol} is vital for ciliary integrity. Ask to "plot umap" to see tissue-specific levels.</p>
+                    </div>`;
+                }
+            }
+        }
+
+        // === 6. DATASET SWITCHING & UMAP (Intent 12) ===
+        else if (htmlResult === null && (
+            qLower.includes('plot') || qLower.includes('display') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('expression')
+        )) {
+            if (qLower.includes('kidney')) window.CiliAI.activeDataset = 'kidney';
+            else if (qLower.includes('lung')) window.CiliAI.activeDataset = 'lung';
+            
+            let target = genes.length > 0 ? genes[0] : 'WDR31';
+            await window.renderUMAPPlot(target);
+
+            const currentDS = window.CiliAI.activeDataset || 'lung';
+            const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
+            const nextDSLabel = nextDS.charAt(0).toUpperCase() + nextDS.slice(1);
+
+            htmlResult = `<div class="ai-result-card">
+                <p>Displaying <strong>${currentDS.toUpperCase()}</strong> scRNA-seq UMAP for <strong>${target}</strong>.</p>
+                <div style="margin-top: 10px; display: flex; gap: 8px;">
+                    <button class="ciliai-button" style="background:#4a5568;" 
+                        onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${target}'); window.addChatMessage('Switched to ${nextDSLabel} data.', true); window.handleAIQuery('plot umap for ${target}');">
+                        🔄 Switch to ${nextDSLabel}
+                    </button>
+                </div>
+            </div>`;
+        }
+  
 
         // === 2. GENERALIZED: "Where is [GENE] expressed?" for ANY ciliary gene ===
         if (qLower.includes('where is') && qLower.includes('expressed')) {
@@ -4507,19 +4614,126 @@ function handleScreenReferenceFollowup() {
         }
     }; 
 
-// CRITICAL: Must be defined in ciliAI.js
+// CRITICAL: Consolidated high-fidelity SVG injector
 window.generateAndInjectSVG = function() {
-    const svgContainer = document.getElementById('cilia-svg');
-    if (!svgContainer) return;
-    
-    // Minimal SVG placeholder (as agreed upon previously)
-    const svgHTML = `
-        <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="16" fill="#005b96">Ciliary Diagram Placeholder</text>
-            </svg>`;
-    
-    svgContainer.innerHTML = svgHTML;
+    const container = document.getElementById('cilia-svg');
+    if (!container) return;
+
+    // Update the UI Title if it exists
+    const titleEl = document.getElementById('current-viz-title');
+    if (titleEl) titleEl.textContent = "Diagram: Spatial Intelligence";
+
+    container.innerHTML = `
+        <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+            <defs>
+                <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#F8FAFC;" />
+                    <stop offset="100%" style="stop-color:#F1F5F9;" />
+                </linearGradient>
+                <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" style="stop-color:#E2E8F0;" />
+                    <stop offset="100%" style="stop-color:#CBD5E1;" />
+                </radialGradient>
+                <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#5b21b6;" />
+                    <stop offset="100%" style="stop-color:#4c1d95;" />
+                </linearGradient>
+                <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#475569;" />
+                    <stop offset="100%" style="stop-color:#334155;" />
+                </linearGradient>
+                <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#0891b2;" />
+                    <stop offset="100%" style="stop-color:#0e7490;" />
+                </linearGradient>
+                <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#2563eb;" />
+                    <stop offset="100%" style="stop-color:#1d4ed8;" />
+                </linearGradient>
+                <linearGradient id="heatmapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00ff00" stop-opacity="0.2" />
+                    <stop offset="50%" stop-color="#ffff00" stop-opacity="0.5" />
+                    <stop offset="100%" stop-color="#ff0000" stop-opacity="0.8" />
+                </linearGradient>
+            </defs>
+            
+            <g id="viewport-group" transform="translate(0, 0)">
+                <path id="cell-body" class="cilia-part" tabindex="0"
+                      fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
+                      d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
+                
+                <circle id="nucleus" class="cilia-part" tabindex="0"
+                        fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
+                        cx="140" cy="290" r="35"/>
+                
+                <rect id="basal-body" class="cilia-part" tabindex="0" 
+                      fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
+                      x="130" y="165" width="20" height="15" rx="2"/>
+                
+                <path id="transition-zone" class="cilia-part" tabindex="0"
+                      fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
+                      d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
+                
+                <path id="ciliary-membrane" class="cilia-part" tabindex="0"
+                      fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
+                      d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
+                
+                <path id="axoneme" class="cilia-part" tabindex="0"
+                      fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
+                      d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
+                
+                <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
+                    <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">PCM1</text>
+                    <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">TMEM17</text>
+                    <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">ARL13B</text>
+                    <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">β2-tubulin</text>
+                </g>
+
+                <circle cx="140" cy="172.5" r="3" fill="#5b21b6" opacity="0.6"><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/></circle>
+                <circle cx="140" cy="157.5" r="3" fill="#475569" opacity="0.6"><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.3s"/></circle>
+                <circle cx="140" cy="90" r="3" fill="#0891b2" opacity="0.6"><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.6s"/></circle>
+                <circle cx="140" cy="42.5" r="3" fill="#2563eb" opacity="0.6"><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.9s"/></circle>
+            </g>
+        </svg>
+    `;
+
+    attachSVGListeners(container);
 };
+
+// Internal helper for clean event attachment
+function attachSVGListeners(container) {
+    container.onmouseenter = () => { container.querySelector('.cilia-labels').style.opacity = '1'; };
+    container.onmouseleave = () => { container.querySelector('.cilia-labels').style.opacity = '0'; };
+
+    container.querySelectorAll('.cilia-part').forEach(part => {
+        part.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight', 'selected'));
+            part.classList.add('active-highlight', 'selected');
+            
+            // Logic for labels and auto-zoom
+            const labels = container.querySelector('.cilia-labels');
+            if (labels) {
+                labels.style.opacity = '1';
+                const partToGene = {'basal-body': 'PCM1', 'transition-zone': 'TMEM17', 'ciliary-membrane': 'ARL13B', 'axoneme': 'β2-tubulin'};
+                const geneName = partToGene[part.id];
+                labels.querySelectorAll('text').forEach(t => {
+                    t.style.fill = t.textContent.includes(geneName) ? '#ff6b6b' : '';
+                    t.style.fontSize = t.textContent.includes(geneName) ? '14px' : '12px';
+                });
+            }
+            if (window.SpatialManager) window.SpatialManager.zoomTo(part);
+        });
+    });
+
+    container.onclick = (e) => {
+        if(e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
+            if (window.SpatialManager) window.SpatialManager.resetZoom();
+            const labels = container.querySelector('.cilia-labels');
+            if (labels) labels.style.opacity = '0';
+        }
+    };
+}
 
 // Global exposure block:
 window.log = log;
