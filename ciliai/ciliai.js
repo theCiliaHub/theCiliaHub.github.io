@@ -1,35 +1,24 @@
 /* ==============================================================
- * CiliAI – Unified Logic Engine (v8.5 – Optimized Initialization)
+ * CiliAI – Unified Logic Engine (v7.1 – Safe Initialization)
  * ============================================================== */
 
 // 1. GLOBAL STATE & UTILITIES
 // ==========================================================
-
-// Global exposure for core utilities
+// 5. Ensure these are exposed globally
 window.extractMultipleGenes = extractMultipleGenes;
 window.getTPMInCellType = getTPMInCellType;
 
-// Core metadata and caches
-window.liPhylogenyCache = null;
-window.neversPhylogenyCache = null;
-window.CiliAI_UMAP = null;
 
-// Persistence and Context
-window.CiliAI = window.CiliAI || {};
-window.CiliAI.ready = false;
-window.CiliAI.lastQueryContext = { type: null, data: [], term: null };
-window.CiliAI.zoomStateByGene = {};
-window.CiliAI.activeDataset = 'lung';
+// 6. Auto-run the fixed router
+console.log("CiliAI v7.2 – Cell-Type Questions FIXED & Fully Supported");
 
-// Default genes for phylogeny queries
-const DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
 
-// Define logger to prevent ReferenceErrors
+// Define logger first to prevent ReferenceErrors
 if (typeof window.log !== "function") {
     window.log = function (msg) { console.log(`CiliAI LOG: ${msg}`); };
 }
 
-// Define chat handler
+// Define chat handler immediately so UI doesn't crash during load
 if (typeof window.addChatMessage !== "function") {
     window.addChatMessage = function (msg, isUser) { 
         const chatWindow = document.getElementById('messages');
@@ -45,86 +34,24 @@ if (typeof window.addChatMessage !== "function") {
     };
 }
 
-// 2. SPATIAL INTELLIGENCE MANAGER
-// ==========================================================
-/* ==============================================================
- * CiliAI – Unified Logic Engine (v8.6 - Global Definition Fix)
- * ============================================================== */
+// Global variables for lazy loading
+window.liPhylogenyCache = null;
+window.neversPhylogenyCache = null;
 
-// 1. DEFINE SPATIAL MANAGER IMMEDIATELY
-window.SpatialManager = {
-    locMap: {
-        "basal body": "basal-body", "pcm1": "basal-body", "centriole": "basal-body",
-        "transition zone": "transition-zone", "tmem17": "transition-zone",
-        "axoneme": "axoneme", "tubulin": "axoneme",
-        "ciliary membrane": "ciliary-membrane", "arl13b": "ciliary-membrane",
-        "ciliary tip": "ciliary-tip", "nucleus": "nucleus", "cytosol": "cell-body"
-    },
-    highlight: function(locTerm) {
-        const svgId = this.locMap[locTerm.toLowerCase().trim()];
-        const element = document.getElementById(svgId);
-        if (element) {
-            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
-            element.classList.add('active-highlight');
-            this.zoomTo(element);
-        }
-    },
-    zoomTo: function(element) {
-        const viewport = document.getElementById('viewport-group');
-        if (!viewport) return;
-        const box = element.getBBox();
-        const cx = box.x + box.width / 2;
-        const cy = box.y + box.height / 2;
-        viewport.style.transform = `translate(${150 - cx}px, ${200 - cy}px) scale(1.8)`;
-    },
-    resetZoom: function() {
-        const viewport = document.getElementById('viewport-group');
-        if (viewport) viewport.style.transform = "translate(0,0) scale(1)";
-    }
-};
+// Default genes for phylogeny queries
+const DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
 
-// 2. DEFINE SVG INJECTOR IMMEDIATELY (REMOVING PLACEHOLDER)
-window.generateAndInjectSVG = function() {
-    const container = document.getElementById('cilia-svg');
-    if (!container) return;
+    // --- Global variables to hold your data ---
+let ciliaryGeneMap = new Map();
+let screenDatabase = {};
+let lastQueryContext = { type: null, data: [], term: null };
+// Phylogeny data is lazy-loaded, so it starts as null
+window.liPhylogenyCache = null;
+window.neversPhylogenyCache = null;
+window.CiliAI_UMAP = null; // This will be populated from the master DB
 
-    container.innerHTML = `
-        <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
-            <defs>
-                <linearGradient id="pcm1Gradient"><stop offset="0%" stop-color="#5b21b6"/><stop offset="100%" stop-color="#4c1d95"/></linearGradient>
-                <linearGradient id="tmem17Gradient"><stop offset="0%" stop-color="#475569"/><stop offset="100%" stop-color="#334155"/></linearGradient>
-                <linearGradient id="arl13bGradient"><stop offset="0%" stop-color="#0891b2"/><stop offset="100%" stop-color="#0e7490"/></linearGradient>
-                <linearGradient id="tubulinGradient"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1d4ed8"/></linearGradient>
-            </defs>
-            <g id="viewport-group" style="transition: transform 0.6s ease;">
-                <path id="cell-body" class="cilia-part" fill="#f8fafc" stroke="#E2E8F0" d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
-                <circle id="nucleus" class="cilia-part" fill="#CBD5E1" cx="140" cy="290" r="35"/>
-                <rect id="basal-body" class="cilia-part" fill="url(#pcm1Gradient)" x="130" y="165" width="20" height="15" rx="2"/>
-                <path id="transition-zone" class="cilia-part" fill="url(#tmem17Gradient)" d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
-                <path id="ciliary-membrane" class="cilia-part" fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4" d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
-                <path id="axoneme" class="cilia-part" fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5" d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
-                <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
-                    <text x="140" y="188" text-anchor="middle" font-size="10" font-weight="700" fill="#5b21b6">PCM1</text>
-                    <text x="140" y="158" text-anchor="middle" font-size="10" font-weight="700" fill="#475569">TMEM17</text>
-                </g>
-            </g>
-        </svg>`;
-
-    // Call the listener helper defined below
-    attachSVGListeners(container);
-};
-
-function attachSVGListeners(container) {
-    container.querySelectorAll('.cilia-part').forEach(part => {
-        part.addEventListener('click', (e) => {
-            e.stopPropagation();
-            window.SpatialManager.highlight(part.id.replace('-', ' '));
-        });
-    });
-    // Hover logic for labels
-    container.onmouseenter = () => { container.querySelector('.cilia-labels').style.opacity = '1'; };
-    container.onmouseleave = () => { container.querySelector('.cilia-labels').style.opacity = '0'; };
-}
+   
+    // --- Data Maps (These are now just for the AI brain) ---
 
 
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
@@ -271,12 +198,19 @@ function getDiseaseClassificationMap() {
         };
     }
 
+   
 
-function ensureArray(value) {
+    function ensureArray(value) {
         if (Array.isArray(value)) return value;
         if (value === null || value === undefined) return [];
         return [value];
     }
+
+    // ==========================================================
+   // ==========================================================
+// 2. DATA LOADING & PROCESSING
+// ==========================================================
+  
 
 // -----------------------------------------------------------------------------------
 // (NOTE: Definitions for populatePlotTypes, updateCustomizationPanel, updatePlotExplanation, 
@@ -3335,9 +3269,8 @@ window.handleCellTypeQuestion = function(query) {
 
 
 /**
- * UPDATED QUERY HANDLER
- * Supports: Cell-types, GO Terms, Domains, Spatial Intelligence, 
- * UMAP/Dataset Switching, and Comparative Analytics.
+ * 2. UPDATED QUERY HANDLER
+ * - Injects "Switch to Kidney/Lung" button directly into the chat response (Intent 12).
  */
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
@@ -3346,7 +3279,7 @@ window.handleAIQuery = async function (query) {
 
     const qLower = query.toLowerCase().trim();
 
-    // === 1. HIGHEST PRIORITY: Cell-type specific questions ===
+    // === 1. HIGHEST PRIORITY: Cell-type specific questions (your existing fix) ===
     if (qLower.includes('cilia-restricted') ||
         qLower.includes('cilia restricted') ||
         qLower.includes('ciliary-restricted') ||
@@ -3371,112 +3304,6 @@ window.handleAIQuery = async function (query) {
 
         let htmlResult = null;
         let match;
-        const genes = extractMultipleGenes(query);
-
-        // === 2. NEW INTENT: GO TERMS (e.g., "GO: intraflagellar transport") ===
-        if (qLower.includes('go:') || qLower.includes('go term')) {
-            const goTerm = qLower.replace(/go:|go term:/g, '').trim();
-            // Look up in the goMap built from masterData
-            const geneList = window.CiliAI.lookups.goMap[goTerm] || 
-                             window.CiliAI.lookups.goMap[goTerm.toUpperCase()];
-            
-            if (geneList && geneList.length > 0) {
-                const dataObjects = geneList.map(g => ({ gene: g }));
-                window.CiliAI.lastQueryContext = { 
-                    type: 'list_followup', 
-                    data: dataObjects, 
-                    term: `GO: ${goTerm}` 
-                };
-                htmlResult = `<div class="ai-result-card">
-                    <h4>Gene Ontology: ${goTerm}</h4>
-                    <p>I found <strong>${geneList.length}</strong> genes associated with this term.</p>
-                    <p>Would you like to <strong>view the list</strong> in the main panel?</p>
-                </div>`;
-            } else {
-                htmlResult = `<div class="ai-result-card"><p>No genes found for GO term: <strong>${goTerm}</strong>.</p></div>`;
-            }
-        }
-
-        // === 3. NEW INTENT: PROTEIN DOMAINS (e.g., "Domains for IFT88") ===
-        else if (qLower.includes('domain')) {
-            const targetGene = genes.length > 0 ? genes[0] : null;
-            if (targetGene) {
-                const pfamData = window.CiliAI.lookups.pfamByGene[targetGene];
-                htmlResult = `<div class="ai-result-card">
-                    <h4>Domain Architecture: ${targetGene}</h4>
-                    <p>Analyzing Pfam domains and sequence motifs...</p>
-                    <button class="ciliai-button" onclick="window.showDomainViewer('${targetGene}')">
-                        🧬 Launch Domain Viewer
-                    </button>
-                </div>`;
-            }
-        }
-
-        // === 4. UPDATED SPATIAL INTENT: High-Precision Localization (PCM1, TMEM17, etc.) ===
-        if (htmlResult === null) {
-            let locMatch = null;
-            // Scan SpatialManager for precise markers or structures
-            if (window.SpatialManager && window.SpatialManager.locMap) {
-                Object.keys(window.SpatialManager.locMap).forEach(loc => {
-                    if (qLower.includes(loc)) locMatch = loc;
-                });
-            }
-
-            if (locMatch) {
-                // Trigger Visual Zoom
-                if (window.showDiagram && window.SpatialManager) {
-                    window.showDiagram();
-                    window.SpatialManager.highlight(locMatch);
-                    htmlResult = `<div class="ai-result-card">
-                        <p>✨ I have highlighted the <strong>${locMatch}</strong> in the ciliary diagram and auto-zoomed to the structure.</p>
-                    </div>`;
-                }
-            }
-        }
-
-        // === 5. GENERALIZED: Expression/Location queries ===
-        if (htmlResult === null && qLower.includes('where is') && qLower.includes('expressed')) {
-            if (genes.length > 0) {
-                const geneSymbol = genes[0];
-                const gene = window.CiliAI.lookups.geneMap[geneSymbol];
-                if (!gene) {
-                    htmlResult = `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found.</p></div>`;
-                } else {
-                    const loc = gene.Localization || 'Not specified';
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>Expression of ${geneSymbol}</h4>
-                        <p><strong>Primary Localization:</strong> ${loc}</p>
-                        <p>${geneSymbol} is vital for ciliary integrity. Ask to "plot umap" to see tissue-specific levels.</p>
-                    </div>`;
-                }
-            }
-        }
-
-        // === 6. DATASET SWITCHING & UMAP (Intent 12) ===
-        else if (htmlResult === null && (
-            qLower.includes('plot') || qLower.includes('display') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('expression')
-        )) {
-            if (qLower.includes('kidney')) window.CiliAI.activeDataset = 'kidney';
-            else if (qLower.includes('lung')) window.CiliAI.activeDataset = 'lung';
-            
-            let target = genes.length > 0 ? genes[0] : 'WDR31';
-            await window.renderUMAPPlot(target);
-
-            const currentDS = window.CiliAI.activeDataset || 'lung';
-            const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
-            const nextDSLabel = nextDS.charAt(0).toUpperCase() + nextDS.slice(1);
-
-            htmlResult = `<div class="ai-result-card">
-                <p>Displaying <strong>${currentDS.toUpperCase()}</strong> scRNA-seq UMAP for <strong>${target}</strong>.</p>
-                <div style="margin-top: 10px; display: flex; gap: 8px;">
-                    <button class="ciliai-button" style="background:#4a5568;" 
-                        onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${target}'); window.addChatMessage('Switched to ${nextDSLabel} data.', true); window.handleAIQuery('plot umap for ${target}');">
-                        🔄 Switch to ${nextDSLabel}
-                    </button>
-                </div>
-            </div>`;
-        }
-  
 
         // === 2. GENERALIZED: "Where is [GENE] expressed?" for ANY ciliary gene ===
         if (qLower.includes('where is') && qLower.includes('expressed')) {
@@ -4680,6 +4507,20 @@ function handleScreenReferenceFollowup() {
         }
     }; 
 
+// CRITICAL: Must be defined in ciliAI.js
+window.generateAndInjectSVG = function() {
+    const svgContainer = document.getElementById('cilia-svg');
+    if (!svgContainer) return;
+    
+    // Minimal SVG placeholder (as agreed upon previously)
+    const svgHTML = `
+        <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="16" fill="#005b96">Ciliary Diagram Placeholder</text>
+            </svg>`;
+    
+    svgContainer.innerHTML = svgHTML;
+};
+
 // Global exposure block:
 window.log = log;
 window.react = react;
@@ -5081,5 +4922,5 @@ window.runDashboardSearch = function() {
     style.textContent = css;
     document.head.appendChild(style);
     
-console.log("CiliAI v8.5 – Harmonized Logic & Spatial Intelligence Ready");
+    console.log("CiliAI Layout Fixes Applied.");
 })();
