@@ -116,7 +116,58 @@
         .save-btn { border: none; background: var(--secondary-blue); color: var(--primary-blue); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .save-btn:hover { background: var(--primary-blue); color: white; }
 
-        #cilia-svg { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #viz-stage {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            height: calc(100% - 60px); /* Account for header height */
+        }
+
+        #cilia-svg, #plotly-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            overflow: hidden;
+        }
+
+        #cilia-svg {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+        }
+
+        #plotly-container {
+            display: none;
+            background: white;
+        }
+
+        /* Plotly-specific fixes */
+        .plotly-graph-div {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            position: relative !important;
+        }
+        
+        .js-plotly-plot, .plot-container {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            position: relative !important;
+        }
+        
+        .main-svg {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+        }
 
         /* Spatial Highlight Effects */
         .cilia-part { cursor: pointer; transition: all 0.3s ease; fill: #cbd5e0; stroke: #4a5568; stroke-width: 1; }
@@ -212,10 +263,12 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title" id="current-viz-title">Diagram: Spatial Intelligence</div>
-                    <button class="save-btn" onclick="window.downloadPlot('cilia-svg', 'ciliai-plot')">📷 Save</button>
+                    <button class="save-btn" onclick="window.downloadCurrentVisualization()">📷 Save</button>
                 </div>
-                <div id="cilia-svg">
-                    </div>
+                <div id="viz-stage">
+                    <div id="cilia-svg"></div>
+                    <div id="plotly-container"></div>
+                </div>
             </div>
         </div>
 
@@ -272,7 +325,8 @@
             },
             cellDataCache: {},
             lastQueryContext: { type: null, data: [], term: null }, 
-            CiliAI_UMAP: null 
+            CiliAI_UMAP: null,
+            currentPlot: null
         };
 
         // 2. SPATIAL INTELLIGENCE MANAGER
@@ -362,6 +416,197 @@
             }
         };
 
+        // Enhanced Plot management functions
+        window.showPlot = function(plotData, title = "Gene Expression UMAP") {
+            // Hide SVG and show plot container
+            document.getElementById('cilia-svg').style.display = 'none';
+            const plotContainer = document.getElementById('plotly-container');
+            plotContainer.style.display = 'block';
+            document.getElementById('current-viz-title').textContent = title;
+            
+            // Clear any existing plot
+            plotContainer.innerHTML = '';
+            
+            // Calculate available dimensions
+            const vizCard = document.querySelector('.viz-card');
+            const vizHeader = document.querySelector('.viz-header');
+            const availableHeight = vizCard.clientHeight - vizHeader.clientHeight - 40; // With padding
+            const availableWidth = vizCard.clientWidth - 40;
+            
+            // Create plot with responsive settings
+            const layout = {
+                ...plotData.layout,
+                autosize: true,
+                width: availableWidth,
+                height: availableHeight,
+                margin: {
+                    l: 60,
+                    r: 30,
+                    b: 60,
+                    t: 50,
+                    pad: 10
+                },
+                paper_bgcolor: 'white',
+                plot_bgcolor: 'white',
+                xaxis: {
+                    ...plotData.layout?.xaxis,
+                    automargin: true,
+                    tickfont: { size: 10 }
+                },
+                yaxis: {
+                    ...plotData.layout?.yaxis,
+                    automargin: true,
+                    tickfont: { size: 10 }
+                },
+                font: { size: 11 },
+                showlegend: true,
+                legend: {
+                    x: 1.02,
+                    y: 1,
+                    xanchor: 'left',
+                    yanchor: 'top',
+                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    bordercolor: '#e1e8ed',
+                    borderwidth: 1,
+                    font: { size: 10 }
+                }
+            };
+            
+            // Create the plot
+            window.CiliAI.currentPlot = Plotly.newPlot('plotly-container', plotData.data, layout, {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
+                modeBarButtonsToAdd: [],
+                scrollZoom: false
+            });
+            
+            // Force resize after render
+            setTimeout(() => {
+                Plotly.Plots.resize(window.CiliAI.currentPlot);
+            }, 100);
+            
+            // Add resize listener
+            window.addEventListener('resize', () => {
+                if (window.CiliAI.currentPlot) {
+                    setTimeout(() => {
+                        Plotly.Plots.resize(window.CiliAI.currentPlot);
+                    }, 50);
+                }
+            });
+        };
+
+        window.showDiagram = function() {
+            document.getElementById('plotly-container').style.display = 'none';
+            document.getElementById('cilia-svg').style.display = 'flex';
+            document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+            window.CiliAI.currentPlot = null;
+        };
+
+        window.downloadCurrentVisualization = function() {
+            if (window.CiliAI.currentPlot) {
+                // Download plot as PNG
+                Plotly.downloadImage(window.CiliAI.currentPlot, {
+                    format: 'png',
+                    filename: 'ciliai-umap-plot',
+                    width: 1200,
+                    height: 800,
+                    scale: 2
+                });
+            } else {
+                // Download SVG diagram
+                const svgElement = document.getElementById('cilia-diagram');
+                if (svgElement) {
+                    const svgData = new XMLSerializer().serializeToString(svgElement);
+                    const blob = new Blob([svgData], {type: 'image/svg+xml'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'ciliai-diagram.svg';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+            }
+        };
+
+        // Example UMAP plot function for testing
+        window.createTestUMAP = function(geneName = "FOXJ1") {
+            // Generate sample UMAP data
+            const n = 1000;
+            const data = [];
+            
+            // Create clusters
+            for (let i = 0; i < 5; i++) {
+                const clusterData = {
+                    x: [],
+                    y: [],
+                    text: [],
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: `Cluster ${i + 1}`,
+                    marker: {
+                        size: 6,
+                        color: `hsl(${i * 60}, 70%, 60%)`,
+                        opacity: 0.7,
+                        line: {
+                            width: 1,
+                            color: 'white'
+                        }
+                    }
+                };
+                
+                for (let j = 0; j < n/5; j++) {
+                    clusterData.x.push(Math.random() * 10 + i * 3);
+                    clusterData.y.push(Math.random() * 10);
+                    clusterData.text.push(`${geneName} exp: ${Math.random().toFixed(2)}`);
+                }
+                data.push(clusterData);
+            }
+            
+            // Highlight FOXJ1 expressing cells
+            const highlightData = {
+                x: [5, 8, 12, 15],
+                y: [5, 8, 3, 10],
+                mode: 'markers',
+                type: 'scatter',
+                name: `${geneName} High`,
+                marker: {
+                    size: 12,
+                    color: '#ff6b6b',
+                    symbol: 'star',
+                    line: {
+                        width: 2,
+                        color: 'white'
+                    }
+                },
+                text: [`${geneName} High Expression`, `${geneName} High Expression`, `${geneName} High Expression`, `${geneName} High Expression`]
+            };
+            data.push(highlightData);
+            
+            const plotData = {
+                data: data,
+                layout: {
+                    title: {
+                        text: `UMAP: ${geneName} Expression in Lung Organoid`,
+                        font: { size: 14 }
+                    },
+                    xaxis: {
+                        title: 'UMAP 1',
+                        gridcolor: '#f1f5f9'
+                    },
+                    yaxis: {
+                        title: 'UMAP 2',
+                        gridcolor: '#f1f5f9'
+                    }
+                }
+            };
+            
+            window.showPlot(plotData, `UMAP: ${geneName} Expression`);
+        };
+
         // Updated Data Loading Logic
         window.loadCiliAIData = async function() {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
@@ -445,6 +690,14 @@
                         if (lastMsg) lastMsg.innerHTML += `<div class="spatial-hint">✨ Diagram auto-zoomed to ${locToHighlight}</div>`;
                     }, 500);
                 }
+            }
+
+            // Test UMAP for FOXJ1 queries
+            if (qLower.includes('foxj1') && (qLower.includes('umap') || qLower.includes('plot') || qLower.includes('scrna'))) {
+                setTimeout(() => {
+                    window.createTestUMAP('FOXJ1');
+                }, 1000);
+                return;
             }
 
             // Call external logic engine
