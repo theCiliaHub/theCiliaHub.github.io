@@ -17,6 +17,12 @@
             --status-ready-bg: #e8f5e9;
             --status-error-bg: #ffebee;
             --highlight-gold: #f6e05e;
+            
+            /* Professional Blue-Compatible Anatomical Palette */
+            --color-pcm1: #5b21b6;      /* Professional Deep Violet - PCM1 (Basal Body) */
+            --color-tmem17: #475569;    /* Slate Blue - TMEM17 (Transition Zone) */
+            --color-arl13b: #0891b2;    /* Muted Cyan - ARL13B (Membrane) */
+            --color-tubulin: #2563eb;   /* Royal Blue - Beta2-tubulin (Axoneme) */
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -382,97 +388,194 @@
             }
         };
 
-        // 3. SVG GENERATION FUNCTION - ADDED YOUR CILIA SVG
+        // 3. SVG GENERATION FUNCTION
         window.generateAndInjectSVG = function() {
             const container = document.getElementById('cilia-svg');
             document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
             container.innerHTML = `
-                <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+                <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
                     <defs>
                         <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#F5F7FA;" />
-                            <stop offset="100%" style="stop-color:#E9EDF2;" />
+                            <stop offset="0%" style="stop-color:#F8FAFC;" />
+                            <stop offset="100%" style="stop-color:#F1F5F9;" />
                         </linearGradient>
                         <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
-                            <stop offset="0%" style="stop-color:#D8DEE9;" />
-                            <stop offset="100%" style="stop-color:#C8D0DD;" />
+                            <stop offset="0%" style="stop-color:#E2E8F0;" />
+                            <stop offset="100%" style="stop-color:#CBD5E1;" />
                         </radialGradient>
                         
-                        <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#ff9999;" />
-                            <stop offset="100%" style="stop-color:#ff6b6b;" />
+                        <!-- Professional Blue-Compatible Color Palette (PCM1 Updated to Violet) -->
+                        <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#5b21b6;" /> <!-- Violet -->
+                            <stop offset="100%" style="stop-color:#4c1d95;" />
+                        </linearGradient>
+                        
+                        <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#475569;" /> <!-- Slate Blue -->
+                            <stop offset="100%" style="stop-color:#334155;" />
+                        </linearGradient>
+                        
+                        <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#0891b2;" /> <!-- Muted Cyan -->
+                            <stop offset="100%" style="stop-color:#0e7490;" />
+                        </linearGradient>
+                        
+                        <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#2563eb;" /> <!-- Royal Blue -->
+                            <stop offset="100%" style="stop-color:#1d4ed8;" />
                         </linearGradient>
                     </defs>
-                    <g id="viewport-group">
+                    
+                    <g id="viewport-group" transform="translate(0, 0)">
+                        <!-- Cell Body (Background) -->
                         <path id="cell-body" class="cilia-part" tabindex="0"
-                              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="2"
-                              d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
+                              fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
+                              d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
+                        
+                        <!-- Nucleus -->
                         <circle id="nucleus" class="cilia-part" tabindex="0"
-                                fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="2"
-                                cx="150" cy="320" r="40"/>
-                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#4A5568" x="140" y="195" width="20" height="15"/>
+                                fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
+                                cx="140" cy="290" r="35"/>
+                        
+                        <!-- Basal Body (PCM1) -->
+                        <rect id="basal-body" class="cilia-part" tabindex="0" 
+                              fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
+                              x="130" y="165" width="20" height="15" rx="2"/>
+                        
+                        <!-- Transition Zone (TMEM17) -->
                         <path id="transition-zone" class="cilia-part" tabindex="0"
-                              fill="#718096" stroke="#4A5568" stroke-width="2"
-                              d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+                              fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
+                              d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
+                        
+                        <!-- Ciliary Membrane (ARL13B) -->
                         <path id="ciliary-membrane" class="cilia-part" tabindex="0"
-                              fill="none" stroke="#A0AEC0" stroke-width="2" stroke-dasharray="4,4"
-                              d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+                              fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
+                              d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
+                        
+                        <!-- Axoneme (beta2-tubulin) -->
                         <path id="axoneme" class="cilia-part" tabindex="0"
-                              fill="none" stroke="#4A5568" stroke-width="2"
-                              d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
-                              
-                        <g class="cilia-labels">
-                            <text x="150" y="370" text-anchor="middle" font-size="10" fill="#4A5568">Cell Body</text>
-                            <text x="150" y="380" text-anchor="middle" font-size="10" fill="#4A5568">(Cytosol)</text>
+                              fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
+                              d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
+                        
+                        <!-- Gene Name Labels (Corrected Positions) -->
+                        <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
+                            <!-- PCM1 (Basal Body) -->
+                            <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">
+                                PCM1
+                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>
+                            </text>
                             
-                            <text x="150" y="280" text-anchor="middle" font-size="10" fill="#4A5568">Nucleus</text>
+                            <!-- TMEM17 (Transition Zone) -->
+                            <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">
+                                TMEM17
+                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+                            </text>
                             
-                            <text x="150" y="185" text-anchor="middle" font-size="10" fill="#4A5568">Basal Body</text>
+                            <!-- ARL13B (Ciliary Membrane) -->
+                            <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">
+                                ARL13B
+                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1s"/>
+                            </text>
                             
-                            <text x="150" y="170" text-anchor="middle" font-size="10" fill="#4A5568">Transition Zone</text>
-                            
-                            <text x="150" y="100" text-anchor="middle" font-size="10" fill="#4A5568">Ciliary Membrane</text>
-                            
-                            <text x="150" y="60" text-anchor="middle" font-size="10" fill="#4A5568">Axoneme</text>
+                            <!-- β2-tubulin (Axoneme) -->
+                            <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">
+                                β2-tubulin
+                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1.5s"/>
+                            </text>
                         </g>
+                        
+                        <!-- Subtle pulsing indicators -->
+                        <circle cx="140" cy="172.5" r="3" fill="#5b21b6" opacity="0.6" style="pointer-events: none;">
+                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        
+                        <circle cx="140" cy="157.5" r="3" fill="#475569" opacity="0.6" style="pointer-events: none;">
+                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+                        </circle>
+                        
+                        <circle cx="140" cy="90" r="3" fill="#0891b2" opacity="0.6" style="pointer-events: none;">
+                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+                        </circle>
+                        
+                        <circle cx="140" cy="42.5" r="3" fill="#2563eb" opacity="0.6" style="pointer-events: none;">
+                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.9s"/>
+                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.9s"/>
+                        </circle>
                     </g>
                 </svg>
             `;
             
-            // Add hover effect for labels
             container.onmouseenter = () => {
                 const labels = container.querySelector('.cilia-labels');
                 if (labels) labels.style.opacity = '1';
             };
+            
             container.onmouseleave = () => {
                 const labels = container.querySelector('.cilia-labels');
-                if (labels) labels.style.opacity = '0.8';
+                if (labels) labels.style.opacity = '0';
             };
             
-            // Initialize labels with slight opacity
-            const labels = container.querySelector('.cilia-labels');
-            if (labels) labels.style.opacity = '0.8';
-            
-            // Attach click handlers to all cilia parts
             const ciliaParts = container.querySelectorAll('.cilia-part');
             ciliaParts.forEach(part => {
                 part.addEventListener('click', (e) => {
                     e.stopPropagation();
                     document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
                     part.classList.add('active-highlight');
+                    
+                    const labels = container.querySelector('.cilia-labels');
+                    if (labels) {
+                        labels.style.opacity = '1';
+                        const partId = part.id;
+                        const geneMap = {
+                            'basal-body': 'PCM1',
+                            'transition-zone': 'TMEM17', 
+                            'ciliary-membrane': 'ARL13B',
+                            'axoneme': 'β2-tubulin'
+                        };
+                        
+                        labels.querySelectorAll('text').forEach(text => {
+                            text.style.fontWeight = '700';
+                            text.style.fontSize = '12px';
+                        });
+                        
+                        const geneName = geneMap[partId];
+                        if (geneName) {
+                            labels.querySelectorAll('text').forEach(text => {
+                                if (text.textContent.includes(geneName)) {
+                                    text.style.fontWeight = '900';
+                                    text.style.fontSize = '14px';
+                                    text.style.fill = '#ff6b6b';
+                                }
+                            });
+                        }
+                    }
                     SpatialManager.zoomTo(part);
                 });
             });
             
-            // Attach reset listener
             container.onclick = (e) => { 
                 if(e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
                     SpatialManager.resetZoom();
+                    const labels = container.querySelector('.cilia-labels');
+                    if (labels) {
+                        labels.style.opacity = '0';
+                        labels.querySelectorAll('text').forEach(text => {
+                            text.style.fontWeight = '700';
+                            text.style.fontSize = '12px';
+                            if (text.textContent.includes('PCM1')) text.style.fill = '#5b21b6';
+                            else if (text.textContent.includes('TMEM17')) text.style.fill = '#475569';
+                            else if (text.textContent.includes('ARL13B')) text.style.fill = '#0891b2';
+                            else if (text.textContent.includes('β2-tubulin')) text.style.fill = '#2563eb';
+                        });
+                    }
                 }
             };
         };
 
-        // 4. Define Helper Functions 
+        // 4. Helper Functions 
         window.addChatMessage = function(html, isUser = false) {
             const messages = document.getElementById('messages');
             if (!messages) return;
@@ -491,84 +594,45 @@
             }
         };
 
-        // Enhanced Plot management functions
         window.showPlot = function(plotData, title = "Gene Expression UMAP") {
-            // Hide SVG and show plot container
             document.getElementById('cilia-svg').style.display = 'none';
             const plotContainer = document.getElementById('plotly-container');
             plotContainer.style.display = 'block';
             document.getElementById('current-viz-title').textContent = title;
-            
-            // Clear any existing plot
             plotContainer.innerHTML = '';
             
-            // Calculate available dimensions
             const vizCard = document.querySelector('.viz-card');
             const vizHeader = document.querySelector('.viz-header');
-            const availableHeight = vizCard.clientHeight - vizHeader.clientHeight - 40; // With padding
+            const availableHeight = vizCard.clientHeight - vizHeader.clientHeight - 40;
             const availableWidth = vizCard.clientWidth - 40;
             
-            // Create plot with responsive settings
             const layout = {
                 ...plotData.layout,
                 autosize: true,
                 width: availableWidth,
                 height: availableHeight,
-                margin: {
-                    l: 60,
-                    r: 30,
-                    b: 60,
-                    t: 50,
-                    pad: 10
-                },
+                margin: { l: 60, r: 30, b: 60, t: 50, pad: 10 },
                 paper_bgcolor: 'white',
                 plot_bgcolor: 'white',
-                xaxis: {
-                    ...plotData.layout?.xaxis,
-                    automargin: true,
-                    tickfont: { size: 10 }
-                },
-                yaxis: {
-                    ...plotData.layout?.yaxis,
-                    automargin: true,
-                    tickfont: { size: 10 }
-                },
+                xaxis: { ...plotData.layout?.xaxis, automargin: true, tickfont: { size: 10 } },
+                yaxis: { ...plotData.layout?.yaxis, automargin: true, tickfont: { size: 10 } },
                 font: { size: 11 },
                 showlegend: true,
                 legend: {
-                    x: 1.02,
-                    y: 1,
-                    xanchor: 'left',
-                    yanchor: 'top',
-                    bgcolor: 'rgba(255, 255, 255, 0.8)',
-                    bordercolor: '#e1e8ed',
-                    borderwidth: 1,
-                    font: { size: 10 }
+                    x: 1.02, y: 1, xanchor: 'left', yanchor: 'top',
+                    bgcolor: 'rgba(255, 255, 255, 0.8)', bordercolor: '#e1e8ed', borderwidth: 1, font: { size: 10 }
                 }
             };
             
-            // Create the plot
             window.CiliAI.currentPlot = Plotly.newPlot('plotly-container', plotData.data, layout, {
-                responsive: true,
-                displayModeBar: true,
-                displaylogo: false,
+                responsive: true, displayModeBar: true, displaylogo: false,
                 modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
-                modeBarButtonsToAdd: [],
                 scrollZoom: false
             });
             
-            // Force resize after render
-            setTimeout(() => {
-                Plotly.Plots.resize(window.CiliAI.currentPlot);
-            }, 100);
-            
-            // Add resize listener
+            setTimeout(() => { Plotly.Plots.resize(window.CiliAI.currentPlot); }, 100);
             window.addEventListener('resize', () => {
-                if (window.CiliAI.currentPlot) {
-                    setTimeout(() => {
-                        Plotly.Plots.resize(window.CiliAI.currentPlot);
-                    }, 50);
-                }
+                if (window.CiliAI.currentPlot) setTimeout(() => { Plotly.Plots.resize(window.CiliAI.currentPlot); }, 50);
             });
         };
 
@@ -581,16 +645,8 @@
 
         window.downloadCurrentVisualization = function() {
             if (window.CiliAI.currentPlot) {
-                // Download plot as PNG
-                Plotly.downloadImage(window.CiliAI.currentPlot, {
-                    format: 'png',
-                    filename: 'ciliai-umap-plot',
-                    width: 1200,
-                    height: 800,
-                    scale: 2
-                });
+                Plotly.downloadImage(window.CiliAI.currentPlot, { format: 'png', filename: 'ciliai-umap-plot', width: 1200, height: 800, scale: 2 });
             } else {
-                // Download SVG diagram
                 const svgElement = document.getElementById('cilia-diagram');
                 if (svgElement) {
                     const svgData = new XMLSerializer().serializeToString(svgElement);
@@ -607,32 +663,14 @@
             }
         };
 
-        // Example UMAP plot function for testing
         window.createTestUMAP = function(geneName = "FOXJ1") {
-            // Generate sample UMAP data
             const n = 1000;
             const data = [];
-            
-            // Create clusters
             for (let i = 0; i < 5; i++) {
                 const clusterData = {
-                    x: [],
-                    y: [],
-                    text: [],
-                    mode: 'markers',
-                    type: 'scatter',
-                    name: `Cluster ${i + 1}`,
-                    marker: {
-                        size: 6,
-                        color: `hsl(${i * 60}, 70%, 60%)`,
-                        opacity: 0.7,
-                        line: {
-                            width: 1,
-                            color: 'white'
-                        }
-                    }
+                    x: [], y: [], text: [], mode: 'markers', type: 'scatter', name: `Cluster ${i + 1}`,
+                    marker: { size: 6, color: `hsl(${i * 60}, 70%, 60%)`, opacity: 0.7, line: { width: 1, color: 'white' } }
                 };
-                
                 for (let j = 0; j < n/5; j++) {
                     clusterData.x.push(Math.random() * 10 + i * 3);
                     clusterData.y.push(Math.random() * 10);
@@ -641,48 +679,16 @@
                 data.push(clusterData);
             }
             
-            // Highlight FOXJ1 expressing cells
             const highlightData = {
-                x: [5, 8, 12, 15],
-                y: [5, 8, 3, 10],
-                mode: 'markers',
-                type: 'scatter',
-                name: `${geneName} High`,
-                marker: {
-                    size: 12,
-                    color: '#ff6b6b',
-                    symbol: 'star',
-                    line: {
-                        width: 2,
-                        color: 'white'
-                    }
-                },
+                x: [5, 8, 12, 15], y: [5, 8, 3, 10], mode: 'markers', type: 'scatter', name: `${geneName} High`,
+                marker: { size: 12, color: '#ff6b6b', symbol: 'star', line: { width: 2, color: 'white' } },
                 text: [`${geneName} High Expression`, `${geneName} High Expression`, `${geneName} High Expression`, `${geneName} High Expression`]
             };
             data.push(highlightData);
-            
-            const plotData = {
-                data: data,
-                layout: {
-                    title: {
-                        text: `UMAP: ${geneName} Expression in Lung Organoid`,
-                        font: { size: 14 }
-                    },
-                    xaxis: {
-                        title: 'UMAP 1',
-                        gridcolor: '#f1f5f9'
-                    },
-                    yaxis: {
-                        title: 'UMAP 2',
-                        gridcolor: '#f1f5f9'
-                    }
-                }
-            };
-            
+            const plotData = { data: data, layout: { title: { text: `UMAP: ${geneName} Expression in Lung Organoid`, font: { size: 14 } }, xaxis: { title: 'UMAP 1', gridcolor: '#f1f5f9' }, yaxis: { title: 'UMAP 2', gridcolor: '#f1f5f9' } } };
             window.showPlot(plotData, `UMAP: ${geneName} Expression`);
         };
 
-        // Updated Data Loading Logic
         window.loadCiliAIData = async function() {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
             try {
@@ -715,7 +721,6 @@
             }
         };
 
-        // UI Routing Handlers
         window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
             const query = input.value.trim();
@@ -733,25 +738,18 @@
             window.handleAIQuery(`What is ${gene}?`);
         };
 
-        // Patch handleAIQuery to include Spatial feedback
         const originalHandleAIQuery = window.handleAIQuery;
         window.handleAIQuery = async function(query) {
-            // 1. Core Logic (ciliai.js will handle the bulk)
-            if (typeof window.processAIResponse === 'function') {
-                // If using the processAIResponse from the snippet logic
-            }
+            if (typeof window.processAIResponse === 'function') {}
             
-            // 2. Spatial Intelligence Interceptor
             const qLower = query.toLowerCase();
             const genesFound = query.toUpperCase().match(/\b([A-Z0-9]{3,})\b/g) || [];
             let locToHighlight = null;
 
-            // Check if query is about a location
             Object.keys(SpatialManager.locMap).forEach(loc => {
                 if (qLower.includes(loc)) locToHighlight = loc;
             });
 
-            // Check if query is about a gene with known location
             if (!locToHighlight && genesFound.length > 0) {
                 const geneData = window.CiliAI.lookups.geneMap[genesFound[0]];
                 if (geneData && geneData.Localization) locToHighlight = geneData.Localization;
@@ -767,15 +765,11 @@
                 }
             }
 
-            // Test UMAP for FOXJ1 queries
             if (qLower.includes('foxj1') && (qLower.includes('umap') || qLower.includes('plot') || qLower.includes('scrna'))) {
-                setTimeout(() => {
-                    window.createTestUMAP('FOXJ1');
-                }, 1000);
+                setTimeout(() => { window.createTestUMAP('FOXJ1'); }, 1000);
                 return;
             }
 
-            // Call external logic engine
             if (typeof window.executeLogic === 'function') window.executeLogic(query);
             else if (originalHandleAIQuery) originalHandleAIQuery(query);
         };
@@ -788,6 +782,10 @@
                 window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
             }
         }
+
+        document.getElementById('chatInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') window.handleUserSend();
+        });
 
         init();
     </script>
