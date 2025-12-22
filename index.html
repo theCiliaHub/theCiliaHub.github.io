@@ -803,22 +803,23 @@
                 }
             };
             
-            window.CiliAI.currentPlot = Plotly.newPlot('plotly-container', plotData.data, layout, {
+            // Fix: Use promise to safely handle Plotly.newPlot
+            Plotly.newPlot('plotly-container', plotData.data, layout, {
                 responsive: true, displayModeBar: true, displaylogo: false,
                 modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
                 scrollZoom: false
-            });
-            
-            // ✅ EXACTLY AS SPECIFIED: Add UMAP click handler
-            document.getElementById('plotly-container')
-                .on('plotly_click', e => {
+            }).then(gd => {
+                window.CiliAI.currentPlot = gd; // Store the DOM element
+                
+                // Add click listener
+                gd.on('plotly_click', e => {
                     const loc = e.points?.[0]?.customdata?.localization;
                     if (!loc) return;
                     window.showDiagram();
                     SpatialManager.highlight(loc, window.CiliAI.activeGeneContext);
                 });
+            });
             
-            setTimeout(() => { Plotly.Plots.resize(window.CiliAI.currentPlot); }, 100);
             window.addEventListener('resize', () => {
                 if (window.CiliAI.currentPlot) setTimeout(() => { Plotly.Plots.resize(window.CiliAI.currentPlot); }, 50);
             });
@@ -841,9 +842,12 @@
             domainContainer.innerHTML = '';
             document.getElementById('current-viz-title').textContent = `Pfam Domains: ${gene}`;
 
-            const pfam = window.CiliAI.lookups.pfamByGene[gene.toUpperCase()] || [];
+            // Safely access lookup
+            const lookup = window.CiliAI.lookups.pfamByGene || {};
+            const pfam = lookup[gene.toUpperCase()] || [];
+            
             if (!pfam.length) {
-                domainContainer.innerHTML = '<p>No Pfam domains found.</p>';
+                domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
                 return;
             }
 
@@ -963,94 +967,49 @@
             URL.revokeObjectURL(url);
         };
 
-        // ✅ EXACTLY AS SPECIFIED: UMAP with EXACT customdata structure
-        window.createTestUMAP = function(geneName = "FOXJ1") {
-            const n = 1000;
-            const data = [];
-            const localizationOptions = ['transition zone', 'axoneme', 'basal body', 'membrane', 'axoneme'];
-            
-            for (let i = 0; i < 5; i++) {
-                const clusterData = {
-                    x: [], y: [], text: [], mode: 'markers', type: 'scatter', name: `Cluster ${i + 1}`,
-                    marker: { size: 6, color: `hsl(${i * 60}, 70%, 60%)`, opacity: 0.7, line: { width: 1, color: 'white' } },
-                    // ✅ EXACTLY AS SPECIFIED: customdata array
-                    customdata: Array(n/5).fill({
-                        localization: localizationOptions[i]
-                    })
-                };
-                
-                for (let j = 0; j < n/5; j++) {
-                    clusterData.x.push(Math.random() * 10 + i * 3);
-                    clusterData.y.push(Math.random() * 10);
-                    clusterData.text.push(`${geneName} exp: ${Math.random().toFixed(2)}`);
-                }
-                data.push(clusterData);
-            }
-            
-            const highlightData = {
-                x: [5, 8, 12, 15], y: [5, 8, 3, 10], mode: 'markers', type: 'scatter', name: `${geneName} High`,
-                marker: { size: 12, color: '#ff6b6b', symbol: 'star', line: { width: 2, color: 'white' } },
-                text: [`${geneName} High Expression`, `${geneName} High Expression`, `${geneName} High Expression`, `${geneName} High Expression`],
-                customdata: Array(4).fill({localization: 'axoneme'})
-            };
-            
-            data.push(highlightData);
-            const plotData = { data: data, layout: { title: { text: `UMAP: ${geneName} Expression in Lung Organoid`, font: { size: 14 } }, xaxis: { title: 'UMAP 1', gridcolor: '#f1f5f9' }, yaxis: { title: 'UMAP 2', gridcolor: '#f1f5f9' } } };
-            window.showPlot(plotData, `UMAP: ${geneName} Expression`);
-        };
-
-        // ✅ EXACTLY AS SPECIFIED: Phylogeny view function
-        window.showPhylogeny = function(gene) {
-            const data = [{
-                x: [0, 1, 2, 3],
-                y: [1, 1.2, 0.8, 1.1],
-                text: ['Human', 'Mouse', 'Zebrafish', 'C. elegans'],
-                mode: 'lines+markers',
-                marker: { size: 8 },
-                line: { width: 2 }
-            }];
-
-            window.showPlot(
-                { data, layout: { title: `Phylogeny of ${gene}` }},
-                `Phylogeny: ${gene}`
-            );
-
-            window.CiliAI.activeGeneContext = gene;
-        };
-
         window.loadCiliAIData = async function() {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+            const rawUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+            
             try {
-                const [mainRes, lookupsRes] = await Promise.all([
+                // Corrected Data Sources
+                const [mainRes, lookupsRes, kidneyExprRes, kidneyUmapRes] = await Promise.all([
                     fetch(baseUrl + 'ciliAI_master_database.json'), 
-                    fetch(baseUrl + 'ciliAI_lookups.json')
+                    fetch(baseUrl + 'ciliAI_lookups.json'),
+                    // Load Kidney Data from new sources
+                    fetch(rawUrl + 'cellxgene_data.json'),
+                    fetch(rawUrl + 'umap_data.json')
                 ]);
+
                 const mainData = await mainRes.json();
                 const lookupData = await lookupsRes.json();
+                const kidneyExpr = await kidneyExprRes.json();
+                const kidneyUmap = await kidneyUmapRes.json();
 
                 window.CiliAI.masterData = mainData.masterData || [];
                 window.CiliAI.lookups = lookupData.lookups || {};
+                
+                // Safety: Ensure lookup objects exist
+                if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {}; 
+                if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
+
+                // Setup Lung Data
                 window.CiliAI_UMAP = mainData.umapData || [];
                 window.CiliAI.datasets.lung.umap = mainData.umapData;
 
-                // Build lookups
+                // Setup Kidney Data (Normalize UMAP keys to match Lung format)
+                window.CiliAI.datasets.kidney.umap = kidneyUmap;
+                window.CiliAI.datasets.kidney.expression = kidneyExpr;
+
+                // Populate Caches
                 window.CiliAI.masterData.forEach(gene => {
                     if (gene.Gene) {
                         const symbol = gene.Gene.toUpperCase();
                         window.CiliAI.lookups.geneMap[symbol] = gene;
+                        // Cache Lung scRNA
                         if (gene.expression?.scRNA) window.CiliAI.cellDataCache[symbol] = gene.expression.scRNA;
-
-                        // New: Build goMap (assume gene.GO_terms is array of strings)
-                        (gene.GO_terms || []).forEach(go => {
-                            const goUpper = go.toUpperCase();
-                            if (!window.CiliAI.lookups.goMap[goUpper]) window.CiliAI.lookups.goMap[goUpper] = [];
-                            window.CiliAI.lookups.goMap[goUpper].push(symbol);
-                        });
-
-                        // New: Pfam (assume gene.pfam_domains is array of {id, name, start, end})
-                        if (gene.pfam_domains) {
-                            window.CiliAI.lookups.pfamByGene[symbol] = gene.pfam_domains;
-                        }
+                        // Cache Pfam
+                        if (gene.pfam_domains) window.CiliAI.lookups.pfamByGene[symbol] = gene.pfam_domains;
                     }
                 });
                 
@@ -1082,8 +1041,6 @@
 
         const originalHandleAIQuery = window.handleAIQuery;
         
-        
-
         async function init() {
             window.updateStatus('Loading databases...', 'loading');
             window.generateAndInjectSVG();
