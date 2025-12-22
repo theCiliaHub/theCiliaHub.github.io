@@ -2983,6 +2983,9 @@ window.terminologyQueries = {
 /**
  * Renders Interactive UMAP (Fixed for Kidney Sparse Data + Debugging)
  */
+/**
+ * Renders Interactive UMAP (Fixed for Dictionary Data Structure)
+ */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Clear previous views
     if (typeof window.resetViews === 'function') window.resetViews();
@@ -2998,8 +3001,11 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     // 3. Inputs
     if (!displayName) displayName = 'WDR31';
-    if (typeof targetGenes === 'string') targetGenes = [targetGenes];
-    if (!targetGenes?.length) targetGenes = [displayName];
+    // Robustly handle string vs array input
+    if (typeof targetGenes === 'string') {
+        targetGenes = targetGenes.split(',').filter(t => t.trim().length > 0);
+    }
+    if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
 
     const gene = displayName.toUpperCase();
     const isClusterView = displayName === 'CLUSTER_VIEW';
@@ -3011,12 +3017,13 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const x = [], y = [], color = [], text = [], size = [];
     let maxExpr = 0;
 
-    // 5. Expression Handling (Sparse vs Dict)
+    // 5. Expression Handling (Auto-detect format)
     let exprData = null;
-    let isSparseArray = false;
-    let geneFound = true;
+    let isSparseArray = false; // Array [idx, val, idx, val...]
+    let isDictionary = false;  // Object { "cell type": val }
+    let geneFound = false;
 
-    // Helper: Strictly decode sparse array [idx, val, idx, val...]
+    // Helper: Strictly decode sparse array
     const decodeSparse = (sparse, total) => {
         const dense = new Float32Array(total).fill(0);
         if (!sparse) return dense;
@@ -3029,25 +3036,25 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     };
 
     if (!isClusterView) {
-        if (datasetKey === 'kidney') {
-            // Kidney: Sparse Array
-            // Ensure dataset.expression exists
-            const raw = dataset.expression?.[gene];
-            
-            if (raw) {
-                // console.log(`[UMAP] Decoding sparse data for ${gene}`);
-                exprData = decodeSparse(raw, sourceData.length);
+        // Try getting data from dataset object (Kidney) OR cache (Lung)
+        let rawData = dataset.expression?.[gene];
+        
+        // Fallback to global cache if not in dataset object (Legacy Lung path)
+        if (!rawData && window.CiliAI.cellDataCache) {
+            rawData = window.CiliAI.cellDataCache[gene];
+        }
+
+        if (rawData) {
+            geneFound = true;
+            if (Array.isArray(rawData)) {
+                // It's a sparse array (Old Kidney format)
+                exprData = decodeSparse(rawData, sourceData.length);
                 isSparseArray = true;
-            } else {
-                // console.warn(`[UMAP] Gene ${gene} missing in Kidney.`);
-                geneFound = false;
-                exprData = new Float32Array(sourceData.length).fill(0);
+            } else if (typeof rawData === 'object') {
+                // It's a dictionary (New Kidney & Lung format)
+                exprData = rawData;
+                isDictionary = true;
             }
-        } else {
-            // Lung: Dictionary (Cache check)
-            exprData = window.CiliAI.cellDataCache?.[gene] || {};
-            isSparseArray = false;
-            if (Object.keys(exprData).length === 0) geneFound = false;
         }
     }
 
@@ -3056,17 +3063,15 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     }
 
     const clusterColors = {
-        'Proximal Tubule Cell': '#3B82F6',
-        'Thick Ascending Limb Cell': '#60A5FA',
-        'Distal Convoluted Tubule Cell': '#93C5FD',
-        'Collecting Duct Principal Cell': '#BFDBFE',
-        'Collecting Duct Intercalated Cell': '#DBEAFE',
-        'Podocyte': '#1E40AF',
-        'Fibroblast': '#1D4ED8',
-        'Endothelial Cell': '#2563EB',
-        'Immune Cell': '#1E3A8A',
-        'Cycling Cell': '#172554',
-        'Ciliated Cell': '#E11D48'
+        'Proximal Tubule Cell': '#3B82F6', 'Thick Ascending Limb Cell': '#60A5FA',
+        'Distal Convoluted Tubule Cell': '#93C5FD', 'Collecting Duct Principal Cell': '#BFDBFE',
+        'Collecting Duct Intercalated Cell': '#DBEAFE', 'Podocyte': '#1E40AF',
+        'Fibroblast': '#1D4ED8', 'Endothelial Cell': '#2563EB',
+        'Immune Cell': '#1E3A8A', 'Cycling Cell': '#172554', 'Ciliated Cell': '#E11D48',
+        'stem cell': '#E11D48', 'club cell': '#3B82F6', 'goblet cell': '#10B981', 
+        'basal cell': '#F59E0B', 'neuroendocrine cell': '#8B5CF6',
+        'pulmonary alveolar type 1 cell': '#60A5FA', 'pulmonary alveolar type 2 cell': '#2563EB',
+        'lung secretory cell': '#34D399'
     };
 
     // 6. Build plot arrays
@@ -3083,11 +3088,12 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         y.push(p.y);
 
         let exprVal = 0;
-        if (!isClusterView) {
+        if (!isClusterView && geneFound) {
             if (isSparseArray) {
-                exprVal = exprData[i]; // Direct Array Access
-            } else {
-                exprVal = exprData[cellType] || 0; // Map Access
+                exprVal = exprData[i]; // Access by index
+            } else if (isDictionary) {
+                // Access by cell type name (Dictionary lookups)
+                exprVal = exprData[cellType] || 0; 
             }
         }
 
@@ -3138,11 +3144,11 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         showlegend: false
     };
 
-    // 7. Render using the global showPlot helper (Handles container visibility)
+    // 7. Render using global helper
     if (typeof window.showPlot === 'function') {
         window.showPlot({ data: [trace], layout }, isClusterView ? 'Cell Clusters' : `scRNA-seq: ${gene}`);
     } else {
-        // Fallback if showPlot missing
+        // Fallback
         const container = document.getElementById('plotly-container');
         if(container) container.style.display = 'block';
         if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
