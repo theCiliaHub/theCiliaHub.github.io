@@ -4022,67 +4022,131 @@ window.handleAIQuery = async function (query) {
             else htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
         }
 
-        // =======================================================
-        // (12) INTENT: UMAP & EXPRESSION (With Dynamic Switch Button)
-        // =======================================================
-        else if (htmlResult === null && (
-            qLower.includes('plot') || qLower.includes('display') || qLower.includes('heatmap') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('expression')
-        )) {
-            if (qLower.includes('kidney')) window.CiliAI.activeDataset = 'kidney';
-            else if (qLower.includes('lung')) window.CiliAI.activeDataset = 'lung';
+      // =======================================================
+// (12) INTENT: UMAP & EXPRESSION (With Dynamic Switch Button)
+// =======================================================
+else if (
+    htmlResult === null &&
+    (
+        qLower.includes('plot') ||
+        qLower.includes('display') ||
+        qLower.includes('heatmap') ||
+        qLower.includes('umap') ||
+        qLower.includes('scrna') ||
+        qLower.includes('expression')
+    )
+) {
 
-            let target = 'WDR31';
-            match = qLower.match(/(?:for|of|in)\s+(.+)/i);
-            if (match) {
-                target = match[1].replace(/lung|kidney|scrna-seq|scrna|expression|in/gi, '').trim();
-                if(target.length < 2) target = 'WDR31';
+    // ---------------------------------------------------
+    // Explicit dataset switching (standalone commands)
+    // ---------------------------------------------------
+    if (qLower === 'switch to kidney') {
+        window.CiliAI.activeDataset = 'kidney';
+        window.addChatMessage('Switched to Kidney scRNA-seq dataset.', false);
+        return;
+    }
+
+    if (qLower === 'switch to lung') {
+        window.CiliAI.activeDataset = 'lung';
+        window.addChatMessage('Switched to Lung scRNA-seq dataset.', false);
+        return;
+    }
+
+    // ---------------------------------------------------
+    // Dataset inference from query
+    // ---------------------------------------------------
+    if (qLower.includes('kidney')) window.CiliAI.activeDataset = 'kidney';
+    else if (qLower.includes('lung')) window.CiliAI.activeDataset = 'lung';
+
+    // ---------------------------------------------------
+    // Target gene / complex parsing
+    // ---------------------------------------------------
+    let target = 'WDR31';
+    match = qLower.match(/(?:for|of|in)\s+(.+)/i);
+    if (match) {
+        target = match[1]
+            .replace(/lung|kidney|scrna-seq|scrna|expression|umap|plot|display|in/gi, '')
+            .trim();
+        if (target.length < 2) target = 'WDR31';
+    }
+
+    let genes = window.extractMultipleGenes(target);
+    let isComplex = false;
+    let finalTargetTerm = target;
+
+    if (genes.length === 0 && target) {
+        const complexName = window.extractComplexIntent(target);
+        if (complexName) {
+            const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
+            if (complexGenes.length > 0) {
+                genes = complexGenes;
+                finalTargetTerm = complexName;
+                isComplex = true;
             }
-
-            let genes = window.extractMultipleGenes(target);
-            let isComplex = false;
-            let finalTargetTerm = target;
-
-            if (genes.length === 0 && target) {
-                const complexName = window.extractComplexIntent(target);
-                if (complexName) {
-                    const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
-                    if (complexGenes.length > 0) {
-                        genes = complexGenes;
-                        finalTargetTerm = complexName;
-                        isComplex = true;
-                    }
-                }
-            }
-
-            const finalGenes = genes.length > 0 ? genes : ['WDR31'];
-            const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
-
-            const zoomMatch = qLower.match(/zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i);
-            const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
-
-            await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
-
-            const currentDS = window.CiliAI.activeDataset || 'lung';
-            const dsName = window.CiliAI.datasets[currentDS] ? window.CiliAI.datasets[currentDS].name : 'scRNA-seq';
-
-            const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
-            const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
-
-            htmlResult = `<div class="ai-result-card">
-                <p>Displaying <strong>${dsName}</strong> scRNA-seq UMAP for <strong>${geneSymbol}</strong> (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.</p>
-                ${zoomToCellType ? `<p>Zoomed to the **${zoomToCellType}** cluster.</p>` : ''}
-               
-                <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                    <button class="ciliai-button" style="width:auto; margin:0; background:#4a5568;"
-                        onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${geneSymbol}', [], '${zoomToCellType || ''}'); window.addChatMessage('Switched to ${nextDSLabel} data.', true); window.handleAIQuery('plot umap for ${geneSymbol} in ${nextDS}');">
-                        🔄 Switch to ${nextDSLabel}
-                    </button>
-                   
-                    <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" style="margin-left:5px; font-weight:600;">⬇️ CSV</a>
-                </div>
-            </div>`;
         }
+    }
 
+    const finalGenes = genes.length > 0 ? genes : ['WDR31'];
+    const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
+
+    // ---------------------------------------------------
+    // Optional zoom-to-cell-type
+    // ---------------------------------------------------
+    const zoomMatch = qLower.match(
+        /zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i
+    );
+    const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
+
+    // ---------------------------------------------------
+    // Render UMAP (SINGLE source of truth)
+    // ---------------------------------------------------
+    await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
+
+    // ---------------------------------------------------
+    // Dataset labels & switch target
+    // ---------------------------------------------------
+    const currentDS = window.CiliAI.activeDataset || 'lung';
+    const dsName = window.CiliAI.datasets[currentDS]
+        ? window.CiliAI.datasets[currentDS].name
+        : 'scRNA-seq';
+
+    const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
+    const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
+
+    // ---------------------------------------------------
+    // Chat output + safe switch button
+    // ---------------------------------------------------
+    htmlResult = `
+        <div class="ai-result-card">
+            <p>
+                Displaying <strong>${dsName}</strong> scRNA-seq UMAP for
+                <strong>${geneSymbol}</strong>
+                (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.
+            </p>
+
+            ${zoomToCellType ? `<p>Zoomed to the <strong>${zoomToCellType}</strong> cluster.</p>` : ''}
+
+            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <button class="ciliai-button"
+                    style="width:auto; margin:0; background:#B8E2F2;"
+                    onclick="
+                        window.CiliAI.activeDataset='${nextDS}';
+                        window.renderUMAPPlot('${geneSymbol}', ${JSON.stringify(finalGenes)}, '${zoomToCellType || ''}');
+                        window.addChatMessage('Switched to ${nextDSLabel} scRNA-seq dataset.', false);
+                    ">
+                    🔄 Switch to ${nextDSLabel}
+                </button>
+
+                <a href="#"
+                   class="ai-action"
+                   onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')"
+                   style="margin-left:5px; font-weight:600;">
+                    ⬇️ CSV
+                </a>
+            </div>
+        </div>
+    `;
+}
         // Intent 13: Comparative
         else if (htmlResult === null && (qLower.includes('compare') || qLower.includes(' vs '))) {
             const matches = query.match(/([A-Z0-9]+)\s+vs\s+([A-Z0-9]+)/gi);
@@ -4141,6 +4205,54 @@ window.handleAIQuery = async function (query) {
             window.CiliAI.lastQueryContext = { type: 'top_500_ciliary' };
             htmlResult = `<div class="ai-result-card"><p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p><p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p></div>`;
         }
+    
+// NEW INTENT: "Where is [GENE] located?" (Ciliary diagram)
+// =======================================================
+if (
+    qLower.startsWith('where is') &&
+    (qLower.includes('located') || qLower.includes('localised') || qLower.includes('localized'))
+) {
+    const genes = extractMultipleGenes(query);
+    if (genes.length === 0) {
+        window.addChatMessage(
+            `<div class="ai-result-card"><p>Please specify a gene (e.g. "Where is IFT88 located?").</p></div>`,
+            false
+        );
+        return;
+    }
+
+    const geneSymbol = genes[0];
+    const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+
+    if (!geneData) {
+        window.addChatMessage(
+            `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found.</p></div>`,
+            false
+        );
+        return;
+    }
+
+    const localization = geneData.Localization || 'Cilium (unspecified compartment)';
+
+    // 🔹 Highlight on interactive cilium (GENE-AWARE)
+    if (typeof window.highlightCiliumLocation === 'function') {
+        window.highlightCiliumLocation(localization, geneSymbol);
+    }
+
+    // 🔹 Chat response
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>Localization of ${geneSymbol}</h4>
+            <p><strong>${geneSymbol}</strong> localizes to:</p>
+            <p style="font-size:16px; font-weight:600; color:#2b6cb0;">
+                ${localization}
+            </p>
+            <p>The corresponding compartment has been highlighted on the ciliary diagram.</p>
+        </div>
+    `, false);
+
+    return;
+}
 
         // Intent 20: Fallback
         else if (htmlResult === null) {
