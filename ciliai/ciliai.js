@@ -18,7 +18,8 @@ if (typeof window.log !== "function") {
     window.log = function (msg) { console.log(`CiliAI LOG: ${msg}`); };
 }
 
-// Define chat handler immediately so UI doesn't crash during load
+
+// Chat Handler
 if (typeof window.addChatMessage !== "function") {
     window.addChatMessage = function (msg, isUser) { 
         const chatWindow = document.getElementById('messages');
@@ -2983,10 +2984,10 @@ window.terminologyQueries = {
  * Renders Interactive UMAP (Fixed for Kidney Sparse Data + Debugging)
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
-    const plotDivId = 'cilia-svg';
-    if (typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
-
-    /* 1. Active dataset */
+    // 1. Clear previous views
+    if (typeof window.resetViews === 'function') window.resetViews();
+    
+    // 2. Active dataset
     const datasetKey = window.CiliAI.activeDataset || 'lung';
     const dataset = window.CiliAI.datasets?.[datasetKey];
 
@@ -2995,16 +2996,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         return;
     }
 
-    const plotDiv = document.getElementById(plotDivId);
-    if (!plotDiv) return;
-
-    // Purge previous plot
-    try {
-        if (window.Plotly) window.Plotly.purge(plotDivId);
-        plotDiv.innerHTML = '';
-    } catch (e) { console.error(e); }
-
-    /* 2. Inputs */
+    // 3. Inputs
     if (!displayName) displayName = 'WDR31';
     if (typeof targetGenes === 'string') targetGenes = [targetGenes];
     if (!targetGenes?.length) targetGenes = [displayName];
@@ -3012,14 +3004,14 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const gene = displayName.toUpperCase();
     const isClusterView = displayName === 'CLUSTER_VIEW';
 
-    /* 3. Prepare data */
+    // 4. Prepare data
     const sourceData = dataset.umap;
     const renderIndices = Array.from({ length: sourceData.length }, (_, i) => i);
 
     const x = [], y = [], color = [], text = [], size = [];
     let maxExpr = 0;
 
-    /* 4. Expression Handling (with Debugging) */
+    // 5. Expression Handling (Sparse vs Dict)
     let exprData = null;
     let isSparseArray = false;
     let geneFound = true;
@@ -3039,24 +3031,20 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     if (!isClusterView) {
         if (datasetKey === 'kidney') {
             // Kidney: Sparse Array
+            // Ensure dataset.expression exists
             const raw = dataset.expression?.[gene];
             
-            // --- DEBUG LOGGING ---
             if (raw) {
-                console.log(`[UMAP Debug] Found data for ${gene} in Kidney. Raw length: ${raw.length}`);
+                // console.log(`[UMAP] Decoding sparse data for ${gene}`);
                 exprData = decodeSparse(raw, sourceData.length);
                 isSparseArray = true;
             } else {
-                console.warn(`[UMAP Debug] Gene ${gene} is MISSING from Kidney expression keys.`);
-                // List first 5 keys to check capitalization
-                const keys = Object.keys(dataset.expression || {}).slice(0, 5);
-                console.log(`[UMAP Debug] Example keys in DB: ${keys.join(', ')}`);
-                
+                // console.warn(`[UMAP] Gene ${gene} missing in Kidney.`);
                 geneFound = false;
                 exprData = new Float32Array(sourceData.length).fill(0);
             }
         } else {
-            // Lung: Dictionary
+            // Lung: Dictionary (Cache check)
             exprData = window.CiliAI.cellDataCache?.[gene] || {};
             isSparseArray = false;
             if (Object.keys(exprData).length === 0) geneFound = false;
@@ -3081,20 +3069,18 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         'Ciliated Cell': '#E11D48'
     };
 
-    /* 5. Build plot arrays */
+    // 6. Build plot arrays
     for (const i of renderIndices) {
         const p = sourceData[i];
         if (!p) continue;
 
-        const px = p.x;
-        const py = p.y;
         const cellType = p.cell_type;
 
         // Zoom Filter
         if (zoomToCellType && cellType !== zoomToCellType) continue; 
 
-        x.push(px);
-        y.push(py);
+        x.push(p.x);
+        y.push(p.y);
 
         let exprVal = 0;
         if (!isClusterView) {
@@ -3152,11 +3138,21 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         showlegend: false
     };
 
-    await Plotly.newPlot(plotDivId, [trace], layout, {
-        responsive: true,
-        displaylogo: false,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d']
-    });
+    // 7. Render using the global showPlot helper (Handles container visibility)
+    if (typeof window.showPlot === 'function') {
+        window.showPlot({ data: [trace], layout }, isClusterView ? 'Cell Clusters' : `scRNA-seq: ${gene}`);
+    } else {
+        // Fallback if showPlot missing
+        const container = document.getElementById('plotly-container');
+        if(container) container.style.display = 'block';
+        if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
+        
+        await Plotly.newPlot('plotly-container', [trace], layout, {
+            responsive: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ['lasso2d', 'select2d']
+        });
+    }
 };
 
 // Helper: Get scRNA expression map for a gene (safe)
@@ -3179,6 +3175,7 @@ function isCiliaRestricted(exprMap) {
     if (expressed.length === 0) return false;
     return expressed.every(ct => ct.toLowerCase().includes('ciliated'));
 }
+
 
 // Helper: Is gene specific to multiciliated cells?
 function isSpecificToMulticiliated(exprMap) {
@@ -4008,10 +4005,27 @@ window.handleAIQuery = async function (query) {
             htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
         }
 
-        // Intent 10: Domains
-        else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
+       // Intent 10: Domains (Visualizer)
+        else if (htmlResult === null && (match = qLower.match(/(?:domains? (?:of|for)|domain architecture (?:of|for))\s+(.+)/i))) {
             const genes = window.extractMultipleGenes(match[1]);
-            if (genes.length > 0) htmlResult = window.handleDomainQuery(genes);
+            if (genes.length > 0) {
+                // Ensure UI is clear before showing new viewer
+                if (typeof window.resetViews === 'function') window.resetViews();
+                
+                // Trigger the visualizer defined in index.html
+                if (typeof window.showDomainViewer === 'function') {
+                    window.showDomainViewer(genes[0]);
+                    htmlResult = `<div class="ai-result-card">
+                        <h4>Domain Architecture: ${genes[0]}</h4>
+                        <p>Displaying Pfam domains in the main panel.</p>
+                        <p style="font-size:11px; color:#666;">(Hover over domains for details)</p>
+                    </div>`;
+                } else {
+                    htmlResult = `<div class="ai-result-card"><p>Domain viewer function is missing.</p></div>`;
+                }
+            } else {
+                htmlResult = `<div class="ai-result-card"><p>Please specify a gene to view domains (e.g., "Domains for IFT88").</p></div>`;
+            }
         }
 
         // Intent 11: Modules
@@ -4097,7 +4111,7 @@ else if (
     );
     const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
 
-    // ---------------------------------------------------
+  // ---------------------------------------------------
     // Render UMAP (SINGLE source of truth)
     // ---------------------------------------------------
     await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
@@ -4112,6 +4126,10 @@ else if (
 
     const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
     const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
+    
+    // Prepare safe arguments for HTML attributes
+    const genesArg = finalGenes.join(','); 
+    const zoomArg = zoomToCellType || '';
 
     // ---------------------------------------------------
     // Chat output + safe switch button
@@ -4119,7 +4137,7 @@ else if (
     htmlResult = `
         <div class="ai-result-card">
             <p>
-                Displaying <strong>${dsName}</strong> scRNA-seq UMAP for
+                Displaying <strong>${dsName}</strong> scRNA-seq UMAP for 
                 <strong>${geneSymbol}</strong>
                 (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.
             </p>
@@ -4127,21 +4145,17 @@ else if (
             ${zoomToCellType ? `<p>Zoomed to the <strong>${zoomToCellType}</strong> cluster.</p>` : ''}
 
             <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <button class="ciliai-button"
-                    style="width:auto; margin:0; background:#B8E2F2;"
-                    onclick="
-                        window.CiliAI.activeDataset='${nextDS}';
-                        window.renderUMAPPlot('${geneSymbol}', ${JSON.stringify(finalGenes)}, '${zoomToCellType || ''}');
-                        window.addChatMessage('Switched to ${nextDSLabel} scRNA-seq dataset.', false);
-                    ">
+                <button class="ciliai-button" 
+                    style="width:auto; margin:0; background:#B8E2F2;" 
+                    onclick="window.switchDatasetAndPlot('${nextDS}', '${geneSymbol}', '${genesArg}', '${zoomArg}')">
                     🔄 Switch to ${nextDSLabel}
                 </button>
 
-                <a href="#"
-                   class="ai-action"
+                <a href="#" 
+                   class="ai-action" 
                    onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')"
                    style="margin-left:5px; font-weight:600;">
-                    ⬇️ CSV
+                   ⬇️ CSV
                 </a>
             </div>
         </div>
@@ -4205,7 +4219,8 @@ else if (
             window.CiliAI.lastQueryContext = { type: 'top_500_ciliary' };
             htmlResult = `<div class="ai-result-card"><p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p><p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p></div>`;
         }
-    
+
+
 // NEW INTENT: "Where is [GENE] located?" (Ciliary diagram)
 // =======================================================
 if (
@@ -4254,6 +4269,28 @@ if (
     return;
 }
 
+    // --- Functional / GO Analysis ---
+    if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:')) {
+        const term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
+        
+        // Use the robust helper
+        const genes = getGenesByFunction(term);
+        
+        if (genes.length > 0) {
+            window.resetViews();
+            window.renderCategoryHeatmap(genes);
+            
+            const listHtml = genes.slice(0, 10).join(', ') + (genes.length > 10 ? `... (+${genes.length-10} more)` : '');
+            window.addChatMessage(`<div class="ai-result-card">
+                <h4>Functional Category: ${term}</h4>
+                <p>Found <strong>${genes.length}</strong> genes (e.g. ${listHtml}).</p>
+                <p><strong>Heatmap</strong> applied to the diagram based on localization.</p>
+            </div>`, false);
+        } else {
+            window.addChatMessage(`<div class="ai-result-card"><p>No genes found for functional category <strong>"${term}"</strong>.</p></div>`, false);
+        }
+        return;
+    }
         // Intent 20: Fallback
         else if (htmlResult === null) {
             const intent = window.flexibleIntentParser(query);
@@ -4297,6 +4334,137 @@ window.fetchVariantData = async function(geneSymbol) {
     } catch (e) {
         return `<p>Variant data unavailable for ${geneSymbol}</p>`;
     }
+};
+
+// Helper: Reset Views (Prevents Overlap)
+window.resetViews = function() {
+    ['cilia-svg', 'plotly-container', 'domain-viewer'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    const ciliaSvg = document.getElementById('cilia-svg');
+    if (ciliaSvg && ciliaSvg.classList.contains('table-view-active')) {
+        window.generateAndInjectSVG(); 
+        ciliaSvg.classList.remove('table-view-active');
+    }
+    // Ensure base visibility
+    if(ciliaSvg) ciliaSvg.style.display = 'flex';
+};
+
+window.switchDatasetAndPlot = function(dataset, geneSymbol, geneListStr, zoom) {
+    // Robustly handle gene list (array vs string)
+    let geneList = geneListStr;
+    if (typeof geneListStr === 'string') {
+        geneList = geneListStr.split(',').filter(g => g);
+    } else if (!Array.isArray(geneListStr)) {
+        geneList = [geneSymbol];
+    }
+
+    window.CiliAI.activeDataset = dataset;
+    window.renderUMAPPlot(geneSymbol, geneList, zoom || null);
+    
+    const label = dataset.charAt(0).toUpperCase() + dataset.slice(1);
+    window.addChatMessage(`Switched to <strong>${label}</strong> dataset.`, false);
+};
+
+// Helper: Find Genes by Functional Category or GO ID
+function getGenesByFunction(term) {
+    const q = term.toLowerCase().trim();
+    const matches = [];
+    if (!window.CiliAI.masterData) return [];
+    
+    window.CiliAI.masterData.forEach(g => {
+        // 1. Check Functional.category (Priority)
+        if (g['Functional.category'] && g['Functional.category'].toLowerCase().includes(q)) {
+            matches.push(g.Gene);
+            return;
+        }
+        // 2. Check ID (for GO:xxxx)
+        if (g.ID && g.ID.toLowerCase().includes(q)) {
+            matches.push(g.Gene);
+            return;
+        }
+        // 3. Check Description
+        if (g.Description && g.Description.toLowerCase().includes(q)) {
+            matches.push(g.Gene);
+        }
+    });
+    // Remove duplicates
+    return [...new Set(matches)];
+}
+
+// Helper: Render Heatmap for Functional Category (Bypasses goMap)
+window.renderCategoryHeatmap = function(geneList) {
+    const svg = document.getElementById('cilia-diagram') || document.getElementById('cilia-svg')?.querySelector('svg');
+    if (!svg) {
+        window.generateAndInjectSVG(); // Ensure SVG is present
+        // Retry after a microtask
+        setTimeout(() => window.renderCategoryHeatmap(geneList), 50);
+        return;
+    }
+
+    // Use SpatialManager to map genes to locations
+    if (!window.SpatialManager || !window.SpatialManager.locMap) return;
+
+    // Remove existing overlays
+    document.querySelectorAll('.heatmap-overlay, .multi-overlay').forEach(el => el.remove());
+
+    // Group genes by location
+    const locCounts = {};
+    geneList.forEach(geneSymbol => {
+        const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
+        if (gene && gene.Localization) {
+            // Handle multiple localizations (e.g., "flagella, Centrosome")
+            const locs = gene.Localization.split(',').map(l => l.trim().toLowerCase());
+            locs.forEach(loc => {
+                // Map "flagella" -> "cilia" or direct map
+                let mappedLoc = loc;
+                if(loc.includes('flagella')) mappedLoc = 'cilia'; 
+                
+                // Find normalized key in SpatialManager
+                const key = Object.keys(window.SpatialManager.locMap).find(k => mappedLoc.includes(k));
+                if (key) {
+                    locCounts[key] = (locCounts[key] || 0) + 1;
+                }
+            });
+        }
+    });
+
+    const maxCount = Math.max(...Object.values(locCounts), 1);
+
+    // Create/Find overlay group
+    let overlayGroup = svg.querySelector('#heatmap-group');
+    if (!overlayGroup) {
+        overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        overlayGroup.id = 'heatmap-group';
+        const viewport = svg.querySelector('#viewport-group') || svg;
+        viewport.appendChild(overlayGroup);
+    } else {
+        overlayGroup.innerHTML = ''; // Clear previous children
+    }
+
+    // Draw overlays
+    Object.entries(locCounts).forEach(([locKey, count]) => {
+        const svgId = window.SpatialManager.locMap[locKey];
+        if (!svgId) return;
+        const element = document.getElementById(svgId);
+        if (!element) return;
+
+        const clone = element.cloneNode(true);
+        clone.id = '';
+        clone.classList.add('heatmap-overlay');
+        clone.removeAttribute('tabindex');
+        clone.style.fill = 'url(#heatmapGrad)'; // Requires the gradient defined in index.html
+        // Fallback color if gradient missing
+        if(!document.getElementById('heatmapGrad')) clone.style.fill = '#ff0000'; 
+        
+        clone.style.opacity = (count / maxCount) * 0.8; 
+        clone.style.pointerEvents = 'none';
+        overlayGroup.appendChild(clone);
+    });
+
+    window.showDiagram(); // Switch view
+    if (window.SpatialManager.resetZoom) window.SpatialManager.resetZoom();
 };
 
 window.handleComparativeDashboard = async function(genesText) {
