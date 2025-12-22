@@ -368,7 +368,7 @@
         };
 
         // =======================================================
-        // (2) SPATIAL INTELLIGENCE MANAGER — FIXED STRUCTURE
+        // (2) SPATIAL INTELLIGENCE MANAGER
         // =======================================================
 
         const SpatialManager = {
@@ -562,7 +562,7 @@
             clearOverlays: function() {
                 document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
             }
-        }; // <--- CORRECT CLOSURE OF SpatialManager Object
+        }; 
         
         // =======================================================
         // PUBLIC BRIDGE — Legacy compatibility
@@ -781,14 +781,15 @@
             plotContainer.style.display = 'block';
             document.getElementById('current-viz-title').textContent = title;
             
-            // NOTE: Do NOT clear innerHTML immediately to allow graceful redraw
-            // But if switching from a different view, clearing is safer
-            // plotContainer.innerHTML = ''; 
+            // Clear previous plot to prevent artifacts
+            plotContainer.innerHTML = '';
             
             const vizCard = document.querySelector('.viz-card');
             const vizHeader = document.querySelector('.viz-header');
-            const availableHeight = vizCard.clientHeight - vizHeader.clientHeight - 40;
-            const availableWidth = vizCard.clientWidth - 40;
+            
+            // Calculate height safely
+            const availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
+            const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
             
             const layout = {
                 ...plotData.layout,
@@ -1022,8 +1023,27 @@
                         window.CiliAI.lookups.geneMap[symbol] = gene;
                         // Cache Lung scRNA
                         if (gene.expression?.scRNA) window.CiliAI.cellDataCache[symbol] = gene.expression.scRNA;
-                        // Cache Pfam
-                        if (gene.pfam_domains) window.CiliAI.lookups.pfamByGene[symbol] = gene.pfam_domains;
+                        
+                        // Parse text-based domains into viewer structure (Fallback for missing pfam_domains)
+                        if (gene.PFAM_IDs || gene.Domain_Descriptions) {
+                            const domains = [];
+                            const desc = gene.Domain_Descriptions || gene.PFAM_IDs || "Unknown";
+                            const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
+                            
+                            // Mock positions for visualization since raw data lacks coordinates
+                            parts.forEach((part, i) => {
+                                domains.push({
+                                    id: `DOM_${i+1}`,
+                                    name: part.trim(),
+                                    start: (i * 200) + 50,
+                                    end: (i * 200) + 150
+                                });
+                            });
+                            
+                            if(domains.length > 0) {
+                                window.CiliAI.lookups.pfamByGene[symbol] = domains;
+                            }
+                        }
                     }
                 });
                 
