@@ -367,72 +367,131 @@
             activeGeneContext: null
         };
 
-        // 2. SPATIAL INTELLIGENCE MANAGER - EXACT UPGRADE AS SPECIFIED
-        const SpatialManager = {
-            locMap: {
-                "transition zone": "transition-zone",
-                "tz": "transition-zone",
-                "axoneme": "axoneme",
-                "axonemal": "axoneme",
-                "basal body": "basal-body",
-                "centriole": "basal-body",
-                "ciliary tip": "ciliary-tip",
-                "membrane": "ciliary-membrane",
-                "ciliary membrane": "ciliary-membrane",
-                "cell body": "cell-body",
-                "cytosol": "cell-body",
-                "nucleus": "nucleus"
-            },
-            
-            // ✅ EXACTLY AS SPECIFIED: Gene-aware highlighting with persistence
-            highlight: function(locTerm, gene = null) {
-                if (!locTerm) return false;
+       // =======================================================
+// (2) SPATIAL INTELLIGENCE MANAGER — FINAL, EXACT UPGRADE
+// =======================================================
 
-                const container = document.getElementById('cilia-svg');
-                if (!container.querySelector('svg')) window.generateAndInjectSVG();
+const SpatialManager = {
 
-                const svgId = this.locMap[locTerm.toLowerCase().trim()];
-                document.querySelectorAll('.cilia-part')
-                    .forEach(el => el.classList.remove('active-highlight'));
+    // ---------------------------------------------------
+    // Location normalization map (user → SVG IDs)
+    // ---------------------------------------------------
+    locMap: {
+        "transition zone": "transition-zone",
+        "tz": "transition-zone",
 
-                if (!svgId) return false;
+        "axoneme": "axoneme",
+        "axonemal": "axoneme",
 
-                const element = document.getElementById(svgId);
-                if (!element) return false;
+        "basal body": "basal-body",
+        "centriole": "basal-body",
 
-                element.classList.add('active-highlight');
-                this.zoomTo(element);
+        "ciliary tip": "ciliary-tip",
 
-                if (gene) {
-                    window.CiliAI.zoomStateByGene[gene] = locTerm;
-                    window.CiliAI.activeGeneContext = gene;
-                }
-                return true;
-            },
-            
-            zoomTo: function(element) {
-                const viewport = document.getElementById('viewport-group');
-                if (!viewport) return;
-                const box = element.getBBox();
-                const centerX = box.x + box.width / 2;
-                const centerY = box.y + box.height / 2;
-                const dx = 150 - centerX;
-                const dy = 200 - centerY;
-                viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
-                viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
-                viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
-            },
-            
-            // ✅ EXACTLY AS SPECIFIED: Smooth animated reset
-            resetZoom: function() {
-                const viewport = document.getElementById('viewport-group');
-                if (viewport) {
-                    viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
-                    viewport.style.transform = "translate(0,0) scale(1)";
-                }
-                document.querySelectorAll('.cilia-part')
-                    .forEach(el => el.classList.remove('active-highlight'));
-            },
+        "membrane": "ciliary-membrane",
+        "ciliary membrane": "ciliary-membrane",
+
+        "cell body": "cell-body",
+        "cytosol": "cell-body",
+
+        "nucleus": "nucleus"
+    },
+
+    // ---------------------------------------------------
+    // ✅ EXACTLY AS SPECIFIED
+    // Gene-aware highlighting with persistence
+    // ---------------------------------------------------
+    highlight: function (locTerm, gene = null) {
+        if (!locTerm) return false;
+
+        const container = document.getElementById('cilia-svg');
+        if (!container) return false;
+
+        // Ensure SVG exists
+        if (!container.querySelector('svg')) {
+            window.generateAndInjectSVG();
+        }
+
+        const normalized = locTerm.toLowerCase().trim();
+        const svgId = this.locMap[normalized];
+
+        // Clear previous highlights
+        document.querySelectorAll('.cilia-part')
+            .forEach(el => el.classList.remove('active-highlight'));
+
+        if (!svgId) return false;
+
+        const element = document.getElementById(svgId);
+        if (!element) return false;
+
+        // Highlight + zoom
+        element.classList.add('active-highlight');
+        this.zoomTo(element);
+
+        // Persist gene → spatial context
+        if (gene) {
+            if (!window.CiliAI.zoomStateByGene) {
+                window.CiliAI.zoomStateByGene = {};
+            }
+            window.CiliAI.zoomStateByGene[gene] = locTerm;
+            window.CiliAI.activeGeneContext = gene;
+        }
+
+        return true;
+    },
+
+    // ---------------------------------------------------
+    // Smooth zoom animation to target structure
+    // ---------------------------------------------------
+    zoomTo: function (element) {
+        const viewport = document.getElementById('viewport-group');
+        if (!viewport || !element.getBBox) return;
+
+        const box = element.getBBox();
+        const centerX = box.x + box.width / 2;
+        const centerY = box.y + box.height / 2;
+
+        const dx = 150 - centerX;
+        const dy = 200 - centerY;
+
+        viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
+        viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+        viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
+    },
+
+    // ---------------------------------------------------
+    // ✅ EXACTLY AS SPECIFIED
+    // Smooth animated reset
+    // ---------------------------------------------------
+    resetZoom: function () {
+        const viewport = document.getElementById('viewport-group');
+
+        if (viewport) {
+            viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
+            viewport.style.transform = "translate(0,0) scale(1)";
+        }
+
+        document.querySelectorAll('.cilia-part')
+            .forEach(el => el.classList.remove('active-highlight'));
+    },
+
+    // ---------------------------------------------------
+    // Utility: restore spatial context by gene
+    // ---------------------------------------------------
+    restoreByGene: function (gene) {
+        if (!gene) return false;
+        const loc = window.CiliAI?.zoomStateByGene?.[gene];
+        if (!loc) return false;
+        return this.highlight(loc, gene);
+    }
+};
+        
+// =======================================================
+// PUBLIC BRIDGE — Legacy compatibility
+// =======================================================
+window.highlightCiliumLocation = function (locTerm, gene = null) {
+    return SpatialManager.highlight(locTerm, gene);
+};
 
             // New: Apply GO Heatmap
             applyHeatmap: function(goTerm) {
