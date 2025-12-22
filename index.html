@@ -773,12 +773,17 @@
         };
 
         window.showPlot = function(plotData, title = "Gene Expression UMAP") {
+            // SAFEGUARD: Clear potential overlapping containers first
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('domain-viewer').style.display = 'none';
+            
             const plotContainer = document.getElementById('plotly-container');
             plotContainer.style.display = 'block';
             document.getElementById('current-viz-title').textContent = title;
-            plotContainer.innerHTML = '';
+            
+            // NOTE: Do NOT clear innerHTML immediately to allow graceful redraw
+            // But if switching from a different view, clearing is safer
+            // plotContainer.innerHTML = ''; 
             
             const vizCard = document.querySelector('.viz-card');
             const vizHeader = document.querySelector('.viz-header');
@@ -803,25 +808,31 @@
                 }
             };
             
-            // Fix: Use promise to safely handle Plotly.newPlot
+            // FIX: Use Promise to ensure plot is ready before attaching listeners or resizing
             Plotly.newPlot('plotly-container', plotData.data, layout, {
                 responsive: true, displayModeBar: true, displaylogo: false,
                 modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
                 scrollZoom: false
             }).then(gd => {
-                window.CiliAI.currentPlot = gd; // Store the DOM element
+                window.CiliAI.currentPlot = gd;
                 
-                // Add click listener
+                // Add click listener safely
                 gd.on('plotly_click', e => {
                     const loc = e.points?.[0]?.customdata?.localization;
                     if (!loc) return;
                     window.showDiagram();
-                    SpatialManager.highlight(loc, window.CiliAI.activeGeneContext);
+                    if(window.SpatialManager) {
+                        window.SpatialManager.highlight(loc, window.CiliAI.activeGeneContext);
+                    }
                 });
             });
             
+            // Resize Listener: Only resize if the container is actually visible
             window.addEventListener('resize', () => {
-                if (window.CiliAI.currentPlot) setTimeout(() => { Plotly.Plots.resize(window.CiliAI.currentPlot); }, 50);
+                const container = document.getElementById('plotly-container');
+                if (window.CiliAI.currentPlot && container && container.offsetParent !== null) {
+                    setTimeout(() => { Plotly.Plots.resize(window.CiliAI.currentPlot); }, 50);
+                }
             });
         };
 
@@ -833,7 +844,7 @@
             window.CiliAI.currentPlot = null;
         };
 
-        // New: Show Domain Viewer
+        // New: Show Domain Viewer (Fixed to prevent crashes)
         window.showDomainViewer = function(gene) {
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('plotly-container').style.display = 'none';
@@ -842,9 +853,9 @@
             domainContainer.innerHTML = '';
             document.getElementById('current-viz-title').textContent = `Pfam Domains: ${gene}`;
 
-            // Safely access lookup
-            const lookup = window.CiliAI.lookups.pfamByGene || {};
-            const pfam = lookup[gene.toUpperCase()] || [];
+            // Safety check for lookup data
+            const pfamLookup = window.CiliAI.lookups.pfamByGene || {};
+            const pfam = pfamLookup[gene.toUpperCase()] || [];
             
             if (!pfam.length) {
                 domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
@@ -854,51 +865,54 @@
             // Generate linear domain SVG based on Pfam docs
             const seqLength = Math.max(...pfam.map(d => d.end), 1000); // Assume length
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 100`);
+            svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 150`);
             svg.setAttribute('width', '100%');
             svg.setAttribute('height', '100%');
 
             // Sequence line
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', '50');
-            line.setAttribute('y1', '50');
+            line.setAttribute('y1', '75');
             line.setAttribute('x2', seqLength + 50);
-            line.setAttribute('y2', '50');
-            line.setAttribute('stroke', '#000');
-            line.setAttribute('stroke-width', '2');
+            line.setAttribute('y2', '75');
+            line.setAttribute('stroke', '#333');
+            line.setAttribute('stroke-width', '4');
+            line.setAttribute('stroke-linecap', 'round');
             svg.appendChild(line);
 
             pfam.forEach((domain, index) => {
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 const width = domain.end - domain.start + 1;
+                
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                 rect.setAttribute('x', domain.start + 50);
-                rect.setAttribute('y', '40');
+                rect.setAttribute('y', '55');
                 rect.setAttribute('width', width);
-                rect.setAttribute('height', '20');
-                rect.setAttribute('rx', '5');
-                rect.setAttribute('fill', `hsl(${index * 60}, 70%, 60%)`);
+                rect.setAttribute('height', '40');
+                rect.setAttribute('rx', '8');
+                rect.setAttribute('fill', `hsl(${index * 50 + 200}, 80%, 60%)`);
+                rect.setAttribute('stroke', '#fff');
+                rect.setAttribute('stroke-width', '2');
                 rect.classList.add('domain-rect');
-                svg.appendChild(rect);
+                
+                // Tooltip
+                const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
+                rect.appendChild(title);
+                
+                group.appendChild(rect);
 
                 const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 text.setAttribute('x', domain.start + 50 + width / 2);
-                text.setAttribute('y', '35');
+                text.setAttribute('y', '45');
                 text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('font-size', '10');
+                text.setAttribute('font-size', '12');
+                text.setAttribute('font-weight', 'bold');
+                text.setAttribute('fill', '#333');
                 text.textContent = domain.name || domain.id;
-                svg.appendChild(text);
+                group.appendChild(text);
 
-                // Domain-level zoom (simulated)
-                rect.addEventListener('click', () => {
-                    // Map domain to sub-region if possible, else alert
-                    const subLoc = domain.name.toLowerCase().includes('ift') ? 'axoneme' : null; // Example mapping
-                    if (subLoc) {
-                        window.showDiagram();
-                        SpatialManager.highlight(subLoc, gene);
-                    } else {
-                        alert(`Zooming to domain: ${domain.name}`);
-                    }
-                });
+                svg.appendChild(group);
             });
 
             domainContainer.appendChild(svg);
