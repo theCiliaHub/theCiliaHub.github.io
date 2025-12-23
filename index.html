@@ -389,28 +389,37 @@
                 "nucleus": "nucleus"
             },
 
-            // Gene-aware highlighting with persistence
+           // Gene-aware highlighting with persistence
             highlight: function (locTerm, gene = null) {
                 if (!locTerm) return false;
 
                 const container = document.getElementById('cilia-svg');
                 if (!container) return false;
 
-                // Ensure SVG exists
+                // --- FIX: Force visibility of the diagram container ---
+                container.style.display = 'flex'; 
+                if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
+                if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
+                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+
+                // Ensure SVG exists (if it was cleared)
                 if (!container.querySelector('svg')) {
                     window.generateAndInjectSVG();
                 }
 
                 const normalized = locTerm.toLowerCase().trim();
-                const svgId = this.locMap[normalized];
+                
+                // Map broad terms like "cilia" to specific SVG parts if needed
+                let targetId = this.locMap[normalized];
+                if (!targetId && normalized.includes('cilia')) targetId = 'axoneme'; // Fallback for general "cilia" queries
 
                 // Clear previous highlights
                 document.querySelectorAll('.cilia-part')
                     .forEach(el => el.classList.remove('active-highlight'));
 
-                if (!svgId) return false;
+                if (!targetId) return false;
 
-                const element = document.getElementById(svgId);
+                const element = document.getElementById(targetId);
                 if (!element) return false;
 
                 // Highlight + zoom
