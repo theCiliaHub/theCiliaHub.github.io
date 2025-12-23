@@ -1184,9 +1184,20 @@
         
         async function init() {
             window.updateStatus('Loading databases...', 'loading');
-            window.generateAndInjectSVG();
+            
+            // 1. Draw SVG immediately
+            if(window.generateAndInjectSVG) window.generateAndInjectSVG();
+            
+            // 2. Load Data
             const loaded = await window.loadCiliAIData();
+            
             if (loaded) {
+                // --- THE FIX: CONNECT MEMORY TO BRAIN ---
+                if (typeof window.buildLogicIndexes === 'function') {
+                    window.buildLogicIndexes();
+                }
+                // ----------------------------------------
+                
                 window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
             }
         }
