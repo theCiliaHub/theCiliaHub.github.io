@@ -2,6 +2,46 @@
  * CiliAI – Unified Logic Engine (v7.1 – Safe Initialization)
  * ============================================================== */
 
+/* ==============================================================
+ * STEP 2: DATA BRIDGE (Connects index.html data to ciliai.js logic)
+ * ============================================================== */
+
+/**
+ * Builds internal lookups (screenDatabase, ciliaryGeneMap) from the raw Master Data.
+ * Call this immediately after window.CiliAI.ready becomes true.
+ */
+window.buildLogicIndexes = function() {
+    if (!window.CiliAI || !window.CiliAI.masterData) {
+        console.warn("CiliAI Master Data not found. Cannot build indexes.");
+        return;
+    }
+
+    console.log("[CiliAI Logic] Building internal indexes...");
+
+    // 1. Reset Maps
+    ciliaryGeneMap = new Map();
+    screenDatabase = {};
+
+    // 2. Iterate Master Data
+    window.CiliAI.masterData.forEach(gene => {
+        if (!gene || !gene.Gene) return;
+        const symbol = gene.Gene.toUpperCase();
+
+        // Populate Legacy Map (for older logic functions)
+        ciliaryGeneMap.set(symbol, gene);
+
+        // Populate Screen Database
+        // Aggregates screen hits for quick lookup in complex queries
+        if (gene.screens && Array.isArray(gene.screens) && gene.screens.length > 0) {
+            screenDatabase[symbol] = gene.screens.map(s => ({
+                source: s.source || 'Unknown Screen',
+                result: s.result || 'Hit'
+            }));
+        }
+    });
+
+    console.log(`[CiliAI Logic] Indexes ready. Mapped ${ciliaryGeneMap.size} genes.`);
+};
 // 1. GLOBAL STATE & UTILITIES
 // ==========================================================
 // 5. Ensure these are exposed globally
