@@ -845,7 +845,7 @@
             window.CiliAI.currentPlot = null;
         };
 
-        // New: Show Domain Viewer (Fixed to prevent crashes)
+       // New: Show Domain Viewer (Fixed: Nature Colors + No Text Overlap)
         window.showDomainViewer = function(gene) {
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('plotly-container').style.display = 'none';
@@ -858,26 +858,22 @@
             const pfamLookup = window.CiliAI.lookups.pfamByGene || {};
             const pfam = pfamLookup[gene.toUpperCase()] || [];
             
-            // If no parsed Pfam domains, check for raw descriptions
             if (!pfam.length) {
-                // Try to find raw domain descriptions
+                // Check for raw text descriptions as fallback
                 const geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
                 if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
                     const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
                     const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
                     
                     if (parts.length > 0) {
-                        // Generate mock visualization from text descriptions
                         const domains = parts.map((part, i) => ({
                             id: `DOM_${i+1}`,
                             name: part.trim(),
                             start: (i * 200) + 50,
                             end: (i * 200) + 150
                         }));
-                        // Save for next time
                         window.CiliAI.lookups.pfamByGene[gene.toUpperCase()] = domains;
-                        // Recursively call with populated data
-                        window.showDomainViewer(gene);
+                        window.showDomainViewer(gene); // Retry
                         return;
                     }
                 }
@@ -886,58 +882,117 @@
                 return;
             }
 
-            // Generate linear domain SVG based on Pfam docs
-            const seqLength = Math.max(...pfam.map(d => d.end), 1000); // Assume length
+            // --- 1. Setup Canvas & Scaling ---
+            const seqLength = Math.max(...pfam.map(d => d.end), 1000); 
+            const svgWidth = 1000; // Internal coordinate width
+            const scale = (val) => (val / seqLength) * (svgWidth - 100) + 50; // Map seq pos to SVG x
+            
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 150`);
+            svg.setAttribute('viewBox', `0 0 ${svgWidth} 200`);
             svg.setAttribute('width', '100%');
             svg.setAttribute('height', '100%');
+            svg.style.fontFamily = "'Inter', sans-serif";
 
-            // Sequence line
+            // --- 2. Nature Journal Color Palette ---
+            const natureColors = [
+                '#E64B35', // Red
+                '#4DBBD5', // Blue
+                '#00A087', // Green
+                '#3C5488', // Dark Blue
+                '#F39B7F', // Peach
+                '#8491B4', // Grey-Blue
+                '#91D1C2', // Teal
+                '#DC0000', // Dark Red
+                '#7E6148', // Brown
+                '#B09C85'  // Beige
+            ];
+
+            // --- 3. Draw Backbone Line ---
+            const lineY = 100;
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', '50');
-            line.setAttribute('y1', '75');
-            line.setAttribute('x2', seqLength + 50);
-            line.setAttribute('y2', '75');
+            line.setAttribute('y1', lineY);
+            line.setAttribute('x2', svgWidth - 50);
+            line.setAttribute('y2', lineY);
             line.setAttribute('stroke', '#333');
             line.setAttribute('stroke-width', '4');
             line.setAttribute('stroke-linecap', 'round');
             svg.appendChild(line);
 
+            // --- 4. Draw Domains & Labels ---
             pfam.forEach((domain, index) => {
                 const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                const width = domain.end - domain.start + 1;
                 
+                // Calculate Positions
+                const xStart = scale(domain.start);
+                const xEnd = scale(domain.end);
+                const width = Math.max(xEnd - xStart, 10); // Min width 10px
+                
+                // Domain Rectangle
                 const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('x', domain.start + 50);
-                rect.setAttribute('y', '55');
+                rect.setAttribute('x', xStart);
+                rect.setAttribute('y', lineY - 20); // Center on line
                 rect.setAttribute('width', width);
                 rect.setAttribute('height', '40');
-                rect.setAttribute('rx', '8');
-                rect.setAttribute('fill', `hsl(${index * 50 + 200}, 80%, 60%)`);
+                rect.setAttribute('rx', '6');
+                rect.setAttribute('fill', natureColors[index % natureColors.length]);
                 rect.setAttribute('stroke', '#fff');
-                rect.setAttribute('stroke-width', '2');
+                rect.setAttribute('stroke-width', '1');
+                rect.setAttribute('opacity', '0.9');
                 rect.classList.add('domain-rect');
                 
                 // Tooltip
                 const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
                 rect.appendChild(title);
-                
                 group.appendChild(rect);
 
-                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text.setAttribute('x', domain.start + 50 + width / 2);
-                text.setAttribute('y', '45');
-                text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('font-size', '12');
-                text.setAttribute('font-weight', 'bold');
-                text.setAttribute('fill', '#333');
-                text.textContent = domain.name || domain.id;
-                group.appendChild(text);
+                // Staggered Label Logic (Alternating Heights)
+                // Even index = Top High, Odd index = Top Low (or bottom)
+                // Here we alternate two rows ABOVE the protein to avoid clutter
+                const labelY = (index % 2 === 0) ? 40 : 65; 
+                
+                // Connector Line (from label to domain)
+                const conn = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                conn.setAttribute('x1', xStart + width / 2);
+                conn.setAttribute('y1', labelY + 5);
+                conn.setAttribute('x2', xStart + width / 2);
+                conn.setAttribute('y2', lineY - 20);
+                conn.setAttribute('stroke', '#ccc');
+                conn.setAttribute('stroke-width', '1');
+                group.appendChild(conn);
 
+                // Text Label
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', xStart + width / 2);
+                text.setAttribute('y', labelY);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', '11');
+                text.setAttribute('font-weight', '600');
+                text.setAttribute('fill', '#2c3e50');
+                text.textContent = domain.name || domain.id;
+                
+                // Prevent text from going off-screen
+                // (Simple clamp logic could be added here if needed, but centering usually works)
+                
+                group.appendChild(text);
                 svg.appendChild(group);
             });
+
+            // Start/End Residue Numbers
+            const startText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            startText.setAttribute('x', '20');
+            startText.setAttribute('y', lineY + 5);
+            startText.setAttribute('font-size', '10');
+            startText.textContent = '1';
+            svg.appendChild(startText);
+
+            const endText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            endText.setAttribute('x', svgWidth - 40);
+            endText.setAttribute('y', lineY + 5);
+            endText.setAttribute('font-size', '10');
+            endText.textContent = seqLength;
+            svg.appendChild(endText);
 
             domainContainer.appendChild(svg);
         };
