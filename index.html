@@ -203,6 +203,23 @@
             transition: fill 0.2s; 
         }
         .domain-rect:hover { fill-opacity: 0.8; }
+        
+        /* New: Dynamic Gene Label in Diagram */
+        .dynamic-gene-label {
+            font-family: 'Inter', sans-serif;
+            font-weight: 900;
+            font-size: 16px;
+            fill: #E11D48; /* Vibrant red-pink */
+            text-anchor: middle;
+            pointer-events: none;
+            text-shadow: 0px 0px 4px white, 0px 0px 4px white; /* Halo effect for readability */
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
         /* --- Right Panel: Chat --- */
         .right-panel {
@@ -389,7 +406,7 @@
                 "nucleus": "nucleus"
             },
 
-           // Gene-aware highlighting with persistence
+            // Gene-aware highlighting with persistence
             highlight: function (locTerm, gene = null) {
                 if (!locTerm) return false;
 
@@ -426,8 +443,11 @@
                 element.classList.add('active-highlight');
                 this.zoomTo(element);
 
-                // Persist gene → spatial context
+                // NEW: Add Dynamic Gene Label
                 if (gene) {
+                    this.addGeneLabel(element, gene);
+                    
+                    // Persist state
                     if (!window.CiliAI.zoomStateByGene) {
                         window.CiliAI.zoomStateByGene = {};
                     }
@@ -436,6 +456,32 @@
                 }
 
                 return true;
+            },
+
+            // NEW FUNCTION: Adds gene name text to diagram
+            addGeneLabel: function(targetElement, geneName) {
+                const svg = document.getElementById('cilia-diagram');
+                if (!svg || !targetElement.getBBox) return;
+
+                // Clear existing dynamic labels
+                document.querySelectorAll('.dynamic-gene-label').forEach(el => el.remove());
+
+                const box = targetElement.getBBox();
+                const x = box.x + box.width / 2;
+                // Place label slightly above or in center
+                const y = box.y + box.height / 2; 
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', x);
+                text.setAttribute('y', y);
+                text.textContent = geneName;
+                text.classList.add('dynamic-gene-label');
+                
+                // Add to viewport group so it zooms with the structure
+                const viewport = document.getElementById('viewport-group');
+                if (viewport) {
+                    viewport.appendChild(text);
+                }
             },
 
             // Smooth zoom animation to target structure
@@ -466,6 +512,9 @@
 
                 document.querySelectorAll('.cilia-part')
                     .forEach(el => el.classList.remove('active-highlight'));
+                    
+                // Clear dynamic label on reset
+                document.querySelectorAll('.dynamic-gene-label').forEach(el => el.remove());
             },
 
             // Utility: restore spatial context by gene
@@ -482,7 +531,7 @@
                 if (!svg) return;
 
                 // Remove existing overlays
-                document.querySelectorAll('.heatmap-overlay').forEach(el => el.remove());
+                document.querySelectorAll('.heatmap-overlay, .dynamic-gene-label').forEach(el => el.remove());
 
                 // Get genes for GO
                 const genes = window.CiliAI.lookups.goMap[goTerm.toUpperCase()] || [];
@@ -533,7 +582,7 @@
                 if (!svg) return;
 
                 // Remove existing overlays
-                document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
+                document.querySelectorAll('.multi-overlay, .dynamic-gene-label').forEach(el => el.remove());
 
                 let overlayGroup = svg.querySelector('#multi-group');
                 if (!overlayGroup) {
@@ -569,7 +618,7 @@
 
             // New: Clear Overlays
             clearOverlays: function() {
-                document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
+                document.querySelectorAll('#heatmap-group, #multi-group, .dynamic-gene-label').forEach(el => el.remove());
             }
         }; 
         
@@ -854,7 +903,7 @@
             window.CiliAI.currentPlot = null;
         };
 
-       // New: Show Domain Viewer (Fixed: Nature Colors + No Text Overlap)
+        // New: Show Domain Viewer (Fixed: Nature Colors + No Text Overlap)
         window.showDomainViewer = function(gene) {
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('plotly-container').style.display = 'none';
@@ -1040,34 +1089,25 @@
             }
         };
 
-        // Data Loading Logic (UPDATED WITH SPLIT KIDNEY JSON)
-        window.loadCiliAIData = async function(timeoutMs = 60000) {
+        window.loadCiliAIData = async function() {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-            const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-            const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
-            
-            // Kidney Data Files (Structure + Split Expression)
-            const kidneyStructUrl = baseUrl + 'kidney_structure.json';
-            const kidneyExpr1Url = baseUrl + 'kidney_expression_part1.json';
-            const kidneyExpr2Url = baseUrl + 'kidney_expression_part2.json';
+            const rawUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
             
             try {
-                // Fetch all 5 files in parallel
-                const [mainRes, lookupsRes, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
-                    fetch(mainDbUrl), 
-                    fetch(lookupsUrl),
-                    fetch(kidneyStructUrl),
-                    fetch(kidneyExpr1Url),
-                    fetch(kidneyExpr2Url)
+                // Corrected Data Sources
+                const [mainRes, lookupsRes, kidneyExprRes, kidneyUmapRes] = await Promise.all([
+                    fetch(baseUrl + 'ciliAI_master_database.json'), 
+                    fetch(baseUrl + 'ciliAI_lookups.json'),
+                    // Load Kidney Data from new sources
+                    fetch(rawUrl + 'cellxgene_data.json'),
+                    fetch(rawUrl + 'umap_data.json')
                 ]);
-
-                if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
-                if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
 
                 const mainData = await mainRes.json();
                 const lookupData = await lookupsRes.json();
+                const kidneyExpr = await kidneyExprRes.json();
+                const kidneyUmap = await kidneyUmapRes.json();
 
-                // Initialize Core Data
                 window.CiliAI.masterData = mainData.masterData || [];
                 window.CiliAI.lookups = lookupData.lookups || {};
                 
@@ -1075,58 +1115,50 @@
                 if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {}; 
                 if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
 
+                // Setup Lung Data
                 window.CiliAI_UMAP = mainData.umapData || [];
-                window.CiliAI.data.umap = mainData.umapData || [];
-                window.CiliAI.datasets.lung.umap = mainData.umapData; // Lung is inside master DB
+                window.CiliAI.datasets.lung.umap = mainData.umapData;
 
-                // Process Kidney Data (Merge Split Files)
-                if (kStructRes.ok && kExpr1Res.ok && kExpr2Res.ok) {
-                    const kStruct = await kStructRes.json();
-                    const kExpr1 = await kExpr1Res.json();
-                    const kExpr2 = await kExpr2Res.json();
-                    
-                    // Merge expression parts
-                    const fullExpression = { ...kExpr1, ...kExpr2 };
-                    
-                    window.CiliAI.datasets.kidney = {
-                        name: "Human Kidney",
-                        umap: kStruct.umap,
-                        expression: fullExpression, // Merged Sparse Map
-                        metadata: kStruct.metadata,
-                        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']]
-                    };
-                } else {
-                    console.warn("Kidney data files failed to load (check file names/locations).");
-                }
-                
-                // Build Fast Lookups
-                window.CiliAI.lookups.umapByGene = {};
-                window.CiliAI.lookups.geneMap = {};
-                window.CiliAI.cellDataCache = {}; // Lung cache
-                
-                if (Array.isArray(window.CiliAI_UMAP)) {
-                    window.CiliAI_UMAP.forEach(point => {
-                        if (point.Gene) window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
-                    });
-                }
-                
-                mainData.masterData.forEach(gene => {
+                // Setup Kidney Data (Normalize UMAP keys to match Lung format)
+                window.CiliAI.datasets.kidney.umap = kidneyUmap;
+                window.CiliAI.datasets.kidney.expression = kidneyExpr;
+
+                // Populate Caches
+                window.CiliAI.masterData.forEach(gene => {
                     if (gene.Gene) {
                         const symbol = gene.Gene.toUpperCase();
                         window.CiliAI.lookups.geneMap[symbol] = gene;
-                        if (gene.expression?.scRNA) {
-                            window.CiliAI.cellDataCache[symbol] = gene.expression.scRNA;
+                        // Cache Lung scRNA
+                        if (gene.expression?.scRNA) window.CiliAI.cellDataCache[symbol] = gene.expression.scRNA;
+                        
+                        // Parse text-based domains into viewer structure (Fallback for missing pfam_domains)
+                        if (gene.PFAM_IDs || gene.Domain_Descriptions) {
+                            const domains = [];
+                            const desc = gene.Domain_Descriptions || gene.PFAM_IDs || "Unknown";
+                            const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
+                            
+                            // Mock positions for visualization since raw data lacks coordinates
+                            parts.forEach((part, i) => {
+                                domains.push({
+                                    id: `DOM_${i+1}`,
+                                    name: part.trim(),
+                                    start: (i * 200) + 50,
+                                    end: (i * 200) + 150
+                                });
+                            });
+                            
+                            if(domains.length > 0) {
+                                window.CiliAI.lookups.pfamByGene[symbol] = domains;
+                            }
                         }
                     }
                 });
                 
                 window.CiliAI.ready = true;
                 return true;
-
             } catch (err) {
                 console.error("Failed to load CiliAI databases:", err);
                 window.updateStatus('Load failed', 'error');
-                window.CiliAI.ready = false;
                 return false;
             }
         };
