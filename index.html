@@ -754,41 +754,27 @@
                 if (labels) labels.style.opacity = '0';
             };
             
+           // Re-attach Event Listeners for the new SVG
             const ciliaParts = container.querySelectorAll('.cilia-part');
             ciliaParts.forEach(part => {
                 part.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
-                    part.classList.add('active-highlight');
                     
-                    const labels = container.querySelector('.cilia-labels');
-                    if (labels) {
-                        labels.style.opacity = '1';
-                        const partId = part.id;
-                        const geneMap = {
-                            'basal-body': 'PCM1',
-                            'transition-zone': 'TMEM17', 
-                            'ciliary-membrane': 'ARL13B',
-                            'axoneme': 'β2-tubulin'
-                        };
-                        
-                        labels.querySelectorAll('text').forEach(text => {
-                            text.style.fontWeight = '700';
-                            text.style.fontSize = '12px';
-                        });
-                        
-                        const geneName = geneMap[partId];
-                        if (geneName) {
-                            labels.querySelectorAll('text').forEach(text => {
-                                if (text.textContent.includes(geneName)) {
-                                    text.style.fontWeight = '900';
-                                    text.style.fontSize = '14px';
-                                    text.style.fill = '#ff6b6b';
-                                }
-                            });
-                        }
+                    // 1. Get the readable name (e.g., "basal-body" -> "Basal Body")
+                    const locationName = part.id.replace(/-/g, ' ');
+                    
+                    // 2. Highlight visually
+                    if (window.SpatialManager) {
+                        window.SpatialManager.highlight(locationName);
                     }
-                    SpatialManager.zoomTo(part);
+                    
+                    // 3. Trigger Data Query (The "Intelligence")
+                    // This uses the AI brain to fetch the actual gene list
+                    if (window.handleAIQuery) {
+                        const query = `List genes in ${locationName}`;
+                        window.addChatMessage(query, true); // Show user's "click" as a message
+                        window.handleAIQuery(query);
+                    }
                 });
             });
             
