@@ -213,62 +213,6 @@ function getDiseaseClassificationMap() {
 // ==========================================================
   
 
-// -----------------------------------------------------------------------------------
-// (NOTE: Definitions for populatePlotTypes, updateCustomizationPanel, updatePlotExplanation, 
-// generateAnalysisPlots, and findAndMergeGenes must exist locally in the file structure)
-// -----------------------------------------------------------------------------------
-function setupPageEventListeners() {
-    // NOTE: We only keep event listeners for elements created dynamically
-    // by the AI chat, like reaction buttons and action links.
-    document.body.addEventListener('click', e => {
-        const feedbackBtn = e.target.closest('.ciliai-reaction-btn');
-        if (feedbackBtn) {
-            const type = feedbackBtn.textContent.includes('👍') ? 'up' : 'down';
-            window.react(type);
-            return;
-        }
-        
-        const geneBadge = e.target.closest('.gene-badge');
-        if (geneBadge) {
-            const gene = geneBadge.textContent.trim();
-            if (gene) window.searchGene(gene);
-            return;
-        }
-
-        // --- THIS IS THE CORRECTED BLOCK (Keep) ---
-        const aiAction = e.target.closest('.ai-action');
-        if (aiAction) {
-            const action = aiAction.dataset.action;
-
-            if (action) {
-                e.preventDefault(); // Stop the link from navigating
-                const genes = aiAction.dataset.genes || "";
-                let query = "";
-                
-                if (action === 'show-li-heatmap') query = `show li phylogeny for ${genes}`;
-                else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
-                else if (action === 'show-table-view') query = `show data table for ${genes}`;
-                
-                // --- UMAP FIX (Keep) ---
-                else if (action === 'show-umap-plot') {
-                    window.log(`Action: show-umap-plot for ${genes}`);
-                    window.renderUMAPPlot(genes); // Use window prefix for global functions
-                    return;
-                }
-                // --- END OF UMAP FIX ---
-
-                if (query) {
-                    window.addChatMessage(query, true);
-                    window.handleAIQuery(query);
-                }
-                return;
-            }
-        }
-        // --- END OF CORRECTED BLOCK ---
-    });
-
-    // Removed listeners for geneSearch and chatInput as they are in index.html
-}
 
     
     // ==========================================================
@@ -4756,25 +4700,10 @@ function handleScreenReferenceFollowup() {
         }
     }; 
 
-// CRITICAL: Must be defined in ciliAI.js
-window.generateAndInjectSVG = function() {
-    const svgContainer = document.getElementById('cilia-svg');
-    if (!svgContainer) return;
-    
-    // Minimal SVG placeholder (as agreed upon previously)
-    const svgHTML = `
-        <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="16" fill="#005b96">Ciliary Diagram Placeholder</text>
-            </svg>`;
-    
-    svgContainer.innerHTML = svgHTML;
-};
 
 // Global exposure block:
 window.log = log;
 window.react = react;
-window.handleUserSend = handleUserSend;
-window.searchGene = searchGene;
 window.showDefaultUMAP = showDefaultUMAP;
 window.showDefaultPhylogeny = showDefaultPhylogeny;
 window.downloadPlot = downloadPlot;
