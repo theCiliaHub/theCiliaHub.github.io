@@ -4665,18 +4665,89 @@ function handleScreenReferenceFollowup() {
 
 // CRITICAL: Must be defined in ciliAI.js
 window.generateAndInjectSVG = function() {
-    const svgContainer = document.getElementById('cilia-svg');
-    if (!svgContainer) return;
-    
-    // Minimal SVG placeholder (as agreed upon previously)
-    const svgHTML = `
-        <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="16" fill="#005b96">Ciliary Diagram Placeholder</text>
-            </svg>`;
-    
-    svgContainer.innerHTML = svgHTML;
-};
+    const container = document.getElementById('cilia-svg');
+    if (!container) return;
+    document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+    container.innerHTML = `
+        <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+            <defs>
+                <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#F8FAFC;" />
+                    <stop offset="100%" style="stop-color:#F1F5F9;" />
+                </linearGradient>
+                <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" style="stop-color:#E2E8F0;" />
+                    <stop offset="100%" style="stop-color:#CBD5E1;" />
+                </radialGradient>
+                <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#5b21b6;" /> <stop offset="100%" style="stop-color:#4c1d95;" />
+                </linearGradient>
+                <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#475569;" /> <stop offset="100%" style="stop-color:#334155;" />
+                </linearGradient>
+                <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#0891b2;" /> <stop offset="100%" style="stop-color:#0e7490;" />
+                </linearGradient>
+                <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#2563eb;" /> <stop offset="100%" style="stop-color:#1d4ed8;" />
+                </linearGradient>
+                <linearGradient id="heatmapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00ff00" stop-opacity="0.2" />
+                    <stop offset="50%" stop-color="#ffff00" stop-opacity="0.5" />
+                    <stop offset="100%" stop-color="#ff0000" stop-opacity="0.8" />
+                </linearGradient>
+            </defs>
+            <g id="viewport-group" transform="translate(0, 0)">
+                <path id="cell-body" class="cilia-part" tabindex="0"
+                      fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
+                      d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
+                <circle id="nucleus" class="cilia-part" tabindex="0"
+                        fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
+                        cx="140" cy="290" r="35"/>
+                <rect id="basal-body" class="cilia-part" tabindex="0"
+                      fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
+                      x="130" y="165" width="20" height="15" rx="2"/>
+                <path id="transition-zone" class="cilia-part" tabindex="0"
+                      fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
+                      d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
+                <path id="ciliary-membrane" class="cilia-part" tabindex="0"
+                      fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
+                      d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
+                <path id="axoneme" class="cilia-part" tabindex="0"
+                      fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
+                      d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
+                <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
+                    <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">PCM1</text>
+                    <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">TMEM17</text>
+                    <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">ARL13B</text>
+                    <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">β2-tubulin</text>
+                </g>
+                <!-- Pulsing dots and animations omitted for brevity – add if desired -->
+            </g>
+        </svg>
+    `;
 
+    // Hover to show labels
+    container.onmouseenter = () => container.querySelector('.cilia-labels').style.opacity = '1';
+    container.onmouseleave = () => container.querySelector('.cilia-labels').style.opacity = '0';
+
+    // Click handling for parts
+    container.querySelectorAll('.cilia-part').forEach(part => {
+        part.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+            part.classList.add('active-highlight');
+            if (window.SpatialManager) window.SpatialManager.zoomTo(part);
+        });
+    });
+
+    // Click background to reset
+    container.onclick = (e) => {
+        if (e.target.id === 'cilia-diagram' || e.target.closest('#cilia-svg')) {
+            if (window.SpatialManager) window.SpatialManager.resetZoom();
+        }
+    };
+};
 // Global exposure block:
 window.log = log;
 window.react = react;
