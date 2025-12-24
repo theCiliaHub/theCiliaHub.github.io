@@ -4266,80 +4266,50 @@ if (qLower.startsWith('multi:') || qLower.includes('multi:')) {
 // GO / Functional category – Colored heatmap
 if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:')) {
     let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
-    const genes = getGenesByFunction(term);  // Your existing function
-
-    if (genes.length === 0) {
-        window.addChatMessage(`<div class="ai-result-card"><p>No genes found for "${term}".</p></div>`, false);
+    
+    if (!term) {
+        window.addChatMessage(`<div class="ai-result-card"><p>Please provide a GO term or functional category (e.g., "GO: intraflagellar transport").</p></div>`, false);
         return;
     }
 
-    window.resetViews();
-    if (window.SpatialManager) {
-        // Use applyMultiOverlay with single color for visual unity
-        const wrapperGenes = genes.map(g => g.toUpperCase());
-        window.SpatialManager.applyMultiOverlay(wrapperGenes);  // Reuses color logic
-    }
-
-    const preview = genes.slice(0, 10).join(', ') + (genes.length > 10 ? '...' : '');
-    window.addChatMessage(`
-        <div class="ai-result-card">
-            <h4>${term}</h4>
-            <p>Found <strong>${genes.length}</strong> genes: ${preview}</p>
-            <p>Localization heatmap applied to the diagram.</p>
-        </div>
-    `, false);
-    return;
-}
-
-    // Search for matching genes across relevant fields
+    // Search genes across multiple fields
     const matchingGenes = [];
     const seen = new Set();
 
     window.CiliAI.masterData.forEach(g => {
-        if (!g.Gene) return;
-        const geneSymbol = g.Gene.toUpperCase();
+        if (!g.Gene || seen.has(g.Gene.toUpperCase())) return;
 
-        if (seen.has(geneSymbol)) return;
-        
         let matched = false;
+        const lowerTerm = term.toLowerCase();
 
-        // 1. Exact or partial match in ID (GO:xxxxxxx)
-        if (g.ID && g.ID.toLowerCase().includes(term)) matched = true;
-
-        // 2. Match in Functional.category
-        if (g['Functional.category'] && g['Functional.category'].toLowerCase().includes(term)) matched = true;
-
-        // 3. Match in Description
-        if (g.Description && g.Description.toLowerCase().includes(term)) matched = true;
-
-        // 4. Match in Gene name itself (e.g., "IFT")
-        if (geneSymbol.toLowerCase().includes(term)) matched = true;
+        if (g.ID && g.ID.toLowerCase().includes(lowerTerm)) matched = true;
+        if (g['Functional.category'] && g['Functional.category'].toLowerCase().includes(lowerTerm)) matched = true;
+        if (g.Description && g.Description.toLowerCase().includes(lowerTerm)) matched = true;
+        if (g.Gene.toLowerCase().includes(lowerTerm)) matched = true;
 
         if (matched) {
-            matchingGenes.push(geneSymbol);
-            seen.add(geneSymbol);
+            matchingGenes.push(g.Gene.toUpperCase());
+            seen.add(g.Gene.toUpperCase());
         }
     });
 
     if (matchingGenes.length === 0) {
         window.addChatMessage(`
             <div class="ai-result-card">
-                <p>No genes found for functional category or GO term: <strong>"${term}"</strong></p>
-                <p>Try a broader term like "intraflagellar transport", "dynein", or "bbsome".</p>
+                <p>No genes found for <strong>"${term}"</strong>.</p>
+                <p>Try broader terms like "intraflagellar transport", "dynein", or "bbsome".</p>
             </div>
         `, false);
         return;
     }
 
-    // Show the diagram and apply heatmap overlay using SpatialManager
-    window.resetViews();  // Ensures diagram is visible and clean
+    // Show diagram and apply colored overlay
+    window.resetViews();
 
-    // Use the multi-overlay style but with a single color for GO/functional group
-    const svg = document.getElementById('cilia-diagram');
-    if (svg && window.SpatialManager) {
-        // Clear previous overlays
+    if (window.SpatialManager && document.getElementById('cilia-diagram')) {
         document.querySelectorAll('.heatmap-overlay, .multi-overlay').forEach(el => el.remove());
 
+        const svg = document.getElementById('cilia-diagram');
         let overlayGroup = svg.querySelector('#heatmap-group');
         if (!overlayGroup) {
             overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -4347,8 +4317,8 @@ if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('
             svg.querySelector('#viewport-group').appendChild(overlayGroup);
         }
 
-        const colors = ['#e91e63', '#9c27b0', '#3f51b5', '#00bcd4', '#4caf50', '#ff9800']; // Vibrant cycle
-        const colorIndex = Math.floor(Math.random() * colors.length); // Random but consistent per query
+        const colors = ['#e91e63', '#9c27b0', '#3f51b5', '#00bcd4', '#4caf50', '#ff9800'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
 
         matchingGenes.forEach(geneSymbol => {
             const gene = window.CiliAI.lookups.geneMap[geneSymbol];
@@ -4363,7 +4333,6 @@ if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('
                         break;
                     }
                 }
-                // Fallback for broad terms
                 if (!matchedId && loc.includes('cilia')) matchedId = 'axoneme';
 
                 if (matchedId) {
@@ -4372,7 +4341,7 @@ if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('
                         const clone = element.cloneNode(true);
                         clone.id = '';
                         clone.classList.add('heatmap-overlay');
-                        clone.style.fill = colors[colorIndex];
+                        clone.style.fill = color;
                         clone.style.opacity = '0.6';
                         overlayGroup.appendChild(clone);
                     }
@@ -4380,46 +4349,55 @@ if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('
             });
         });
 
-        // Reset zoom to show full view
         if (window.SpatialManager.resetZoom) window.SpatialManager.resetZoom();
     }
 
-    // Truncate list for preview
-    const previewList = matchingGenes.slice(0, 12).join(', ');
+    const preview = matchingGenes.slice(0, 12).join(', ');
     const more = matchingGenes.length > 12 ? `... and ${matchingGenes.length - 12} more` : '';
 
     window.addChatMessage(`
         <div class="ai-result-card">
             <h4>Functional Category / GO Term: ${term}</h4>
-            <p>Found <strong>${matchingGenes.length}</strong> matching genes.</p>
-            <p><strong>Examples:</strong> ${previewList}${more}</p>
-            <p>A <strong>colored overlay heatmap</strong> has been applied to the ciliary diagram showing where these genes localize.</p>
+            <p>Found <strong>${matchingGenes.length}</strong> genes.</p>
+            <p><strong>Examples:</strong> ${preview}${more}</p>
+            <p>A <strong>colored overlay</strong> has been applied to the ciliary diagram.</p>
         </div>
     `, false);
 
     return;
 }
-        // Intent 20: Fallback
-        else if (htmlResult === null) {
-            const intent = window.flexibleIntentParser(query);
-            if (intent) htmlResult = intent.handler(intent.entity, query);
-            if (htmlResult === null) {
-                let term = qLower;
-                if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
-                    term = match[1];
-                }
-                term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
-                const genes = window.extractMultipleGenes(term);
-                if (genes.length > 0) htmlResult = await window.displayFullGeneInfo(genes[0]);
-                else htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
-            }
-        }
-        if (htmlResult) window.addChatMessage(htmlResult, false);
-    } catch (e) {
-        console.error("Error in handleAIQuery:", e);
-        window.addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+
+// Fallback intent
+if (htmlResult === null) {
+    const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
+    if (intent && intent.handler) {
+        htmlResult = intent.handler(intent.entity, query);
     }
+
+    if (htmlResult === null) {
+        let term = qLower;
+        const match = qLower.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
+        if (match) term = match[1];
+
+        term = term.replace(/[?.]/g, '').trim().toUpperCase();
+        const genes = window.extractMultipleGenes ? window.extractMultipleGenes(term) : [];
+
+        if (genes.length > 0) {
+            htmlResult = await window.displayFullGeneInfo(genes[0]);
+        } else {
+            htmlResult = `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, localization, or GO term.`;
+        }
+    }
+}
+
+if (htmlResult) window.addChatMessage(htmlResult, false);
+} catch (e) {
+    console.error("Error in handleAIQuery:", e);
+    window.addChatMessage(`Internal error: ${e.message}`, false);
+}
 };
+
+
 
 window.fetchVariantData = async function(geneSymbol) {
     try {
@@ -5910,9 +5888,14 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 // Final init
 window.initCiliAI = async function() {
     window.updateStatus('Loading databases...', 'loading');
+    window.generateAndInjectSVG(); // Show diagram immediately
+
     const loaded = await window.loadCiliAIData();
     if (loaded) {
-        window.addChatMessage("👋 CiliAI ready! Ask me anything about ciliary genes.", false);
+        window.addChatMessage("👋 CiliAI ready! Ask about genes, localization, GO terms, or try 'Multi: IFT88, FOXJ1'.", false);
+        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes loaded)`, 'ready');
+    } else {
+        window.updateStatus('Load failed', 'error');
     }
 };
 // Optional auto-run if not triggered from index.html
