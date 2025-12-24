@@ -6,7 +6,8 @@
     <title>CiliAI — Unified Explorer</title>
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-    
+    <!-- Load the main AI logic FIRST -->
+    <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
     <style>
         :root {
             --primary-blue: #005b96;
@@ -518,6 +519,10 @@
                 window.CiliAI.resetZoom();  // Reset to show full heatmap
             },
 
+            window.resetViews = function() {
+            window.showDiagram();
+            if (window.SpatialManager) SpatialManager.clearOverlays();
+            };
             // New: Apply Multi-Gene Overlay
             applyMultiOverlay: function(genes) {
                 const svg = document.getElementById('cilia-diagram');
@@ -1057,6 +1062,7 @@
                 });
                 
                 window.CiliAI.ready = true;
+                window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes loaded)`, 'ready');
                 return true;
 
             } catch (err) {
@@ -1084,7 +1090,6 @@
             window.handleAIQuery(`What is ${gene}?`);
         };
 
-        const originalHandleAIQuery = window.handleAIQuery;
         
         async function init() {
             window.updateStatus('Loading databases...', 'loading');
@@ -1101,6 +1106,5 @@
 
         init();
     </script>
-    <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
 </body>
 </html>
