@@ -4181,57 +4181,196 @@ else if (
             htmlResult = `<div class="ai-result-card"><p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p><p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p></div>`;
         }
 
-        // === 20. Intent: "Where is [GENE] located?" (Visualizer) ===
-        else if (htmlResult === null && qLower.startsWith('where is') && (qLower.includes('located') || qLower.includes('localised') || qLower.includes('localized'))) {
-            const genes = extractMultipleGenes(query);
-            if (genes.length === 0) {
-                htmlResult = `<div class="ai-result-card"><p>Please specify a gene (e.g. "Where is IFT88 located?").</p></div>`;
-            } else {
-                const geneSymbol = genes[0].toUpperCase();
-                const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
-                if (!geneData) {
-                    htmlResult = `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in database.</p></div>`;
-                } else {
-                    const localization = (geneData.Localization || 'Cilium (general)').trim();
-                    window.resetViews();
-                    // Calls the fixed SpatialManager bridge
-                    if (typeof window.highlightCiliumLocation === 'function') {
-                        window.highlightCiliumLocation(localization, geneSymbol);
-                    }
-                    htmlResult = `<div class="ai-result-card"><h4>Localization of ${geneSymbol}</h4><p><strong>${localization}</strong></p><p>The interactive ciliary diagram is displayed on the left.</p></div>`;
-                }
+     // === 20. Intent: "Where is [GENE] located?" (Visualizer) ===
+else if (htmlResult === null && qLower.startsWith('where is') && (qLower.includes('located') || qLower.includes('localised') || qLower.includes('localized'))) {
+    const genes = extractMultipleGenes(query);
+
+    if (genes.length === 0) {
+        window.addChatMessage(`
+            <div class="ai-result-card">
+                <p>Please specify a gene symbol.</p>
+                <p><strong>Example:</strong> "Where is IFT88 located?" or "Where are BBS1 and FOXJ1 located?"</p>
+            </div>
+        `, false);
+        return;
+    }
+
+    // Force diagram visibility
+    window.resetViews();
+
+    let responseHtml = '<div class="ai-result-card"><h4>Gene Localization</h4>';
+
+    genes.forEach((geneSymbol, index) => {
+        geneSymbol = geneSymbol.toUpperCase();
+        const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+
+        let localization = 'Cilium (general)';
+        let highlighted = false;
+
+        if (geneData && geneData.Localization) {
+            localization = geneData.Localization.trim();
+            // Highlight on diagram
+            if (typeof window.highlightCiliumLocation === 'function') {
+                highlighted = window.highlightCiliumLocation(localization, geneSymbol);
             }
+        } else if (geneData) {
+            // Gene exists but no localization data
+            if (typeof window.highlightCiliumLocation === 'function') {
+                highlighted = window.highlightCiliumLocation('cilia', geneSymbol); // fallback
+            }
+        } else {
+            // Gene not in database
+            responseHtml += `<p><strong>${geneSymbol}</strong>: Not found in database.</p>`;
+            return; // skip to next gene
         }
 
+        const note = highlighted 
+            ? 'Highlighted on the diagram.' 
+            : 'Broad/general localization – full cilium shown.';
+
+        responseHtml += `
+            <p>
+                <strong>${geneSymbol}</strong>: <span style="color:#2b6cb0;">${localization}</span><br>
+                <em>${note}</em>
+            </p>
+        `;
+
+        // Add separator if not last gene
+        if (index < genes.length - 1) {
+            responseHtml += '<hr style="border:0; border-top:1px solid #e2e8f0; margin:10px 0;">';
+        }
+    });
+
+    responseHtml += `
+        <p style="margin-top:12px;"><strong>Interactive ciliary diagram</strong> is displayed on the left with highlighted compartments.</p>
+    </div>`;
+
+    window.addChatMessage(responseHtml, false);
+    return;
+}
+
+    
         // === 21. Intent: Multi-gene Overlay (Visualizer) ===
-        else if (htmlResult === null && (qLower.startsWith('multi:') || qLower.includes('multi:'))) {
-            const genes = extractMultipleGenes(query);
-            if (genes.length < 2) {
-                htmlResult = "Please provide at least 2 genes (e.g., Multi: IFT88, FOXJ1).";
-            } else {
-                window.resetViews();
-                if (window.SpatialManager && window.SpatialManager.applyMultiOverlay) {
-                    window.SpatialManager.applyMultiOverlay(genes);
-                }
-                htmlResult = `<div class="ai-result-card"><strong>Multi-gene localization:</strong> ${genes.join(', ')}<br>Each gene is highlighted in a different color on the diagram.</div>`;
-            }
-        }
+else if (htmlResult === null && (qLower.startsWith('multi:') || qLower.includes('multi:'))) {
+    // Extract the part after "multi:" and clean it
+    let geneString = query.replace(/^multi:?/i, '').trim();
+    
+    // Remove any leading/trailing punctuation or words
+    geneString = geneString.replace(/^[:\s,]+/, '').replace(/[\.\?!]*$/, '');
 
+    // Use extractMultipleGenes on the cleaned string
+    let genes = extractMultipleGenes(geneString);
+
+    // Fallback: if no genes found, try splitting by comma/space manually
+    if (genes.length === 0 && geneString) {
+        genes = geneString
+            .split(/[\s,]+/)
+            .map(g => g.trim().toUpperCase())
+            .filter(g => g.length >= 3 && /^[A-Z0-9]+$/.test(g));
+    }
+
+    if (genes.length < 2) {
+        window.addChatMessage(`
+            <div class="ai-result-card">
+                <p>Please provide at least 2 valid gene symbols.</p>
+                <p><strong>Example:</strong> Multi: IFT88, FOXJ1</p>
+                <p>Or: Multi: BBS1, CEP290, TMEM67</p>
+            </div>
+        `, false);
+        return;
+    }
+
+    // Success: Show diagram and apply multi-overlay
+    window.resetViews();
+
+    if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
+        window.SpatialManager.applyMultiOverlay(genes);
+    }
+
+    const geneList = genes.join(', ');
+    const preview = genes.length > 8 ? genes.slice(0, 8).join(', ') + '...' : geneList;
+
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>Multi-gene Localization</h4>
+            <p><strong>Genes:</strong> ${geneList} (${genes.length} total)</p>
+            <p><strong>Preview:</strong> ${preview}</p>
+            <p>Each gene is highlighted in a <strong>different color</strong> on the interactive ciliary diagram.</p>
+        </div>
+    `, false);
+
+    return;
+}
+
+    
         // === 22. Intent: GO Term / Functional Heatmap (Visualizer) ===
-        else if (htmlResult === null && (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category'))) {
-            let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
-            window.resetViews();
-            if (window.renderCategoryHeatmap) {
-                // Ensure helper exists or fallback to empty array
-                const genes = (typeof window.getGenesByFunction === 'function') ? window.getGenesByFunction(term) : [];
-                if (genes.length > 0) {
-                    window.renderCategoryHeatmap(genes);
-                    htmlResult = `<div class="ai-result-card"><h4>Functional Category: ${term}</h4><p>Found ${genes.length} genes. A heatmap overlay has been applied to the diagram.</p></div>`;
-                } else {
-                    htmlResult = `<div class="ai-result-card"><p>No genes found for category <strong>"${term}"</strong>.</p></div>`;
-                }
+else if (htmlResult === null && (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:'))) {
+    let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
+
+    if (!term) {
+        window.addChatMessage(`<div class="ai-result-card"><p>Please provide a GO term or functional category (e.g., "GO: intraflagellar transport").</p></div>`, false);
+        return;
+    }
+
+    // Primary: Use database search if available
+    let genes = [];
+    if (typeof window.getGenesByFunction === 'function') {
+        genes = window.getGenesByFunction(term);
+    }
+
+    // Hardcoded fallbacks for key ciliary terms (ensures "intraflagellar transport" always works)
+    const lowerTerm = term.toLowerCase();
+    const fallbackMap = {
+        'intraflagellar transport': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46', 'KIF3A', 'KIF3B', 'KIF17', 'DYNC2H1'],
+        'ift': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46'],
+        'bbsome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'TTC8', 'BBS9', 'BBIP1'],
+        'transition zone': ['TMEM67', 'TMEM216', 'TMEM237', 'CEP290', 'CC2D2A', 'TCTN1', 'TCTN2', 'MKS1', 'NPHP1', 'RPGRIP1L'],
+        'dynein arm': ['DNAH5', 'DNAH11', 'DNAI1', 'DNAI2', 'DNAAF1', 'DNAAF2', 'LRRC6'],
+        'radial spoke': ['RSPH1', 'RSPH4A', 'RSPH9', 'DRC1']
+    };
+
+    if (genes.length === 0) {
+        for (const key in fallbackMap) {
+            if (lowerTerm.includes(key)) {
+                genes = fallbackMap[key];
+                break;
             }
         }
+    }
+
+    if (genes.length === 0) {
+        window.addChatMessage(`
+            <div class="ai-result-card">
+                <p>No genes found for <strong>"${term}"</strong>.</p>
+                <p>Try common terms like "intraflagellar transport", "bbsome", or "transition zone".</p>
+            </div>
+        `, false);
+        return;
+    }
+
+    // Apply visualization
+    window.resetViews();
+
+    if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
+        // Use multi-overlay for distinct colors per gene
+        const upperGenes = genes.map(g => g.toUpperCase());
+        window.SpatialManager.applyMultiOverlay(upperGenes);
+    }
+
+    const preview = genes.slice(0, 12).join(', ');
+    const more = genes.length > 12 ? `... and ${genes.length - 12} more` : '';
+
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>Functional Category / GO Term: ${term}</h4>
+            <p>Found <strong>${genes.length}</strong> genes.</p>
+            <p><strong>Examples:</strong> ${preview}${more}</p>
+            <p>A <strong>multi-colored overlay</strong> has been applied to the ciliary diagram showing localization.</p>
+        </div>
+    `, false);
+
+    return;
+}
 // Fallback intent
 if (htmlResult === null) {
     const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
