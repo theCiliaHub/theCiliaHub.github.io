@@ -3207,7 +3207,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     if (gd) {
         gd.on('plotly_click', (data) => {
             const point = data.points[0];
-            const loc = point.customdata?.localization;
+            const loc = point.customdata && point.customdata.localization;
             if (loc && typeof window.highlightCiliumLocation === 'function') {
                 window.resetViews();
                 window.highlightCiliumLocation(loc, gene);
@@ -5489,7 +5489,7 @@ const SpatialManager = {
 
     restoreByGene: function (gene) {
         if (!gene) return false;
-        const loc = window.CiliAI?.zoomStateByGene?.[gene.toUpperCase()];
+        const loc = (window.CiliAI && window.CiliAI.zoomStateByGene && window.CiliAI.zoomStateByGene[gene.toUpperCase()]);
         if (!loc) return false;
         return this.highlight(loc, gene);
     },
