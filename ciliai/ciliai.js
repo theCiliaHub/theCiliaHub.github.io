@@ -4158,31 +4158,52 @@ if (
         );
         return;
     }
-    const geneSymbol = genes[0];
+
+    const geneSymbol = genes[0].toUpperCase();
     const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
     if (!geneData) {
         window.addChatMessage(
-            `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found.</p></div>`,
+            `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in the database.</p></div>`,
             false
         );
         return;
     }
-    const localization = geneData.Localization || 'Cilium (unspecified compartment)';
-    // 🔹 Highlight on interactive cilium (GENE-AWARE)
+
+    const localization = (geneData.Localization || 'Cilium (general)').trim();
+
+    // CRITICAL: Force diagram visibility and clean state
+    window.resetViews();  // This re-injects the SVG and ensures it's visible
+
+    // Now highlight the compartment
     if (typeof window.highlightCiliumLocation === 'function') {
-        window.highlightCiliumLocation(localization, geneSymbol);
+        const highlighted = window.highlightCiliumLocation(localization, geneSymbol);
+        // Optional: fallback message if no specific part matched
+        const highlightNote = highlighted 
+            ? 'The relevant compartment is now highlighted.' 
+            : 'Broad ciliary localization – the entire structure is shown.';
+        
+        window.addChatMessage(`
+            <div class="ai-result-card">
+                <h4>Localization of ${geneSymbol}</h4>
+                <p><strong>${geneSymbol}</strong> localizes to:</p>
+                <p style="font-size:16px; font-weight:600; color:#2b6cb0;">
+                    ${localization}
+                </p>
+                <p>${highlightNote}</p>
+                <p>The interactive ciliary diagram is displayed on the left.</p>
+            </div>
+        `, false);
+    } else {
+        // Fallback if highlight function missing
+        window.addChatMessage(`
+            <div class="ai-result-card">
+                <h4>Localization of ${geneSymbol}</h4>
+                <p><strong>${geneSymbol}</strong> localizes to: <strong>${localization}</strong></p>
+                <p>The ciliary diagram is displayed on the left.</p>
+            </div>
+        `, false);
     }
-    // 🔹 Chat response
-    window.addChatMessage(`
-        <div class="ai-result-card">
-            <h4>Localization of ${geneSymbol}</h4>
-            <p><strong>${geneSymbol}</strong> localizes to:</p>
-            <p style="font-size:16px; font-weight:600; color:#2b6cb0;">
-                ${localization}
-            </p>
-            <p>The corresponding compartment has been highlighted on the ciliary diagram.</p>
-        </div>
-    `, false);
+
     return;
 }
     // --- Functional / GO Analysis ---
@@ -4249,20 +4270,6 @@ window.fetchVariantData = async function(geneSymbol) {
     }
 };
 
-// Helper: Reset Views (Prevents Overlap)
-window.resetViews = function() {
-    ['cilia-svg', 'plotly-container', 'domain-viewer'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-    });
-    const ciliaSvg = document.getElementById('cilia-svg');
-    if (ciliaSvg && ciliaSvg.classList.contains('table-view-active')) {
-        window.generateAndInjectSVG(); 
-        ciliaSvg.classList.remove('table-view-active');
-    }
-    // Ensure base visibility
-    if(ciliaSvg) ciliaSvg.style.display = 'flex';
-};
 
 window.switchDatasetAndPlot = function(dataset, geneSymbol, geneListStr, zoom) {
     // Robustly handle gene list (array vs string)
@@ -5305,10 +5312,35 @@ window.highlightCiliumLocation = function (locTerm, gene = null) {
     return SpatialManager.highlight(locTerm, gene);
 };
 
-// View switching & reset utility
+// Helper: Reset Views – Ensures diagram is visible and refreshed
 window.resetViews = function() {
-    window.showDiagram();
-    if (window.SpatialManager) SpatialManager.clearOverlays();
+    // Hide all alternative views
+    document.getElementById('plotly-container').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+
+    // Always re-inject the full interactive SVG to ensure it's present and clean
+    window.generateAndInjectSVG();
+
+    // Ensure cilia-svg is visible
+    const ciliaSvg = document.getElementById('cilia-svg');
+    if (ciliaSvg) {
+        ciliaSvg.style.display = 'flex';
+        // Remove any table mode class
+        ciliaSvg.classList.remove('table-view-active');
+    }
+
+    // Update title
+    document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+
+    // Clear any overlays (heatmaps, multi-gene)
+    if (window.SpatialManager && typeof window.SpatialManager.clearOverlays === 'function') {
+        window.SpatialManager.clearOverlays();
+    }
+
+    // Reset zoom/state
+    if (window.SpatialManager && typeof window.SpatialManager.resetZoom === 'function') {
+        window.SpatialManager.resetZoom();
+    }
 };
 
 window.showDiagram = function() {
