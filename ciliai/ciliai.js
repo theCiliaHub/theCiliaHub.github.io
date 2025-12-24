@@ -4390,13 +4390,26 @@ if (htmlResult === null) {
     }
 }
 
-if (htmlResult) window.addChatMessage(htmlResult, false);
-} catch (e) {
-    console.error("Error in handleAIQuery:", e);
-    window.addChatMessage(`Internal error: ${e.message}`, false);
-}
+        if (htmlResult) window.addChatMessage(htmlResult, false);
+    } catch (e) {
+        console.error("Error in handleAIQuery:", e);
+        window.addChatMessage(`An internal error occurred: ${e.message}`, false);
+    }
 };
 
+// Re-define initCiliAI (must be after all other code)
+window.initCiliAI = async function() {
+    window.updateStatus('Loading databases...', 'loading');
+    window.generateAndInjectSVG();
+
+    const loaded = await window.loadCiliAIData();
+    if (loaded) {
+        window.addChatMessage("CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
+        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes loaded)`, 'ready');
+    } else {
+        window.updateStatus('Load failed', 'error');
+    }
+};
 
 
 window.fetchVariantData = async function(geneSymbol) {
@@ -5875,19 +5888,5 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
     }
 };
 
-// Your existing initCiliAI (keep or merge)
-// Final init
-window.initCiliAI = async function() {
-    window.updateStatus('Loading databases...', 'loading');
-    window.generateAndInjectSVG(); // Show diagram immediately
-
-    const loaded = await window.loadCiliAIData();
-    if (loaded) {
-        window.addChatMessage("👋 CiliAI ready! Ask about genes, localization, GO terms, or try 'Multi: IFT88, FOXJ1'.", false);
-        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes loaded)`, 'ready');
-    } else {
-        window.updateStatus('Load failed', 'error');
-    }
-};
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
