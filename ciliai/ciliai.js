@@ -2,6 +2,41 @@
  * CiliAI – Unified Logic Engine (v7.1 – Safe Initialization)
  * ============================================================== */
 
+/* ==============================================================
+ * CiliAI – Global State (MUST BE FIRST)
+ * ============================================================== */
+window.CiliAI = {
+    activeDataset: 'lung',
+    datasets: {
+        lung: { 
+            name: 'Human Lung Organoid', 
+            umap: null, 
+            colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] 
+        },
+        kidney: { 
+            name: 'Human Kidney', 
+            umap: null, 
+            expression: null, 
+            colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']] 
+        }
+    },
+    data: { umap: [] },
+    masterData: [],
+    ready: false,
+    lookups: {
+        geneMap: {},
+        umapByGene: {},
+        goMap: {},
+        pfamByGene: {}
+    },
+    cellDataCache: {},
+    lastQueryContext: { type: null, data: [], term: null },
+    CiliAI_UMAP: null,
+    currentPlot: null,
+    zoomStateByGene: {},
+    activeGeneContext: null
+};
+
 // 1. GLOBAL STATE & UTILITIES
 // ==========================================================
 // 5. Ensure these are exposed globally
