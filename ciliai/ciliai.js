@@ -5447,9 +5447,13 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 };
 
 // Your existing initCiliAI (keep or merge)
+// Final init
 window.initCiliAI = async function() {
-    await window.loadCiliAIData();
-    window.addChatMessage("CiliAI ready! Try a query.", false);
+    window.updateStatus('Loading databases...', 'loading');
+    const loaded = await window.loadCiliAIData();
+    if (loaded) {
+        window.addChatMessage("👋 CiliAI ready! Ask me anything about ciliary genes.", false);
+    }
 };
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
