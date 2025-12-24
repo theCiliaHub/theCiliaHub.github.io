@@ -5410,62 +5410,46 @@ const SpatialManager = {
     },
 
     highlight: function (locTerm, gene = null) {
-        if (!locTerm) return false;
+    if (!locTerm) return false;
 
-        const container = document.getElementById('cilia-svg');
-        if (!container) return false;
+    const container = document.getElementById('cilia-svg');
+    if (!container || !container.querySelector('svg')) {
+        window.generateAndInjectSVG();
+    }
 
-        // Ensure SVG is loaded
-        if (!container.querySelector('svg')) {
-            window.generateAndInjectSVG();
+    const normalized = locTerm.toLowerCase().trim();
+
+    let matchedId = null;
+    const sortedKeys = Object.keys(this.locMap).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+        if (normalized.includes(key)) {
+            matchedId = this.locMap[key];
+            break;
         }
+    }
 
-        // Normalize input
-        const normalized = locTerm.toLowerCase().trim();
+    // Fallback for broad terms
+    if (!matchedId && /cilia|cilium|flagella/.test(normalized)) {
+        matchedId = 'axoneme';
+    }
 
-        // Find best matching key in locMap (longest match wins)
-        let bestMatch = null;
-        let bestLength = 0;
-        for (const key in this.locMap) {
-            if (normalized.includes(key) && key.length > bestLength) {
-                bestMatch = key;
-                bestLength = key.length;
-            }
-        }
+    if (!matchedId) return false;
 
-        const svgId = bestMatch ? this.locMap[bestMatch] : null;
+    document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+    const element = document.getElementById(matchedId);
+    if (!element) return false;
 
-        // Clear previous highlights
-        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+    element.classList.add('active-highlight');
+    this.zoomTo(element);
 
-        if (!svgId) {
-            // Fallback: if no specific match, highlight the whole axoneme for "cilia"-like terms
-            if (normalized.includes('cilia') || normalized.includes('cilium')) {
-                const fallbackEl = document.getElementById('axoneme');
-                if (fallbackEl) {
-                    fallbackEl.classList.add('active-highlight');
-                    this.zoomTo(fallbackEl);
-                    return true;
-                }
-            }
-            return false;
-        }
+    if (gene) {
+        window.CiliAI.zoomStateByGene = window.CiliAI.zoomStateByGene || {};
+        window.CiliAI.zoomStateByGene[gene] = locTerm;
+        window.CiliAI.activeGeneContext = gene;
+    }
 
-        const element = document.getElementById(svgId);
-        if (!element) return false;
-
-        element.classList.add('active-highlight');
-        this.zoomTo(element);
-
-        // Persist gene context
-        if (gene) {
-            window.CiliAI.zoomStateByGene = window.CiliAI.zoomStateByGene || {};
-            window.CiliAI.zoomStateByGene[gene] = locTerm;
-            window.CiliAI.activeGeneContext = gene;
-        }
-
-        return true;
-    },
+    return true;
+},
 
     zoomTo: function (element) {
         const viewport = document.getElementById('viewport-group');
@@ -5553,59 +5537,66 @@ const SpatialManager = {
         this.resetZoom();
     },
 
-    applyMultiOverlay: function(genes) {
-        const svg = document.getElementById('cilia-diagram');
-        if (!svg) return;
+   applyMultiOverlay: function(genes) {
+    const svg = document.getElementById('cilia-diagram');
+    if (!svg) return;
 
-        document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
+    // Clear previous overlays
+    document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
 
-        let overlayGroup = svg.querySelector('#multi-group');
-        if (!overlayGroup) {
-            overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            overlayGroup.id = 'multi-group';
-            overlayGroup.style.mixBlendMode = 'multiply';
-            svg.querySelector('#viewport-group').appendChild(overlayGroup);
-        }
-
-        const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
-
-        genes.forEach((geneSymbol, index) => {
-            const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
-            if (!gene || !gene.Localization) return;
-
-            const locs = gene.Localization.toLowerCase().split(/[,;]/).map(l => l.trim());
-            locs.forEach(loc => {
-                let matchedId = null;
-                for (const key in this.locMap) {
-                    if (loc.includes(key)) {
-                        matchedId = this.locMap[key];
-                        break;
-                    }
-                }
-                if (!matchedId && loc.includes('cilia')) matchedId = 'axoneme';
-
-                if (matchedId) {
-                    const element = document.getElementById(matchedId);
-                    if (element) {
-                        const clone = element.cloneNode(true);
-                        clone.id = '';
-                        clone.classList.add('multi-overlay');
-                        clone.style.fill = colors[index % colors.length];
-                        clone.style.opacity = '0.5';
-                        overlayGroup.appendChild(clone);
-                    }
-                }
-            });
-        });
-
-        window.showDiagram();
-        this.resetZoom();
-    },
-
-    clearOverlays: function() {
-        document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
+    let overlayGroup = svg.querySelector('#multi-group');
+    if (!overlayGroup) {
+        overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        overlayGroup.id = 'multi-group';
+        overlayGroup.style.mixBlendMode = 'multiply';
+        svg.querySelector('#viewport-group').appendChild(overlayGroup);
     }
-};
+
+    const colors = ['#ff1744', '#00e676', '#2979ff', '#ffd600', '#ff9100', '#7c4dff'];
+
+    genes.forEach((geneSymbol, index) => {
+        const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
+        if (!gene || !gene.Localization) return;
+
+        const color = colors[index % colors.length];
+        const locs = gene.Localization.toLowerCase().split(/[,;]/).map(l => l.trim());
+
+        locs.forEach(loc => {
+            let matchedId = null;
+
+            // Longest match first (specific over broad)
+            const sortedKeys = Object.keys(this.locMap).sort((a, b) => b.length - a.length);
+            for (const key of sortedKeys) {
+                if (loc.includes(key)) {
+                    matchedId = this.locMap[key];
+                    break;
+                }
+            }
+
+            // Fallback for any cilia-related term
+            if (!matchedId && /cilia|cilium|flagella/.test(loc)) {
+                matchedId = 'axoneme';
+            }
+
+            if (matchedId) {
+                const element = document.getElementById(matchedId);
+                if (element) {
+                    const clone = element.cloneNode(true);
+                    clone.id = '';
+                    clone.classList.add('multi-overlay');
+                    clone.style.fill = color;
+                    clone.style.opacity = '0.6';
+                    clone.style.stroke = color;
+                    clone.style.strokeWidth = '3';
+                    overlayGroup.appendChild(clone);
+                }
+            }
+        });
+    });
+
+    window.showDiagram();
+    this.resetZoom();
+},
 
 // Public bridge
 window.highlightCiliumLocation = function (locTerm, gene = null) {
