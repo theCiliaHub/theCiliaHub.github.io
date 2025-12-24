@@ -5389,7 +5389,7 @@ window.runDashboardSearch = function() {
 // (ADDED FROM index.html – MISSING VISUALIZATION HELPERS)
 // =======================================================
 
-// Spatial Intelligence Manager – FIXED & ENHANCED for accurate gene localization
+/// Spatial Intelligence Manager – FIXED & ENHANCED for accurate gene localization
 const SpatialManager = {
     locMap: {
         // Specific compartments
@@ -5423,46 +5423,46 @@ const SpatialManager = {
     },
 
     highlight: function (locTerm, gene = null) {
-    if (!locTerm) return false;
+        if (!locTerm) return false;
 
-    const container = document.getElementById('cilia-svg');
-    if (!container || !container.querySelector('svg')) {
-        window.generateAndInjectSVG();
-    }
-
-    const normalized = locTerm.toLowerCase().trim();
-
-    let matchedId = null;
-    const sortedKeys = Object.keys(this.locMap).sort((a, b) => b.length - a.length);
-    for (const key of sortedKeys) {
-        if (normalized.includes(key)) {
-            matchedId = this.locMap[key];
-            break;
+        const container = document.getElementById('cilia-svg');
+        if (!container || !container.querySelector('svg')) {
+            window.generateAndInjectSVG();
         }
-    }
 
-    // Fallback for broad terms
-    if (!matchedId && /cilia|cilium|flagella/.test(normalized)) {
-        matchedId = 'axoneme';
-    }
+        const normalized = locTerm.toLowerCase().trim();
 
-    if (!matchedId) return false;
+        let matchedId = null;
+        const sortedKeys = Object.keys(this.locMap).sort((a, b) => b.length - a.length);
+        for (const key of sortedKeys) {
+            if (normalized.includes(key)) {
+                matchedId = this.locMap[key];
+                break;
+            }
+        }
 
-    document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
-    const element = document.getElementById(matchedId);
-    if (!element) return false;
+        // Fallback for broad terms
+        if (!matchedId && /cilia|cilium|flagella/.test(normalized)) {
+            matchedId = 'axoneme';
+        }
 
-    element.classList.add('active-highlight');
-    this.zoomTo(element);
+        if (!matchedId) return false;
 
-    if (gene) {
-        window.CiliAI.zoomStateByGene = window.CiliAI.zoomStateByGene || {};
-        window.CiliAI.zoomStateByGene[gene] = locTerm;
-        window.CiliAI.activeGeneContext = gene;
-    }
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+        const element = document.getElementById(matchedId);
+        if (!element) return false;
 
-    return true;
-},
+        element.classList.add('active-highlight');
+        this.zoomTo(element);
+
+        if (gene) {
+            window.CiliAI.zoomStateByGene = window.CiliAI.zoomStateByGene || {};
+            window.CiliAI.zoomStateByGene[gene] = locTerm;
+            window.CiliAI.activeGeneContext = gene;
+        }
+
+        return true;
+    },
 
     zoomTo: function (element) {
         const viewport = document.getElementById('viewport-group');
@@ -5546,75 +5546,78 @@ const SpatialManager = {
             }
         });
 
+window.showDiagram();
+        this.resetZoom();
+    }
+};
+
+    applyMultiOverlay: function(genes) {
+        const svg = document.getElementById('cilia-diagram');
+        if (!svg) return;
+
+        // Clear previous overlays
+        document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
+
+        let overlayGroup = svg.querySelector('#multi-group');
+        if (!overlayGroup) {
+            overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            overlayGroup.id = 'multi-group';
+            overlayGroup.style.mixBlendMode = 'multiply';
+            svg.querySelector('#viewport-group').appendChild(overlayGroup);
+        }
+
+        const colors = ['#ff1744', '#00e676', '#2979ff', '#ffd600', '#ff9100', '#7c4dff'];
+
+        genes.forEach((geneSymbol, index) => {
+            const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
+            if (!gene || !gene.Localization) return;
+
+            const color = colors[index % colors.length];
+            const locs = gene.Localization.toLowerCase().split(/[,;]/).map(l => l.trim());
+
+            locs.forEach(loc => {
+                let matchedId = null;
+
+                // Longest match first (specific over broad)
+                const sortedKeys = Object.keys(this.locMap).sort((a, b) => b.length - a.length);
+                for (const key of sortedKeys) {
+                    if (loc.includes(key)) {
+                        matchedId = this.locMap[key];
+                        break;
+                    }
+                }
+
+                // Fallback for any cilia-related term
+                if (!matchedId && /cilia|cilium|flagella/.test(loc)) {
+                    matchedId = 'axoneme';
+                }
+
+                if (matchedId) {
+                    const element = document.getElementById(matchedId);
+                    if (element) {
+                        const clone = element.cloneNode(true);
+                        clone.id = '';
+                        clone.classList.add('multi-overlay');
+                        clone.style.fill = color;
+                        clone.style.opacity = '0.6';
+                        clone.style.stroke = color;
+                        clone.style.strokeWidth = '3';
+                        overlayGroup.appendChild(clone);
+                    }
+                }
+            });
+        });
+
         window.showDiagram();
         this.resetZoom();
-    },
-
-   applyMultiOverlay: function(genes) {
-    const svg = document.getElementById('cilia-diagram');
-    if (!svg) return;
-
-    // Clear previous overlays
-    document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
-
-    let overlayGroup = svg.querySelector('#multi-group');
-    if (!overlayGroup) {
-        overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        overlayGroup.id = 'multi-group';
-        overlayGroup.style.mixBlendMode = 'multiply';
-        svg.querySelector('#viewport-group').appendChild(overlayGroup);
     }
-
-    const colors = ['#ff1744', '#00e676', '#2979ff', '#ffd600', '#ff9100', '#7c4dff'];
-
-    genes.forEach((geneSymbol, index) => {
-        const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
-        if (!gene || !gene.Localization) return;
-
-        const color = colors[index % colors.length];
-        const locs = gene.Localization.toLowerCase().split(/[,;]/).map(l => l.trim());
-
-        locs.forEach(loc => {
-            let matchedId = null;
-
-            // Longest match first (specific over broad)
-            const sortedKeys = Object.keys(this.locMap).sort((a, b) => b.length - a.length);
-            for (const key of sortedKeys) {
-                if (loc.includes(key)) {
-                    matchedId = this.locMap[key];
-                    break;
-                }
-            }
-
-            // Fallback for any cilia-related term
-            if (!matchedId && /cilia|cilium|flagella/.test(loc)) {
-                matchedId = 'axoneme';
-            }
-
-            if (matchedId) {
-                const element = document.getElementById(matchedId);
-                if (element) {
-                    const clone = element.cloneNode(true);
-                    clone.id = '';
-                    clone.classList.add('multi-overlay');
-                    clone.style.fill = color;
-                    clone.style.opacity = '0.6';
-                    clone.style.stroke = color;
-                    clone.style.strokeWidth = '3';
-                    overlayGroup.appendChild(clone);
-                }
-            }
-        });
-    });
-
-    window.showDiagram();
-    this.resetZoom();
-},
+}; // <--- THIS WAS MISSING
 
 // Public bridge
 window.highlightCiliumLocation = function (locTerm, gene = null) {
     return SpatialManager.highlight(locTerm, gene);
 };
+
 
 // Helper: Reset Views – Ensures diagram is visible and refreshed
 window.resetViews = function() {
