@@ -3014,32 +3014,25 @@ window.terminologyQueries = {
 // ==========================================================
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
-
-
 /**
- * Renders Interactive UMAP (Fixed for Kidney Sparse Data + Debugging)
- */
-/**
- * Renders Interactive UMAP (Fixed for Dictionary Data Structure)
+ * Renders Interactive UMAP – Enhanced with legend, dataset switch, and clickable points
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Clear previous views
     if (typeof window.resetViews === 'function') window.resetViews();
-    
+
     // 2. Active dataset
     const datasetKey = window.CiliAI.activeDataset || 'lung';
     const dataset = window.CiliAI.datasets?.[datasetKey];
-
     if (!dataset || !Array.isArray(dataset.umap)) {
-        if (window.addChatMessage) window.addChatMessage(`⚠️ ${datasetKey} data not loaded yet.`, false);
+        window.addChatMessage(`⚠️ ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
         return;
     }
 
     // 3. Inputs
     if (!displayName) displayName = 'WDR31';
-    // Robustly handle string vs array input
     if (typeof targetGenes === 'string') {
-        targetGenes = targetGenes.split(',').filter(t => t.trim().length > 0);
+        targetGenes = targetGenes.split(',').map(t => t.trim()).filter(t => t.length > 0);
     }
     if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
 
@@ -3048,18 +3041,15 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     // 4. Prepare data
     const sourceData = dataset.umap;
-    const renderIndices = Array.from({ length: sourceData.length }, (_, i) => i);
-
-    const x = [], y = [], color = [], text = [], size = [];
+    const x = [], y = [], color = [], text = [], size = [], customdata = [];
     let maxExpr = 0;
 
-    // 5. Expression Handling (Auto-detect format)
+    // Expression handling
     let exprData = null;
-    let isSparseArray = false; // Array [idx, val, idx, val...]
-    let isDictionary = false;  // Object { "cell type": val }
+    let isSparseArray = false;
+    let isDictionary = false;
     let geneFound = false;
 
-    // Helper: Strictly decode sparse array
     const decodeSparse = (sparse, total) => {
         const dense = new Float32Array(total).fill(0);
         if (!sparse) return dense;
@@ -3072,90 +3062,85 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     };
 
     if (!isClusterView) {
-        // Try getting data from dataset object (Kidney) OR cache (Lung)
         let rawData = dataset.expression?.[gene];
-        
-        // Fallback to global cache if not in dataset object (Legacy Lung path)
         if (!rawData && window.CiliAI.cellDataCache) {
             rawData = window.CiliAI.cellDataCache[gene];
         }
-
         if (rawData) {
             geneFound = true;
             if (Array.isArray(rawData)) {
-                // It's a sparse array (Old Kidney format)
                 exprData = decodeSparse(rawData, sourceData.length);
                 isSparseArray = true;
             } else if (typeof rawData === 'object') {
-                // It's a dictionary (New Kidney & Lung format)
                 exprData = rawData;
                 isDictionary = true;
             }
         }
     }
 
-    if (!isClusterView && !geneFound) {
-        if(window.addChatMessage) window.addChatMessage(`⚠️ **${gene}** not found in ${dataset.name}.`, false);
-    }
-
+    // Unique cell types for legend
+    const cellTypes = new Set();
     const clusterColors = {
-        'Proximal Tubule Cell': '#3B82F6', 'Thick Ascending Limb Cell': '#60A5FA',
-        'Distal Convoluted Tubule Cell': '#93C5FD', 'Collecting Duct Principal Cell': '#BFDBFE',
-        'Collecting Duct Intercalated Cell': '#DBEAFE', 'Podocyte': '#1E40AF',
-        'Fibroblast': '#1D4ED8', 'Endothelial Cell': '#2563EB',
-        'Immune Cell': '#1E3A8A', 'Cycling Cell': '#172554', 'Ciliated Cell': '#E11D48',
-        'stem cell': '#E11D48', 'club cell': '#3B82F6', 'goblet cell': '#10B981', 
-        'basal cell': '#F59E0B', 'neuroendocrine cell': '#8B5CF6',
-        'pulmonary alveolar type 1 cell': '#60A5FA', 'pulmonary alveolar type 2 cell': '#2563EB',
+        'Proximal Tubule Cell': '#3B82F6',
+        'Thick Ascending Limb Cell': '#60A5FA',
+        'Distal Convoluted Tubule Cell': '#93C5FD',
+        'Collecting Duct Principal Cell': '#BFDBFE',
+        'Collecting Duct Intercalated Cell': '#DBEAFE',
+        'Podocyte': '#1E40AF',
+        'Fibroblast': '#1D4ED8',
+        'Endothelial Cell': '#2563EB',
+        'Immune Cell': '#1E3A8A',
+        'Cycling Cell': '#172554',
+        'Ciliated Cell': '#E11D48',
+        'stem cell': '#E11D48',
+        'club cell': '#3B82F6',
+        'goblet cell': '#10B981',
+        'basal cell': '#F59E0B',
+        'neuroendocrine cell': '#8B5CF6',
+        'pulmonary alveolar type 1 cell': '#60A5FA',
+        'pulmonary alveolar type 2 cell': '#2563EB',
         'lung secretory cell': '#34D399'
     };
 
-    // 6. Build plot arrays
-    for (const i of renderIndices) {
-        const p = sourceData[i];
-        if (!p) continue;
-
+    // Build plot data
+    sourceData.forEach((p, i) => {
+        if (!p) return;
         const cellType = p.cell_type;
+        cellTypes.add(cellType);
 
-        // Zoom Filter
-        if (zoomToCellType && cellType !== zoomToCellType) continue; 
+        if (zoomToCellType && cellType !== zoomToCellType) return;
 
         x.push(p.x);
         y.push(p.y);
 
         let exprVal = 0;
         if (!isClusterView && geneFound) {
-            if (isSparseArray) {
-                exprVal = exprData[i]; // Access by index
-            } else if (isDictionary) {
-                // Access by cell type name (Dictionary lookups)
-                exprVal = exprData[cellType] || 0; 
-            }
+            if (isSparseArray) exprVal = exprData[i];
+            else if (isDictionary) exprVal = exprData[cellType] || 0;
         }
 
-        text.push(
-            `<b>${cellType}</b><br>${isClusterView ? '' : `Expr: ${exprVal.toFixed(2)}`}`
-        );
+        text.push(`<b>${cellType}</b><br>${isClusterView ? '' : `Expression: ${exprVal.toFixed(2)} TPM`}`);
+        customdata.push({ localization: window.CiliAI.lookups.geneMap[gene]?.Localization || 'Cilium' });
 
         if (isClusterView) {
             color.push(clusterColors[cellType] || '#94A3B8');
-            size.push(4);
+            size.push(6);
         } else {
             color.push(exprVal);
-            size.push(exprVal > 0 ? 6 : 3);
+            size.push(exprVal > 0 ? 8 : 4);
             if (exprVal > maxExpr) maxExpr = exprVal;
         }
-    }
+    });
 
     const trace = {
-        x, y, text,
+        x, y, text, customdata,
         mode: 'markers',
         type: 'scattergl',
         hoverinfo: 'text',
         marker: {
             size,
-            opacity: 0.8,
-            line: { width: 0 }
+            opacity: 0.85,
+            line: { width: 0.5, color: '#fff' }
         }
     };
 
@@ -3163,38 +3148,89 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         trace.marker.color = color;
         trace.marker.cmin = 0;
         trace.marker.cmax = maxExpr > 0 ? maxExpr : 1;
-        trace.marker.colorscale = dataset.colorScale || 'Viridis';
-        trace.marker.colorbar = { title: 'TPM', len: 0.5 };
+        trace.marker.colorscale = dataset.colorScale || [[0, '#e2e8f0'], [0.5, '#3b82f6'], [1, '#1e40af']];
+        trace.marker.colorbar = { title: 'TPM', thickness: 15, len: 0.6 };
     } else {
         trace.marker.color = color;
     }
 
     const layout = {
-        title: `<b>${isClusterView ? 'Cell Types' : gene} (${dataset.name})</b>`,
-        xaxis: { visible: false, automargin: true },
-        yaxis: { visible: false, automargin: true },
+        title: {
+            text: `<b>${isClusterView ? 'Cell Types' : gene}</b><br><sub>${dataset.name} scRNA-seq</sub>`,
+            font: { size: 16 }
+        },
+        xaxis: { visible: false, showgrid: false, zeroline: false },
+        yaxis: { visible: false, showgrid: false, zeroline: false },
         hovermode: 'closest',
-        margin: { t: 40, b: 20, l: 20, r: 20 },
+        margin: { t: 60, b: 40, l: 40, r: 40 },
         plot_bgcolor: '#fff',
         paper_bgcolor: '#fff',
-        showlegend: false
+        showlegend: false,
+        annotations: []
     };
 
-    // 7. Render using global helper
+    // Add cell type legend as annotations
+    if (isClusterView) {
+        const legendX = 1.05;
+        let legendY = 1;
+        const legendStep = 0.06;
+        Array.from(cellTypes).sort().forEach((ct, idx) => {
+            const col = clusterColors[ct] || '#666';
+            layout.annotations.push({
+                x: legendX,
+                y: legendY - idx * legendStep,
+                xref: 'paper',
+                yref: 'paper',
+                text: `<span style="color:${col}">●</span> ${ct}`,
+                showarrow: false,
+                font: { size: 11 },
+                align: 'left',
+                xanchor: 'left'
+            });
+        });
+    }
+
+    // Render plot
+    const plotData = { data: [trace], layout };
     if (typeof window.showPlot === 'function') {
-        window.showPlot({ data: [trace], layout }, isClusterView ? 'Cell Clusters' : `scRNA-seq: ${gene}`);
+        window.showPlot(plotData, isClusterView ? 'Cell Type Clusters' : `scRNA-seq: ${gene}`);
     } else {
-        // Fallback
-        const container = document.getElementById('plotly-container');
-        if(container) container.style.display = 'block';
-        if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
-        
         await Plotly.newPlot('plotly-container', [trace], layout, {
             responsive: true,
             displaylogo: false,
-            modeBarButtonsToRemove: ['lasso2d', 'select2d']
+            modeBarButtonsToRemove: ['lasso2d', 'select2d', 'zoom2d']
         });
     }
+
+    // Click handler: jump to diagram and highlight localization
+    const gd = window.CiliAI.currentPlot || document.querySelector('.plotly');
+    if (gd) {
+        gd.on('plotly_click', (data) => {
+            const point = data.points[0];
+            const loc = point.customdata?.localization;
+            if (loc && typeof window.highlightCiliumLocation === 'function') {
+                window.resetViews();
+                window.highlightCiliumLocation(loc, gene);
+                window.addChatMessage(`<i>Clicked cell type: ${point.text.split('<br>')[0]}</i><br>Localization highlighted on diagram.`, false);
+            }
+        });
+    }
+
+    // Dataset switch button
+    const currentDS = datasetKey;
+    const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
+    const nextName = nextDS === 'lung' ? 'Lung Organoid' : 'Human Kidney';
+
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <p><strong>${isClusterView ? 'Cell Type View' : gene}</strong> in <strong>${dataset.name}</strong></p>
+            ${isClusterView ? '<p>Colored by cell type (legend on right)</p>' : '<p>Colored by expression level</p>'}
+            <p><i>Click any point to highlight its localization on the ciliary diagram.</i></p>
+            <button class="ciliai-button" style="margin-top:8px;" onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${displayName}', '${targetGenes.join(',')}', ${zoomToCellType ? `'${zoomToCellType}'` : 'null'})">
+                🔄 Switch to ${nextName}
+            </button>
+        </div>
+    `, false);
 };
 
 // Helper: Get scRNA expression map for a gene (safe)
@@ -4207,17 +4243,53 @@ if (
     return;
 }
    // INTENT: GO term, functional category, or function query → Heatmap on diagram
-if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:')) {
-    // Extract the search term cleanly
-    let term = query
-        .replace(/^(go:|go term:|function:|functional category:?)\s*/i, '')
-        .trim()
-        .toLowerCase();
-
-    if (!term) {
-        window.addChatMessage(`<div class="ai-result-card"><p>Please provide a GO term or functional category (e.g., "GO: intraflagellar transport").</p></div>`, false);
+// "Multi:" queries – Colored overlays
+if (qLower.startsWith('multi:') || qLower.includes('multi:')) {
+    const genes = extractMultipleGenes(query);
+    if (genes.length < 2) {
+        window.addChatMessage("Please provide at least 2 genes (e.g., Multi: IFT88, FOXJ1).", false);
         return;
     }
+    window.resetViews();
+    if (window.SpatialManager && window.SpatialManager.applyMultiOverlay) {
+        window.SpatialManager.applyMultiOverlay(genes);
+    }
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <strong>Multi-gene localization:</strong> ${genes.join(', ')}<br>
+            Each gene is highlighted in a different color on the diagram.
+        </div>
+    `, false);
+    return;
+}
+
+// GO / Functional category – Colored heatmap
+if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:')) {
+    let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
+    const genes = getGenesByFunction(term);  // Your existing function
+
+    if (genes.length === 0) {
+        window.addChatMessage(`<div class="ai-result-card"><p>No genes found for "${term}".</p></div>`, false);
+        return;
+    }
+
+    window.resetViews();
+    if (window.SpatialManager) {
+        // Use applyMultiOverlay with single color for visual unity
+        const wrapperGenes = genes.map(g => g.toUpperCase());
+        window.SpatialManager.applyMultiOverlay(wrapperGenes);  // Reuses color logic
+    }
+
+    const preview = genes.slice(0, 10).join(', ') + (genes.length > 10 ? '...' : '');
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>${term}</h4>
+            <p>Found <strong>${genes.length}</strong> genes: ${preview}</p>
+            <p>Localization heatmap applied to the diagram.</p>
+        </div>
+    `, false);
+    return;
+}
 
     // Search for matching genes across relevant fields
     const matchingGenes = [];
@@ -4773,9 +4845,11 @@ function handleScreenReferenceFollowup() {
 window.generateAndInjectSVG = function() {
     const container = document.getElementById('cilia-svg');
     if (!container) return;
+
     document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+
     container.innerHTML = `
-        <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+        <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: 100%;">
             <defs>
                 <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" style="stop-color:#F8FAFC;" />
@@ -4786,16 +4860,20 @@ window.generateAndInjectSVG = function() {
                     <stop offset="100%" style="stop-color:#CBD5E1;" />
                 </radialGradient>
                 <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#5b21b6;" /> <stop offset="100%" style="stop-color:#4c1d95;" />
+                    <stop offset="0%" style="stop-color:#5b21b6;" />
+                    <stop offset="100%" style="stop-color:#4c1d95;" />
                 </linearGradient>
                 <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#475569;" /> <stop offset="100%" style="stop-color:#334155;" />
+                    <stop offset="0%" style="stop-color:#475569;" />
+                    <stop offset="100%" style="stop-color:#334155;" />
                 </linearGradient>
                 <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#0891b2;" /> <stop offset="100%" style="stop-color:#0e7490;" />
+                    <stop offset="0%" style="stop-color:#0891b2;" />
+                    <stop offset="100%" style="stop-color:#0e7490;" />
                 </linearGradient>
                 <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#2563eb;" /> <stop offset="100%" style="stop-color:#1d4ed8;" />
+                    <stop offset="0%" style="stop-color:#2563eb;" />
+                    <stop offset="100%" style="stop-color:#1d4ed8;" />
                 </linearGradient>
                 <linearGradient id="heatmapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stop-color="#00ff00" stop-opacity="0.2" />
@@ -4803,42 +4881,97 @@ window.generateAndInjectSVG = function() {
                     <stop offset="100%" stop-color="#ff0000" stop-opacity="0.8" />
                 </linearGradient>
             </defs>
+
             <g id="viewport-group" transform="translate(0, 0)">
-                <path id="cell-body" class="cilia-part" tabindex="0"
-                      fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
-                      d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
-                <circle id="nucleus" class="cilia-part" tabindex="0"
-                        fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
-                        cx="140" cy="290" r="35"/>
-                <rect id="basal-body" class="cilia-part" tabindex="0"
-                      fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
-                      x="130" y="165" width="20" height="15" rx="2"/>
-                <path id="transition-zone" class="cilia-part" tabindex="0"
-                      fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
-                      d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
-                <path id="ciliary-membrane" class="cilia-part" tabindex="0"
-                      fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
-                      d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
-                <path id="axoneme" class="cilia-part" tabindex="0"
-                      fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
-                      d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
-                <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
+                <!-- Cell Body -->
+                <path id="cell-body" class="cilia-part" tabindex="0" fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
+                      d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z">
+                    <title>Cell Body / Cytosol – Main cytoplasmic compartment</title>
+                </path>
+
+                <!-- Nucleus -->
+                <circle id="nucleus" class="cilia-part" tabindex="0" fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
+                        cx="140" cy="290" r="35">
+                    <title>Nucleus – Contains genomic DNA</title>
+                </circle>
+
+                <!-- Basal Body -->
+                <rect id="basal-body" class="cilia-part" tabindex="0" fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
+                      x="130" y="165" width="20" height="15" rx="2">
+                    <title>Basal Body – Anchors cilium; example: PCM1</title>
+                </rect>
+
+                <!-- Transition Zone -->
+                <path id="transition-zone" class="cilia-part" tabindex="0" fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
+                      d="M 132,165 L 128,150 L 152,150 L 148,165 Z">
+                    <title>Transition Zone – Ciliary gate; example: TMEM17, CEP290</title>
+                </path>
+
+                <!-- Ciliary Membrane -->
+                <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
+                      d="M 128,150 L 135,30 L 145,30 L 152,150 Z">
+                    <title>Ciliary Membrane – Lipid barrier; example: ARL13B</title>
+                </path>
+
+                <!-- Axoneme -->
+                <path id="axoneme" class="cilia-part" tabindex="0" fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
+                      d="M 135,150 L 138,35 L 142,35 L 145,150 Z">
+                    <title>Axoneme – Microtubule core; example: β-tubulin, IFT proteins</title>
+                </path>
+
+                <!-- Animated Protein Labels with Pulsing Dots -->
+                <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.4s ease;">
                     <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">PCM1</text>
                     <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">TMEM17</text>
                     <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">ARL13B</text>
-                    <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">β2-tubulin</text>
+                    <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">β-tubulin</text>
                 </g>
-                <!-- Pulsing dots and animations omitted for brevity – add if desired -->
+
+                <!-- Pulsing Dots -->
+                <circle cx="140" cy="172.5" r="4" fill="#5b21b6" opacity="0.7">
+                    <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite"/>
+                    <animate attributeName="opacity" values="0.7;0.4;0.7" dur="2s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="140" cy="157.5" r="4" fill="#475569" opacity="0.7">
+                    <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+                </circle>
+                <circle cx="140" cy="90" r="4" fill="#0891b2" opacity="0.7">
+                    <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+                </circle>
+                <circle cx="140" cy="42.5" r="4" fill="#2563eb" opacity="0.7">
+                    <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite" begin="0.9s"/>
+                </circle>
+            </g>
+
+            <!-- Legend (initially hidden) -->
+            <g id="overlay-legend" style="display:none; font-size:11px;">
+                <rect x="10" y="10" width="180" height="80" fill="white" stroke="#ccc" rx="8" opacity="0.9"/>
+                <text x="20" y="25" font-weight="bold">Overlay Legend</text>
+                <g transform="translate(20,40)">
+                    <rect width="15" height="15" fill="#ff0000"/>
+                    <text x="20" y="12">Gene 1</text>
+                </g>
+                <g transform="translate(20,60)">
+                    <rect width="15" height="15" fill="#00ff00"/>
+                    <text x="20" y="12">Gene 2</text>
+                </g>
             </g>
         </svg>
     `;
 
     // Hover to show labels
-    container.onmouseenter = () => container.querySelector('.cilia-labels').style.opacity = '1';
-    container.onmouseleave = () => container.querySelector('.cilia-labels').style.opacity = '0';
+    container.onmouseenter = () => {
+        const labels = container.querySelector('.cilia-labels');
+        if (labels) labels.style.opacity = '1';
+    };
+    container.onmouseleave = () => {
+        const labels = container.querySelector('.cilia-labels');
+        if (labels) labels.style.opacity = '0';
+    };
 
-    // Click handling for parts
+    // Click handlers
     container.querySelectorAll('.cilia-part').forEach(part => {
+        part.style.cursor = 'pointer';
         part.addEventListener('click', (e) => {
             e.stopPropagation();
             document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
@@ -4847,13 +4980,15 @@ window.generateAndInjectSVG = function() {
         });
     });
 
-    // Click background to reset
-    container.onclick = (e) => {
-        if (e.target.id === 'cilia-diagram' || e.target.closest('#cilia-svg')) {
+    // Background click to reset
+    container.addEventListener('click', (e) => {
+        if (e.target === container || e.target.tagName === 'svg') {
             if (window.SpatialManager) window.SpatialManager.resetZoom();
         }
-    };
+    });
 };
+
+
 // Global exposure block:
 window.log = log;
 window.react = react;
