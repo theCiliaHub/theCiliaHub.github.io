@@ -270,14 +270,15 @@ function setupPageEventListeners() {
     // Removed listeners for geneSearch and chatInput as they are in index.html
 }
 
+
+
     
-    // ==========================================================
-    // 4. CILIBRAIN v5.1 - QUERY & PLOTTING ENGINE
-    // ==========================================================
+// ==========================================================
+// 4. CILIBRAIN v5.1 - QUERY & PLOTTING ENGINE
+// ==========================================================
+// --- 4A. Core Helper Functions ---
 
-    // --- 4A. Core Helper Functions ---
-
-    function log(message) {
+function log(message) {
         console.log(`[CiliAI] ${message}`);
     }
 
@@ -4984,6 +4985,7 @@ window.runDashboardSearch = function() {
         }).join('');
 };
 
+
 /* ==============================================================
  * MODULE: UI LAYOUT FIXES (Prevents Overflow)
  * ============================================================== */
@@ -5044,3 +5046,410 @@ window.runDashboardSearch = function() {
     
     console.log("CiliAI Layout Fixes Applied.");
 })();
+
+// =======================================================
+// (ADDED FROM index.html – MISSING VISUALIZATION HELPERS)
+// =======================================================
+
+// Spatial Intelligence Manager (full version with heatmaps & overlays)
+const SpatialManager = {
+    locMap: {
+        "transition zone": "transition-zone",
+        "tz": "transition-zone",
+        "axoneme": "axoneme",
+        "axonemal": "axoneme",
+        "basal body": "basal-body",
+        "centriole": "basal-body",
+        "ciliary tip": "ciliary-tip",
+        "membrane": "ciliary-membrane",
+        "ciliary membrane": "ciliary-membrane",
+        "cell body": "cell-body",
+        "cytosol": "cell-body",
+        "nucleus": "nucleus"
+    },
+
+    highlight: function (locTerm, gene = null) {
+        if (!locTerm) return false;
+        const container = document.getElementById('cilia-svg');
+        if (!container) return false;
+        if (!container.querySelector('svg')) {
+            window.generateAndInjectSVG();
+        }
+        const normalized = locTerm.toLowerCase().trim();
+        const svgId = this.locMap[normalized];
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+        if (!svgId) return false;
+        const element = document.getElementById(svgId);
+        if (!element) return false;
+        element.classList.add('active-highlight');
+        this.zoomTo(element);
+        if (gene) {
+            if (!window.CiliAI.zoomStateByGene) window.CiliAI.zoomStateByGene = {};
+            window.CiliAI.zoomStateByGene[gene] = locTerm;
+            window.CiliAI.activeGeneContext = gene;
+        }
+        return true;
+    },
+
+    zoomTo: function (element) {
+        const viewport = document.getElementById('viewport-group');
+        if (!viewport || !element.getBBox) return;
+        const box = element.getBBox();
+        const centerX = box.x + box.width / 2;
+        const centerY = box.y + box.height / 2;
+        const dx = 150 - centerX;
+        const dy = 200 - centerY;
+        viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
+        viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+        viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
+    },
+
+    resetZoom: function () {
+        const viewport = document.getElementById('viewport-group');
+        if (viewport) {
+            viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
+            viewport.style.transform = "translate(0,0) scale(1)";
+        }
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+    },
+
+    restoreByGene: function (gene) {
+        if (!gene) return false;
+        const loc = window.CiliAI?.zoomStateByGene?.[gene];
+        if (!loc) return false;
+        return this.highlight(loc, gene);
+    },
+
+    applyHeatmap: function(goTerm) {
+        const svg = document.getElementById('cilia-diagram');
+        if (!svg) return;
+        document.querySelectorAll('.heatmap-overlay').forEach(el => el.remove());
+        const genes = window.CiliAI.lookups.goMap[goTerm.toUpperCase()] || [];
+        if (!genes.length) return;
+        const locCounts = {};
+        genes.forEach(geneSymbol => {
+            const gene = window.CiliAI.lookups.geneMap[geneSymbol];
+            if (gene && gene.Localization) {
+                const loc = gene.Localization.toLowerCase();
+                locCounts[loc] = (locCounts[loc] || 0) + 1;
+            }
+        });
+        const maxCount = Math.max(...Object.values(locCounts), 1);
+        let overlayGroup = svg.querySelector('#heatmap-group');
+        if (!overlayGroup) {
+            overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            overlayGroup.id = 'heatmap-group';
+            svg.querySelector('#viewport-group').appendChild(overlayGroup);
+        }
+        Object.entries(locCounts).forEach(([loc, count]) => {
+            const svgId = this.locMap[loc];
+            if (!svgId) return;
+            const element = document.getElementById(svgId);
+            if (!element) return;
+            const clone = element.cloneNode(true);
+            clone.id = '';
+            clone.classList.add('heatmap-overlay');
+            clone.removeAttribute('tabindex');
+            clone.style.fill = 'url(#heatmapGrad)';
+            clone.style.opacity = (count / maxCount) * 0.7;
+            overlayGroup.appendChild(clone);
+        });
+        window.showDiagram();
+        this.resetZoom();
+    },
+
+    applyMultiOverlay: function(genes) {
+        const svg = document.getElementById('cilia-diagram');
+        if (!svg) return;
+        document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
+        let overlayGroup = svg.querySelector('#multi-group');
+        if (!overlayGroup) {
+            overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            overlayGroup.id = 'multi-group';
+            overlayGroup.style.mixBlendMode = 'multiply';
+            svg.querySelector('#viewport-group').appendChild(overlayGroup);
+        }
+        genes.forEach((geneSymbol, index) => {
+            const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
+            if (!gene || !gene.Localization) return;
+            const loc = gene.Localization.toLowerCase();
+            const svgId = this.locMap[loc];
+            if (!svgId) return;
+            const element = document.getElementById(svgId);
+            if (!element) return;
+            const clone = element.cloneNode(true);
+            clone.id = '';
+            clone.classList.add('multi-overlay');
+            clone.removeAttribute('tabindex');
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
+            clone.style.fill = colors[index % colors.length];
+            overlayGroup.appendChild(clone);
+        });
+        window.showDiagram();
+        this.resetZoom();
+    },
+
+    clearOverlays: function() {
+        document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
+    }
+};
+
+// Public bridge
+window.highlightCiliumLocation = function (locTerm, gene = null) {
+    return SpatialManager.highlight(locTerm, gene);
+};
+
+// View switching & reset utility
+window.resetViews = function() {
+    window.showDiagram();
+    if (window.SpatialManager) SpatialManager.clearOverlays();
+};
+
+window.showDiagram = function() {
+    document.getElementById('plotly-container').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+    document.getElementById('cilia-svg').style.display = 'flex';
+    document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+    if (window.CiliAI) window.CiliAI.currentPlot = null;
+};
+
+window.showPlot = function(plotData, title = "Gene Expression UMAP") {
+    document.getElementById('cilia-svg').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+    const plotContainer = document.getElementById('plotly-container');
+    plotContainer.style.display = 'block';
+    document.getElementById('current-viz-title').textContent = title;
+    plotContainer.innerHTML = '';
+    const vizCard = document.querySelector('.viz-card');
+    const vizHeader = document.querySelector('.viz-header');
+    const availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
+    const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
+    const layout = {
+        ...plotData.layout,
+        autosize: true,
+        width: availableWidth,
+        height: availableHeight,
+        margin: { l: 60, r: 30, b: 60, t: 50, pad: 10 },
+        paper_bgcolor: 'white',
+        plot_bgcolor: 'white',
+        xaxis: { ...plotData.layout?.xaxis, automargin: true, tickfont: { size: 10 } },
+        yaxis: { ...plotData.layout?.yaxis, automargin: true, tickfont: { size: 10 } },
+        font: { size: 11 },
+        showlegend: true,
+        legend: { x: 1.02, y: 1, xanchor: 'left', yanchor: 'top', bgcolor: 'rgba(255,255,255,0.8)', bordercolor: '#e1e8ed', borderwidth: 1, font: { size: 10 } }
+    };
+    Plotly.newPlot('plotly-container', plotData.data, layout, {
+        responsive: true, displayModeBar: true, displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
+        scrollZoom: false
+    }).then(gd => {
+        if (window.CiliAI) window.CiliAI.currentPlot = gd;
+        gd.on('plotly_click', e => {
+            const loc = e.points?.[0]?.customdata?.localization;
+            if (!loc) return;
+            window.showDiagram();
+            if (window.SpatialManager) SpatialManager.highlight(loc, window.CiliAI?.activeGeneContext);
+        });
+    });
+    window.addEventListener('resize', () => {
+        const container = document.getElementById('plotly-container');
+        if (window.CiliAI?.currentPlot && container && container.offsetParent !== null) {
+            setTimeout(() => Plotly.Plots.resize(window.CiliAI.currentPlot), 50);
+        }
+    });
+};
+
+window.showDomainViewer = function(gene) {
+    document.getElementById('cilia-svg').style.display = 'none';
+    document.getElementById('plotly-container').style.display = 'none';
+    const domainContainer = document.getElementById('domain-viewer');
+    domainContainer.style.display = 'flex';
+    domainContainer.innerHTML = '';
+    document.getElementById('current-viz-title').textContent = `Pfam Domains: ${gene}`;
+    const pfamLookup = window.CiliAI.lookups.pfamByGene || {};
+    let pfam = pfamLookup[gene.toUpperCase()] || [];
+    if (!pfam.length) {
+        const geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
+        if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
+            const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
+            const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
+            if (parts.length > 0) {
+                const domains = parts.map((part, i) => ({
+                    id: `DOM_${i+1}`,
+                    name: part.trim(),
+                    start: (i * 200) + 50,
+                    end: (i * 200) + 150
+                }));
+                window.CiliAI.lookups.pfamByGene[gene.toUpperCase()] = domains;
+                window.showDomainViewer(gene);
+                return;
+            }
+        }
+        domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
+        return;
+    }
+    const seqLength = Math.max(...pfam.map(d => d.end), 1000);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 150`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', '50');
+    line.setAttribute('y1', '75');
+    line.setAttribute('x2', seqLength + 50);
+    line.setAttribute('y2', '75');
+    line.setAttribute('stroke', '#333');
+    line.setAttribute('stroke-width', '4');
+    line.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(line);
+    pfam.forEach((domain, index) => {
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const width = domain.end - domain.start + 1;
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', domain.start + 50);
+        rect.setAttribute('y', '55');
+        rect.setAttribute('width', width);
+        rect.setAttribute('height', '40');
+        rect.setAttribute('rx', '8');
+        rect.setAttribute('fill', `hsl(${index * 50 + 200}, 80%, 60%)`);
+        rect.setAttribute('stroke', '#fff');
+        rect.setAttribute('stroke-width', '2');
+        rect.classList.add('domain-rect');
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
+        rect.appendChild(title);
+        group.appendChild(rect);
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', domain.start + 50 + width / 2);
+        text.setAttribute('y', '45');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('font-size', '12');
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('fill', '#333');
+        text.textContent = domain.name || domain.id;
+        group.appendChild(text);
+        svg.appendChild(group);
+    });
+    domainContainer.appendChild(svg);
+};
+
+window.downloadCurrentVisualization = function() {
+    if (window.CiliAI?.currentPlot) {
+        Plotly.downloadImage(window.CiliAI.currentPlot, { format: 'png', filename: 'ciliai-umap-plot', width: 1200, height: 800, scale: 2 });
+    } else if (document.getElementById('domain-viewer').style.display !== 'none') {
+        const svgElement = document.getElementById('domain-viewer').querySelector('svg');
+        if (svgElement) {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const blob = new Blob([svgData], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ciliai-domain.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    } else {
+        const svgElement = document.getElementById('cilia-diagram');
+        if (svgElement) {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const blob = new Blob([svgData], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ciliai-diagram.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    }
+};
+
+window.updateStatus = function(text, state = 'normal') {
+    const statusEl = document.getElementById('dataStatus');
+    if (statusEl) {
+        statusEl.textContent = text;
+        statusEl.className = `status-badge status ${state}`;
+    }
+};
+
+// Full data loading (updated with kidney split)
+window.loadCiliAIData = async function(timeoutMs = 60000) {
+    const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+    const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
+    const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
+    const kidneyStructUrl = baseUrl + 'kidney_structure.json';
+    const kidneyExpr1Url = baseUrl + 'kidney_expression_part1.json';
+    const kidneyExpr2Url = baseUrl + 'kidney_expression_part2.json';
+
+    try {
+        const [mainRes, lookupsRes, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
+            fetch(mainDbUrl), fetch(lookupsUrl), fetch(kidneyStructUrl),
+            fetch(kidneyExpr1Url), fetch(kidneyExpr2Url)
+        ]);
+        if (!mainRes.ok || !lookupsRes.ok) throw new Error('Failed to load core data');
+        const mainData = await mainRes.json();
+        const lookupData = await lookupsRes.json();
+
+        window.CiliAI.masterData = mainData.masterData || [];
+        window.CiliAI.lookups = lookupData.lookups || {};
+        if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+        if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
+
+        window.CiliAI_UMAP = mainData.umapData || [];
+        window.CiliAI.data.umap = mainData.umapData || [];
+        window.CiliAI.datasets.lung.umap = mainData.umapData;
+
+        if (kStructRes.ok && kExpr1Res.ok && kExpr2Res.ok) {
+            const kStruct = await kStructRes.json();
+            const kExpr1 = await kExpr1Res.json();
+            const kExpr2 = await kExpr2Res.json();
+            const fullExpression = { ...kExpr1, ...kExpr2 };
+            window.CiliAI.datasets.kidney = {
+                name: "Human Kidney",
+                umap: kStruct.umap,
+                expression: fullExpression,
+                metadata: kStruct.metadata,
+                colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']]
+            };
+        }
+
+        // Build lookups
+        window.CiliAI.lookups.umapByGene = {};
+        window.CiliAI.lookups.geneMap = {};
+        window.CiliAI.cellDataCache = {};
+        if (Array.isArray(window.CiliAI_UMAP)) {
+            window.CiliAI_UMAP.forEach(point => {
+                if (point.Gene) window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
+            });
+        }
+        mainData.masterData.forEach(gene => {
+            if (gene.Gene) {
+                const symbol = gene.Gene.toUpperCase();
+                window.CiliAI.lookups.geneMap[symbol] = gene;
+                if (gene.expression?.scRNA) {
+                    window.CiliAI.cellDataCache[symbol] = gene.expression.scRNA;
+                }
+            }
+        });
+
+        window.CiliAI.ready = true;
+        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes loaded)`, 'ready');
+        return true;
+    } catch (err) {
+        console.error("Failed to load CiliAI databases:", err);
+        window.updateStatus('Load failed', 'error');
+        window.CiliAI.ready = false;
+        return false;
+    }
+};
+
+// Your existing initCiliAI (keep or merge)
+window.initCiliAI = async function() {
+    await window.loadCiliAIData();
+    window.addChatMessage("CiliAI ready! Try a query.", false);
+};
+// Optional auto-run if not triggered from index.html
+// window.initCiliAI();
