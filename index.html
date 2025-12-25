@@ -10,12 +10,12 @@
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- CiliAI Engine - Centralized Logic -->
+    <!-- CiliAI Engine - External Logic Source -->
     <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
     
     <style>
         :root {
-            /* Synchronized Palette from plots.html */
+            /* Synchronized Palette with Cilia Analysis */
             --primary-blue: #005b96;
             --secondary-blue: #b3cde0;
             --accent-text: #333333;
@@ -27,23 +27,23 @@
             --bg: #f8fafc;
             --card: #ffffff;
             
-            /* Anatomical Palette markers */
-            --color-pcm1: #5b21b6;      /* Professional Deep Violet - PCM1 (Basal Body) */
-            --color-tmem17: #475569;    /* Slate Blue - TMEM17 (Transition Zone) */
-            --color-arl13b: #0891b2;    /* Muted Cyan - ARL13B (Membrane) */
-            --color-tubulin: #2563eb;   /* Royal Blue - Beta2-tubulin (Axoneme) */
+            /* Anatomical Palette markers used by engine */
+            --color-pcm1: #5b21b6;
+            --color-tmem17: #475569;
+            --color-arl13b: #0891b2;
+            --color-tubulin: #2563eb;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { 
             height: 100%; 
-            font-family: 'Segoe UI', 'Inter', Arial, sans-serif; 
+            font-family: 'Segoe UI', 'Inter', -apple-system, sans-serif; 
             background: var(--bg); 
             color: var(--accent-text);
             overflow: hidden; 
         }
 
-        /* --- TOP NAVBAR - Harmonized with plots.html (64px height) --- */
+        /* --- TOP NAVBAR - Harmonized with Cilia Analysis (64px) --- */
         .top-navbar {
             background: var(--primary-blue);
             color: white;
@@ -90,33 +90,29 @@
             font-weight: 400;
         }
 
-        .nav-links {
+         .nav-links {
             display: flex;
             list-style: none;
-            gap: 4px;
+            gap: 20px;
+            height: 100%;
         }
 
         .nav-links a {
             color: white;
             text-decoration: none;
-            padding: 12px 15px;
-            border-radius: 6px;
-            font-weight: 500;
-            transition: all 0.2s;
+            padding: 0 15px;
+            height: 100%;
             display: flex;
             align-items: center;
-            font-size: 15px;
+            font-size: 19px;
+            font-weight: 500;
+            transition: background-color 0.3s;
         }
 
-        .nav-links a:hover {
-            background: rgba(255,255,255,0.15);
+        .nav-links a:hover, .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.1);
         }
-
-        .nav-links a.active {
-            background: rgba(255,255,255,0.25);
-            font-weight: 600;
-        }
-
+        
         /* --- MAIN LAYOUT --- */
         .app-container {
             display: grid;
@@ -381,10 +377,6 @@
         /* LABELS */
         .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
         .labels-visible .cilia-labels text { opacity: 1; }
-        
-        .ai-result-card { background: white; border: 1px solid var(--border-light); border-radius: 12px; padding: 12px; margin-top: 8px; }
-        .ai-result-card ul { padding-left: 20px; margin-top: 8px; font-size: 12px; }
-        .ai-result-card li { margin-bottom: 4px; }
     </style>
 </head>
 <body>
@@ -421,8 +413,10 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title-group">
-                        <!-- Corrected ID vizActiveTitle to match engine expectations -->
-                        <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
+                        <!-- Corrected IDs resolve engine Null reference errors -->
+                        <div class="viz-title" id="current-viz-title">
+                            <span id="vizActiveTitle">Cilia Spatial Intelligence</span>
+                        </div>
                         <div class="view-tabs">
                             <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
                             <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')">📊 Plot</button>
@@ -463,6 +457,8 @@
                     <div id="cilia-svg"></div>
                     <div id="plotly-container"></div>
                     <div id="domain-viewer"></div>
+                    <!-- Hidden ID used by engine for some responses -->
+                    <div id="vizActiveDescription" style="display:none"></div>
                 </div>
             </div>
 
@@ -517,13 +513,9 @@
     </div>
 
 <script>
-    /* UI INTERFACE LAYER 
-       Central logic is loaded from ciliai.js
+    /* ============ UI INTERFACE LAYER ============ 
+       Central logic is externalized to ciliai.js
     */
-
-    // --- HOOKING INTO THE ENGINE ---
-    // We capture the engine's query handler so we can call it after our UI logic
-    const engineQueryHandler = window.handleAIQuery;
 
     // --- VIEW MANAGEMENT ---
     window.switchView = function(view) {
@@ -623,46 +615,84 @@
         `;
     };
 
-    // --- OVERRIDE handleAIQuery TO ENSURE RESPONSES ---
-    window.handleAIQuery = async function(query) {
-        const qLower = query.toLowerCase();
-        
-        if (qLower.includes('about yourself') || qLower.includes('what can you do') || qLower.includes('help')) {
-            window.addChatMessage(window.tellAboutCiliAI(), false);
-            return;
-        }
+    // --- DASHBOARD AND DATA WRAPPER ---
+    window.initCiliAIUI = async function() {
+        const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+        window.updateStatus('Syncing...', 'loading');
+        try {
+            const [mainRes, lookupsRes] = await Promise.all([
+                fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
+                fetch(base + 'ciliAI_lookups.json').then(r => r.json())
+            ]);
 
-        // Logic for Spatial mapping
-        const genes = query.toUpperCase().match(/\b([A-Z0-9]{3,})\b/g) || [];
-        let locToHighlight = null;
+            window.CiliAI.masterData = mainRes.masterData || [];
+            window.CiliAI.lookups = lookupsRes.lookups || {};
+            
+            // Initialization for engine objects
+            if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+            if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
+            
+            window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
 
-        if (window.SpatialManager) {
-            Object.keys(window.SpatialManager.locMap).forEach(loc => {
-                if (qLower.includes(loc)) locToHighlight = loc;
+            // Define categories for Ciliopathy Diseases (excluding Secondary)
+            const primaryCiliopathyClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+            const validCiliopathyDiseases = new Set();
+            const uniqueCiliopathyGenes = new Set();
+
+            window.CiliAI.masterData.forEach(g => {
+                if (g.Gene) {
+                    const sym = g.Gene.toUpperCase();
+                    window.CiliAI.lookups.geneMap[sym] = g;
+                    if (primaryCiliopathyClasses.includes(g.ciliopathy_classification)) {
+                        uniqueCiliopathyGenes.add(sym);
+                        if (g.Ciliopathy) {
+                            const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                            diseases.forEach(d => {
+                                if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d);
+                            });
+                        }
+                    }
+                }
             });
-        }
 
-        if (!locToHighlight && genes.length > 0) {
-            const gData = window.CiliAI.lookups.geneMap[genes[0]];
-            if (gData && gData.Localization) locToHighlight = gData.Localization;
-            const markers = { "PCM1": "basal-body", "TMEM17": "transition-zone", "IFT88": "axoneme" };
-            if (markers[genes[0]]) locToHighlight = markers[genes[0]];
-        }
+            // Update Dashboard DOM
+            document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
+            document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
+            document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
 
-        if (locToHighlight) {
-            window.switchView('diagram');
-            if(window.SpatialManager) window.SpatialManager.highlight(locToHighlight, genes[0]);
-        }
-
-        // DELIVER QUERY TO ENGINE
-        // Check both possible locations for the engine logic
-        if (typeof window.executeLogic === 'function') {
-            window.executeLogic(query);
-        } else if (engineQueryHandler && engineQueryHandler !== window.handleAIQuery) {
-            // Call the original handler captured from ciliai.js if it exists
-            engineQueryHandler(query);
+            window.CiliAI.ready = true;
+            window.updateStatus('CONNECTED', 'ready');
+            return true;
+        } catch (err) {
+            console.error("Load failed:", err);
+            window.updateStatus('SYNC ERROR', 'error');
+            return false;
         }
     };
+
+    // --- APPLICATION STARTUP ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Core rendering
+        if (window.generateAndInjectSVG) window.generateAndInjectSVG();
+        
+        // Data loading and Dashboard setup
+        await window.initCiliAIUI();
+
+        // Event listeners
+        const chatInput = document.getElementById('chatInput');
+        if(chatInput) {
+            chatInput.addEventListener('keydown', e => {
+                if(e.key === 'Enter') window.handleUserSend();
+            });
+        }
+        
+        const geneSearch = document.getElementById('geneSearch');
+        if(geneSearch) {
+            geneSearch.addEventListener('keydown', e => {
+                if(e.key === 'Enter') window.searchGene();
+            });
+        }
+    });
 
     window.downloadCurrentVisualization = function() {
         if (document.getElementById('plotly-container').style.display !== 'none') {
@@ -693,91 +723,6 @@
             URL.revokeObjectURL(url);
         }
     };
-
-    /* ============ DYNAMIC DASHBOARD DATA LOADING ============ */
-    window.initCiliAI = async function() {
-        const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-        window.updateStatus('Syncing...', 'loading');
-        try {
-            const [mainRes, lookupsRes] = await Promise.all([
-                fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
-                fetch(base + 'ciliAI_lookups.json').then(r => r.json())
-            ]);
-
-            window.CiliAI.masterData = mainRes.masterData || [];
-            window.CiliAI.lookups = lookupsRes.lookups || {};
-            
-            // Safe initialization for engine properties
-            if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
-            if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
-            
-            window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
-
-            // Map and count
-            const primaryCiliopathyClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
-            const validCiliopathyDiseases = new Set();
-            const uniqueCiliopathyGenes = new Set();
-
-            window.CiliAI.masterData.forEach(g => {
-                if (g.Gene) {
-                    const sym = g.Gene.toUpperCase();
-                    window.CiliAI.lookups.geneMap[sym] = g;
-
-                    // Filter out Secondary ciliopathies for the dashboard count
-                    if (primaryCiliopathyClasses.includes(g.ciliopathy_classification)) {
-                        uniqueCiliopathyGenes.add(sym);
-                        if (g.Ciliopathy) {
-                            const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
-                            diseases.forEach(d => {
-                                if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d);
-                            });
-                        }
-                    }
-                }
-            });
-
-            // Update Dashboard Counters
-            document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
-            document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
-            document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
-
-            window.CiliAI.ready = true;
-            window.updateStatus('CONNECTED', 'ready');
-            return true;
-        } catch (err) {
-            console.error("Load failed:", err);
-            window.updateStatus('SYNC ERROR', 'error');
-            return false;
-        }
-    };
-
-    window.searchGene = function() {
-        const input = document.getElementById('geneSearch');
-        const gene = input.value.trim().toUpperCase();
-        if (!gene) return;
-        window.addChatMessage(`Searching for ${gene}...`, true);
-        window.handleAIQuery(`Tell me about ${gene}`);
-    };
-
-    window.handleUserSend = function() {
-        const input = document.getElementById('chatInput');
-        const val = input.value.trim();
-        if (!val) return;
-        window.addChatMessage(val, true);
-        window.handleAIQuery(val);
-        input.value = '';
-    };
-
-    // --- APPLICATION STARTUP ---
-    document.addEventListener('DOMContentLoaded', async () => {
-        if (window.generateAndInjectSVG) window.generateAndInjectSVG();
-        await window.initCiliAI();
-
-        const chatInput = document.getElementById('chatInput');
-        if(chatInput) chatInput.addEventListener('keydown', e => { if(e.key === 'Enter') window.handleUserSend(); });
-        const geneSearch = document.getElementById('geneSearch');
-        if(geneSearch) geneSearch.addEventListener('keydown', e => { if(e.key === 'Enter') window.searchGene(); });
-    });
 </script>
 
 </body>
