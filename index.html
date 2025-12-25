@@ -421,7 +421,7 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title-group">
-                        <!-- Correct IDs to resolve console errors in engine -->
+                        <!-- BOTH IDs included to fix console textContent and null reference errors -->
                         <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
                         <div class="view-tabs">
                             <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
@@ -430,7 +430,7 @@
                         </div>
                     </div>
                     <div class="viz-actions">
-                        <button class="action-btn" onclick="window.downloadCurrentVisualization()">📷 Save PNG</button>
+                        <button class="action-btn" onclick="window.downloadCurrentVisualization()">📷 PNG</button>
                         <button class="action-btn" onclick="window.downloadJournalSVG()">📄 SVG</button>
                         <button class="action-btn" onclick="window.toggleFullscreen()">⛶</button>
                     </div>
@@ -496,7 +496,7 @@
                             👋 Welcome to CiliAI. I can help you visualize gene expression and map localizations. Try asking:
                             <div class="suggested-chips">
                                 <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">IFT88 Details</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('List transition zone genes')">TZ Genes</span>
+                                <span class="gene-badge" onclick="window.handleAIQuery('List genes in the transition zone')">TZ Genes</span>
                                 <span class="gene-badge" onclick="window.handleAIQuery('What genes are in the BBSome?')">BBSome Components</span>
                                 <span class="gene-badge" onclick="window.handleAIQuery('Gene list of Joubert Syndrome')">Joubert Genes</span>
                                 <span class="gene-badge" onclick="window.handleAIQuery('Show conservation of IFT88')">IFT88 Phylogeny</span>
@@ -514,6 +514,256 @@
             </div>
         </aside>
     </div>
+
+<script>
+    /* UI INTERFACE LAYER 
+       Central logic is loaded from ciliai.js
+    */
+
+    // --- VIEW MANAGEMENT ---
+    window.switchView = function(view) {
+        const tabs = document.querySelectorAll('.view-tab');
+        
+        document.getElementById('cilia-svg').style.display = 'none';
+        document.getElementById('plotly-container').style.display = 'none';
+        document.getElementById('domain-viewer').style.display = 'none';
+        tabs.forEach(t => t.classList.remove('active'));
+
+        if (view === 'diagram') {
+            document.getElementById('cilia-svg').style.display = 'flex';
+            document.getElementById('tab-diagram').classList.add('active');
+            if(window.SpatialManager) window.SpatialManager.resetZoom();
+        } else if (view === 'plot') {
+            document.getElementById('plotly-container').style.display = 'block';
+            document.getElementById('tab-plot').classList.add('active');
+            if (window.Plotly && window.CiliAI.currentPlot) window.Plotly.Plots.resize('plotly-container');
+        } else if (view === 'domain') {
+            document.getElementById('domain-viewer').style.display = 'flex';
+            document.getElementById('tab-domain').classList.add('active');
+            if (window.CiliAI.activeGeneContext && window.showDomainViewer) {
+                window.showDomainViewer(window.CiliAI.activeGeneContext);
+            }
+        }
+    };
+
+    window.toggleFullscreen = function() {
+        const el = document.querySelector('.viz-card');
+        if (!document.fullscreenElement) el.requestFullscreen().catch(e => console.error(e));
+        else document.exitFullscreen();
+    };
+
+    window.toggleLabels = function(checkbox) {
+        const svgContainer = document.getElementById('cilia-svg');
+        if (checkbox.checked) svgContainer.classList.add('labels-visible');
+        else svgContainer.classList.remove('labels-visible');
+    };
+
+    window.zoomIn = function() {
+        const vp = document.getElementById('viewport-group');
+        if (!vp) return;
+        const currentTransform = vp.style.transform || 'scale(1)';
+        const scaleMatch = currentTransform.match(/scale\((.*?)\)/);
+        let scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+        vp.style.transform = `scale(${scale + 0.1})`;
+    };
+
+    window.zoomOut = function() {
+        const vp = document.getElementById('viewport-group');
+        if (!vp) return;
+        const currentTransform = vp.style.transform || 'scale(1)';
+        const scaleMatch = currentTransform.match(/scale\((.*?)\)/);
+        let scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+        if (scale > 0.5) vp.style.transform = `scale(${scale - 0.1})`;
+    };
+
+    // --- INTERFACE WRAPPERS (Called by Engine in ciliai.js) ---
+    window.updateStatus = function(text, state) {
+        const el = document.getElementById('dataStatus');
+        if (el) {
+            el.textContent = text;
+            el.className = `status-badge status ${state}`;
+        }
+    };
+
+    window.addChatMessage = function(html, isUser = false) {
+        const container = document.getElementById('messages');
+        if (!container) return;
+        
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+        msgDiv.innerHTML = `
+            <div class="message-wrapper">
+                <div class="ciliai-message-content">${html}</div>
+            </div>
+        `;
+        container.appendChild(msgDiv);
+        container.scrollTop = container.scrollHeight;
+    };
+
+    window.tellAboutCiliAI = function() {
+        return `
+            <div class="ai-result-card">
+                <strong>Welcome to CiliAI!</strong>
+                <p>I am an AI assistant designed to help you explore data on ciliary biology. You can ask me questions like:</p>
+                <ul>
+                    <li><b>Gene Details:</b> "What is IFT88?" or "Describe ARL13B."</li>
+                    <li><b>Localization:</b> "List genes in the transition zone." or "Where is CEP290?"</li>
+                    <li><b>Complexes:</b> "What genes are in the BBSome?" or "Complex components of OFD1."</li>
+                    <li><b>Ciliopathies:</b> "Gene list of Joubert Syndrome." or "What genes cause PCD?"</li>
+                    <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
+                    <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
+                </ul>
+                <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
+            </div>
+        `;
+    };
+
+    window.downloadCurrentVisualization = function() {
+        if (document.getElementById('plotly-container').style.display !== 'none') {
+            window.Plotly.downloadImage(window.CiliAI.currentPlot, {format: 'png', filename: 'ciliai_plot'});
+        } else {
+            const svg = document.querySelector('#cilia-svg svg');
+            if (svg) {
+                const data = new XMLSerializer().serializeToString(svg);
+                const blob = new Blob([data], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'cilia_diagram.svg'; a.click();
+                URL.revokeObjectURL(url);
+            }
+        }
+    };
+
+    window.downloadJournalSVG = function() {
+        const svg = document.querySelector('#cilia-svg svg');
+        if (svg) {
+            const clone = svg.cloneNode(true);
+            clone.querySelectorAll('text').forEach(t => t.setAttribute('font-family', 'sans-serif'));
+            const data = new XMLSerializer().serializeToString(clone);
+            const blob = new Blob([data], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'cilia_journal.svg'; a.click();
+            URL.revokeObjectURL(url);
+        }
+    };
+
+    /* ============ DYNAMIC DASHBOARD DATA LOADING ============ */
+    window.initCiliAI = async function() {
+        const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+        window.updateStatus('Syncing...', 'loading');
+        try {
+            const [mainRes, lookupsRes] = await Promise.all([
+                fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
+                fetch(base + 'ciliAI_lookups.json').then(r => r.json())
+            ]);
+
+            window.CiliAI.masterData = mainRes.masterData || [];
+            window.CiliAI.lookups = lookupsRes.lookups || {};
+            
+            if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+            if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
+            
+            window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
+
+            // Define categories that qualify for the dashboard count (excluding Secondary)
+            const primaryCiliopathyClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+            const validCiliopathyDiseases = new Set();
+            const uniqueCiliopathyGenes = new Set();
+
+            window.CiliAI.masterData.forEach(g => {
+                if (g.Gene) {
+                    const sym = g.Gene.toUpperCase();
+                    window.CiliAI.lookups.geneMap[sym] = g;
+
+                    // Filter out Secondary ciliopathies for the dashboard count
+                    if (primaryCiliopathyClasses.includes(g.ciliopathy_classification)) {
+                        uniqueCiliopathyGenes.add(sym);
+                        if (g.Ciliopathy) {
+                            const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                            diseases.forEach(d => {
+                                if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d);
+                            });
+                        }
+                    }
+                }
+            });
+
+            // Update DOM counters
+            document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
+            document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
+            document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
+
+            window.CiliAI.ready = true;
+            window.updateStatus('CONNECTED', 'ready');
+            return true;
+        } catch (err) {
+            console.error("Load failed:", err);
+            window.updateStatus('SYNC ERROR', 'error');
+            return false;
+        }
+    };
+
+    window.searchGene = function() {
+        const input = document.getElementById('geneSearch');
+        const gene = input.value.trim().toUpperCase();
+        if (!gene) return;
+        window.addChatMessage(`Searching for ${gene}...`, true);
+        if(window.handleAIQuery) window.handleAIQuery(`Tell me about ${gene}`);
+    };
+
+    window.handleUserSend = function() {
+        const input = document.getElementById('chatInput');
+        const val = input.value.trim();
+        if (!val) return;
+        window.addChatMessage(val, true);
+        if(window.handleAIQuery) window.handleAIQuery(val);
+        input.value = '';
+    };
+
+    window.handleAIQuery = async function(query) {
+        const qLower = query.toLowerCase();
+        
+        if (qLower.includes('about yourself') || qLower.includes('what can you do') || qLower.includes('help')) {
+            window.addChatMessage(window.tellAboutCiliAI(), false);
+            return;
+        }
+
+        const genes = query.toUpperCase().match(/\b([A-Z0-9]{3,})\b/g) || [];
+        let locToHighlight = null;
+
+        if (window.SpatialManager) {
+            Object.keys(window.SpatialManager.locMap).forEach(loc => {
+                if (qLower.includes(loc)) locToHighlight = loc;
+            });
+        }
+
+        if (!locToHighlight && genes.length > 0) {
+            const gData = window.CiliAI.lookups.geneMap[genes[0]];
+            if (gData && gData.Localization) locToHighlight = gData.Localization;
+            const markers = { "PCM1": "basal-body", "TMEM17": "transition-zone", "IFT88": "axoneme" };
+            if (markers[genes[0]]) locToHighlight = markers[genes[0]];
+        }
+
+        if (locToHighlight) {
+            window.switchView('diagram');
+            if(window.SpatialManager) window.SpatialManager.highlight(locToHighlight, genes[0]);
+        }
+
+        if (typeof window.executeLogic === 'function') window.executeLogic(query);
+    };
+
+    // --- APPLICATION STARTUP ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (window.generateAndInjectSVG) window.generateAndInjectSVG();
+        await window.initCiliAI();
+
+        const chatInput = document.getElementById('chatInput');
+        if(chatInput) chatInput.addEventListener('keydown', e => { if(e.key === 'Enter') window.handleUserSend(); });
+        const geneSearch = document.getElementById('geneSearch');
+        if(geneSearch) geneSearch.addEventListener('keydown', e => { if(e.key === 'Enter') window.searchGene(); });
+    });
+</script>
 
 </body>
 </html>
