@@ -28,10 +28,10 @@
             --card: #ffffff;
             
             /* Anatomical Palette markers */
-            --color-pcm1: #5b21b6;      /* Violet - Basal Body */
-            --color-tmem17: #475569;    /* Slate - Transition Zone */
-            --color-arl13b: #0891b2;    /* Cyan - Membrane */
-            --color-tubulin: #2563eb;   /* Blue - Axoneme */
+            --color-pcm1: #5b21b6;      /* Professional Deep Violet - PCM1 (Basal Body) */
+            --color-tmem17: #475569;    /* Slate Blue - TMEM17 (Transition Zone) */
+            --color-arl13b: #0891b2;    /* Muted Cyan - ARL13B (Membrane) */
+            --color-tubulin: #2563eb;   /* Royal Blue - Beta2-tubulin (Axoneme) */
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -93,24 +93,28 @@
         .nav-links {
             display: flex;
             list-style: none;
-            gap: 20px;
-            height: 100%;
+            gap: 4px;
         }
 
         .nav-links a {
             color: white;
             text-decoration: none;
-            padding: 0 15px;
-            height: 100%;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            font-size: 19px;
-            font-weight: 500;
-            transition: background-color 0.3s;
+            font-size: 15px;
         }
 
-        .nav-links a:hover, .nav-links a.active {
-            background-color: rgba(255, 255, 255, 0.1);
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .nav-links a.active {
+            background: rgba(255,255,255,0.25);
+            font-weight: 600;
         }
 
         /* --- MAIN LAYOUT --- */
@@ -426,7 +430,7 @@
                         </div>
                     </div>
                     <div class="viz-actions">
-                        <button class="action-btn" onclick="window.downloadCurrentVisualization()">📷 PNG</button>
+                        <button class="action-btn" onclick="window.downloadCurrentVisualization()">📷 Save PNG</button>
                         <button class="action-btn" onclick="window.downloadJournalSVG()">📄 SVG</button>
                         <button class="action-btn" onclick="window.toggleFullscreen()">⛶</button>
                     </div>
@@ -511,267 +515,5 @@
         </aside>
     </div>
 
-<script>
-    /* ============ 1. GLOBAL STATE & LOGIC ============ */
-    window.CiliAI = {
-        masterData: [], ready: false,
-        lookups: { geneMap: {}, pfamByGene: {}, goMap: {} },
-        activeDataset: 'lung',
-        datasets: {
-            lung: { name: 'Human Lung Organoid', umap: null, colorScale: [[0,'#e2e8f0'],[0.1,'#fed7d7'],[1,'#c53030']] },
-            kidney: { name: 'Human Kidney', umap: null, expression: null, colorScale: [[0,'#e2e8f0'],[0.1,'#bee3f8'],[1,'#2b6cb0']] }
-        },
-        cellDataCache: {}, 
-        zoomStateByGene: {}, 
-        activeGeneContext: null,
-        currentPlot: null
-    };
-
-    /* ============ 2. UI UTILITIES ============ */
-
-    window.tellAboutCiliAI = function() {
-        return `
-            <div class="ai-result-card">
-                <strong>Welcome to CiliAI!</strong>
-                <p>I am an AI assistant designed to help you explore data on ciliary biology. You can ask me questions like:</p>
-                <ul>
-                    <li><b>Gene Details:</b> "What is IFT88?" or "Describe ARL13B."</li>
-                    <li><b>Localization:</b> "List genes in the transition zone." or "Where is CEP290?"</li>
-                    <li><b>Complexes:</b> "What genes are in the BBSome?" or "Complex components of OFD1."</li>
-                    <li><b>Ciliopathies:</b> "Gene list of Joubert Syndrome." or "What genes cause PCD?"</li>
-                    <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
-                    <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
-                </ul>
-                <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
-            </div>
-        `;
-    };
-
-    window.updateStatus = function(text, state) {
-        const el = document.getElementById('dataStatus');
-        if (el) {
-            el.textContent = text;
-            el.className = `status-badge status ${state}`;
-        }
-    };
-
-    window.addChatMessage = function(html, isUser = false) {
-        const container = document.getElementById('messages');
-        if (!container) return;
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
-        msgDiv.innerHTML = `<div class="message-wrapper"><div class="ciliai-message-content">${html}</div></div>`;
-        container.appendChild(msgDiv);
-        container.scrollTop = container.scrollHeight;
-    };
-
-    /* ============ 3. VIEW & SPATIAL MANAGEMENT ============ */
-
-    window.switchView = function(view) {
-        const tabs = document.querySelectorAll('.view-tab');
-        document.getElementById('cilia-svg').style.display = 'none';
-        document.getElementById('plotly-container').style.display = 'none';
-        document.getElementById('domain-viewer').style.display = 'none';
-        tabs.forEach(t => t.classList.remove('active'));
-
-        if (view === 'diagram') {
-            document.getElementById('cilia-svg').style.display = 'flex';
-            document.getElementById('tab-diagram').classList.add('active');
-            if(window.SpatialManager) window.SpatialManager.resetZoom();
-        } else if (view === 'plot') {
-            document.getElementById('plotly-container').style.display = 'block';
-            document.getElementById('tab-plot').classList.add('active');
-            if (window.Plotly && window.CiliAI.currentPlot) window.Plotly.Plots.resize('plotly-container');
-        } else if (view === 'domain') {
-            document.getElementById('domain-viewer').style.display = 'flex';
-            document.getElementById('tab-domain').classList.add('active');
-            if (window.CiliAI.activeGeneContext && window.showDomainViewer) {
-                window.showDomainViewer(window.CiliAI.activeGeneContext);
-            }
-        }
-    };
-
-    window.toggleLabels = function(checkbox) {
-        const svgContainer = document.getElementById('cilia-svg');
-        if (checkbox.checked) svgContainer.classList.add('labels-visible');
-        else svgContainer.classList.remove('labels-visible');
-    };
-
-    window.zoomIn = function() {
-        const vp = document.getElementById('viewport-group');
-        if (!vp) return;
-        const currentTransform = vp.style.transform || 'scale(1)';
-        const scaleMatch = currentTransform.match(/scale\((.*?)\)/);
-        let scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
-        vp.style.transform = `scale(${scale + 0.1})`;
-    };
-
-    window.zoomOut = function() {
-        const vp = document.getElementById('viewport-group');
-        if (!vp) return;
-        const currentTransform = vp.style.transform || 'scale(1)';
-        const scaleMatch = currentTransform.match(/scale\((.*?)\)/);
-        let scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
-        if (scale > 0.5) vp.style.transform = `scale(${scale - 0.1})`;
-    };
-
-    window.toggleFullscreen = function() {
-        const el = document.querySelector('.viz-card');
-        if (!document.fullscreenElement) el.requestFullscreen().catch(e => console.error(e));
-        else document.exitFullscreen();
-    };
-
-    /* ============ 4. CORE ENGINE WRAPPERS ============ */
-
-    window.initCiliAI = async function() {
-        const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-        window.updateStatus('Syncing...', 'loading');
-        try {
-            const [mainRes, lookupsRes] = await Promise.all([
-                fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
-                fetch(base + 'ciliAI_lookups.json').then(r => r.json())
-            ]);
-
-            window.CiliAI.masterData = mainRes.masterData || [];
-            window.CiliAI.lookups = lookupsRes.lookups || {};
-            
-            if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
-            if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
-            
-            window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
-
-            // Define categories that qualify as "Primary" ciliopathies
-            const primaryCiliopathyClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
-            const validCiliopathyDiseases = new Set();
-            const uniqueCiliopathyGenes = new Set();
-
-            window.CiliAI.masterData.forEach(g => {
-                if (g.Gene) {
-                    const sym = g.Gene.toUpperCase();
-                    window.CiliAI.lookups.geneMap[sym] = g;
-
-                    // Filter out Secondary ciliopathies for the dashboard count
-                    if (primaryCiliopathyClasses.includes(g.ciliopathy_classification)) {
-                        uniqueCiliopathyGenes.add(sym);
-                        
-                        // Extract disease names associated with these non-secondary categories
-                        if (g.Ciliopathy) {
-                            const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
-                            diseases.forEach(d => {
-                                if (d && d !== 'Not specified' && d !== 'N/A') {
-                                    validCiliopathyDiseases.add(d);
-                                }
-                            });
-                        }
-                    }
-                }
-            });
-
-            // Update Dashboard Counters
-            document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
-            document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
-            document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
-
-            window.CiliAI.ready = true;
-            window.updateStatus('CONNECTED', 'ready');
-            return true;
-        } catch (err) {
-            console.error("Load failed:", err);
-            window.updateStatus('SYNC ERROR', 'error');
-            return false;
-        }
-    };
-
-    window.searchGene = function() {
-        const input = document.getElementById('geneSearch');
-        const gene = input.value.trim().toUpperCase();
-        if (!gene) return;
-        window.addChatMessage(`Searching for ${gene}...`, true);
-        if(window.handleAIQuery) window.handleAIQuery(`Tell me about ${gene}`);
-    };
-
-    window.handleUserSend = function() {
-        const input = document.getElementById('chatInput');
-        const val = input.value.trim();
-        if (!val) return;
-        window.addChatMessage(val, true);
-        if(window.handleAIQuery) window.handleAIQuery(val);
-        input.value = '';
-    };
-
-    window.handleAIQuery = async function(query) {
-        const qLower = query.toLowerCase();
-        
-        if (qLower.includes('about yourself') || qLower.includes('what can you do') || qLower.includes('help')) {
-            window.addChatMessage(window.tellAboutCiliAI(), false);
-            return;
-        }
-
-        const genes = query.toUpperCase().match(/\b([A-Z0-9]{3,})\b/g) || [];
-        let locToHighlight = null;
-
-        if (window.SpatialManager) {
-            Object.keys(window.SpatialManager.locMap).forEach(loc => {
-                if (qLower.includes(loc)) locToHighlight = loc;
-            });
-        }
-
-        if (!locToHighlight && genes.length > 0) {
-            const gData = window.CiliAI.lookups.geneMap[genes[0]];
-            if (gData && gData.Localization) locToHighlight = gData.Localization;
-            const markers = { "PCM1": "basal-body", "TMEM17": "transition-zone", "IFT88": "axoneme" };
-            if (markers[genes[0]]) locToHighlight = markers[genes[0]];
-        }
-
-        if (locToHighlight) {
-            window.switchView('diagram');
-            if(window.SpatialManager) window.SpatialManager.highlight(locToHighlight, genes[0]);
-        }
-
-        if (typeof window.executeLogic === 'function') window.executeLogic(query);
-    };
-
-    window.downloadCurrentVisualization = function() {
-        if (document.getElementById('plotly-container').style.display !== 'none') {
-            window.Plotly.downloadImage(window.CiliAI.currentPlot, {format: 'png', filename: 'ciliai_plot'});
-        } else {
-            const svg = document.querySelector('#cilia-svg svg');
-            if (svg) {
-                const data = new XMLSerializer().serializeToString(svg);
-                const blob = new Blob([data], {type: 'image/svg+xml'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = 'cilia_diagram.svg'; a.click();
-                URL.revokeObjectURL(url);
-            }
-        }
-    };
-
-    window.downloadJournalSVG = function() {
-        const svg = document.querySelector('#cilia-svg svg');
-        if (svg) {
-            const clone = svg.cloneNode(true);
-            clone.querySelectorAll('text').forEach(t => t.setAttribute('font-family', 'sans-serif'));
-            const data = new XMLSerializer().serializeToString(clone);
-            const blob = new Blob([data], {type: 'image/svg+xml'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'cilia_journal.svg'; a.click();
-            URL.revokeObjectURL(url);
-        }
-    };
-
-    /* ============ 5. APPLICATION STARTUP ============ */
-    document.addEventListener('DOMContentLoaded', async () => {
-        if (window.generateAndInjectSVG) window.generateAndInjectSVG();
-        await window.initCiliAI();
-
-        const chatInput = document.getElementById('chatInput');
-        chatInput.addEventListener('keydown', e => { if(e.key === 'Enter') window.handleUserSend(); });
-        const geneSearch = document.getElementById('geneSearch');
-        geneSearch.addEventListener('keydown', e => { if(e.key === 'Enter') window.searchGene(); });
-    });
-</script>
-    <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
 </body>
 </html>
