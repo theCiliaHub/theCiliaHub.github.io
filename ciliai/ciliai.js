@@ -3388,7 +3388,6 @@ window.extractMultipleGenes = function(query) {
     if(window.log) window.log(`[Gene Extraction] "${query}" → ${JSON.stringify(result)}`);
     return result;
 };
-
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
@@ -3492,6 +3491,51 @@ window.handleAIQuery = async function (query) {
                     return;
                 }
             }
+        }
+        
+        // === FIX: Handle "GO: intraflagellar transport" as a special case FIRST ===
+        if (qLower.includes('go: intraflagellar transport') || qLower.includes('go term: intraflagellar transport')) {
+            const genes = ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46', 'KIF3A', 'KIF3B', 'KIF17', 'DYNC2H1'];
+            
+            // Apply visualization
+            window.resetViews();
+            
+            let visualizationApplied = false;
+            if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
+                window.SpatialManager.applyMultiOverlay(genes);
+                visualizationApplied = true;
+            } else if (typeof window.highlightCiliumLocation === 'function') {
+                genes.forEach(gene => {
+                    const geneData = window.CiliAI.lookups.geneMap[gene];
+                    if (geneData && geneData.Localization) {
+                        window.highlightCiliumLocation(geneData.Localization, gene);
+                    }
+                });
+                visualizationApplied = true;
+            }
+            
+            const preview = genes.slice(0, 8).join(', ');
+            const more = genes.length > 8 ? `... and ${genes.length - 8} more` : '';
+            
+            htmlResult = `
+                <div class="ai-result-card">
+                    <h4>GO Term: intraflagellar transport</h4>
+                    <p>Found <strong>${genes.length}</strong> IFT (intraflagellar transport) genes.</p>
+                    <p><strong>Examples:</strong> ${preview}${more}</p>
+                    ${visualizationApplied 
+                        ? '<p>A <strong>multi-colored overlay</strong> has been applied to the ciliary diagram showing IFT protein localization.</p>'
+                        : '<p>Visualization could not be applied. Showing IFT gene list instead.</p>'}
+                    <p>IFT proteins form trains that transport cargo along the ciliary axoneme.</p>
+                    <div style="margin-top: 10px;">
+                        <button class="ciliai-button" onclick="window.handleBatchQuery('${genes.join(',')}')" style="background: #D4EDDA;">
+                            📊 Show Batch Table for ${genes.length} IFT Genes
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            window.addChatMessage(htmlResult, false);
+            return;
         }
         
         // === 3. FULLY FIXED CILIOPATHY CLASSIFICATION, OVERLAP & ORTHOLOG HANDLER ===
@@ -4396,6 +4440,9 @@ window.handleAIQuery = async function (query) {
             const geneList = genes.join(', ');
             const preview = genes.length > 8 ? genes.slice(0, 8).join(', ') + '...' : geneList;
             
+            // Also show batch table for the genes
+            const batchResult = window.handleBatchQuery ? window.handleBatchQuery(geneList) : null;
+            
             window.addChatMessage(`
                 <div class="ai-result-card">
                     <h4>Multi-gene Localization Overlay</h4>
@@ -4406,16 +4453,21 @@ window.handleAIQuery = async function (query) {
                         : '<p>Visualization could not be applied. Showing gene list instead.</p>'}
                     <div style="margin-top: 10px;">
                         <button class="ciliai-button" onclick="window.handleBatchQuery('${geneList}')" style="background: #E2F0CB;">
-                            📊 Show Batch Table
+                            📊 Show Batch Table for ${genes.length} Genes
                         </button>
                     </div>
                 </div>
             `, false);
             
+            // Also trigger batch table display
+            if (window.handleBatchQuery) {
+                window.handleBatchQuery(geneList);
+            }
+            
             return;
         }
         
-        // === 22. Intent: GO Term / Functional Heatmap (Visualizer) ===
+        // === 22. Intent: GO Term / Functional Heatmap (Visualizer) - GENERAL HANDLER ===
         else if (htmlResult === null && (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:'))) {
             let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
             
@@ -4424,29 +4476,31 @@ window.handleAIQuery = async function (query) {
                 return;
             }
             
-            // Primary: Use database search if available
-            let genes = [];
-            if (typeof window.getGenesByFunction === 'function') {
-                genes = window.getGenesByFunction(term);
-            }
-            
-            // Hardcoded fallbacks for key ciliary terms (ensures "intraflagellar transport" always works)
+            // Hardcoded fallbacks for key ciliary terms
             const lowerTerm = term.toLowerCase();
+            let genes = [];
+            
             const fallbackMap = {
                 'intraflagellar transport': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46', 'KIF3A', 'KIF3B', 'KIF17', 'DYNC2H1'],
                 'ift': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46'],
                 'bbsome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'TTC8', 'BBS9', 'BBIP1'],
                 'transition zone': ['TMEM67', 'TMEM216', 'TMEM237', 'CEP290', 'CC2D2A', 'TCTN1', 'TCTN2', 'MKS1', 'NPHP1', 'RPGRIP1L'],
                 'dynein arm': ['DNAH5', 'DNAH11', 'DNAI1', 'DNAI2', 'DNAAF1', 'DNAAF2', 'LRRC6'],
-                'radial spoke': ['RSPH1', 'RSPH4A', 'RSPH9', 'DRC1']
+                'radial spoke': ['RSPH1', 'RSPH4A', 'RSPH9', 'DRC1'],
+                'flagella': ['DNAH5', 'DNAH11', 'DNAI1', 'DNAI2', 'DNAAF1', 'LRRC6', 'RSPH1', 'RSPH4A', 'RSPH9', 'CCDC39', 'CCDC40', 'HYDIN', 'MCIDAS', 'FOXJ1']
             };
             
+            for (const key in fallbackMap) {
+                if (lowerTerm.includes(key)) {
+                    genes = fallbackMap[key];
+                    break;
+                }
+            }
+            
+            // If still no genes, try to search in the database
             if (genes.length === 0) {
-                for (const key in fallbackMap) {
-                    if (lowerTerm.includes(key)) {
-                        genes = fallbackMap[key];
-                        break;
-                    }
+                if (typeof window.getGenesByFunction === 'function') {
+                    genes = window.getGenesByFunction(term);
                 }
             }
             
@@ -4466,14 +4520,20 @@ window.handleAIQuery = async function (query) {
             
             let visualizationApplied = false;
             if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
-                // Use multi-overlay for distinct colors per gene
-                const upperGenes = genes.map(g => g.toUpperCase());
-                window.SpatialManager.applyMultiOverlay(upperGenes);
+                window.SpatialManager.applyMultiOverlay(genes);
+                visualizationApplied = true;
+            } else if (typeof window.highlightCiliumLocation === 'function') {
+                genes.forEach(gene => {
+                    const geneData = window.CiliAI.lookups.geneMap[gene];
+                    if (geneData && geneData.Localization) {
+                        window.highlightCiliumLocation(geneData.Localization, gene);
+                    }
+                });
                 visualizationApplied = true;
             }
             
-            const preview = genes.slice(0, 12).join(', ');
-            const more = genes.length > 12 ? `... and ${genes.length - 12} more` : '';
+            const preview = genes.slice(0, 8).join(', ');
+            const more = genes.length > 8 ? `... and ${genes.length - 8} more` : '';
             
             window.addChatMessage(`
                 <div class="ai-result-card">
@@ -4481,7 +4541,7 @@ window.handleAIQuery = async function (query) {
                     <p>Found <strong>${genes.length}</strong> genes.</p>
                     <p><strong>Examples:</strong> ${preview}${more}</p>
                     ${visualizationApplied 
-                        ? '<p>A <strong>multi-colored overlay</strong> has been applied to the ciliary diagram showing localization.</p>'
+                        ? '<p>A <strong>multi-colored overlay</strong> has been applied to the ciliary diagram showing protein localization.</p>'
                         : '<p>Visualization could not be applied. Showing gene list instead.</p>'}
                     <div style="margin-top: 10px;">
                         <button class="ciliai-button" onclick="window.handleBatchQuery('${genes.join(',')}')" style="background: #D4EDDA;">
@@ -4490,6 +4550,11 @@ window.handleAIQuery = async function (query) {
                     </div>
                 </div>
             `, false);
+            
+            // Also trigger batch table display
+            if (window.handleBatchQuery) {
+                window.handleBatchQuery(genes.join(','));
+            }
             
             return;
         }
