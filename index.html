@@ -474,7 +474,7 @@
                 </div>
                 <div class="stat-item">
                     <div class="stat-value" id="stat-ciliopathys">...</div>
-                    <div class="stat-label">Ciliopathys</div>
+                    <div class="stat-label">Ciliopathy Diseases</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-value" id="stat-ciliopathy-genes">...</div>
@@ -531,7 +531,7 @@
         currentPlot: null
     };
 
-    /* ============ 2. UI UTILITIES (Preserved from Prompt) ============ */
+    /* ============ 2. UI UTILITIES ============ */
 
     window.tellAboutCiliAI = function() {
         return `
@@ -639,26 +639,41 @@
             window.CiliAI.masterData = mainRes.masterData || [];
             window.CiliAI.lookups = lookupsRes.lookups || {};
             
-            // Safe initialization for engine properties
             if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
             if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
             
             window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
 
-            // Map and count
+            // Define categories that qualify as "Primary" ciliopathies
+            const primaryCiliopathyClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+            const validCiliopathyDiseases = new Set();
             const uniqueCiliopathyGenes = new Set();
-            window.CiliAI.masterData.forEach(g => {
-                if (g.Gene) window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g;
-            });
 
-            const byCiliopathy = window.CiliAI.lookups.byCiliopathy || {};
-            Object.values(byCiliopathy).forEach(list => {
-                if(Array.isArray(list)) list.forEach(gene => uniqueCiliopathyGenes.add(gene.toUpperCase()));
+            window.CiliAI.masterData.forEach(g => {
+                if (g.Gene) {
+                    const sym = g.Gene.toUpperCase();
+                    window.CiliAI.lookups.geneMap[sym] = g;
+
+                    // Filter out Secondary ciliopathies for the dashboard count
+                    if (primaryCiliopathyClasses.includes(g.ciliopathy_classification)) {
+                        uniqueCiliopathyGenes.add(sym);
+                        
+                        // Extract disease names associated with these non-secondary categories
+                        if (g.Ciliopathy) {
+                            const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                            diseases.forEach(d => {
+                                if (d && d !== 'Not specified' && d !== 'N/A') {
+                                    validCiliopathyDiseases.add(d);
+                                }
+                            });
+                        }
+                    }
+                }
             });
 
             // Update Dashboard Counters
             document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
-            document.getElementById('stat-ciliopathys').textContent = Object.keys(byCiliopathy).length.toLocaleString();
+            document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
             document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
 
             window.CiliAI.ready = true;
@@ -691,7 +706,6 @@
     window.handleAIQuery = async function(query) {
         const qLower = query.toLowerCase();
         
-        // Handle "help" or capability queries locally
         if (qLower.includes('about yourself') || qLower.includes('what can you do') || qLower.includes('help')) {
             window.addChatMessage(window.tellAboutCiliAI(), false);
             return;
@@ -753,11 +767,9 @@
 
     /* ============ 5. APPLICATION STARTUP ============ */
     document.addEventListener('DOMContentLoaded', async () => {
-        // Initial setup
         if (window.generateAndInjectSVG) window.generateAndInjectSVG();
         await window.initCiliAI();
 
-        // Event listeners
         const chatInput = document.getElementById('chatInput');
         chatInput.addEventListener('keydown', e => { if(e.key === 'Enter') window.handleUserSend(); });
         const geneSearch = document.getElementById('geneSearch');
