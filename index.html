@@ -15,7 +15,7 @@
     
     <style>
         :root {
-            /* Synchronized with plots.html and index palette */
+            /* Synchronized Palette */
             --primary-blue: #005b96;
             --secondary-blue: #b3cde0;
             --accent-text: #333333;
@@ -99,7 +99,7 @@
         .nav-links a {
             color: white;
             text-decoration: none;
-            padding: 12px 10px;
+            padding: 12px 15px;
             border-radius: 6px;
             font-weight: 500;
             transition: all 0.2s;
@@ -155,7 +155,7 @@
             padding: 0 16px;
             border: 1px solid var(--border-light); 
             border-radius: 8px; 
-            height: 40px; 
+            height: 44px; 
             font-size: 14px;
             background: white;
         }
@@ -168,7 +168,7 @@
             border-radius: 8px; 
             font-weight: 600; 
             cursor: pointer;
-            height: 40px;
+            height: 44px;
             transition: background 0.2s;
         }
         .search-btn:hover { background: #004577; }
@@ -214,7 +214,8 @@
             gap: 16px;
         }
 
-        .viz-title { font-size: 15px; font-weight: 700; color: var(--primary-blue); }
+        /* Combined IDs to fix ciliai.js reference error */
+        .viz-title { font-size: 14px; font-weight: 700; color: var(--primary-blue); }
 
         .view-tabs {
             display: flex;
@@ -304,9 +305,9 @@
             overflow: hidden;
         }
 
-        .chat-header { padding: 20px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
-        .chat-header h2 { font-size: 18px; color: var(--primary-blue); font-weight: 700; }
-        .chat-header p { font-size: 12px; color: #666; margin-top: 2px; }
+        .chat-header { padding: 18px 20px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+        .chat-header h2 { font-size: 16px; color: var(--primary-blue); font-weight: 700; }
+        .chat-header p { font-size: 11px; color: #666; margin-top: 2px; }
 
         .messages-area { 
             flex: 1; 
@@ -337,7 +338,7 @@
         .user .ciliai-message-content { background: var(--primary-blue); color: white; border-bottom-right-radius: 2px; }
         .assistant .ciliai-message-content { background: white; border: 1px solid var(--border-light); border-bottom-left-radius: 2px; color: #334155; }
 
-        .suggested-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .suggested-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
         .gene-badge {
             background: var(--secondary-blue);
             color: var(--primary-blue);
@@ -362,12 +363,12 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
-            padding-top: 4px;
+            padding: 0 0 8px 0;
             flex-shrink: 0;
         }
         .stat-item { background: white; padding: 14px; border-radius: 12px; border: 1px solid var(--border-light); text-align: center; }
         .stat-value { font-size: 18px; font-weight: 800; color: var(--primary-blue); }
-        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 2px; font-weight: 700; }
+        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 4px; font-weight: 700; }
 
         /* LABELS */
         .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
@@ -408,7 +409,8 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title-group">
-                        <div class="viz-title">Cilia Spatial Intelligence</div>
+                        <!-- BOTH IDs included to fix console textContent error -->
+                        <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
                         <div class="view-tabs">
                             <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
                             <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')">📊 Plot</button>
@@ -416,7 +418,7 @@
                         </div>
                     </div>
                     <div class="viz-actions">
-                        <button class="action-btn" onclick="window.downloadCurrentVisualization()">📷 Save PNG</button>
+                        <button class="action-btn" onclick="window.downloadCurrentVisualization()">📷 PNG</button>
                         <button class="action-btn" onclick="window.downloadJournalSVG()">📄 SVG</button>
                         <button class="action-btn" onclick="window.toggleFullscreen()">⛶</button>
                     </div>
@@ -473,7 +475,7 @@
         <aside class="right-panel">
             <div class="chat-header">
                 <h2>CiliAI Assistant</h2>
-                <p>Map localizations & query database</p>
+                <p>Interactive biological logic mapping</p>
             </div>
             <div class="messages-area" id="messages">
                 <div class="ciliai-message assistant">
@@ -501,7 +503,7 @@
 
 <script>
     /* UI INTERFACE LAYER 
-       Central logic (init, query, render) is loaded from ciliai.js
+       Note: The engine (initCiliAI, handleAIQuery, generateAndInjectSVG) is in ciliai.js
     */
 
     // --- VIEW MANAGEMENT ---
@@ -563,7 +565,7 @@
         if (scale > 0.5) vp.style.transform = `scale(${scale - 0.1})`;
     };
 
-    // --- INTERFACE WRAPPERS (Called by Engine in ciliai.js) ---
+    // --- INTERFACE WRAPPERS (Called by Engine) ---
     window.updateStatus = function(text, state) {
         const el = document.getElementById('dataStatus');
         if (el) {
@@ -578,14 +580,11 @@
         
         const msgDiv = document.createElement('div');
         msgDiv.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
-        
-        // Future-proofing for streaming with wrapper structure
         msgDiv.innerHTML = `
             <div class="message-wrapper">
                 <div class="ciliai-message-content">${html}</div>
             </div>
         `;
-        
         container.appendChild(msgDiv);
         container.scrollTop = container.scrollHeight;
     };
@@ -651,7 +650,7 @@
                 }
             });
 
-            // Update DOM
+            // Update Dashboard DOM
             document.getElementById('stat-genes').textContent = ciliaryGenesCount.toLocaleString();
             document.getElementById('stat-ciliopathys').textContent = ciliopathiesList.length.toLocaleString();
             document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
@@ -685,7 +684,7 @@
 
     // --- APPLICATION STARTUP ---
     document.addEventListener('DOMContentLoaded', async () => {
-        // Core rendering and data loading triggers (defined in ciliai.js or this file)
+        // Initial SVG setup
         if (window.generateAndInjectSVG) window.generateAndInjectSVG();
         
         // Data loading and dashboard update
