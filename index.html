@@ -3,11 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CiliAI — Unified Explorer</title>
-    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+    <title>CiliAI — Enhanced Gene Explorer</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
+    
+    <!-- External Dependencies -->
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-    <!-- Load the main AI logic FIRST -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CiliAI Engine -->
     <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
+    
     <style>
         :root {
             --primary-blue: #005b96;
@@ -19,84 +24,164 @@
             --status-error-bg: #ffebee;
             --highlight-gold: #f6e05e;
             
-            /* Professional Blue-Compatible Anatomical Palette */
-            --color-pcm1: #5b21b6;       /* Professional Deep Violet - PCM1 (Basal Body) */
-            --color-tmem17: #475569;     /* Slate Blue - TMEM17 (Transition Zone) */
-            --color-arl13b: #0891b2;     /* Muted Cyan - ARL13B (Membrane) */
-            --color-tubulin: #2563eb;    /* Royal Blue - Beta2-tubulin (Axoneme) */
+            /* Anatomical Palette */
+            --color-pcm1: #5b21b6;
+            --color-tmem17: #475569;
+            --color-arl13b: #0891b2;
+            --color-tubulin: #2563eb;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { height: 100%; font-family: 'Inter', sans-serif; background: #f1f5f9; overflow: hidden; }
+        body, html { 
+            height: 100%; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+            background: #f8f9fa; 
+            overflow: hidden; 
+        }
 
-        /* --- Top Navigation Bar --- */
+        /* Compact Top Navigation - 50px */
         .top-navbar {
             background: var(--primary-blue);
             color: white;
             display: flex;
             align-items: center;
-            padding: 0 20px;
-            height: 60px;
-            border-bottom: 1px solid var(--primary-blue);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            justify-content: space-between;
+            padding: 0 24px;
+            height: 50px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 32px;
         }
 
         .brand {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-right: 30px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
+        }
+
+        .brand img {
+            height: 32px;
+            border-radius: 6px;
+        }
+
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+
+        .brand-subtitle {
+            font-size: 9px;
+            opacity: 0.8;
+            font-weight: 400;
         }
 
         .nav-links {
             display: flex;
             list-style: none;
-            gap: 20px;
+            gap: 4px;
             height: 100%;
         }
 
         .nav-links a {
             color: white;
             text-decoration: none;
-            padding: 0 15px;
+            padding: 0 16px;
             height: 100%;
             display: flex;
             align-items: center;
-            font-size: 19px;
+            font-size: 14px;
             font-weight: 500;
-            transition: background-color 0.3s;
+            transition: all 0.2s;
+            position: relative;
         }
 
-        .nav-links a:hover, .nav-links a.active {
-            background-color: rgba(255, 255, 255, 0.1);
+        .nav-links a:hover {
+            background-color: rgba(255, 255, 255, 0.15);
         }
 
-        /* --- Main Layout: Two Panels --- */
+        .nav-links a.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: white;
+        }
+
+        /* Main Layout */
         .app-container {
             display: grid;
-            grid-template-columns: 1fr 400px;
-            height: calc(100vh - 60px);
+            grid-template-columns: 1fr 420px;
+            height: calc(100vh - 50px);
             width: 100vw;
         }
 
-        /* --- Left Panel: Visualization and Search --- */
+        /* Left Panel: Visualization */
         .center-panel {
             display: flex;
             flex-direction: column;
-            padding: 20px;
-            overflow-y: hidden;
+            padding: 16px;
+            overflow: hidden;
             background: #f1f5f9;
         }
 
-        .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; height: 40px; }
-        .search-container { display: flex; gap: 10px; flex: 1; max-width: 600px; }
-        .search-input { flex: 1; padding: 0 15px; border: 2px solid var(--border-light); border-radius: 8px; height: 40px; font-size: 14px; }
-        .search-input:focus { outline: none; border-color: var(--primary-blue); }
-        .search-btn { padding: 0 20px; background: var(--primary-blue); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
-        .search-btn:hover { background: #00477a; }
+        .top-bar { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            margin-bottom: 12px; 
+            height: 44px;
+            gap: 12px;
+        }
 
+        .search-container { 
+            display: flex; 
+            gap: 8px; 
+            flex: 1; 
+            max-width: 600px;
+        }
+
+        .search-input { 
+            flex: 1; 
+            padding: 0 16px;
+            border: 2px solid var(--border-light); 
+            border-radius: 10px; 
+            height: 40px; 
+            font-size: 14px;
+        }
+
+        .search-btn { 
+            padding: 0 20px; 
+            background: var(--primary-blue); 
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            font-weight: 600; 
+            cursor: pointer;
+            height: 40px;
+        }
+
+        .status-badge { 
+            padding: 6px 12px; 
+            border-radius: 8px; 
+            font-size: 11px; 
+            font-weight: 600; 
+        }
+        .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
+        .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
+        .status.error { background: var(--status-error-bg); color: #c62828; }
+
+        /* Visualization Card */
         .viz-card {
             flex: 1;
             background: white;
@@ -110,27 +195,91 @@
         }
 
         .viz-header {
-            padding: 15px 20px;
+            padding: 0 20px;
             border-bottom: 1px solid var(--border-light);
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: white;
             z-index: 10;
+            height: 54px;
+            flex-shrink: 0;
         }
 
-        .viz-title { font-size: 15px; font-weight: 600; color: var(--accent-text); }
-        .save-btn { border: none; background: var(--secondary-blue); color: var(--primary-blue); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        .save-btn:hover { background: var(--primary-blue); color: white; }
-        .save-btn.journal { background: #e0e0e0; color: #333; margin-left: 10px; }
-        .save-btn.journal:hover { background: #ccc; }
+        .viz-title-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .viz-title { font-size: 14px; font-weight: 700; color: var(--accent-text); }
+
+        .view-tabs {
+            display: flex;
+            gap: 4px;
+            background: #f1f5f9;
+            padding: 3px;
+            border-radius: 8px;
+        }
+
+        .view-tab {
+            border: none;
+            background: transparent;
+            padding: 4px 12px;
+            font-weight: 600;
+            font-size: 11px;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .view-tab.active { background: white; color: var(--primary-blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        .viz-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .action-btn {
+            background: var(--secondary-blue);
+            color: var(--primary-blue);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .action-btn:hover { background: var(--primary-blue); color: white; }
+
+        .viz-controls {
+            padding: 8px 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fafafa;
+            height: 44px;
+            flex-shrink: 0;
+        }
+
+        .control-group { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: #666; }
+        .control-group select { padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-light); font-size: 11px; outline: none; }
+
+        .zoom-controls { display: flex; gap: 4px; }
+        .zoom-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .zoom-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
 
         #viz-stage {
             flex: 1;
             position: relative;
             overflow: hidden;
             width: 100%;
-            height: calc(100% - 60px); /* Account for header height */
+            background: white;
         }
 
         #cilia-svg, #plotly-container, #domain-viewer {
@@ -142,106 +291,46 @@
             overflow: hidden;
         }
 
-        #cilia-svg {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: white;
-        }
+        #cilia-svg { display: flex; align-items: center; justify-content: center; }
 
-        #plotly-container, #domain-viewer {
-            display: none;
-            background: white;
-        }
-
-        /* Plotly-specific fixes */
-        .plotly-graph-div {
-            width: 100% !important;
-            height: 100% !important;
-            max-width: 100% !important;
-            max-height: 100% !important;
-            position: relative !important;
-        }
-        
-        .js-plotly-plot, .plot-container {
-            width: 100% !important;
-            height: 100% !important;
-            max-width: 100% !important;
-            max-height: 100% !important;
-            position: relative !important;
-        }
-        
-        .main-svg {
-            width: 100% !important;
-            height: 100% !important;
-            max-width: 100% !important;
-            max-height: 100% !important;
-        }
-
-        /* Spatial Highlight Effects */
-        .cilia-part { cursor: pointer; transition: all 0.3s ease; }
-        .cilia-part:hover { opacity: 0.9; }
-        .cilia-part.active-highlight { 
-            fill: var(--highlight-gold) !important; 
-            stroke: var(--primary-blue); 
-            stroke-width: 2.5; 
-            filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8)); 
-        }
-
-        /* Heatmap and Overlay Styles */
-        .heatmap-overlay { 
-            pointer-events: none; 
-            transition: opacity 0.3s; 
-            mix-blend-mode: screen;
-        }
-        .multi-overlay { 
-            opacity: 0.3; 
-            mix-blend-mode: multiply; 
-            pointer-events: none; 
-        }
-        .domain-rect { 
-            cursor: pointer; 
-            transition: fill 0.2s; 
-        }
-        .domain-rect:hover { fill-opacity: 0.8; }
-
-        /* --- Right Panel: Chat --- */
+        /* Right Panel: Chat */
         .right-panel {
             display: flex;
             flex-direction: column;
-            background: #f8fafc;
+            background: white;
             border-left: 1px solid var(--border-light);
             overflow: hidden;
         }
 
-        .chat-header { padding: 20px; border-bottom: 1px solid var(--border-light); }
-        .chat-header h2 { font-size: 18px; color: var(--primary-blue); }
-        .chat-header p { font-size: 12px; color: #666; }
+        .chat-header { padding: 16px 20px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+        .chat-header h2 { font-size: 16px; color: var(--primary-blue); font-weight: 700; }
+        .chat-header p { font-size: 11px; color: #666; margin-top: 2px; }
 
-        .messages-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .ciliai-message { display: flex; gap: 8px; }
-        .ciliai-message.user { justify-content: flex-end; }
-        .ciliai-message-content { max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
-        .ciliai-message.user .ciliai-message-content { background: var(--primary-blue); color: white; border-radius: 14px 14px 4px 14px; }
-        .ciliai-message.assistant .ciliai-message-content { background: #f0f0f0; color: #333; border-radius: 14px 14px 14px 4px; }
-
-        .input-area { padding: 15px; border-top: 1px solid var(--border-light); background: white; }
-        .chat-input-group { display: flex; gap: 10px; }
-        .chat-input { flex: 1; padding: 12px; border: 2px solid var(--border-light); border-radius: 8px; font-size: 14px; }
-        .chat-input:focus { outline: none; border-color: var(--primary-blue); }
-        .send-btn { background: var(--primary-blue); color: white; padding: 12px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
-        .send-btn:hover { background: #00477a; }
-
-        .status-badge { 
-            padding: 8px 14px; 
-            border-radius: 6px; 
-            font-size: 12px; 
-            font-weight: 600; 
-            transition: background 0.3s; 
+        .messages-area { 
+            flex: 1; 
+            padding: 20px; 
+            overflow-y: auto; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px; 
+            background: #fafafa;
         }
-        .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
-        .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
-        .status.error { background: var(--status-error-bg); color: #c62828; }
+
+        .ciliai-message { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+        .ciliai-message.user { align-items: flex-end; }
+        .ciliai-message.assistant { align-items: flex-start; }
+
+        .ciliai-message-content { 
+            max-width: 90%; 
+            padding: 12px 16px; 
+            border-radius: 14px; 
+            font-size: 13.5px; 
+            line-height: 1.5; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+        }
+
+        .user .ciliai-message-content { background: var(--primary-blue); color: white; border-bottom-right-radius: 2px; }
+        .assistant .ciliai-message-content { background: white; border: 1px solid var(--border-light); border-bottom-left-radius: 2px; color: #334155; }
 
         .gene-badge {
             background: var(--secondary-blue);
@@ -249,110 +338,246 @@
             padding: 4px 10px;
             border-radius: 12px;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.2s;
+            display: inline-block;
         }
         .gene-badge:hover { background: var(--primary-blue); color: white; }
 
-        .spatial-hint { font-size: 11px; color: var(--primary-blue); margin-top: 8px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+        .input-area { padding: 16px; border-top: 1px solid var(--border-light); background: white; flex-shrink: 0; }
+        .chat-input-group { display: flex; gap: 8px; }
+        .chat-input { flex: 1; padding: 10px 14px; border: 2px solid var(--border-light); border-radius: 12px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .chat-input:focus { border-color: var(--primary-blue); }
+        .send-btn { background: var(--primary-blue); color: white; border: none; padding: 0 20px; border-radius: 12px; font-weight: 600; cursor: pointer; }
+
+        .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .labels-visible .cilia-labels text { opacity: 1; }
+
+        .landing-dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 0 0 4px 0;
+            flex-shrink: 0;
+        }
+        .stat-item { background: white; padding: 12px; border-radius: 10px; border: 1px solid var(--border-light); text-align: center; }
+        .stat-value { font-size: 16px; font-weight: 800; color: var(--primary-blue); }
+        .stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 2px; font-weight: 700; }
     </style>
 </head>
 <body>
+
     <nav class="top-navbar">
-        <div class="brand">
-            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
-            <div>
-                <div>CiliAI</div>
-                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
+        <div class="navbar-left">
+            <div class="brand">
+                <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo">
+                <div class="brand-text">
+                    <div>CiliAI</div>
+                    <div class="brand-subtitle">Gene Explorer</div>
+                </div>
             </div>
+            <ul class="nav-links">
+                <li><a href="index.html" class="active">Home</a></li>
+                <li><a href="plots.html">Cilia Analysis</a></li>
+                <li><a href="ciliahub.html">CiliaHub</a></li>
+                <li><a href="about.html">About</a></li>
+            </ul>
         </div>
-        
-        <ul class="nav-links">
-            <li><a href="index.html" class="active">Home</a></li>
-            <li><a href="plots.html">Cilia Analysis</a></li>
-             <li><a href="ciliahub.html">CiliaHub</a></li>        
-            <li><a href="about.html">About</a></li>
-        </ul>
     </nav>
 
     <div class="app-container">
+        <!-- Visualization Panel -->
         <div class="center-panel">
             <div class="top-bar">
                 <div class="search-container">
-                    <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (e.g., IFT88, FOXJ1)...">
-                    <button class="search-btn" onclick="window.searchGene()">Search</button>
+                    <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (IFT88, FOXJ1, PCM1)...">
+                    <button class="search-btn" onclick="window.searchGene()">Visualize</button>
                 </div>
-                <div id="dataStatus" class="status-badge loading">Loading...</div>
+                <div id="dataStatus" class="status-badge loading">SYNCING</div>
             </div>
-            
+
             <div class="viz-card">
                 <div class="viz-header">
-                    <div class="viz-title" id="current-viz-title">Diagram: Spatial Intelligence</div>
-                    <div>
-                        <button class="save-btn" onclick="window.downloadCurrentVisualization()">📷 Save</button>
-                        <button class="save-btn journal" onclick="window.downloadJournalSVG()">Journal SVG</button>
+                    <div class="viz-title-group">
+                        <div class="viz-title" id="current-viz-title">Cilia Spatial Intelligence</div>
+                        <div class="view-tabs">
+                            <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
+                            <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')">📊 Plot</button>
+                            <button class="view-tab" id="tab-domain" onclick="window.switchView('domain')">🧬 Domains</button>
+                        </div>
+                    </div>
+                    <div class="viz-actions">
+                        <button class="action-btn" onclick="window.downloadCurrentVisualization()">📷 Save</button>
+                        <button class="action-btn" onclick="window.downloadJournalSVG()">📄 SVG</button>
+                        <button class="action-btn" onclick="window.toggleFullscreen()">⛶</button>
                     </div>
                 </div>
+
+                <div class="viz-controls">
+                    <div class="control-group">
+                        <span>Color:</span>
+                        <select id="colorSelect">
+                            <option value="anatomical">Anatomical</option>
+                            <option value="expression">Expression</option>
+                            <option value="function">Function</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <div class="zoom-controls">
+                            <button class="zoom-btn" onclick="window.zoomIn()">🔍+</button>
+                            <button class="zoom-btn" onclick="window.zoomOut()">🔍−</button>
+                            <button class="zoom-btn" onclick="window.SpatialManager.resetZoom()">↻</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label><input type="checkbox" id="labelToggle" onchange="window.toggleLabels(this)"> Labels</label>
+                    </div>
+                </div>
+
                 <div id="viz-stage">
                     <div id="cilia-svg"></div>
                     <div id="plotly-container"></div>
                     <div id="domain-viewer"></div>
                 </div>
             </div>
+
+            <div class="landing-dashboard">
+                <div class="stat-item"><div class="stat-value" id="stat-genes">...</div><div class="stat-label">Ciliary Genes</div></div>
+                <div class="stat-item"><div class="stat-value">Lung/Kidney</div><div class="stat-label">scRNA Profiles</div></div>
+                <div class="stat-item"><div class="stat-value">6</div><div class="stat-label">Model Orthologs</div></div>
+            </div>
         </div>
 
+        <!-- Chat Panel -->
         <aside class="right-panel">
             <div class="chat-header">
                 <h2>CiliAI Assistant</h2>
-                <p>Ask about genes & ciliary biology</p>
+                <p>Interactive biological logic mapping</p>
             </div>
-
             <div class="messages-area" id="messages">
                 <div class="ciliai-message assistant">
                     <div class="ciliai-message-content">
-                        <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px; color: #2d3748;">
-                            👋 Welcome to CiliAI
-                        </div>
-                        <p style="margin: 0 0 10px 0; color: #4a5568;">
-                            I am your research assistant for ciliary biology. Click parts of the diagram or ask me questions to explore.
-                        </p>
-                        <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Try asking:
-                        </p>
-                        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                            <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">What is IFT88?</span>
-                            <span class="gene-badge" onclick="window.handleAIQuery('List transition zone genes')">List transition zone genes</span>
-                            <span class="gene-badge" onclick="window.handleAIQuery('plot umap for FOXJ1')">scRNA-seq for FOXJ1</span>
-                            <span class="gene-badge" onclick="window.handleAIQuery('GO term: intraflagellar transport')">GO: intraflagellar transport</span>
-                            <span class="gene-badge" onclick="window.handleAIQuery('Multi: IFT88, FOXJ1')">Multi: IFT88, FOXJ1</span>
-                            <span class="gene-badge" onclick="window.handleAIQuery('Domains for IFT88')">Domains for IFT88</span>
+                        👋 Welcome to CiliAI. I can help you visualize gene expression and map localizations. Try asking:
+                        <div style="margin-top:12px; display:flex; gap:6px; flex-wrap:wrap;">
+                            <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">IFT88</span>
+                            <span class="gene-badge" onclick="window.handleAIQuery('Where is PCM1?')">Locate PCM1</span>
+                            <span class="gene-badge" onclick="window.handleAIQuery('List transition zone genes')">TZ genes</span>
+                            <span class="gene-badge" onclick="window.handleAIQuery('Plot FOXJ1')">FOXJ1 expression</span>
                         </div>
                     </div>
                 </div>
             </div>
-
             <div class="input-area">
                 <div class="chat-input-group">
-                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question...">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask about a gene or ciliary structure...">
                     <button class="send-btn" onclick="window.handleUserSend()">Send</button>
                 </div>
             </div>
         </aside>
     </div>
 
-    <script>
-    // Tiny bootstrap: Show diagram + run init from ciliai.js
-    document.addEventListener('DOMContentLoaded', async () => {
-        if (typeof window.generateAndInjectSVG === 'function') {
-            window.generateAndInjectSVG();
+<script>
+    /* UI INTERFACE LAYER 
+       Note: The engine (init, handleAIQuery, generateAndInjectSVG) is in ciliai.js
+    */
+
+    // UI-Specific View Management
+    window.switchView = function(view) {
+        const stage = document.getElementById('viz-stage');
+        const tabs = document.querySelectorAll('.view-tab');
+        
+        document.getElementById('cilia-svg').style.display = 'none';
+        document.getElementById('plotly-container').style.display = 'none';
+        document.getElementById('domain-viewer').style.display = 'none';
+        tabs.forEach(t => t.classList.remove('active'));
+
+        if (view === 'diagram') {
+            document.getElementById('cilia-svg').style.display = 'flex';
+            document.getElementById('tab-diagram').classList.add('active');
+            if(window.SpatialManager) window.SpatialManager.resetZoom();
+        } else if (view === 'plot') {
+            document.getElementById('plotly-container').style.display = 'block';
+            document.getElementById('tab-plot').classList.add('active');
+            if (window.Plotly && window.CiliAI.currentPlot) Plotly.Plots.resize('plotly-container');
+        } else if (view === 'domain') {
+            document.getElementById('domain-viewer').style.display = 'flex';
+            document.getElementById('tab-domain').classList.add('active');
+            if (window.CiliAI.activeGeneContext && window.showDomainViewer) {
+                window.showDomainViewer(window.CiliAI.activeGeneContext);
+            }
         }
-        if (typeof window.initCiliAI === 'function') {
-            await window.initCiliAI();
+    };
+
+    window.toggleFullscreen = function() {
+        const el = document.querySelector('.viz-card');
+        if (!document.fullscreenElement) {
+            el.requestFullscreen().catch(e => console.error(e));
         } else {
-            console.error('initCiliAI missing in ciliai.js');
+            document.exitFullscreen();
         }
+    };
+
+    window.toggleLabels = function(checkbox) {
+        const svgContainer = document.getElementById('cilia-svg');
+        if (checkbox.checked) svgContainer.classList.add('labels-visible');
+        else svgContainer.classList.remove('labels-visible');
+    };
+
+    window.zoomIn = function() {
+        const vp = document.getElementById('viewport-group');
+        if (!vp) return;
+        const currentTransform = vp.style.transform || 'scale(1)';
+        const scaleMatch = currentTransform.match(/scale\((.*?)\)/);
+        let scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+        vp.style.transform = `scale(${scale + 0.1})`;
+    };
+
+    window.zoomOut = function() {
+        const vp = document.getElementById('viewport-group');
+        if (!vp) return;
+        const currentTransform = vp.style.transform || 'scale(1)';
+        const scaleMatch = currentTransform.match(/scale\((.*?)\)/);
+        let scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+        if (scale > 0.5) vp.style.transform = `scale(${scale - 0.1})`;
+    };
+
+    // UI Updates (Called by Engine)
+    window.updateStatus = function(text, state) {
+        const el = document.getElementById('dataStatus');
+        if (el) {
+            el.textContent = text;
+            el.className = `status-badge status ${state}`;
+        }
+    };
+
+    window.addChatMessage = function(html, isUser = false) {
+        const container = document.getElementById('messages');
+        if (!container) return;
+        const msg = document.createElement('div');
+        msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+        msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
+        container.appendChild(msg);
+        container.scrollTop = container.scrollHeight;
+    };
+
+    // Application Bootstrap
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Core rendering
+        if (window.generateAndInjectSVG) window.generateAndInjectSVG();
+        
+        // Data loading
+        if (window.initCiliAI) await window.initCiliAI();
+
+        // Event listeners
+        document.getElementById('chatInput').addEventListener('keydown', e => {
+            if(e.key === 'Enter') window.handleUserSend();
+        });
+        document.getElementById('geneSearch').addEventListener('keydown', e => {
+            if(e.key === 'Enter') window.searchGene();
+        });
     });
 </script>
+
 </body>
 </html>
