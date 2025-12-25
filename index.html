@@ -28,8 +28,8 @@
             --card: #ffffff;
             
             /* Anatomical Palette markers */
-            --color-pcm1: #5b21b6;      /* Violet - Basal Body */
-            --color-tmem17: #475569;    /* Slate Blue - Transition Zone */
+            --color-pcm1: #5b21b6;      /* Professional Deep Violet - PCM1 (Basal Body) */
+            --color-tmem17: #475569;    /* Slate Blue - TMEM17 (Transition Zone) */
             --color-arl13b: #0891b2;    /* Muted Cyan - ARL13B (Membrane) */
             --color-tubulin: #2563eb;   /* Royal Blue - Beta2-tubulin (Axoneme) */
         }
@@ -61,26 +61,61 @@
 
         .nav-container { 
             display: flex;
-            align-items: center; gap: 20px;
+            align-items: center;
+            gap: 20px;
         }
 
         .brand {
             display: flex;
-            align-items: center; gap: 12px;
-            font-weight: 600; font-size: 20px;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            font-size: 20px;
         }
 
-        .brand img { height: 40px; border-radius: 8px; }
-        .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
-        .brand-subtitle { font-size: 10px; opacity: 0.9; font-weight: 400; }
+        .brand img {
+            height: 40px;
+            border-radius: 8px;
+        }
 
-        .nav-links { display: flex; list-style: none; gap: 4px; }
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+
+        .brand-subtitle {
+            font-size: 10px;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 4px;
+        }
+
         .nav-links a {
-            color: white; text-decoration: none; padding: 12px 15px; border-radius: 6px;
-            font-weight: 500; transition: all 0.2s; font-size: 15px;
+            color: white;
+            text-decoration: none;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            font-size: 15px;
         }
-        .nav-links a:hover { background: rgba(255,255,255,0.15); }
-        .nav-links a.active { background: rgba(255,255,255,0.25); font-weight: 600; }
+
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .nav-links a.active {
+            background: rgba(255,255,255,0.25);
+            font-weight: 600;
+        }
 
         /* --- MAIN LAYOUT --- */
         .app-container {
@@ -90,80 +125,258 @@
             width: 100vw;
         }
 
+        /* LEFT PANEL */
         .center-panel {
-            display: flex; flex-direction: column; padding: 20px; overflow: hidden;
-            background: var(--bg); gap: 16px;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+            background: var(--bg);
+            gap: 16px;
         }
 
         .top-bar { 
-            display: flex; align-items: center; justify-content: space-between; 
-            height: 44px; gap: 12px;
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            height: 44px;
+            gap: 12px;
         }
 
-        .search-container { display: flex; gap: 8px; flex: 1; max-width: 600px; }
-        .search-input { flex: 1; padding: 0 16px; border: 1px solid var(--border-light); border-radius: 8px; height: 44px; font-size: 14px; background: white; }
-        .search-btn { padding: 0 24px; background: var(--primary-blue); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; height: 44px; }
+        .search-container { 
+            display: flex; 
+            gap: 8px; 
+            flex: 1; 
+            max-width: 600px;
+        }
+
+        .search-input { 
+            flex: 1; 
+            padding: 0 16px;
+            border: 1px solid var(--border-light); 
+            border-radius: 8px; 
+            height: 44px; 
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-btn { 
+            padding: 0 24px; 
+            background: var(--primary-blue); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            cursor: pointer;
+            height: 44px;
+            transition: background 0.2s;
+        }
+        .search-btn:hover { background: #004577; }
+
+        .status-badge { 
+            padding: 8px 14px; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            font-weight: 600; 
+        }
+        .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
+        .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
+        .status.error { background: var(--status-error-bg); color: #c62828; }
 
         /* VIZ CARD */
         .viz-card {
-            flex: 1; background: var(--card); border-radius: 12px; border: 1px solid var(--border-light);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; position: relative;
+            flex: 1;
+            background: var(--card);
+            border-radius: 12px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
         }
 
         .viz-header {
-            padding: 0 20px; border-bottom: 1px solid var(--border-light); display: flex;
-            justify-content: space-between; align-items: center; background: white; z-index: 10; height: 54px;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            z-index: 10;
+            height: 54px;
             flex-shrink: 0;
         }
 
-        .viz-title-group { display: flex; align-items: center; gap: 16px; overflow: hidden; }
-        .viz-title { font-size: 15px; font-weight: 700; color: var(--primary-blue); }
+        .viz-title-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            overflow: hidden;
+        }
 
-        .view-tabs { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 8px; }
-        .view-tab { border: none; background: transparent; padding: 5px 14px; font-weight: 600; font-size: 11px; color: #64748b; cursor: pointer; border-radius: 6px; transition: all 0.2s; white-space: nowrap; }
+        .viz-title { 
+            font-size: 15px; 
+            font-weight: 700; 
+            color: var(--primary-blue);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .view-tabs {
+            display: flex;
+            gap: 4px;
+            background: #f1f5f9;
+            padding: 3px;
+            border-radius: 8px;
+        }
+
+        .view-tab {
+            border: none;
+            background: transparent;
+            padding: 5px 14px;
+            font-weight: 600;
+            font-size: 11px;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
         .view-tab.active { background: white; color: var(--primary-blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
-        .viz-actions { display: flex; gap: 6px; }
-        .action-btn { background: var(--secondary-blue); color: var(--primary-blue); border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; }
+        .viz-actions {
+            display: flex;
+            gap: 6px;
+        }
 
-        .viz-controls { padding: 8px 20px; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: #fafafa; height: 44px; flex-shrink: 0; }
+        .action-btn {
+            background: var(--secondary-blue);
+            color: var(--primary-blue);
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .action-btn:hover { background: var(--primary-blue); color: white; }
+
+        /* ACTION BAR CONTROLS */
+        .viz-controls {
+            padding: 8px 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fafafa;
+            height: 44px;
+            flex-shrink: 0;
+        }
+
         .control-group { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: #666; }
         .control-group select { padding: 4px 8px; border-radius: 5px; border: 1px solid var(--border-light); font-size: 11px; outline: none; background: white; cursor: pointer; }
 
         .zoom-controls { display: flex; gap: 4px; }
-        .zoom-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .zoom-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .zoom-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); background: #f0f7ff; }
 
-        #viz-stage { flex: 1; position: relative; overflow: hidden; background: white; }
-        #cilia-svg, #plotly-container, #domain-viewer { position: absolute; inset: 0; width: 100% !important; height: 100% !important; overflow: hidden; }
+        #viz-stage {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            background: white;
+        }
+
+        #cilia-svg, #plotly-container, #domain-viewer {
+            position: absolute;
+            inset: 0;
+            width: 100% !important;
+            height: 100% !important;
+            overflow: hidden;
+        }
+
         #cilia-svg { display: flex; align-items: center; justify-content: center; }
 
         /* RIGHT PANEL: CHAT */
-        .right-panel { display: flex; flex-direction: column; background: white; border-left: 1px solid var(--border-light); overflow: hidden; }
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-left: 1px solid var(--border-light);
+            overflow: hidden;
+        }
+
         .chat-header { padding: 18px 20px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
         .chat-header h2 { font-size: 16px; color: var(--primary-blue); font-weight: 700; }
         .chat-header p { font-size: 11px; color: #666; margin-top: 2px; }
 
-        .messages-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; background: #fafafa; }
+        .messages-area { 
+            flex: 1; 
+            padding: 20px; 
+            overflow-y: auto; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px; 
+            background: #fafafa;
+        }
+
+        /* Streaming compatible structure */
         .ciliai-message { display: flex; flex-direction: column; gap: 4px; width: 100%; }
         .ciliai-message.user { align-items: flex-end; }
-        .ciliai-message-content { padding: 12px 16px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .ciliai-message.assistant { align-items: flex-start; }
+
+        .message-wrapper { max-width: 90%; display: flex; flex-direction: column; gap: 4px; }
+        .ciliai-message.user .message-wrapper { align-items: flex-end; }
+
+        .ciliai-message-content { 
+            padding: 12px 16px; 
+            border-radius: 14px; 
+            font-size: 13.5px; 
+            line-height: 1.5; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+        }
+
         .user .ciliai-message-content { background: var(--primary-blue); color: white; border-bottom-right-radius: 2px; }
         .assistant .ciliai-message-content { background: white; border: 1px solid var(--border-light); border-bottom-left-radius: 2px; color: #334155; }
 
         .suggested-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-        .gene-badge { background: var(--secondary-blue); color: var(--primary-blue); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
-        .gene-badge:hover { background: var(--primary-blue); color: white; }
+        .gene-badge {
+            background: var(--secondary-blue);
+            color: var(--primary-blue);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .gene-badge:hover { background: var(--primary-blue); color: white; transform: translateY(-1px); }
 
         .input-area { padding: 16px; border-top: 1px solid #e2e8f0; background: white; flex-shrink: 0; }
         .chat-input-group { display: flex; gap: 8px; }
-        .chat-input { flex: 1; padding: 12px 16px; border: 2px solid var(--border-light); border-radius: 12px; font-size: 14px; outline: none; }
+        .chat-input { flex: 1; padding: 12px 16px; border: 2px solid var(--border-light); border-radius: 12px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .chat-input:focus { border-color: var(--primary-blue); }
         .send-btn { background: var(--primary-blue); color: white; border: none; padding: 0 24px; border-radius: 12px; font-weight: 600; cursor: pointer; }
 
         /* DASHBOARD */
-        .landing-dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 0 0 8px 0; flex-shrink: 0; }
+        .landing-dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 0 0 8px 0;
+            flex-shrink: 0;
+        }
         .stat-item { background: white; padding: 14px; border-radius: 12px; border: 1px solid var(--border-light); text-align: center; }
         .stat-value { font-size: 18px; font-weight: 800; color: var(--primary-blue); }
-        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 2px; font-weight: 700; }
+        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 4px; font-weight: 700; }
 
         /* DETAIL CARD TABS */
         .detail-tabs { display: flex; border-bottom: 1px solid #eee; margin: 10px 0; }
@@ -176,6 +389,7 @@
         .expr-table td { padding: 6px 0; border-bottom: 1px solid #f5f5f5; color: #4b5563; }
         .expr-table td:last-child { text-align: right; font-weight: 700; color: var(--primary-blue); }
 
+        /* LABELS */
         .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
         .labels-visible .cilia-labels text { opacity: 1; }
         
@@ -216,10 +430,8 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title-group">
-                        <!-- Critical IDs resolve engine errors -->
-                        <div class="viz-title" id="current-viz-title">
-                            <span id="vizActiveTitle">Cilia Spatial Intelligence</span>
-                        </div>
+                        <!-- Corrected IDs resolve console errors in engine -->
+                        <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
                         <div class="view-tabs">
                             <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
                             <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')">📊 Plot</button>
@@ -260,6 +472,7 @@
                     <div id="cilia-svg"></div>
                     <div id="plotly-container"></div>
                     <div id="domain-viewer"></div>
+                    <!-- Hidden elements required by engine logic -->
                     <div id="vizActiveDescription" style="display:none"></div>
                 </div>
             </div>
@@ -296,7 +509,7 @@
                                 <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">IFT88 Details</span>
                                 <span class="gene-badge" onclick="window.handleAIQuery('Please list the genes for Joubert Syndrome')">Joubert Syndrome</span>
                                 <span class="gene-badge" onclick="window.handleAIQuery('Where is PCM1?')">PCM1 Mapping</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Plot FOXJ1')">FOXJ1 scRNA</span>
+                                <span class="gene-badge" onclick="window.handleAIQuery('Plot FOXJ1')">FOXJ1 Expression</span>
                             </div>
                         </div>
                     </div>
@@ -312,11 +525,23 @@
     </div>
 
 <script>
-    /* UI INTERFACE LAYER 
-       Central logic is exteriorized to ciliai.js
-    */
+    /* ============ UI INTERFACE LAYER ============ */
 
-    // --- VIEW MANAGEMENT ---
+    window.updateStatus = function(text, state) {
+        const el = document.getElementById('dataStatus');
+        if (el) { el.textContent = text; el.className = `status-badge status ${state}`; }
+    };
+
+    window.addChatMessage = function(html, isUser = false) {
+        const container = document.getElementById('messages');
+        if (!container) return;
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+        msgDiv.innerHTML = `<div class="message-wrapper"><div class="ciliai-message-content">${html}</div></div>`;
+        container.appendChild(msgDiv);
+        container.scrollTop = container.scrollHeight;
+    };
+
     window.switchView = function(view) {
         const tabs = document.querySelectorAll('.view-tab');
         document.getElementById('cilia-svg').style.display = 'none';
@@ -341,111 +566,100 @@
         }
     };
 
-    window.toggleFullscreen = function() {
-        const el = document.querySelector('.viz-card');
-        if (!document.fullscreenElement) el.requestFullscreen().catch(e => console.error(e));
-        else document.exitFullscreen();
-    };
-
-    window.toggleLabels = function(checkbox) {
-        const svgContainer = document.getElementById('cilia-svg');
-        if (checkbox.checked) svgContainer.classList.add('labels-visible');
-        else svgContainer.classList.remove('labels-visible');
-    };
-
-    window.zoomIn = function() {
-        const vp = document.getElementById('viewport-group');
-        if (!vp) return;
-        const currentTransform = vp.style.transform || 'scale(1)';
-        const scaleMatch = currentTransform.match(/scale\((.*?)\)/);
-        let scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
-        vp.style.transform = `scale(${scale + 0.1})`;
-    };
-
-    window.zoomOut = function() {
-        const vp = document.getElementById('viewport-group');
-        if (!vp) return;
-        const currentTransform = vp.style.transform || 'scale(1)';
-        const scaleMatch = currentTransform.match(/scale\((.*?)\)/);
-        let scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
-        if (scale > 0.5) vp.style.transform = `scale(${scale - 0.1})`;
-    };
-
-    // --- INTERFACE WRAPPERS (Called by Engine) ---
-    window.updateStatus = function(text, state) {
-        const el = document.getElementById('dataStatus');
-        if (el) {
-            el.textContent = text;
-            el.className = `status-badge status ${state}`;
-        }
-    };
-
-    window.addChatMessage = function(html, isUser = false) {
-        const container = document.getElementById('messages');
-        if (!container) return;
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
-        msgDiv.innerHTML = `<div class="message-wrapper"><div class="ciliai-message-content">${html}</div></div>`;
-        container.appendChild(msgDiv);
-        container.scrollTop = container.scrollHeight;
-    };
-
-    /* --- ENHANCED GENE DETAIL VIEW --- */
+    /* --- COMPREHENSIVE EXPRESSION PROFILE VIEW (FIXED MAPPING) --- */
     window.displayFullGeneInfo = function(symbol) {
-        const g = window.CiliAI.lookups.geneMap[symbol.toUpperCase()];
-        if (!g) return;
+        const symUpper = symbol.toUpperCase();
+        const g = window.CiliAI.lookups.geneMap[symUpper];
+        if (!g) {
+            window.addChatMessage(`<div class="ai-result-card"><p>Gene <strong>${symbol}</strong> not found.</p></div>`, false);
+            return;
+        }
 
-        const lungExpr = window.CiliAI.cellDataCache[symbol.toUpperCase()] || {};
-        const kidneyExpr = (window.CiliAI.datasets.kidney?.expression || {})[symbol.toUpperCase()] || {};
-        const tissueExpr = (window.rnaTissueExpressionData || {})[symbol.toUpperCase()] || {};
+        // --- 1. Lung Expression (Dictionary Format) ---
+        const lungExpr = window.CiliAI.cellDataCache[symUpper] || {};
 
-        const formatRows = (map) => {
-            const entries = Object.entries(map).sort((a,b) => b[1] - a[1]).slice(0, 5);
-            if (!entries.length) return '<tr><td colspan="2">No data recorded</td></tr>';
-            return entries.map(([k,v])=>`<tr><td>${k}</td><td>${Number(v).toFixed(2)}</td></tr>`).join('');
+        // --- 2. Kidney Expression (Sparse Mapping FIX) ---
+        const kidneySparse = (window.CiliAI.datasets.kidney?.expression || {})[symUpper] || [];
+        const kidneyUmap = window.CiliAI.datasets.kidney?.umap || [];
+        const kidneyExprMap = {};
+        
+        // Convert sparse array [index, val, index, val] to { CellName: val }
+        for (let i = 0; i < kidneySparse.length; i += 2) {
+            const idx = kidneySparse[i];
+            const val = kidneySparse[i+1];
+            if (kidneyUmap[idx]) {
+                const name = kidneyUmap[idx].cell_type;
+                // Accumulate max or sum by cell type
+                if(!kidneyExprMap[name] || val > kidneyExprMap[name]) kidneyExprMap[name] = val;
+            }
+        }
+
+        // --- 3. Tissue Expression (Dictionary format from TSV) ---
+        const tissueExpr = (window.rnaTissueExpressionData || {})[symUpper] || {};
+
+        const formatTable = (dataMap) => {
+            const entries = Object.entries(dataMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            if (!entries.length) return '<tr><td colspan="2" style="text-align:center; padding:10px; color:#999;">No expression data available.</td></tr>';
+            return entries.map(([k, v]) => `<tr><td>${k}</td><td>${Number(v).toFixed(2)}</td></tr>`).join('');
         };
 
         const cardId = `card-${Date.now()}`;
         const html = `
             <div class="ai-result-card" id="${cardId}">
-                <h3 style="color:var(--primary-blue); margin-bottom:8px;">${symbol} Multi-OMICS</h3>
-                <p style="font-size:12px; margin-bottom:12px;"><strong>Loc:</strong> ${g.Localization || 'Unknown'}</p>
+                <h3 style="color:var(--primary-blue); margin-bottom:10px; font-size:16px;">${symUpper} Profile</h3>
+                <p style="font-size:13px; margin-bottom:8px;"><strong>Localization:</strong> ${g.Localization || 'Unknown'}</p>
                 
                 <div class="detail-tabs">
-                    <div class="detail-tab active" data-target="lung">Lung</div>
-                    <div class="detail-tab" data-target="kidney">Kidney</div>
+                    <div class="detail-tab active" data-target="lung">Lung scRNA</div>
+                    <div class="detail-tab" data-target="kidney">Kidney scRNA</div>
                     <div class="detail-tab" data-target="tissue">Tissue</div>
                 </div>
 
                 <div class="detail-container">
-                    <div id="${cardId}-lung" class="detail-content active"><table class="expr-table">${formatRows(lungExpr)}</table></div>
-                    <div id="${cardId}-kidney" class="detail-content"><table class="expr-table">${formatRows(kidneyExpr)}</table></div>
-                    <div id="${cardId}-tissue" class="detail-content"><table class="expr-table">${formatRows(tissueExpr)}</table></div>
+                    <div id="${cardId}-lung" class="detail-content active">
+                        <table class="expr-table">${formatTable(lungExpr)}</table>
+                    </div>
+                    <div id="${cardId}-kidney" class="detail-content">
+                        <table class="expr-table">${formatTable(kidneyExprMap)}</table>
+                    </div>
+                    <div id="${cardId}-tissue" class="detail-content">
+                        <table class="expr-table">${formatTable(tissueExpr)}</table>
+                    </div>
+                </div>
+                
+                <div style="margin-top:12px; padding-top:10px; border-top:1px solid #eee; display:flex; gap:6px;">
+                    <span class="gene-badge" style="font-size:10px;" onclick="window.handleAIQuery('Show phylogeny of ${symUpper}')">🌍 Phylogeny</span>
+                    <span class="gene-badge" style="font-size:10px;" onclick="window.handleAIQuery('Domains for ${symUpper}')">🧬 Domains</span>
                 </div>
             </div>
         `;
         window.addChatMessage(html, false);
 
+        // Bind tab logic
         setTimeout(() => {
             const card = document.getElementById(cardId);
             if(!card) return;
-            card.querySelectorAll('.detail-tab').forEach(tab => {
+            const tabs = card.querySelectorAll('.detail-tab');
+            const contents = card.querySelectorAll('.detail-content');
+            tabs.forEach(tab => {
                 tab.onclick = () => {
-                    card.querySelectorAll('.detail-tab').forEach(t=>t.classList.remove('active'));
-                    card.querySelectorAll('.detail-content').forEach(c=>c.classList.remove('active'));
+                    tabs.forEach(t => t.classList.remove('active'));
+                    contents.forEach(c => c.classList.remove('active'));
                     tab.classList.add('active');
-                    document.getElementById(`${cardId}-${tab.dataset.target}`).classList.add('active');
+                    const targetId = `${cardId}-${tab.dataset.target}`;
+                    document.getElementById(targetId).classList.add('active');
                 };
             });
         }, 50);
     };
 
-    // --- WRAPPER FOR handleAIQuery ---
-    const originalHandler = window.handleAIQuery;
+    // --- WRAPPER FOR handleAIQuery (Ensures Stability) ---
+    const engineQueryHandler = window.handleAIQuery;
+
     window.handleAIQuery = async function(query) {
         const qLower = query.toLowerCase();
         
-        // Joubert Syndrome gene list fix
+        // Joubert Syndrome fix
         if (qLower.includes('joubert') && (qLower.includes('list') || qLower.includes('genes'))) {
             const byCiliopathy = window.CiliAI.lookups.byCiliopathy || {};
             const joubertKey = Object.keys(byCiliopathy).find(k => k.toLowerCase().includes('joubert'));
@@ -453,13 +667,13 @@
                 const genes = byCiliopathy[joubertKey];
                 const html = `
                     <div class="ai-result-card">
-                        <h4>Associated Genes: ${joubertKey}</h4>
-                        <p>Total genes found: <strong>${genes.length}</strong></p>
+                        <h4>Genes Associated with ${joubertKey}</h4>
+                        <p>Found <strong>${genes.length}</strong> associated genes:</p>
                         <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px;">
                             ${genes.slice(0, 40).map(g => `<span class="gene-badge" onclick="window.displayFullGeneInfo('${g}')">${g}</span>`).join('')}
                         </div>
-                        ${genes.length > 40 ? `<p style="font-size:11px; margin-top:5px; opacity:0.6;">...and more.</p>` : ''}
-                        <button class="action-btn" style="margin-top:10px; width:100%;" onclick="window.handleBatchQuery('${genes.join(',')}')">📊 View Comparative Table</button>
+                        ${genes.length > 40 ? `<p style="font-size:11px; margin-top:8px; opacity:0.6;">...and ${genes.length - 40} more.</p>` : ''}
+                        <button class="action-btn" style="margin-top:12px; width:100%;" onclick="window.handleBatchQuery('${genes.join(',')}')">📊 View Batch Table</button>
                     </div>
                 `;
                 window.addChatMessage(html, false);
@@ -467,90 +681,102 @@
             }
         }
 
-        // Logic for highlights
+        // UI Layer logic (Spatial highlights)
         const genesFound = query.toUpperCase().match(/\b([A-Z0-9]{3,})\b/g) || [];
         let locToHighlight = null;
-
         if (window.SpatialManager) {
             Object.keys(window.SpatialManager.locMap).forEach(loc => {
                 if (qLower.includes(loc)) locToHighlight = loc;
             });
         }
-
         if (!locToHighlight && genesFound.length > 0) {
             const gData = window.CiliAI.lookups.geneMap[genesFound[0]];
             if (gData && gData.Localization) locToHighlight = gData.Localization;
             const markers = { "PCM1": "basal-body", "TMEM17": "transition-zone", "IFT88": "axoneme" };
             if (markers[genesFound[0]]) locToHighlight = markers[genesFound[0]];
         }
-
         if (locToHighlight) {
             window.switchView('diagram');
             if(window.SpatialManager) window.SpatialManager.highlight(locToHighlight, genesFound[0]);
         }
 
-        // --- FIXED ENGINE CALL ---
-        // We use .then() for Plotly compatibility or wrap in a promise check
+        // CALL ENGINE (Handle UMAP / Phylogeny)
         if (typeof window.executeLogic === 'function') {
             window.executeLogic(query);
-        } else if (originalHandler && originalHandler !== window.handleAIQuery) {
-            // Using a safe catch to prevent the gd.on error from crashing the UI
-            try {
-                const res = await originalHandler(query);
-                // The error gd.on occurs in renderUMAPPlot inside ciliai.js
-                // It happens when it tries to attach listeners before the DOM is ready.
-            } catch (e) {
-                console.warn("Engine Query warning handled:", e);
+        } else if (engineQueryHandler && engineQueryHandler !== window.handleAIQuery) {
+            // Microtask delay avoids the "gd.on is not a function" error by ensuring Plotly is ready
+            setTimeout(() => {
+                try {
+                    engineQueryHandler(query);
+                } catch (e) {
+                    console.warn("Handled engine warning:", e);
+                }
+            }, 10);
+        }
+    };
+
+    /* --- DATA LOADING & PARSING --- */
+
+    function parseTsvData(tsvText) {
+        const data = {};
+        const lines = tsvText.split('\n').filter(line => line.trim() !== '');
+        if (lines.length <= 1) return data;
+        const headers = lines[0].split('\t').map(h => h.trim());
+        const geneNameIndex = headers.indexOf('Gene name');
+        const tissueIndex = headers.indexOf('Tissue');
+        const nTPMIndex = headers.indexOf('nTPM');
+        if (geneNameIndex === -1 || tissueIndex === -1 || nTPMIndex === -1) return data;
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split('\t').map(v => v.trim());
+            if (values.length > tissueIndex) {
+                const geneName = values[geneNameIndex];
+                const tissue = values[tissueIndex];
+                const nTPM = parseFloat(values[nTPMIndex]);
+                if (geneName && !isNaN(nTPM)) {
+                    if (!data[geneName]) data[geneName] = {};
+                    data[geneName][tissue] = nTPM;
+                }
             }
         }
-    };
+        return data;
+    }
 
-    window.downloadCurrentVisualization = function() {
-        if (document.getElementById('plotly-container').style.display !== 'none' && window.CiliAI.currentPlot) {
-            window.Plotly.downloadImage(window.CiliAI.currentPlot, {format: 'png', filename: 'ciliai_plot'});
-        } else {
-            const svg = document.querySelector('#cilia-svg svg');
-            if (svg) {
-                const data = new XMLSerializer().serializeToString(svg);
-                const blob = new Blob([data], {type: 'image/svg+xml'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = 'cilia_anatomy.svg'; a.click();
-            }
-        }
-    };
-
-    window.downloadJournalSVG = function() {
-        const svg = document.querySelector('#cilia-svg svg') || document.querySelector('#domain-viewer svg');
-        if (svg) {
-            const clone = svg.cloneNode(true);
-            clone.querySelectorAll('text').forEach(t => t.setAttribute('font-family', 'sans-serif'));
-            const data = new XMLSerializer().serializeToString(clone);
-            const blob = new Blob([data], {type: 'image/svg+xml'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'cilia_journal.svg'; a.click();
-        }
-    };
-
-    /* ============ DYNAMIC DASHBOARD DATA LOADING ============ */
     window.initCiliAIUI = async function() {
         const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
         window.updateStatus('Syncing...', 'loading');
         try {
-            const [mainRes, lookupsRes] = await Promise.all([
+            const [mainRes, lookupsRes, rnaResp, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
                 fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
-                fetch(base + 'ciliAI_lookups.json').then(r => r.json())
+                fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
+                fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
+                fetch(base + 'kidney_structure.json').then(r => r.json()),
+                fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
+                fetch(base + 'kidney_expression_part2.json').then(r => r.json())
             ]);
 
             window.CiliAI.masterData = mainRes.masterData || [];
             window.CiliAI.lookups = lookupsRes.lookups || {};
+            
             if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
             if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
             
             window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
 
-            const primaryCiliopathyClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+            // Assign Kidney Multi-part data
+            const mergedKidneyExpr = { ...kExpr1Res, ...kExpr2Res };
+            window.CiliAI.datasets.kidney = {
+                name: "Human Kidney",
+                umap: kStructRes.umap,
+                expression: mergedKidneyExpr,
+                colorScale: [[0, '#e2e8f0'], [0.1, '#bee3f8'], [1, '#2b6cb0']]
+            };
+
+            // Assign RNA Tissue
+            const rnaText = await rnaResp.text();
+            window.rnaTissueExpressionData = parseTsvData(rnaText);
+
+            // Populate mapping and calculate stats
+            const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
             const validCiliopathyDiseases = new Set();
             const uniqueCiliopathyGenes = new Set();
 
@@ -559,8 +785,8 @@
                     const sym = g.Gene.toUpperCase();
                     window.CiliAI.lookups.geneMap[sym] = g;
                     if(g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
-                    
-                    if (primaryCiliopathyClasses.includes(g.ciliopathy_classification)) {
+
+                    if (primaryClasses.includes(g.ciliopathy_classification)) {
                         uniqueCiliopathyGenes.add(sym);
                         if (g.Ciliopathy) {
                             const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
@@ -570,6 +796,7 @@
                 }
             });
 
+            // Update Counters
             document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
             document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
             document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
@@ -602,12 +829,48 @@
         input.value = '';
     };
 
-    /* ============ INITIALIZATION ============ */
+    window.toggleFullscreen = function() {
+        const el = document.querySelector('.viz-card');
+        if (!document.fullscreenElement) el.requestFullscreen().catch(e => console.error(e));
+        else document.exitFullscreen();
+    };
+
+    window.downloadCurrentVisualization = function() {
+        if (document.getElementById('plotly-container').style.display !== 'none' && window.CiliAI.currentPlot) {
+            window.Plotly.downloadImage(window.CiliAI.currentPlot, {format: 'png', filename: 'ciliai_plot'});
+        } else {
+            const svg = document.querySelector('#cilia-svg svg');
+            if (svg) {
+                const data = new XMLSerializer().serializeToString(svg);
+                const blob = new Blob([data], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'cilia_anatomy.svg'; a.click();
+            }
+        }
+    };
+
+    window.downloadJournalSVG = function() {
+        const svg = document.querySelector('#cilia-svg svg') || document.querySelector('#domain-viewer svg');
+        if (svg) {
+            const clone = svg.cloneNode(true);
+            clone.querySelectorAll('text').forEach(t => t.setAttribute('font-family', 'sans-serif'));
+            const data = new XMLSerializer().serializeToString(clone);
+            const blob = new Blob([data], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'cilia_journal.svg'; a.click();
+        }
+    };
+
+    // --- APPLICATION STARTUP ---
     document.addEventListener('DOMContentLoaded', async () => {
         if (window.generateAndInjectSVG) window.generateAndInjectSVG();
         await window.initCiliAIUI();
-        document.getElementById('chatInput')?.addEventListener('keydown', e => { if(e.key === 'Enter') window.handleUserSend(); });
-        document.getElementById('geneSearch')?.addEventListener('keydown', e => { if(e.key === 'Enter') window.searchGene(); });
+        const chatInput = document.getElementById('chatInput');
+        if(chatInput) chatInput.addEventListener('keydown', e => { if(e.key === 'Enter') window.handleUserSend(); });
+        const geneSearch = document.getElementById('geneSearch');
+        if(geneSearch) geneSearch.addEventListener('keydown', e => { if(e.key === 'Enter') window.searchGene(); });
     });
 </script>
 
