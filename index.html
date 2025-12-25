@@ -15,7 +15,7 @@
     
     <style>
         :root {
-            /* Synchronized Palette */
+            /* Synchronized Palette from plots.html */
             --primary-blue: #005b96;
             --secondary-blue: #b3cde0;
             --accent-text: #333333;
@@ -93,26 +93,25 @@
         .nav-links {
             display: flex;
             list-style: none;
-            gap: 20px;
-            height: 100%;
+            gap: 4px;
         }
 
         .nav-links a {
             color: white;
             text-decoration: none;
-            padding: 0 15px;
-            height: 100%;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            font-size: 19px;
-            font-weight: 500;
-            transition: background-color 0.3s;
+            font-size: 15px;
         }
 
-        .nav-links a:hover, .nav-links a.active {
-            background-color: rgba(255, 255, 255, 0.1);
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.15);
         }
-        
+
         .nav-links a.active {
             background: rgba(255,255,255,0.25);
             font-weight: 600;
@@ -205,7 +204,7 @@
             align-items: center;
             background: white;
             z-index: 10;
-            height: 52px;
+            height: 54px;
             flex-shrink: 0;
         }
 
@@ -213,10 +212,17 @@
             display: flex;
             align-items: center;
             gap: 16px;
+            overflow: hidden;
         }
 
-        /* Combined IDs to fix ciliai.js reference error */
-        .viz-title { font-size: 14px; font-weight: 700; color: var(--primary-blue); }
+        .viz-title { 
+            font-size: 15px; 
+            font-weight: 700; 
+            color: var(--primary-blue);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
         .view-tabs {
             display: flex;
@@ -236,6 +242,7 @@
             cursor: pointer;
             border-radius: 6px;
             transition: all 0.2s;
+            white-space: nowrap;
         }
         .view-tab.active { background: white; color: var(--primary-blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
@@ -320,7 +327,6 @@
             background: #fafafa;
         }
 
-        /* Streaming compatible structure */
         .ciliai-message { display: flex; flex-direction: column; gap: 4px; width: 100%; }
         .ciliai-message.user { align-items: flex-end; }
         .ciliai-message.assistant { align-items: flex-start; }
@@ -353,7 +359,7 @@
         }
         .gene-badge:hover { background: var(--primary-blue); color: white; transform: translateY(-1px); }
 
-        .input-area { padding: 16px; border-top: 1px solid var(--border-light); background: white; flex-shrink: 0; }
+        .input-area { padding: 16px; border-top: 1px solid #e2e8f0; background: white; flex-shrink: 0; }
         .chat-input-group { display: flex; gap: 8px; }
         .chat-input { flex: 1; padding: 12px 16px; border: 2px solid var(--border-light); border-radius: 12px; font-size: 14px; outline: none; transition: border-color 0.2s; }
         .chat-input:focus { border-color: var(--primary-blue); }
@@ -369,7 +375,7 @@
         }
         .stat-item { background: white; padding: 14px; border-radius: 12px; border: 1px solid var(--border-light); text-align: center; }
         .stat-value { font-size: 18px; font-weight: 800; color: var(--primary-blue); }
-        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 4px; font-weight: 700; }
+        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 2px; font-weight: 700; }
 
         /* LABELS */
         .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
@@ -410,7 +416,7 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title-group">
-                        <!-- BOTH IDs included to fix console textContent error -->
+                        <!-- Included IDs vizActiveTitle and current-viz-title to fix engine errors -->
                         <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
                         <div class="view-tabs">
                             <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
@@ -504,7 +510,7 @@
 
 <script>
     /* UI INTERFACE LAYER 
-       Note: The engine (initCiliAI, handleAIQuery, generateAndInjectSVG) is in ciliai.js
+       Central logic (initCiliAI, handleAIQuery, generateAndInjectSVG) is loaded from ciliai.js
     */
 
     // --- VIEW MANAGEMENT ---
@@ -586,6 +592,7 @@
                 <div class="ciliai-message-content">${html}</div>
             </div>
         `;
+        
         container.appendChild(msgDiv);
         container.scrollTop = container.scrollHeight;
     };
@@ -639,7 +646,7 @@
                 if (g.Gene) window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g;
             });
 
-            // --- Calculate Stats ---
+            // --- Calculate Dashboard Stats ---
             const ciliaryGenesCount = window.CiliAI.masterData.length;
             const byCiliopathy = window.CiliAI.lookups.byCiliopathy || {};
             const ciliopathiesList = Object.keys(byCiliopathy);
@@ -651,10 +658,14 @@
                 }
             });
 
-            // Update Dashboard DOM
-            document.getElementById('stat-genes').textContent = ciliaryGenesCount.toLocaleString();
-            document.getElementById('stat-ciliopathys').textContent = ciliopathiesList.length.toLocaleString();
-            document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
+            // Update DOM counters
+            const genesEl = document.getElementById('stat-genes');
+            const ciliopathysEl = document.getElementById('stat-ciliopathys');
+            const cpGenesEl = document.getElementById('stat-ciliopathy-genes');
+
+            if(genesEl) genesEl.textContent = ciliaryGenesCount.toLocaleString();
+            if(ciliopathysEl) ciliopathysEl.textContent = ciliopathiesList.length.toLocaleString();
+            if(cpGenesEl) cpGenesEl.textContent = uniqueCiliopathyGenes.size.toLocaleString();
 
             window.CiliAI.ready = true;
             window.updateStatus('CONNECTED', 'ready');
@@ -685,22 +696,26 @@
 
     // --- APPLICATION STARTUP ---
     document.addEventListener('DOMContentLoaded', async () => {
-        // Initial SVG setup
+        // Core rendering
         if (window.generateAndInjectSVG) window.generateAndInjectSVG();
         
-        // Data loading and dashboard update
+        // Data loading & Dashboard refresh
         await window.initCiliAI();
 
-        // Event listeners
+        // UI Event listeners
         const chatInput = document.getElementById('chatInput');
-        chatInput.addEventListener('keydown', e => {
-            if(e.key === 'Enter') window.handleUserSend();
-        });
+        if(chatInput) {
+            chatInput.addEventListener('keydown', e => {
+                if(e.key === 'Enter') window.handleUserSend();
+            });
+        }
         
         const geneSearch = document.getElementById('geneSearch');
-        geneSearch.addEventListener('keydown', e => {
-            if(e.key === 'Enter') window.searchGene();
-        });
+        if(geneSearch) {
+            geneSearch.addEventListener('keydown', e => {
+                if(e.key === 'Enter') window.searchGene();
+            });
+        }
     });
 </script>
 
