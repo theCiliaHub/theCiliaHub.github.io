@@ -57,7 +57,10 @@ window.addChatMessage = function (msg, isUser) {
     }
 };
 
-
+function normalizeTerm(term) {
+    if (typeof term !== 'string') return '';
+    return term.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
 
 /* ============ EXPRESSION MAPPING & PROFILE ============ */
 
