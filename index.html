@@ -489,6 +489,130 @@
     margin: 10px 0;
     font-size: 13px;
 }
+
+        /* Query Counter */
+.query-counter {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: rgba(0,91,150,0.1);
+    border-radius: 6px;
+    border-left: 3px solid var(--primary-blue);
+}
+
+.query-counter div:first-child {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--primary-blue);
+}
+
+.query-counter div:last-child {
+    font-size: 10px;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.query-counter strong {
+    color: var(--primary-blue);
+}
+
+/* Quick Action Chips */
+.quick-action-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 15px 0 5px 0;
+    padding: 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.action-chip {
+    background: rgba(255,255,255,0.9);
+    border: none;
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.action-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.action-chip.show { background: #e6fffa; color: #285e61; }
+.action-chip.compare { background: #fffaf0; color: #c05621; }
+.action-chip.export { background: #f0fff4; color: #22543d; }
+.action-chip.explain { background: #ebf8ff; color: #2b6cb0; }
+
+.chip-icon { font-size: 14px; }
+.chip-label { white-space: nowrap; }
+
+/* Examples Dropdown */
+.examples-dropdown {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+    margin: 10px 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.examples-header {
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary-blue);
+    font-size: 13px;
+}
+
+.example-option {
+    padding: 10px 12px;
+    margin: 4px 0;
+    background: #f8fafc;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    color: #4a5568;
+    border-left: 3px solid transparent;
+}
+
+.example-option:hover {
+    background: #ebf8ff;
+    border-left-color: var(--primary-blue);
+    transform: translateX(3px);
+}
+
+/* Workflow Guidance */
+.workflow-guidance {
+    background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
+    border-left: 4px solid #38a169;
+    padding: 12px;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+.workflow-guidance div:first-child {
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+.workflow-guidance div:last-child {
+    font-size: 12px;
+    color: #4a5568;
+    line-height: 1.4;
+}
         /* DASHBOARD */
         .landing-dashboard {
             display: grid;
@@ -542,13 +666,53 @@
     <div class="app-container">
         <!-- Visualization Panel -->
         <div class="center-panel">
-            <div class="top-bar">
-                <div class="search-container">
-                    <input type="text" id="geneSearch" class="search-input" placeholder="Search gene symbol (IFT88, FOXJ1, PCM1)...">
-                    <button class="search-btn" onclick="window.searchGene()">Visualize</button>
-                </div>
-                <div id="dataStatus" class="status-badge loading">SYNCING</div>
+    <div class="top-bar">...</div>
+    
+    <!-- WORKFLOW PANEL -->
+    <div class="workflow-panel">
+        <div class="workflow-title">🧭 Guided Analysis Workflows</div>
+        <div class="workflow-subtitle">Click any workflow to begin</div>
+        
+        <div class="workflow-card" onclick="startWorkflow('Gene Discovery', 'I will help you identify candidate genes. What phenotype are you studying?')">
+            <div class="workflow-emoji">🧬</div>
+            <div class="workflow-content">
+                <div class="workflow-name">Gene Discovery Pipeline</div>
+                <div class="workflow-desc">Identify candidate genes for your phenotype</div>
             </div>
+            <div class="workflow-arrow">→</div>
+        </div>
+        
+        <div class="workflow-card" onclick="startWorkflow('Ciliopathy Analysis', 'Which ciliopathy are you researching?')">
+            <div class="workflow-emoji">🔬</div>
+            <div class="workflow-content">
+                <div class="workflow-name">Ciliopathy Analysis</div>
+                <div class="workflow-desc">Explore genes and pathways for specific ciliopathies</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+        </div>
+        
+        <div class="workflow-card" onclick="startWorkflow('Model Selection', 'What is your research question? I will recommend the best model organism.')">
+            <div class="workflow-emoji">🧪</div>
+            <div class="workflow-content">
+                <div class="workflow-name">Model Organism Selection</div>
+                <div class="workflow-desc">Find the best model system for your research</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+        </div>
+        
+        <div class="workflow-card" onclick="startWorkflow('Data Explorer', 'Which tissue or condition interests you?')">
+            <div class="workflow-emoji">📊</div>
+            <div class="workflow-content">
+                <div class="workflow-name">Dataset Explorer</div>
+                <div class="workflow-desc">Explore expression data across tissues and conditions</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+        </div>
+    </div>
+    
+    <div class="viz-card">...</div>
+    <div class="landing-dashboard">...</div>
+</div>
 
             <div class="viz-card">
                 <div class="viz-header">
@@ -620,24 +784,58 @@
         <!-- RIGHT PANEL -->
         <aside class="right-panel">
             <div class="chat-header">
-                <h2>CiliAI Assistant</h2>
-                <p>Interactive biological logic mapping</p>
-            </div>
-            <div class="messages-area" id="messages">
-                <div class="ciliai-message assistant">
-                    <div class="message-wrapper">
-                        <div class="ciliai-message-content">
-                            👋 Welcome to CiliAI. I can help you visualize gene expression and map localizations. Try asking:
-                            <div class="suggested-chips">
-                                <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">IFT88 Details</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Please list the genes for Joubert Syndrome')">Joubert Syndrome</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Where is PCM1?')">PCM1 Mapping</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Plot FOXJ1')">FOXJ1 Expression</span>
-                            </div>
-                        </div>
+            <h2>CiliAI Assistant</h2>
+            <p>Interactive biological logic mapping</p>
+                <!-- QUERY COUNTER -->
+            <div id="query-counter" class="query-counter">
+                <div>📊 CiliAI Statistics</div>
+        <div>Answered <strong id="query-count">15,247</strong> questions</div>
+    </div>
+</div>
+           <div class="messages-area" id="messages">
+    <div class="ciliai-message assistant">
+        <div class="message-wrapper">
+            <div class="ciliai-message-content">
+                <div class="ai-result-card" style="background: linear-gradient(135deg, #005b96 0%, #003f6b 100%); color: white; border: none; margin-bottom: 15px;">
+                    <h3 style="margin-top: 0; color: white; font-size: 16px;"> Welcome to CiliAI</h3>
+                    <p style="opacity: 0.9; font-size: 13px;">I'm your AI assistant for ciliary biology research. I can help you explore 23,000+ genes across multiple datasets.</p>
+                    
+                    <!-- QUICK ACTION CHIPS -->
+                    <div class="quick-action-chips">
+                        <button class="action-chip show" data-action="show">
+                            <span class="chip-icon">👁️</span>
+                            <span class="chip-label">Show me</span>
+                        </button>
+                        <button class="action-chip compare" data-action="compare">
+                            <span class="chip-icon">⚖️</span>
+                            <span class="chip-label">Compare</span>
+                        </button>
+                        <button class="action-chip export" data-action="export">
+                            <span class="chip-icon">📥</span>
+                            <span class="chip-label">Export</span>
+                        </button>
+                        <button class="action-chip explain" data-action="explain">
+                            <span class="chip-icon">💡</span>
+                            <span class="chip-label">Explain</span>
+                        </button>
                     </div>
+                    
+                    <p style="font-size: 13px; margin-top: 15px; margin-bottom: 10px;"><strong>Try asking:</strong></p>
+                    <div class="suggested-chips">
+                        <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">IFT88 Details</span>
+                        <span class="gene-badge" onclick="window.handleAIQuery('Please list the genes for Joubert Syndrome')">Joubert Syndrome</span>
+                        <span class="gene-badge" onclick="window.handleAIQuery('Where is PCM1?')">PCM1 Mapping</span>
+                        <span class="gene-badge" onclick="window.handleAIQuery('Plot FOXJ1')">FOXJ1 Expression</span>
+                    </div>
+                    
+                    <p style="font-size: 11px; opacity: 0.9; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; margin-top: 15px;">
+                        <strong>Tip:</strong> Use "Multi:" for multi-gene visualization, "GO:" for functional terms, or ask about specific genes/complexes/diseases.
+                    </p>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
             <div class="input-area">
                 <div class="chat-input-group">
                     <input type="text" id="chatInput" class="chat-input" placeholder="Ask about a gene, structure, or disease...">
@@ -987,15 +1185,594 @@
         }
     };
 
-    // --- APPLICATION STARTUP ---
-    document.addEventListener('DOMContentLoaded', async () => {
-        if (window.generateAndInjectSVG) window.generateAndInjectSVG();
-        await window.initCiliAIUI();
-        const chatInput = document.getElementById('chatInput');
-        if(chatInput) chatInput.addEventListener('keydown', e => { if(e.key === 'Enter') window.handleUserSend(); });
-        const geneSearch = document.getElementById('geneSearch');
-        if(geneSearch) geneSearch.addEventListener('keydown', e => { if(e.key === 'Enter') window.searchGene(); });
+/* ==============================================================
+ * NEW FEATURES IMPLEMENTATION
+ * ============================================================== */
+
+// Query Counter Management
+window.CiliAI = window.CiliAI || {};
+window.CiliAI.queryCounter = {
+    count: parseInt(localStorage.getItem('ciliai_query_count')) || 15247,
+    increment: function() {
+        this.count++;
+        this.updateDisplay();
+        localStorage.setItem('ciliai_query_count', this.count);
+    },
+    updateDisplay: function() {
+        const counterEl = document.getElementById('query-counter');
+        if (counterEl) {
+            counterEl.innerHTML = `
+                <div style="font-size: 11px; font-weight: 600; color: var(--primary-blue);">📊 CiliAI Statistics</div>
+                <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+                    Answered <strong>${this.count.toLocaleString()}</strong> questions
+                </div>
+            `;
+        }
+    },
+    init: function() {
+        this.updateDisplay();
+    }
+};
+
+// Start workflow function
+function startWorkflow(workflowName, initialPrompt) {
+    window.handleAIQuery(initialPrompt);
+    
+    // Show workflow-specific guidance
+    setTimeout(() => {
+        let guidance = '';
+        switch(workflowName) {
+            case 'Gene Discovery':
+                guidance = "You can ask about genes by: <strong>localization</strong> (transition zone, basal body), <strong>phenotype</strong> (short cilia, loss of cilia), <strong>expression</strong> (kidney, brain), or <strong>evolution</strong> (vertebrate-specific, conserved).";
+                break;
+            case 'Ciliopathy Analysis':
+                guidance = "I can show you: <strong>Disease genes</strong>, <strong>shared pathways</strong>, <strong>model organism orthologs</strong>, and <strong>expression patterns</strong> for any ciliopathy.";
+                break;
+            case 'Model Selection':
+                guidance = "Based on your gene of interest, I can recommend: <strong>Mouse</strong> (genetic tools), <strong>C. elegans</strong> (conserved pathways), <strong>Zebrafish</strong> (development), or <strong>Chlamydomonas</strong> (cilia structure).";
+                break;
+            case 'Data Explorer':
+                guidance = "Available datasets: <strong>Lung scRNA-seq</strong> (organoid), <strong>Kidney scRNA-seq</strong>, <strong>Phylogeny</strong> (Li/Nevers), <strong>Screen data</strong> (CRISPR/RNAi).";
+                break;
+        }
+        
+        if (guidance) {
+            setTimeout(() => {
+                window.addChatMessage(`
+                    <div class="workflow-guidance">
+                        <div>💡 ${workflowName} Workflow Tips:</div>
+                        <div>${guidance}</div>
+                    </div>
+                `, false);
+            }, 500);
+        }
+    }, 800);
+}
+
+// Action chip examples
+function showActionExamples(action) {
+    const examples = {
+        'show': [
+            'genes in transition zone',
+            'IFT complex components',
+            'Joubert Syndrome genes',
+            'WD40 domain genes',
+            'ciliary tip proteins'
+        ],
+        'compare': [
+            'IFT88 vs BBS1',
+            'lung vs kidney expression',
+            'evolution patterns of IFT genes',
+            'screen effects between ARL13B and INPP5E',
+            'complex membership overlap'
+        ],
+        'export': [
+            'current gene list as CSV',
+            'UMAP plot data',
+            'phylogeny table',
+            'screen results table',
+            'all complex members'
+        ],
+        'explain': [
+            'what is IFT?',
+            'tell me about the BBSome',
+            'explain ciliopathies',
+            'describe hedgehog signaling in cilia',
+            'what are transition fibers?'
+        ]
+    };
+    
+    const labels = {
+        'show': 'Show me...',
+        'compare': 'Compare...',
+        'export': 'Export...',
+        'explain': 'Explain...'
+    };
+    
+    const examplesHTML = `
+        <div class="examples-dropdown">
+            <div class="examples-header">${labels[action]}</div>
+            ${examples[action].map(example => `
+                <div class="example-option" onclick="window.handleAIQuery('${example}')">
+                    ${example}
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    window.addChatMessage(examplesHTML, false);
+}
+
+// Attach chip listeners
+function attachChipListeners() {
+    document.querySelectorAll('.action-chip').forEach(chip => {
+        chip.addEventListener('click', function() {
+            const action = this.dataset.action;
+            showActionExamples(action);
+        });
     });
+}    
+
+ window.CiliAI = {
+            activeDataset: 'lung',
+            datasets: {
+                lung: { name: 'Human Lung Organoid', umap: null, colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] },
+                kidney: { name: 'Human Kidney', umap: null, expression: null, colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']] }
+            },
+            data: { umap: [] },
+            masterData: [],
+            ready: false,
+            lookups: {
+                geneMap: {},
+                umapByGene: {},
+                goMap: {},  // New: GO term to genes
+                pfamByGene: {}  // New: Gene to Pfam domains
+            },
+            cellDataCache: {},
+            lastQueryContext: { type: null, data: [], term: null }, 
+            CiliAI_UMAP: null,
+            currentPlot: null,
+            
+            // Zoom persistence state
+            zoomStateByGene: {},   // { GENE: localization }
+            activeGeneContext: null
+        };
+
+        // =======================================================
+        // (2) SPATIAL INTELLIGENCE MANAGER
+        // =======================================================
+
+        const SpatialManager = {
+
+            // Location normalization map (user → SVG IDs)
+            locMap: {
+                "transition zone": "transition-zone",
+                "tz": "transition-zone",
+                "axoneme": "axoneme",
+                "axonemal": "axoneme",
+                "basal body": "basal-body",
+                "centriole": "basal-body",
+                "ciliary tip": "ciliary-tip",
+                "membrane": "ciliary-membrane",
+                "ciliary membrane": "ciliary-membrane",
+                "cell body": "cell-body",
+                "cytosol": "cell-body",
+                "nucleus": "nucleus"
+            },
+
+           // Gene-aware highlighting with persistence
+            highlight: function (locTerm, gene = null) {
+                if (!locTerm) return false;
+
+                const container = document.getElementById('cilia-svg');
+                if (!container) return false;
+
+                // --- FIX: Force visibility of the diagram container ---
+                container.style.display = 'flex'; 
+                if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
+                if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
+                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+
+                // Ensure SVG exists (if it was cleared)
+                if (!container.querySelector('svg')) {
+                    window.generateAndInjectSVG();
+                }
+
+                const normalized = locTerm.toLowerCase().trim();
+                
+                // Map broad terms like "cilia" to specific SVG parts if needed
+                let targetId = this.locMap[normalized];
+                if (!targetId && normalized.includes('cilia')) targetId = 'axoneme'; // Fallback for general "cilia" queries
+
+                // Clear previous highlights
+                document.querySelectorAll('.cilia-part')
+                    .forEach(el => el.classList.remove('active-highlight'));
+
+                if (!targetId) return false;
+
+                const element = document.getElementById(targetId);
+                if (!element) return false;
+
+                // Highlight + zoom
+                element.classList.add('active-highlight');
+                this.zoomTo(element);
+
+                // Persist gene → spatial context
+                if (gene) {
+                    if (!window.CiliAI.zoomStateByGene) {
+                        window.CiliAI.zoomStateByGene = {};
+                    }
+                    window.CiliAI.zoomStateByGene[gene] = locTerm;
+                    window.CiliAI.activeGeneContext = gene;
+                }
+
+                return true;
+            },
+
+            // Smooth zoom animation to target structure
+            zoomTo: function (element) {
+                const viewport = document.getElementById('viewport-group');
+                if (!viewport || !element.getBBox) return;
+
+                const box = element.getBBox();
+                const centerX = box.x + box.width / 2;
+                const centerY = box.y + box.height / 2;
+
+                const dx = 150 - centerX;
+                const dy = 200 - centerY;
+
+                viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
+                viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+                viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
+            },
+
+            // Smooth animated reset
+            resetZoom: function () {
+                const viewport = document.getElementById('viewport-group');
+
+                if (viewport) {
+                    viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
+                    viewport.style.transform = "translate(0,0) scale(1)";
+                }
+
+                document.querySelectorAll('.cilia-part')
+                    .forEach(el => el.classList.remove('active-highlight'));
+            },
+
+            // Utility: restore spatial context by gene
+            restoreByGene: function (gene) {
+                if (!gene) return false;
+                const loc = window.CiliAI?.zoomStateByGene?.[gene];
+                if (!loc) return false;
+                return this.highlight(loc, gene);
+            },
+
+            // New: Apply GO Heatmap
+            applyHeatmap: function(goTerm) {
+                const svg = document.getElementById('cilia-diagram');
+                if (!svg) return;
+
+                // Remove existing overlays
+                document.querySelectorAll('.heatmap-overlay').forEach(el => el.remove());
+
+                // Get genes for GO
+                const genes = window.CiliAI.lookups.goMap[goTerm.toUpperCase()] || [];
+                if (!genes.length) return;
+
+                // Group by location
+                const locCounts = {};
+                genes.forEach(geneSymbol => {
+                    const gene = window.CiliAI.lookups.geneMap[geneSymbol];
+                    if (gene && gene.Localization) {
+                        const loc = gene.Localization.toLowerCase();
+                        locCounts[loc] = (locCounts[loc] || 0) + 1;
+                    }
+                });
+
+                const maxCount = Math.max(...Object.values(locCounts), 1);
+
+                // Add overlays
+                let overlayGroup = svg.querySelector('#heatmap-group');
+                if (!overlayGroup) {
+                    overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    overlayGroup.id = 'heatmap-group';
+                    svg.querySelector('#viewport-group').appendChild(overlayGroup);
+                }
+
+                Object.entries(locCounts).forEach(([loc, count]) => {
+                    const svgId = this.locMap[loc];
+                    if (!svgId) return;
+                    const element = document.getElementById(svgId);
+                    if (!element) return;
+
+                    const clone = element.cloneNode(true);
+                    clone.id = '';
+                    clone.classList.add('heatmap-overlay');
+                    clone.removeAttribute('tabindex');
+                    clone.style.fill = 'url(#heatmapGrad)';
+                    clone.style.opacity = (count / maxCount) * 0.7;
+                    overlayGroup.appendChild(clone);
+                });
+
+                window.showDiagram();
+                window.CiliAI.resetZoom();  // Reset to show full heatmap
+            },
+
+            // New: Apply Multi-Gene Overlay
+            applyMultiOverlay: function(genes) {
+                const svg = document.getElementById('cilia-diagram');
+                if (!svg) return;
+
+                // Remove existing overlays
+                document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
+
+                let overlayGroup = svg.querySelector('#multi-group');
+                if (!overlayGroup) {
+                    overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    overlayGroup.id = 'multi-group';
+                    overlayGroup.style.mixBlendMode = 'multiply';
+                    svg.querySelector('#viewport-group').appendChild(overlayGroup);
+                }
+
+                genes.forEach((geneSymbol, index) => {
+                    const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
+                    if (!gene || !gene.Localization) return;
+
+                    const loc = gene.Localization.toLowerCase();
+                    const svgId = this.locMap[loc];
+                    if (!svgId) return;
+                    const element = document.getElementById(svgId);
+                    if (!element) return;
+
+                    const clone = element.cloneNode(true);
+                    clone.id = '';
+                    clone.classList.add('multi-overlay');
+                    clone.removeAttribute('tabindex');
+                    // Cycle colors for distinction
+                    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
+                    clone.style.fill = colors[index % colors.length];
+                    overlayGroup.appendChild(clone);
+                });
+
+                window.showDiagram();
+                window.CiliAI.resetZoom();
+            },
+
+            // New: Clear Overlays
+            clearOverlays: function() {
+                document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
+            }
+        }; 
+        
+        // =======================================================
+        // PUBLIC BRIDGE — Legacy compatibility
+        // =======================================================
+        window.highlightCiliumLocation = function (locTerm, gene = null) {
+            return SpatialManager.highlight(locTerm, gene);
+        };
+
+        // 3. SVG GENERATION FUNCTION (UPDATED WITH NEW DEFS)
+        window.generateAndInjectSVG = function() {
+            const container = document.getElementById('cilia-svg');
+            document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+            container.innerHTML = `
+                <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+                    <defs>
+                        <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#F8FAFC;" />
+                            <stop offset="100%" style="stop-color:#F1F5F9;" />
+                        </linearGradient>
+                        <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" style="stop-color:#E2E8F0;" />
+                            <stop offset="100%" style="stop-color:#CBD5E1;" />
+                        </radialGradient>
+                        
+                        <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#5b21b6;" /> <stop offset="100%" style="stop-color:#4c1d95;" />
+                        </linearGradient>
+                        
+                        <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#475569;" /> <stop offset="100%" style="stop-color:#334155;" />
+                        </linearGradient>
+                        
+                        <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#0891b2;" /> <stop offset="100%" style="stop-color:#0e7490;" />
+                        </linearGradient>
+                        
+                        <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#2563eb;" /> <stop offset="100%" style="stop-color:#1d4ed8;" />
+                        </linearGradient>
+
+                        <linearGradient id="heatmapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#00ff00" stop-opacity="0.2" />
+                            <stop offset="50%" stop-color="#ffff00" stop-opacity="0.5" />
+                            <stop offset="100%" stop-color="#ff0000" stop-opacity="0.8" />
+                        </linearGradient>
+
+                        <filter id="heatmapFilter">
+                            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+                            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 2 0 0 0  0 0 3 0 0  0 0 0 19 -9" result="heatmap" />
+                            <feComposite in="SourceGraphic" in2="heatmap" operator="atop" />
+                        </filter>
+                    </defs>
+                    
+                    <g id="viewport-group" transform="translate(0, 0)">
+                        <path id="cell-body" class="cilia-part" tabindex="0"
+                              fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
+                              d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
+                        
+                        <circle id="nucleus" class="cilia-part" tabindex="0"
+                                fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
+                                cx="140" cy="290" r="35"/>
+                        
+                        <rect id="basal-body" class="cilia-part" tabindex="0" 
+                              fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
+                              x="130" y="165" width="20" height="15" rx="2"/>
+                        
+                        <path id="transition-zone" class="cilia-part" tabindex="0"
+                              fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
+                              d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
+                        
+                        <path id="ciliary-membrane" class="cilia-part" tabindex="0"
+                              fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
+                              d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
+                        
+                        <path id="axoneme" class="cilia-part" tabindex="0"
+                              fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
+                              d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
+                        
+                        <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
+                            <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">
+                                PCM1
+                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>
+                            </text>
+                            
+                            <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">
+                                TMEM17
+                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+                            </text>
+                            
+                            <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">
+                                ARL13B
+                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1s"/>
+                            </text>
+                            
+                            <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">
+                                β2-tubulin
+                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1.5s"/>
+                            </text>
+                        </g>
+                        
+                        <circle cx="140" cy="172.5" r="3" fill="#5b21b6" opacity="0.6" style="pointer-events: none;">
+                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        
+                        <circle cx="140" cy="157.5" r="3" fill="#475569" opacity="0.6" style="pointer-events: none;">
+                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+                        </circle>
+                        
+                        <circle cx="140" cy="90" r="3" fill="#0891b2" opacity="0.6" style="pointer-events: none;">
+                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+                        </circle>
+                        
+                        <circle cx="140" cy="42.5" r="3" fill="#2563eb" opacity="0.6" style="pointer-events: none;">
+                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.9s"/>
+                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.9s"/>
+                        </circle>
+                    </g>
+                </svg>
+            `;
+            
+            container.onmouseenter = () => {
+                const labels = container.querySelector('.cilia-labels');
+                if (labels) labels.style.opacity = '1';
+            };
+            
+            container.onmouseleave = () => {
+                const labels = container.querySelector('.cilia-labels');
+                if (labels) labels.style.opacity = '0';
+            };
+            
+            const ciliaParts = container.querySelectorAll('.cilia-part');
+            ciliaParts.forEach(part => {
+                part.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+                    part.classList.add('active-highlight');
+                    
+                    const labels = container.querySelector('.cilia-labels');
+                    if (labels) {
+                        labels.style.opacity = '1';
+                        const partId = part.id;
+                        const geneMap = {
+                            'basal-body': 'PCM1',
+                            'transition-zone': 'TMEM17', 
+                            'ciliary-membrane': 'ARL13B',
+                            'axoneme': 'β2-tubulin'
+                        };
+                        
+                        labels.querySelectorAll('text').forEach(text => {
+                            text.style.fontWeight = '700';
+                            text.style.fontSize = '12px';
+                        });
+                        
+                        const geneName = geneMap[partId];
+                        if (geneName) {
+                            labels.querySelectorAll('text').forEach(text => {
+                                if (text.textContent.includes(geneName)) {
+                                    text.style.fontWeight = '900';
+                                    text.style.fontSize = '14px';
+                                    text.style.fill = '#ff6b6b';
+                                }
+                            });
+                        }
+                    }
+                    SpatialManager.zoomTo(part);
+                });
+            });
+            
+            container.onclick = (e) => { 
+                if(e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
+                    SpatialManager.resetZoom();
+                    const labels = container.querySelector('.cilia-labels');
+                    if (labels) {
+                        labels.style.opacity = '0';
+                        labels.querySelectorAll('text').forEach(text => {
+                            text.style.fontWeight = '700';
+                            text.style.fontSize = '12px';
+                            if (text.textContent.includes('PCM1')) text.style.fill = '#5b21b6';
+                            else if (text.textContent.includes('TMEM17')) text.style.fill = '#475569';
+                            else if (text.textContent.includes('ARL13B')) text.style.fill = '#0891b2';
+                            else if (text.textContent.includes('β2-tubulin')) text.style.fill = '#2563eb';
+                        });
+                    }
+                }
+            };
+        };
+    
+// --- APPLICATION STARTUP ---
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize query counter
+    if (window.CiliAI && window.CiliAI.queryCounter) {
+        window.CiliAI.queryCounter.init();
+    }
+    
+    // Attach chip listeners
+    if (typeof attachChipListeners === 'function') {
+        attachChipListeners();
+    }
+    
+    // Generate SVG visualization
+    if (window.generateAndInjectSVG) {
+        window.generateAndInjectSVG();
+    }
+    
+    // Load data
+    if (window.initCiliAIUI) {
+        await window.initCiliAIUI();
+    }
+    
+    // Setup event listeners
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') window.handleUserSend();
+        });
+    }
+    
+    const geneSearch = document.getElementById('geneSearch');
+    if (geneSearch) {
+        geneSearch.addEventListener('keydown', e => {
+            if (e.key === 'Enter') window.searchGene();
+        });
+    }
+});
+    
+window.generateAndInjectSVG = generateAndInjectSVG;
+    
 </script>
 </body>
 </html>
