@@ -681,6 +681,11 @@
         // (2) SPATIAL INTELLIGENCE MANAGER
         // =======================================================
 
+
+    // =======================================================
+// Attach to window for global access
+// =======================================================
+
         const SpatialManager = {
 
             // Location normalization map (user → SVG IDs)
@@ -886,9 +891,10 @@
         // =======================================================
         // PUBLIC BRIDGE — Legacy compatibility
         // =======================================================
-        window.highlightCiliumLocation = function (locTerm, gene = null) {
-            return SpatialManager.highlight(locTerm, gene);
-        };
+        window.SpatialManager = SpatialManager;
+        window.highlightCiliumLocation = function(locTerm, gene = null) {
+        return SpatialManager.highlight(locTerm, gene);
+};
 
         // 3. SVG GENERATION FUNCTION (UPDATED WITH NEW DEFS)
         window.generateAndInjectSVG = function() {
@@ -1421,7 +1427,108 @@
         }
     };
 
-    // ================================
+ // =======================================================
+// View Switching Function
+// =======================================================
+window.switchView = function(viewType) {
+    const diagramTab = document.getElementById('tab-diagram');
+    const plotTab = document.getElementById('tab-plot');
+    const domainTab = document.getElementById('tab-domain');
+    
+    // Update tab styles
+    [diagramTab, plotTab, domainTab].forEach(tab => tab.classList.remove('active'));
+    
+    if (viewType === 'diagram') {
+        diagramTab.classList.add('active');
+        window.showDiagram();
+    } else if (viewType === 'plot') {
+        plotTab.classList.add('active');
+        // You might need to trigger a plot generation here
+        const gene = document.getElementById('geneSearch').value.trim();
+        if (gene) {
+            // Call your plotting function
+        }
+    } else if (viewType === 'domain') {
+        domainTab.classList.add('active');
+        const gene = document.getElementById('geneSearch').value.trim();
+        if (gene) {
+            window.showDomainViewer(gene);
+        }
+    }
+};
+
+ // =======================================================
+// Zoom Controls
+// =======================================================
+window.zoomIn = function() {
+    const viewport = document.getElementById('viewport-group');
+    if (!viewport) return;
+    
+    const currentTransform = viewport.style.transform || 'scale(1)';
+    const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+    const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+    const newScale = currentScale * 1.2;
+    
+    viewport.style.transition = "transform 0.3s ease";
+    viewport.style.transform = currentTransform.replace(
+        /scale\([\d.]+\)/, 
+        `scale(${newScale})`
+    );
+};
+
+window.zoomOut = function() {
+    const viewport = document.getElementById('viewport-group');
+    if (!viewport) return;
+    
+    const currentTransform = viewport.style.transform || 'scale(1)';
+    const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+    const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+    const newScale = Math.max(0.5, currentScale * 0.8);
+    
+    viewport.style.transition = "transform 0.3s ease";
+    viewport.style.transform = currentTransform.replace(
+        /scale\([\d.]+\)/, 
+        `scale(${newScale})`
+    );
+};
+
+window.toggleLabels = function(checkbox) {
+    const container = document.getElementById('cilia-svg');
+    if (checkbox.checked) {
+        container.classList.add('labels-visible');
+    } else {
+        container.classList.remove('labels-visible');
+    }
+};   
+
+window.toggleFullscreen = function() {
+    const container = document.querySelector('.viz-card');
+    if (!document.fullscreenElement) {
+        container.requestFullscreen().catch(err => {
+            console.log(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+};
+
+window.downloadJournalSVG = function() {
+    const svgElement = document.getElementById('cilia-diagram');
+    if (svgElement) {
+        const svgData = new XMLSerializer().serializeToString(svgElement);
+        const blob = new Blob([svgData], {type: 'image/svg+xml'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ciliai-journal-diagram.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+};    
+    
+// ================================
 // TSV PARSER — REQUIRED BY ENGINE
 // ================================
 window.parseTsvData = function (tsvText) {
