@@ -4630,9 +4630,16 @@ window.handleAIQuery = async function (query) {
             htmlResult = `<div class="ai-result-card"><p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p><p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p></div>`;
         }
         
-        // === 20. Intent: "Where is [GENE] located?" (Visualizer) ===
-        else if (htmlResult === null && qLower.startsWith('where is') && (qLower.includes('located') || qLower.includes('localised') || qLower.includes('localized'))) {
-            const genes = extractMultipleGenes(query);
+      // === 20. Intent: "Where is [GENE] located?" (Visualizer) - FIXED ===
+        // Uses broader matching to catch "Where is X located" before the fallback
+        else if (htmlResult === null && 
+                (qLower.includes('where is') || qLower.includes('location of') || qLower.includes('localization of')) && 
+                (qLower.includes('located') || qLower.includes('localised') || qLower.includes('localized') || qLower.includes('localization'))) {
+            
+            window.log(`[CiliAI] Triggered Visualizer for: ${query}`);
+            
+            // Use window. prefix to ensure we access the global function
+            const genes = window.extractMultipleGenes ? window.extractMultipleGenes(query) : [];
             
             if (genes.length === 0) {
                 window.addChatMessage(`
@@ -4644,8 +4651,15 @@ window.handleAIQuery = async function (query) {
                 return;
             }
             
-            // Force diagram visibility
-            window.resetViews();
+            // Force diagram visibility and inject SVG
+            // This calls window.generateAndInjectSVG internally
+            if (typeof window.resetViews === 'function') {
+                window.resetViews();
+            } else if (typeof window.generateAndInjectSVG === 'function') {
+                // Fallback if resetViews is missing
+                window.generateAndInjectSVG();
+                document.getElementById('cilia-svg').style.display = 'flex';
+            }
             
             let responseHtml = '<div class="ai-result-card"><h4>Gene Localization</h4>';
             
@@ -4663,14 +4677,13 @@ window.handleAIQuery = async function (query) {
                         highlighted = window.highlightCiliumLocation(localization, geneSymbol);
                     }
                 } else if (geneData) {
-                    // Gene exists but no localization data
+                    // Gene exists but no localization data -> Highlight broad cilium
                     if (typeof window.highlightCiliumLocation === 'function') {
-                        highlighted = window.highlightCiliumLocation('cilia', geneSymbol); // fallback
+                        highlighted = window.highlightCiliumLocation('cilia', geneSymbol);
                     }
                 } else {
-                    // Gene not in database
                     responseHtml += `<p><strong>${geneSymbol}</strong>: Not found in database.</p>`;
-                    return; // skip to next gene
+                    return; 
                 }
                 
                 const note = highlighted 
@@ -4684,20 +4697,20 @@ window.handleAIQuery = async function (query) {
                     </p>
                 `;
                 
-                // Add separator if not last gene
                 if (index < genes.length - 1) {
                     responseHtml += '<hr style="border:0; border-top:1px solid #e2e8f0; margin:10px 0;">';
                 }
             });
             
             responseHtml += `
-                <p style="margin-top:12px;"><strong>Interactive ciliary diagram</strong> is displayed on the left with highlighted compartments.</p>
+                <p style="margin-top:12px;"><strong>Interactive ciliary diagram</strong> is displayed on the left.</p>
+                [Image of ciliary structure diagram]
+
             </div>`;
             
             window.addChatMessage(responseHtml, false);
             return;
         }
-        
         // === 21. Intent: Multi-gene Overlay (Visualizer) - FIXED VERSION ===
         else if (htmlResult === null && (qLower.startsWith('multi:') || qLower.includes('multi:'))) {
             // Extract the part after "multi:" and clean it
