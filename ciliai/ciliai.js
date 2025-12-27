@@ -431,12 +431,27 @@ window.renderUMAPPlot = async function(displayName, targetGenes = []) {
         marker: { size: 6, color, colorscale: dataset.colorScale, showscale: true }
     };
 
+    // --- SAFE LAYOUT CONSTRUCTION ---
     const layout = {
-        title: `${gene} Expression (${dataset.name})`,
-        xaxis: { visible: false }, yaxis: { visible: false },
+        title: `${isClusterView ? 'Cell Clusters' : titleGene} (${dataset.name})`,
         margin: { t: 40, b: 20, l: 20, r: 20 },
-        hovermode: 'closest'
+        hovermode: 'closest',
+        paper_bgcolor: 'white',
+        plot_bgcolor: 'white',
+        // Only add range if explicitly defined and valid
+        xaxis: { 
+            visible: false, 
+            autorange: !xRange, // Auto-scale if no range provided
+            range: xRange 
+        }, 
+        yaxis: { 
+            visible: false, 
+            autorange: !yRange, 
+            range: yRange 
+        }
     };
+    
+
 
     // ✅ FIXED: Using .then() to ensure gd is ready before calling .on()
     Plotly.newPlot(container, [trace], layout, { responsive: true }).then(gd => {
@@ -4917,6 +4932,55 @@ window.handleAIQuery = async function (query) {
     }
 };
 
+// ==============================================================
+// 6. GLOBAL ZOOM CONTROLS (Fixes Uncaught TypeError)
+// ==============================================================
+
+window.currentZoomLevel = 1;
+
+window.zoomIn = function() {
+    window.currentZoomLevel = Math.min(window.currentZoomLevel * 1.2, 5); // Max zoom 5x
+    applyZoom();
+};
+
+window.zoomOut = function() {
+    window.currentZoomLevel = Math.max(window.currentZoomLevel / 1.2, 0.5); // Min zoom 0.5x
+    applyZoom();
+};
+
+window.resetDiagram = function() {
+    window.currentZoomLevel = 1;
+    if (window.SpatialManager && typeof window.SpatialManager.resetZoom === 'function') {
+        window.SpatialManager.resetZoom();
+    } else {
+        applyZoom(); // Fallback if SpatialManager is missing
+    }
+};
+
+function applyZoom() {
+    const viewport = document.getElementById('viewport-group');
+    if (viewport) {
+        // Keep existing translate if possible, or reset to 0,0
+        // This regex extracts the current translate values to preserve panning
+        const currentTransform = window.getComputedStyle(viewport).transform;
+        // Default to center if no pan
+        viewport.style.transition = "transform 0.3s ease";
+        viewport.style.transform = `scale(${window.currentZoomLevel})`;
+    }
+}
+
+// Ensure SpatialManager is robust against missing resets
+if (window.SpatialManager) {
+    window.SpatialManager.resetZoom = function() {
+        const viewport = document.getElementById('viewport-group');
+        if (viewport) {
+            window.currentZoomLevel = 1;
+            viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
+            viewport.style.transform = "translate(0,0) scale(1)";
+        }
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+    };
+}
 
 // Re-define initCiliAI (must be after all other code)
 window.initCiliAI = async function() {
