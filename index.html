@@ -648,7 +648,9 @@
     </div>
 
 <script>
-    
+
+
+    /* ============ UI INTERFACE LAYER ============ */
         // 1. Initialize Global State WITH NEW PERSISTENCE FEATURES
         window.CiliAI = {
             activeDataset: 'lung',
@@ -1350,94 +1352,75 @@
 
         // Data Loading Logic (UPDATED WITH SPLIT KIDNEY JSON)
         window.loadCiliAIData = async function(timeoutMs = 60000) {
-            const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-            const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-            const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
+            const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+        window.updateStatus('Syncing...', 'loading');
+        try {
+            const [mainRes, lookupsRes, rnaResp, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
+                fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
+                fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
+                fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
+                fetch(base + 'kidney_structure.json').then(r => r.json()),
+                fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
+                fetch(base + 'kidney_expression_part2.json').then(r => r.json())
+            ]);
+
+            window.CiliAI.masterData = mainRes.masterData || [];
+            window.CiliAI.lookups = lookupsRes.lookups || {};
             
-            // Kidney Data Files (Structure + Split Expression)
-            const kidneyStructUrl = baseUrl + 'kidney_structure.json';
-            const kidneyExpr1Url = baseUrl + 'kidney_expression_part1.json';
-            const kidneyExpr2Url = baseUrl + 'kidney_expression_part2.json';
+            if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+            if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
             
-            try {
-                // Fetch all 5 files in parallel
-                const [mainRes, lookupsRes, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
-                    fetch(mainDbUrl), 
-                    fetch(lookupsUrl),
-                    fetch(kidneyStructUrl),
-                    fetch(kidneyExpr1Url),
-                    fetch(kidneyExpr2Url)
-                ]);
+            window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
 
-                if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
-                if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
+            // Assign Kidney Multi-part data
+            const mergedKidneyExpr = { ...kExpr1Res, ...kExpr2Res };
+            window.CiliAI.datasets.kidney = {
+                name: "Human Kidney",
+                umap: kStructRes.umap,
+                expression: mergedKidneyExpr,
+                colorScale: [[0, '#e2e8f0'], [0.1, '#bee3f8'], [1, '#2b6cb0']]
+            };
 
-                const mainData = await mainRes.json();
-                const lookupData = await lookupsRes.json();
+            // Assign RNA Tissue
+            const rnaText = await rnaResp.text();
+            window.rnaTissueExpressionData = parseTsvData(rnaText);
 
-                // Initialize Core Data
-                window.CiliAI.masterData = mainData.masterData || [];
-                window.CiliAI.lookups = lookupData.lookups || {};
-                
-                // Safety: Ensure lookup objects exist
-                if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {}; 
-                if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
+            // Populate mapping and calculate stats
+            const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+            const validCiliopathyDiseases = new Set();
+            const uniqueCiliopathyGenes = new Set();
 
-                window.CiliAI_UMAP = mainData.umapData || [];
-                window.CiliAI.data.umap = mainData.umapData || [];
-                window.CiliAI.datasets.lung.umap = mainData.umapData; // Lung is inside master DB
+            window.CiliAI.masterData.forEach(g => {
+                if (g.Gene) {
+                    const sym = g.Gene.toUpperCase();
+                    window.CiliAI.lookups.geneMap[sym] = g;
+                    if(g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
 
-                // Process Kidney Data (Merge Split Files)
-                if (kStructRes.ok && kExpr1Res.ok && kExpr2Res.ok) {
-                    const kStruct = await kStructRes.json();
-                    const kExpr1 = await kExpr1Res.json();
-                    const kExpr2 = await kExpr2Res.json();
-                    
-                    // Merge expression parts
-                    const fullExpression = { ...kExpr1, ...kExpr2 };
-                    
-                    window.CiliAI.datasets.kidney = {
-                        name: "Human Kidney",
-                        umap: kStruct.umap,
-                        expression: fullExpression, // Merged Sparse Map
-                        metadata: kStruct.metadata,
-                        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']]
-                    };
-                } else {
-                    console.warn("Kidney data files failed to load (check file names/locations).");
-                }
-                
-                // Build Fast Lookups
-                window.CiliAI.lookups.umapByGene = {};
-                window.CiliAI.lookups.geneMap = {};
-                window.CiliAI.cellDataCache = {}; // Lung cache
-                
-                if (Array.isArray(window.CiliAI_UMAP)) {
-                    window.CiliAI_UMAP.forEach(point => {
-                        if (point.Gene) window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
-                    });
-                }
-                
-                mainData.masterData.forEach(gene => {
-                    if (gene.Gene) {
-                        const symbol = gene.Gene.toUpperCase();
-                        window.CiliAI.lookups.geneMap[symbol] = gene;
-                        if (gene.expression?.scRNA) {
-                            window.CiliAI.cellDataCache[symbol] = gene.expression.scRNA;
+                    if (primaryClasses.includes(g.ciliopathy_classification)) {
+                        uniqueCiliopathyGenes.add(sym);
+                        if (g.Ciliopathy) {
+                            const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                            diseases.forEach(d => { if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d); });
                         }
                     }
-                });
-                
-                window.CiliAI.ready = true;
-                return true;
+                }
+            });
 
-            } catch (err) {
-                console.error("Failed to load CiliAI databases:", err);
-                window.updateStatus('Load failed', 'error');
-                window.CiliAI.ready = false;
-                return false;
-            }
-        };
+            // Update Counters
+            document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
+            document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
+            document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
+
+            window.CiliAI.ready = true;
+            window.updateStatus('CONNECTED', 'ready');
+            return true;
+        } catch (err) {
+            console.error("Load failed:", err);
+            window.updateStatus('SYNC ERROR', 'error');
+            return false;
+        }
+    };
+    
 
         window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
