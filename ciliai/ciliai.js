@@ -309,9 +309,9 @@ window.startWorkflow = function(workflowName, initialPrompt) {
     }
 };
 
+
+
 /* ============ EXPRESSION MAPPING & PROFILE ============ */
-
-
 window.displayFullGeneInfo = function(symbol) {
     const symUpper = symbol.toUpperCase();
     const g = window.CiliAI.lookups.geneMap[symUpper];
@@ -319,6 +319,25 @@ window.displayFullGeneInfo = function(symbol) {
         window.addChatMessage(`<div class="ai-result-card">No record found for <strong>${symbol}</strong>.</div>`, false);
         return;
     }
+
+    // --- AUTOMATIC DIAGRAM TRIGGER (Added Fix) ---
+    // This ensures the visualizer updates every time a gene profile is shown.
+    if (g.Localization) {
+        setTimeout(() => {
+            // 1. Switch sidebar to diagram view
+            if (typeof window.showDiagram === 'function') {
+                window.showDiagram();
+            } else if (typeof window.resetViews === 'function') {
+                window.resetViews();
+            }
+            
+            // 2. Highlight the specific location
+            if (typeof window.highlightCiliumLocation === 'function') {
+                window.highlightCiliumLocation(g.Localization, symUpper);
+            }
+        }, 100); // Slight delay to allow UI to settle
+    }
+    // ---------------------------------------------
 
     // 1. Resolve Lung Expression (Dictionary format)
     const lungExpr = window.CiliAI.cellDataCache[symUpper] || {};
@@ -348,12 +367,12 @@ window.displayFullGeneInfo = function(symbol) {
     const cardId = `card-${Date.now()}`;
     const html = `
         <div class="ai-result-card" id="${cardId}">
-            <h3 style="color:#005b96; margin-bottom:8px;">${symUpper} Multi-OMICS</h3>
-            <p style="font-size:12px; margin-bottom:12px;"><strong>Loc:</strong> ${g.Localization || 'Unknown'}</p>
+            <h3 style="color:#005b96; margin-bottom:8px;">${symUpper} Profile</h3>
+            <p style="font-size:12px; margin-bottom:12px;"><strong>Localization:</strong> ${g.Localization || 'Unknown'}</p>
             
             <div class="detail-tabs" style="display:flex; border-bottom:1px solid #eee; margin-bottom:10px;">
-                <div class="detail-tab active" style="padding:5px 10px; font-size:11px; cursor:pointer; font-weight:700;" data-target="lung">Lung</div>
-                <div class="detail-tab" style="padding:5px 10px; font-size:11px; cursor:pointer; font-weight:700;" data-target="kidney">Kidney</div>
+                <div class="detail-tab active" style="padding:5px 10px; font-size:11px; cursor:pointer; font-weight:700;" data-target="lung">Lung scRNA</div>
+                <div class="detail-tab" style="padding:5px 10px; font-size:11px; cursor:pointer; font-weight:700;" data-target="kidney">Kidney scRNA</div>
                 <div class="detail-tab" style="padding:5px 10px; font-size:11px; cursor:pointer; font-weight:700;" data-target="tissue">Tissue</div>
             </div>
 
@@ -393,7 +412,6 @@ window.displayFullGeneInfo = function(symbol) {
         });
     }, 100);
 };
-
 /* ============ VISUALIZATION RENDERING ============ */
 window.renderUMAPPlot = async function(displayName, targetGenes = []) {
     if (typeof window.switchView === 'function') window.switchView('plot');
