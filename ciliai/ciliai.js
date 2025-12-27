@@ -5384,9 +5384,14 @@ window.selectComp = function (id) {
 // CRITICAL: Must be defined in ciliAI.js
 window.generateAndInjectSVG = function() {
     const container = document.getElementById('cilia-svg');
-    if (!container) return;
+    if (!container) {
+        console.warn("CiliAI: 'cilia-svg' container not found.");
+        return;
+    }
 
-    document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+    // FIX: Added check for title element to prevent crash if missing
+    const titleEl = document.getElementById('current-viz-title');
+    if (titleEl) titleEl.textContent = "Diagram: Spatial Intelligence";
 
     container.innerHTML = `
         <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: 100%;">
@@ -5423,43 +5428,36 @@ window.generateAndInjectSVG = function() {
             </defs>
 
             <g id="viewport-group" transform="translate(0, 0)">
-                <!-- Cell Body -->
                 <path id="cell-body" class="cilia-part" tabindex="0" fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
                       d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z">
                     <title>Cell Body / Cytosol – Main cytoplasmic compartment</title>
                 </path>
 
-                <!-- Nucleus -->
                 <circle id="nucleus" class="cilia-part" tabindex="0" fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
                         cx="140" cy="290" r="35">
                     <title>Nucleus – Contains genomic DNA</title>
                 </circle>
 
-                <!-- Basal Body -->
                 <rect id="basal-body" class="cilia-part" tabindex="0" fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
                       x="130" y="165" width="20" height="15" rx="2">
                     <title>Basal Body – Anchors cilium; example: PCM1</title>
                 </rect>
 
-                <!-- Transition Zone -->
                 <path id="transition-zone" class="cilia-part" tabindex="0" fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
                       d="M 132,165 L 128,150 L 152,150 L 148,165 Z">
                     <title>Transition Zone – Ciliary gate; example: TMEM17, CEP290</title>
                 </path>
 
-                <!-- Ciliary Membrane -->
                 <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
                       d="M 128,150 L 135,30 L 145,30 L 152,150 Z">
                     <title>Ciliary Membrane – Lipid barrier; example: ARL13B</title>
                 </path>
 
-                <!-- Axoneme -->
                 <path id="axoneme" class="cilia-part" tabindex="0" fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
                       d="M 135,150 L 138,35 L 142,35 L 145,150 Z">
                     <title>Axoneme – Microtubule core; example: β-tubulin, IFT proteins</title>
                 </path>
 
-                <!-- Animated Protein Labels with Pulsing Dots -->
                 <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.4s ease;">
                     <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">PCM1</text>
                     <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">TMEM17</text>
@@ -5467,7 +5465,6 @@ window.generateAndInjectSVG = function() {
                     <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">β-tubulin</text>
                 </g>
 
-                <!-- Pulsing Dots -->
                 <circle cx="140" cy="172.5" r="4" fill="#5b21b6" opacity="0.7">
                     <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite"/>
                     <animate attributeName="opacity" values="0.7;0.4;0.7" dur="2s" repeatCount="indefinite"/>
@@ -5483,7 +5480,6 @@ window.generateAndInjectSVG = function() {
                 </circle>
             </g>
 
-            <!-- Legend (initially hidden) -->
             <g id="overlay-legend" style="display:none; font-size:11px;">
                 <rect x="10" y="10" width="180" height="80" fill="white" stroke="#ccc" rx="8" opacity="0.9"/>
                 <text x="20" y="25" font-weight="bold">Overlay Legend</text>
@@ -5526,8 +5522,12 @@ window.generateAndInjectSVG = function() {
             if (window.SpatialManager) window.SpatialManager.resetZoom();
         }
     });
-};
+    
+    
 
+[Image of ciliary structure diagram]
+
+};
 
 // ==========================================================
 // FINAL GLOBAL EXPORTS (CORRECTED)
