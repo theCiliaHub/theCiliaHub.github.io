@@ -5522,11 +5522,6 @@ window.generateAndInjectSVG = function() {
             if (window.SpatialManager) window.SpatialManager.resetZoom();
         }
     });
-    
-    
-
-[Image of ciliary structure diagram]
-
 };
 
 // ==========================================================
