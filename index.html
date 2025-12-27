@@ -1420,9 +1420,30 @@
             return false;
         }
     };
-    
 
-        window.handleUserSend = function() {
+    // ================================
+// TSV PARSER — REQUIRED BY ENGINE
+// ================================
+window.parseTsvData = function (tsvText) {
+    if (!tsvText || typeof tsvText !== 'string') return [];
+
+    const lines = tsvText.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split('\t').map(h => h.trim());
+
+    return lines.slice(1).map(line => {
+        const values = line.split('\t');
+        const row = {};
+        headers.forEach((h, i) => {
+            row[h] = values[i]?.trim() ?? '';
+        });
+        return row;
+    });
+};
+
+
+window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
             const query = input.value.trim();
             if (!query) return;
@@ -1456,6 +1477,4 @@
 
         init();
     </script>
-    <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
-</body>
 </html>
