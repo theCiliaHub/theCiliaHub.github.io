@@ -66,7 +66,7 @@ function normalizeTerm(term) {
 function showEnhancedWelcomeMessage() {
     const welcomeHTML = `
         <div class="ai-result-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
-            <h3 style="margin-top: 0; color: white;">🧬 Welcome to CiliAI v7.5</h3>
+            <h3 style="margin-top: 0; color: white;">🧬 Welcome to CiliAI </h3>
             <p style="opacity: 0.9;">I'm your AI assistant for ciliary biology research. Here are some ways I can help:</p>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin: 15px 0;">
@@ -5514,27 +5514,19 @@ window.generateAndInjectSVG = function() {
 };
 
 
-// Global exposure block:
+// ==========================================================
+// FINAL GLOBAL EXPORTS (CORRECTED)
+// ==========================================================
+
+// --- KEEP THESE (They were defined as local functions) ---
 window.log = log;
 window.react = react;
 window.handleUserSend = handleUserSend;
-window.searchGene = searchGene;
-window.showDefaultUMAP = showDefaultUMAP;
-window.showDefaultPhylogeny = showDefaultPhylogeny;
-window.downloadPlot = downloadPlot;
-
-// Core Logic & Analysis exposure — keep only once:
-window.renderUMAPPlot = renderUMAPPlot; 
-window.getGenesByLocalization = getGenesByLocalization;
-window.showDataInLeftPanel = showDataInLeftPanel;
-window.generateAndInjectSVG = generateAndInjectSVG;
 window.normalizeTerm = normalizeTerm;
 window.ensureArray = ensureArray;
-
-// Helper exposures needed for complex queries:
-window.handleComplexQuery = handleComplexQuery;
-window.extractComplexIntent = extractComplexIntent; 
-window.extractCellTypeIntent = extractCellTypeIntent; 
+window.getGenesByLocalization = getGenesByLocalization;
+window.extractComplexIntent = extractComplexIntent;
+window.extractCellTypeIntent = extractCellTypeIntent;
 window.extractDiseaseIntent = extractDiseaseIntent;
 window.extractDomainIntent = extractDomainIntent;
 window.calculateFoldChangeForComplex = calculateFoldChangeForComplex;
@@ -5544,6 +5536,18 @@ window.getClusterBoundaries = getClusterBoundaries;
 window.getGenesByComplex = getGenesByComplex;
 window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
 
+// --- REMOVED THESE (They caused the crash) ---
+// These functions were ALREADY defined as window.funcName = ... 
+// Re-assigning them causes a ReferenceError because the local name doesn't exist.
+//
+// REMOVED: window.searchGene = searchGene;
+// REMOVED: window.showDefaultUMAP = showDefaultUMAP;
+// REMOVED: window.showDefaultPhylogeny = showDefaultPhylogeny;
+// REMOVED: window.downloadPlot = downloadPlot;
+// REMOVED: window.renderUMAPPlot = renderUMAPPlot; 
+// REMOVED: window.showDataInLeftPanel = showDataInLeftPanel;
+// REMOVED: window.generateAndInjectSVG = generateAndInjectSVG; <--- THE CRASH CAUSE
+// REMOVED: window.handleComplexQuery = handleComplexQuery;
 /* ==============================================================
  * MODULE: ADVANCED SEARCH & FILTERS (v9.0)
  * ============================================================== */
