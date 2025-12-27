@@ -390,25 +390,23 @@ function extractCellTypeQuestion(qLower) {
     }
     return null;
 }
-
-
-    
 function formatListResult(title, genes, description = "") {
     if (!genes || genes.length === 0) {
         return `<div class="ai-result-card"><strong>${title}</strong><p>No matching genes found.</p></div>`;
     }
 
     const count = genes.length;
+    // Limit inline display to 100 to prevent DOM lag (user can view full table for more)
     const displayGenes = genes.slice(0, 100); 
 
-    let listHtml = `<div style="max-height: 300px; overflow-y: auto; margin: 0; background: #fff;">`;
+    let listHtml = `<div style="max-height: 280px; overflow-y: auto; margin: 0; background: #fff;">`;
 
     displayGenes.forEach(item => {
         // Resolve full gene data to calculate score
         const g = window.CiliAI.lookups.geneMap[item.gene.toUpperCase()] || {};
         const desc = item.description || g['Gene.Description'] || '';
 
-        // --- SCORE CALCULATION (Same as Profile) ---
+        // --- SCORE & BADGE LOGIC (Matching DisplayFullGeneInfo) ---
         let score = 0;
         if (g.screens) score += g.screens.length; 
         if (g.Ciliopathies && g.Ciliopathies.length > 0) score += 2;
@@ -418,12 +416,12 @@ function formatListResult(title, genes, description = "") {
         if (score >= 4) badge = `<span class="cilia-badge badge-gold" style="font-size:9px; padding:2px 6px; margin-left:6px;">🥇 High Conf</span>`;
         else if (score >= 2) badge = `<span class="cilia-badge badge-silver" style="font-size:9px; padding:2px 6px; margin-left:6px;">🥈 Verified</span>`;
         else badge = `<span class="cilia-badge badge-bronze" style="font-size:9px; padding:2px 6px; margin-left:6px;">🥉 Candidate</span>`;
-        // -------------------------------------------
+        // ---------------------------------------------------------
 
         listHtml += `
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid #f1f5f9; transition: background 0.1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
                 <div style="display: flex; align-items: center;">
-                    <strong style="color: #2b6cb0; cursor: pointer; font-size: 13px;" onclick="window.displayFullGeneInfo('${item.gene}')">${item.gene}</strong>
+                    <strong style="color: #005b96; cursor: pointer; font-size: 13px;" onclick="window.displayFullGeneInfo('${item.gene}')">${item.gene}</strong>
                     ${badge}
                 </div>
                 <div style="font-size: 11px; color: #94a3b8; max-width: 180px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
@@ -442,7 +440,7 @@ function formatListResult(title, genes, description = "") {
             <div style="padding: 15px; background: #fff; border-bottom: 1px solid #e2e8f0;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h4 style="margin:0; color:#005b96; font-size:15px; font-weight:700;">${title}</h4>
-                    <span style="background: #2b6cb0; color: white; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: bold;">${count}</span>
+                    <span style="background: #005b96; color: white; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: bold;">${count}</span>
                 </div>
                 ${description ? `<p style="font-size: 12px; color: #64748b; margin-top: 5px; margin-bottom:0;">${description}</p>` : ''}
             </div>
@@ -450,12 +448,16 @@ function formatListResult(title, genes, description = "") {
             ${listHtml}
             
             <div style="padding: 12px 15px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;">
-                <button class="ciliai-button" style="flex: 1; margin: 0; background: #3182ce; color: white; height:36px; display:flex; align-items:center; justify-content:center;" 
-                    onclick="window.handleBatchQuery('${allGeneNames}')">
+                <button class="ciliai-button" style="flex: 1; margin: 0; background: #b3cde0; color: #005b96; height:36px; display:flex; align-items:center; justify-content:center; font-weight:700; border:1px solid #005b96;" 
+                    onclick="window.handleBatchQuery('${allGeneNames}')"
+                    onmouseover="this.style.background='#005b96'; this.style.color='white'"
+                    onmouseout="this.style.background='#b3cde0'; this.style.color='#005b96'">
                     📊 View Full Table
                 </button>
-                <button class="ciliai-button" style="flex: 1; margin: 0; background: #805ad5; color: white; height:36px; display:flex; align-items:center; justify-content:center;" 
-                    onclick="window.handleAIQuery('Multi: ${top5}')">
+                <button class="ciliai-button" style="flex: 1; margin: 0; background: #005b96; color: white; height:36px; display:flex; align-items:center; justify-content:center; font-weight:700;" 
+                    onclick="window.handleAIQuery('Multi: ${top5}')"
+                    onmouseover="this.style.background='#004577'"
+                    onmouseout="this.style.background='#005b96'">
                     🎨 Visualize Top 5
                 </button>
             </div>
@@ -463,6 +465,7 @@ function formatListResult(title, genes, description = "") {
     `;
 }
 
+ 
     function handleUserSend() {
         const chatInput = document.getElementById('chatInput');
         if (!chatInput) return;
