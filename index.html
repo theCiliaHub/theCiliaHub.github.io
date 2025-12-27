@@ -303,6 +303,7 @@
         }
 
         #cilia-svg { display: flex; align-items: center; justify-content: center; }
+        
 
         /* RIGHT PANEL: CHAT */
         .right-panel {
@@ -489,6 +490,17 @@
     margin: 10px 0;
     font-size: 13px;
 }
+
+/* Spatial Highlight Effects */
+        .cilia-part { cursor: pointer; transition: all 0.3s ease; }
+        .cilia-part:hover { opacity: 0.9; }
+        .cilia-part.active-highlight { 
+            fill: var(--highlight-gold) !important; 
+            stroke: var(--primary-blue); 
+            stroke-width: 2.5; 
+            filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8)); 
+        }
+        
         /* DASHBOARD */
         .landing-dashboard {
             display: grid;
