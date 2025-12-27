@@ -5292,12 +5292,11 @@ function handleScreenReferenceFollowup() {
 // ==========================================================
 // 5. GLOBAL UI WRAPPERS & STARTUP (CLEANED)
 // ==========================================================
-
-    // NOTE: handleUserSend, react, and clearChat are now defined below 
-    // or as robust global definitions that override the fallbacks.
-
-    window.selectComp = function (id) {
-        generateAndInjectSVG(); 
+window.selectComp = function (id) {
+        // FIX: Added 'window.' prefix here to avoid ReferenceError
+        if (typeof window.generateAndInjectSVG === 'function') {
+            window.generateAndInjectSVG(); 
+        }
         
         document.querySelectorAll('.cilia-part').forEach(el =>
             el.classList.remove('selected', 'active')
@@ -5306,11 +5305,13 @@ function handleScreenReferenceFollowup() {
         const el = document.getElementById(id);
         if (el) el.classList.add('selected');
 
-        const data = structureInfoMap[id];
+        // Note: structureInfoMap must be defined globally or passed in
+        const data = window.structureInfoMap ? window.structureInfoMap[id] : null;
         if (!data) return;
 
-        const genes = getGenesByLocalization(data.title);
+        const genes = window.getGenesByLocalization(data.title);
         const bar = document.getElementById('bottomBar');
+        if (!bar) return;
 
         if (genes.length > 0) {
             bar.innerHTML = `
@@ -5329,6 +5330,7 @@ function handleScreenReferenceFollowup() {
                 <p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
         }
     };
+
 
     window.searchGene = function (name) {
         const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
