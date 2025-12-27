@@ -320,29 +320,34 @@ window.displayFullGeneInfo = function(symbol) {
         return;
     }
 
-    // --- AUTOMATIC DIAGRAM TRIGGER (Added Fix) ---
-    // This ensures the visualizer updates every time a gene profile is shown.
+    // --- AUTOMATIC DIAGRAM TRIGGER ---
     if (g.Localization) {
         setTimeout(() => {
-            // 1. Switch sidebar to diagram view
-            if (typeof window.showDiagram === 'function') {
-                window.showDiagram();
-            } else if (typeof window.resetViews === 'function') {
-                window.resetViews();
-            }
+            // 1. Force View Switch: Hide Plotly/Domain, Show SVG
+            const plotDiv = document.getElementById('plotly-container');
+            const domainDiv = document.getElementById('domain-viewer');
+            const svgDiv = document.getElementById('cilia-svg');
             
-            // 2. Highlight the specific location
+            if (plotDiv) plotDiv.style.display = 'none';
+            if (domainDiv) domainDiv.style.display = 'none';
+            if (svgDiv) {
+                svgDiv.style.display = 'flex';
+                // If empty, regenerate
+                if (!svgDiv.querySelector('svg')) {
+                    window.generateAndInjectSVG();
+                }
+            }
+
+            // 2. Trigger Highlight with Gene Name
             if (typeof window.highlightCiliumLocation === 'function') {
                 window.highlightCiliumLocation(g.Localization, symUpper);
             }
-        }, 100); // Slight delay to allow UI to settle
+        }, 200); // 200ms delay to ensure DOM is ready
     }
     // ---------------------------------------------
 
-    // 1. Resolve Lung Expression (Dictionary format)
+    // [Rest of your existing function logic for data tables...]
     const lungExpr = window.CiliAI.cellDataCache[symUpper] || {};
-
-    // 2. Resolve Kidney Expression (Sparse Array Mapping: Index to Name)
     const kidneySparse = (window.CiliAI.datasets.kidney?.expression || {})[symUpper] || [];
     const kidneyUmap = window.CiliAI.datasets.kidney?.umap || [];
     const kidneyExprMap = {};
@@ -354,8 +359,6 @@ window.displayFullGeneInfo = function(symbol) {
             if(!kidneyExprMap[cellType] || val > kidneyExprMap[cellType]) kidneyExprMap[cellType] = val;
         }
     }
-
-    // 3. Resolve Tissue Expression (RNA Consensus Dictionary)
     const tissueExpr = (window.rnaTissueExpressionData || {})[symUpper] || {};
 
     const formatTable = (dataMap) => {
@@ -412,6 +415,7 @@ window.displayFullGeneInfo = function(symbol) {
         });
     }, 100);
 };
+
 /* ============ VISUALIZATION RENDERING ============ */
 window.renderUMAPPlot = async function(displayName, targetGenes = []) {
     if (typeof window.switchView === 'function') window.switchView('plot');
@@ -5003,10 +5007,21 @@ if (window.SpatialManager) {
 // Re-define initCiliAI (must be after all other code)
 window.initCiliAI = async function() {
     window.updateStatus('Loading databases...', 'loading');
-    window.generateAndInjectSVG();
+    
+    // 1. Force diagram generation and visibility immediately
+    if (typeof window.generateAndInjectSVG === 'function') {
+        window.generateAndInjectSVG();
+        const container = document.getElementById('cilia-svg');
+        if (container) {
+            container.style.display = 'flex'; // Ensure it's visible
+            // Remove any previous "table view" classes that might hide the SVG
+            const wrapper = container.closest('.interactive-cilium');
+            if (wrapper) wrapper.classList.remove('table-view-active');
+        }
+    }
 
     // Inject workflow panel into left sidebar
-    const leftPanel = document.querySelector('.left-panel'); // Adjust selector based on your HTML
+    const leftPanel = document.querySelector('.left-panel'); 
     if (leftPanel) {
         const workflowHTML = createWorkflowPanel();
         leftPanel.insertAdjacentHTML('afterbegin', workflowHTML);
@@ -5014,23 +5029,17 @@ window.initCiliAI = async function() {
     
     const loaded = await window.loadCiliAIData();
     if (loaded) {
-        // Show enhanced welcome message
         showEnhancedWelcomeMessage();
         
-        // Add action chips to welcome message
         setTimeout(() => {
             const actionChips = createQuickActionChips();
             const chatWindow = document.getElementById('messages');
-            if (chatWindow) {
-                const lastMessage = chatWindow.lastElementChild;
-                if (lastMessage) {
-                    lastMessage.querySelector('.ai-result-card')?.appendChild(actionChips);
-                }
+            if (chatWindow && chatWindow.lastElementChild) {
+                chatWindow.lastElementChild.querySelector('.ai-result-card')?.appendChild(actionChips);
             }
         }, 100);
         
-        // Add query counter to chat header or sidebar
-        const chatHeader = document.querySelector('.chat-header'); // Adjust selector
+        const chatHeader = document.querySelector('.chat-header');
         if (chatHeader) {
             chatHeader.appendChild(createQueryCounter());
         }
@@ -6048,7 +6057,6 @@ window.runDashboardSearch = function() {
 // Spatial Intelligence Manager – FIXED & ENHANCED for accurate gene localization
 const SpatialManager = {
     locMap: {
-        // Specific compartments
         "transition zone": "transition-zone",
         "tz": "transition-zone",
         "axoneme": "axoneme",
@@ -6061,9 +6069,7 @@ const SpatialManager = {
         "cell body": "cell-body",
         "cytosol": "cell-body",
         "nucleus": "nucleus",
-
-        // NEW: Broad and common database terms mapped to visible parts
-        "cilia": "axoneme",                    // Most visible part – best for broad "cilia" localization
+        "cilia": "axoneme",
         "cilium": "axoneme",
         "primary cilium": "axoneme",
         "primary cilia": "axoneme",
@@ -6071,7 +6077,7 @@ const SpatialManager = {
         "motile cilia": "axoneme",
         "flagella": "axoneme",
         "flagellum": "axoneme",
-        "ciliary base": "basal-body",          // For basal body/centriole genes
+        "ciliary base": "basal-body",
         "ciliary rootlet": "basal-body",
         "ciliary compartment": "axoneme",
         "ciliary axoneme": "axoneme",
@@ -6082,13 +6088,23 @@ const SpatialManager = {
         if (!locTerm) return false;
 
         const container = document.getElementById('cilia-svg');
+        // Ensure SVG exists and is visible
         if (!container || !container.querySelector('svg')) {
-            window.generateAndInjectSVG();
+            if (typeof window.generateAndInjectSVG === 'function') {
+                window.generateAndInjectSVG();
+                container.style.display = 'flex'; // Force visibility
+            }
+        } else {
+            // If it exists but is hidden (e.g. plot view), show it
+            container.style.display = 'flex';
+            const plotDiv = document.getElementById('plotly-container');
+            if(plotDiv) plotDiv.style.display = 'none';
         }
 
         const normalized = locTerm.toLowerCase().trim();
-
         let matchedId = null;
+        
+        // Find best match (longest string first)
         const sortedKeys = Object.keys(this.locMap).sort((a, b) => b.length - a.length);
         for (const key of sortedKeys) {
             if (normalized.includes(key)) {
@@ -6096,27 +6112,60 @@ const SpatialManager = {
                 break;
             }
         }
-
-        // Fallback for broad terms
+        
+        // Fallback
         if (!matchedId && /cilia|cilium|flagella/.test(normalized)) {
             matchedId = 'axoneme';
         }
 
         if (!matchedId) return false;
 
+        // Clear previous highlights and labels
         document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+        const oldLabel = document.getElementById('dynamic-gene-label');
+        if (oldLabel) oldLabel.remove();
+
         const element = document.getElementById(matchedId);
         if (!element) return false;
 
+        // Apply Highlight
         element.classList.add('active-highlight');
-        this.zoomTo(element);
-
+        
+        // --- NEW: Add Dynamic Gene Label ---
         if (gene) {
-            window.CiliAI.zoomStateByGene = window.CiliAI.zoomStateByGene || {};
-            window.CiliAI.zoomStateByGene[gene] = locTerm;
-            window.CiliAI.activeGeneContext = gene;
+            const svg = container.querySelector('svg');
+            const bbox = element.getBBox();
+            
+            const textGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            textGroup.id = 'dynamic-gene-label';
+            textGroup.style.pointerEvents = 'none'; // Click-through
+
+            // Create text element
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.textContent = gene;
+            
+            // Center text on the element
+            text.setAttribute('x', bbox.x + bbox.width / 2);
+            text.setAttribute('y', bbox.y + bbox.height / 2); 
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('dominant-baseline', 'middle');
+            
+            // Styling
+            text.setAttribute('fill', 'white');
+            text.setAttribute('font-size', '14px');
+            text.setAttribute('font-weight', 'bold');
+            // Add a text shadow/stroke for readability against colors
+            text.setAttribute('stroke', 'black');
+            text.setAttribute('stroke-width', '0.5px');
+            text.style.textShadow = '0px 1px 3px rgba(0,0,0,0.8)';
+
+            textGroup.appendChild(text);
+            
+            // Append to the end of SVG so it sits on top of everything
+            svg.appendChild(textGroup);
         }
 
+        this.zoomTo(element);
         return true;
     },
 
@@ -6131,7 +6180,7 @@ const SpatialManager = {
         const dy = 200 - centerY;
 
         viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
-        viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.8)`; // Slightly more zoom
+        viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.8)`;
     },
 
     resetZoom: function () {
@@ -6141,8 +6190,20 @@ const SpatialManager = {
             viewport.style.transform = "translate(0,0) scale(1)";
         }
         document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+        
+        // Remove the label when resetting
+        const oldLabel = document.getElementById('dynamic-gene-label');
+        if (oldLabel) oldLabel.remove();
+    },
+    
+    // Helper to clear multiple overlays (heatmap/multi-gene)
+    clearOverlays: function() {
+        document.querySelectorAll('.heatmap-overlay, .multi-overlay').forEach(el => el.remove());
+        const oldLabel = document.getElementById('dynamic-gene-label');
+        if (oldLabel) oldLabel.remove();
     },
 
+    // Keep existing methods
     restoreByGene: function (gene) {
         if (!gene) return false;
         const loc = (window.CiliAI && window.CiliAI.zoomStateByGene && window.CiliAI.zoomStateByGene[gene.toUpperCase()]);
@@ -6151,44 +6212,33 @@ const SpatialManager = {
     },
 
     applyHeatmap: function(goTerm) {
+        // ... (Keep existing implementation) ...
         const svg = document.getElementById('cilia-diagram');
         if (!svg) return;
-
         document.querySelectorAll('.heatmap-overlay').forEach(el => el.remove());
-
         const genes = window.CiliAI.lookups.goMap[goTerm.toUpperCase()] || [];
         if (!genes.length) return;
-
         const locCounts = {};
         genes.forEach(geneSymbol => {
             const gene = window.CiliAI.lookups.geneMap[geneSymbol];
             if (gene && gene.Localization) {
                 const locs = gene.Localization.toLowerCase().split(/[,;]/).map(l => l.trim());
-                locs.forEach(loc => {
-                    locCounts[loc] = (locCounts[loc] || 0) + 1;
-                });
+                locs.forEach(loc => { locCounts[loc] = (locCounts[loc] || 0) + 1; });
             }
         });
-
         const maxCount = Math.max(...Object.values(locCounts), 1);
-
         let overlayGroup = svg.querySelector('#heatmap-group');
         if (!overlayGroup) {
             overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             overlayGroup.id = 'heatmap-group';
             svg.querySelector('#viewport-group').appendChild(overlayGroup);
         }
-
         Object.entries(locCounts).forEach(([loc, count]) => {
             let matchedId = null;
             for (const key in this.locMap) {
-                if (loc.includes(key)) {
-                    matchedId = this.locMap[key];
-                    break;
-                }
+                if (loc.includes(key)) { matchedId = this.locMap[key]; break; }
             }
             if (!matchedId && loc.includes('cilia')) matchedId = 'axoneme';
-
             if (matchedId) {
                 const element = document.getElementById(matchedId);
                 if (element) {
@@ -6201,18 +6251,15 @@ const SpatialManager = {
                 }
             }
         });
-
         window.showDiagram();
         this.resetZoom();
     },
 
     applyMultiOverlay: function(genes) {
+        // ... (Keep existing implementation) ...
         const svg = document.getElementById('cilia-diagram');
         if (!svg) return;
-
-        // Clear previous overlays
         document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
-
         let overlayGroup = svg.querySelector('#multi-group');
         if (!overlayGroup) {
             overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -6220,33 +6267,19 @@ const SpatialManager = {
             overlayGroup.style.mixBlendMode = 'multiply';
             svg.querySelector('#viewport-group').appendChild(overlayGroup);
         }
-
         const colors = ['#ff1744', '#00e676', '#2979ff', '#ffd600', '#ff9100', '#7c4dff'];
-
         genes.forEach((geneSymbol, index) => {
             const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
             if (!gene || !gene.Localization) return;
-
             const color = colors[index % colors.length];
             const locs = gene.Localization.toLowerCase().split(/[,;]/).map(l => l.trim());
-
             locs.forEach(loc => {
                 let matchedId = null;
-
-                // Longest match first (specific over broad)
                 const sortedKeys = Object.keys(this.locMap).sort((a, b) => b.length - a.length);
                 for (const key of sortedKeys) {
-                    if (loc.includes(key)) {
-                        matchedId = this.locMap[key];
-                        break;
-                    }
+                    if (loc.includes(key)) { matchedId = this.locMap[key]; break; }
                 }
-
-                // Fallback for any cilia-related term
-                if (!matchedId && /cilia|cilium|flagella/.test(loc)) {
-                    matchedId = 'axoneme';
-                }
-
+                if (!matchedId && /cilia|cilium|flagella/.test(loc)) matchedId = 'axoneme';
                 if (matchedId) {
                     const element = document.getElementById(matchedId);
                     if (element) {
@@ -6262,7 +6295,6 @@ const SpatialManager = {
                 }
             });
         });
-
         window.showDiagram();
         this.resetZoom();
     }
