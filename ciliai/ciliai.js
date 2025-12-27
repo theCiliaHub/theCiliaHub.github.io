@@ -75,7 +75,7 @@ window.liPhylogenyCache = null;
 window.neversPhylogenyCache = null;
 
 // Default genes for phylogeny queries
-const DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+window.DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
 
     // --- Global variables to hold your data ---
 let ciliaryGeneMap = new Map();
