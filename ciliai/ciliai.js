@@ -5463,6 +5463,32 @@ window.selectComp = function (id) {
         }
     }; 
 
+// NEW: Inject CSS for Diagram Highlighting
+window.injectDiagramStyles = function() {
+    const styleId = 'ciliai-diagram-styles';
+    if (document.getElementById(styleId)) return;
+    const css = `
+        /* Highlight Class for Active Ciliary Parts */
+        .cilia-part.active-highlight {
+            fill: #ff0000 !important;       /* Bright Red */
+            stroke: #cc0000 !important;     /* Darker Red Border */
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.5));
+            transition: all 0.3s ease;
+        }
+        
+        /* Selection State */
+        .cilia-part.selected {
+            fill: #48bb78 !important;       /* Green */
+            stroke: #2f855a !important;
+        }
+    `;
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = css;
+    document.head.appendChild(style);
+};
+
 // CRITICAL: Must be defined in ciliAI.js
 window.generateAndInjectSVG = function() {
     const container = document.getElementById('cilia-svg');
