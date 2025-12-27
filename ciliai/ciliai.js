@@ -2789,27 +2789,58 @@ function flexibleIntentParser(query) {
 }
 
 function getCiliopathyGenes(term) {
-    // This is a minimal placeholder structure to prevent crashes.
-    // In a full app, this would query the master data based on the disease term.
-    const normalizedTerm = normalizeTerm(term);
-    
-    // Example lookup (you need to define your actual lookup logic here)
-    if (normalizedTerm.includes('jouber')) {
+    // 1. Use your helper to standardize the name (e.g. "Joubert" -> "Joubert Syndrome")
+    // We use window.normalizeDiseaseKey if available, otherwise just the term
+    const normalizedKey = typeof window.normalizeDiseaseKey === 'function' 
+        ? window.normalizeDiseaseKey(term) 
+        : window.normalizeTerm(term);
+
+    // 2. Ensure the key format matches your database keys (lowercase, no spaces)
+    const cleanKey = window.normalizeTerm(normalizedKey); 
+
+    // 3. Retrieve the list from the database
+    let geneSymbols = window.CiliAI.lookups.byCiliopathy[cleanKey] || [];
+
+    // 4. Fallback: If strict lookup fails, scan the Master Data for partial matches
+    // (This helps if the user types "Joubert" but the key is "joubertsyndrome")
+    if (geneSymbols.length === 0 && window.CiliAI.masterData) {
+        const lowerTerm = term.toLowerCase();
+        const foundSet = new Set();
+        
+        window.CiliAI.masterData.forEach(g => {
+            if (g.Ciliopathy) {
+                const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                // Check if any disease string matches the user's term
+                if (diseases.some(d => d.toLowerCase().includes(lowerTerm))) {
+                    foundSet.add(g.Gene.toUpperCase());
+                }
+            }
+        });
+        geneSymbols = Array.from(foundSet);
+    }
+
+    // 5. Format results for the chat
+    const formattedGenes = geneSymbols.map(sym => {
+        const geneData = window.CiliAI.lookups.geneMap[sym];
         return {
-            genes: [{ gene: 'AHI1', description: 'Transition Zone protein' }, { gene: 'CEP290', description: 'Centrosome/TZ protein' }],
-            description: 'Joubert Syndrome genes retrieved.'
+            gene: sym,
+            description: geneData ? (geneData.Localization || 'Ciliopathy gene') : 'No details available'
+        };
+    });
+
+    if (formattedGenes.length === 0) {
+        return {
+            genes: [],
+            description: `No genes found for <strong>${term}</strong> in the database.`
         };
     }
-    
-    // Fallback if no specific logic exists
-    const geneSymbols = window.CiliAI.lookups.byCiliopathy?.[normalizedTerm] || [];
 
+    // Sort alphabetically for display
     return {
-        genes: geneSymbols.map(g => ({ gene: g, description: 'Ciliopathy gene' })),
-        description: `Genes associated with ${term}.`
+        genes: formattedGenes.sort((a, b) => a.gene.localeCompare(b.gene)),
+        description: `Found <strong>${formattedGenes.length}</strong> genes associated with <strong>${normalizedKey}</strong>.`
     };
 }
-
 
 // ==========================================================
 // 4B. COMPLEX QUERY ENGINE (L2/L3) - NEW
