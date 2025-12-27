@@ -5555,7 +5555,7 @@ window.runDashboardSearch = function() {
 /* ==============================================================
  * MODULE: UI LAYOUT FIXES (Prevents Overflow)
  * ============================================================== */
-function applyLayoutFixes() {
+(function applyLayoutFixes() {
     const styleId = 'ciliai-layout-fixes';
     if (document.getElementById(styleId)) return;
     
