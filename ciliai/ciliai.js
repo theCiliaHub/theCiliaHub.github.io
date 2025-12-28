@@ -4688,7 +4688,6 @@ else if (
         }
 
         // === 22. Intent: GO Term / Functional Heatmap (Visualizer) ===
-        // (Removed the stray 'try {' that was causing the syntax error here)
         else if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:')) {
             let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
             if (!term) {
