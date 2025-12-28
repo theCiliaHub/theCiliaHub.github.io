@@ -4332,141 +4332,98 @@ else if (
     const hasLocalizationQuery = qLower.includes('localization') || qLower.includes('located') || qLower.includes('compartment') || qLower.includes('where');
 
     if (hasExpressionQuery) {
-    // === EXPRESSION COMPARISON: Side-by-side UMAPs ===
-    window.switchView('plot');
+        // === EXPRESSION COMPARISON: Multi-gene UMAP overlay ===
+        window.switchView('plot');
 
-    const validGenesUpper = validGenes.map(g => g.toUpperCase());
-    if (validGenesUpper.length !== 2) {
-        // Fallback to average for >2 genes (or change to grid later)
-        await window.renderUMAPPlot(validGenesUpper[0], validGenesUpper, null);
-        responseHtml += `<p><strong>Expression comparison</strong> (${validGenes.length} genes): average shown.</p>`;
-    } else {
-        const gene1 = validGenesUpper[0];
-        const gene2 = validGenesUpper[1];
+        // Use the same rendering function as single-gene plots
+        const primaryGene = validGenes[0];
+        await window.renderUMAPPlot(primaryGene, validGenes, null); // null = no cell type zoom
 
-        // We'll build two traces manually
-        const datasetKey = window.CiliAI.activeDataset || 'lung';
-        const dataset = window.CiliAI.datasets[datasetKey];
-        const sourceData = dataset.umap;
+        const currentDS = window.CiliAI.activeDataset || 'lung';
+        const dsName = window.CiliAI.datasets[currentDS].name;
+        const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
+        const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
 
-        const x = [], y = [];
-        const expr1 = [], expr2 = [];
-        let max1 = 0, max2 = 0;
+        const genesArg = validGenes.join(',');
 
-        const decodeSparse = (sparse, total) => {
-            const dense = new Float32Array(total).fill(0);
-            if (!sparse) return dense;
-            for (let k = 0; k < sparse.length; k += 2) {
-                if (sparse[k] < total) dense[sparse[k]] = sparse[k + 1];
-            }
-            return dense;
-        };
+        responseHtml += `
+            <p><strong>Expression Comparison</strong> across <strong>${validGenes.length}</strong> genes in <strong>${dsName}</strong>:</p>
+            <p>Colored by <strong>average expression</strong> of the gene set.<br>
+               Click points to see localization of individual cells.</p>
+            <ul style="margin:10px 0; padding-left:20px; font-size:13.5px;">
+                ${validGenes.map((g, i) => {
+                    const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5', '#9f7aea'];
+                    return `<li style="margin:4px 0;">
+                        <span style="display:inline-block; width:12px; height:12px; background:${colors[i]}; border-radius:3px; margin-right:8px;"></span>
+                        <strong>${g}</strong>
+                    </li>`;
+                }).join('')}
+            </ul>
+            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="ciliai-button"
+                    onclick="window.switchDatasetAndPlot('${nextDS}', '${validGenes[0]}', '${genesArg}', '')">
+                    🔄 Switch to ${nextDSLabel}
+                </button>
+                <a href="#" onclick="window.downloadUMAPDataAsCSV('${validGenes.join('_')}')" class="ai-action">
+                    ⬇️ CSV
+                </a>
+            </div>
+            <p style="margin-top:10px; font-size:12px; color:#666;">
+                💡 Higher color intensity = higher average expression of these genes.
+            </p>
+        `;
 
-        // Load expression for both genes
-        let data1 = dataset.expression?.[gene1] || window.CiliAI.cellDataCache?.[gene1];
-        let data2 = dataset.expression?.[gene2] || window.CiliAI.cellDataCache?.[gene2];
-        const arr1 = data1 ? (Array.isArray(data1) ? decodeSparse(data1, sourceData.length) : null) : null;
-        const arr2 = data2 ? (Array.isArray(data2) ? decodeSparse(data2, sourceData.length) : null) : null;
+    } else if (hasLocalizationQuery) {
+        // === LOCALIZATION COMPARISON ===
+        window.switchView('diagram');
+        window.showDiagram();
+        SpatialManager.clearOverlays();
+        SpatialManager.applyMultiOverlay(validGenes);
 
-        sourceData.forEach((p, i) => {
-            if (!p) return;
-            x.push(p.x);
-            y.push(p.y);
-            const v1 = arr1 ? arr1[i] : 0;
-            const v2 = arr2 ? arr2[i] : 0;
-            expr1.push(v1);
-            expr2.push(v2);
-            if (v1 > max1) max1 = v1;
-            if (v2 > max2) max2 = v2;
+        responseHtml += `<p><strong>Localization Comparison</strong> (colored overlays):</p><ul style="margin:8px 0;">`;
+        const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+        validGenes.forEach((g, i) => {
+            const loc = window.CiliAI.lookups.geneMap[g]?.Localization || 'Not annotated';
+            responseHtml += `<li style="margin:4px 0;">
+                <span style="display:inline-block; width:12px; height:12px; background:${colors[i]}; border-radius:3px; margin-right:8px;"></span>
+                <strong>${g}</strong>: ${loc}
+            </li>`;
         });
+        responseHtml += `</ul><p><em>👆 Overlapping colors show shared compartments.</em></p>`;
 
-        const sharedMax = Math.max(max1, max2, 1);
+    } else {
+        // === DEFAULT: Summary + Localization Overlay ===
+        window.switchView('diagram');
+        window.showDiagram();
+        SpatialManager.clearOverlays();
+        SpatialManager.applyMultiOverlay(validGenes);
 
-        const trace1 = {
-            x, y,
-            mode: 'markers',
-            type: 'scattergl',
-            name: gene1,
-            marker: {
-                color: expr1,
-                colorscale: [[0, '#e0e0e0'], [0.5, '#ff9999'], [1, '#ff0000']],
-                cmin: 0,
-                cmax: sharedMax,
-                size: expr1.map(v => v > 0 ? 8 : 4),
-                opacity: 0.8,
-                colorbar: { x: 0.45, len: 0.4, title: gene1 + ' TPM' }
-            },
-            text: sourceData.map(p => p ? `<b>${p.cell_type}</b><br>${gene1}: ${expr1[sourceData.indexOf(p)]?.toFixed(2)}` : ''),
-            hoverinfo: 'text'
-        };
-
-        const trace2 = {
-            ...trace1,
-            x,
-            y,
-            name: gene2,
-            marker: {
-                ...trace1.marker,
-                color: expr2,
-                colorscale: [[0, '#e0e0e0'], [0.5, '#99ff99'], [1, '#00aa00']],
-                colorbar: { x: 1.02, len: 0.4, title: gene2 + ' TPM' }
-            },
-            text: sourceData.map(p => p ? `<b>${p.cell_type}</b><br>${gene2}: ${expr2[sourceData.indexOf(p)]?.toFixed(2)}` : ''),
-        };
-
-        const layout = {
-            title: `<b>Expression Comparison: ${gene1} vs ${gene2}</b><br><sub>${dataset.name}</sub>`,
-            grid: { rows: 1, columns: 2, pattern: 'independent' },
-            xaxis: { title: gene1, visible: false },
-            xaxis2: { title: gene2, visible: false },
-            yaxis: { visible: false },
-            yaxis2: { visible: false },
-            hovermode: 'closest',
-            margin: { t: 80, l: 40, r: 40, b: 40 },
-            annotations: [
-                { text: gene1, xref: 'paper', yref: 'paper', x: 0.25, y: 1.05, showarrow: false, font: { size: 14 } },
-                { text: gene2, xref: 'paper', yref: 'paper', x: 0.75, y: 1.05, showarrow: false, font: { size: 14 } }
-            ]
-        };
-
-        const plotData = { data: [trace1, trace2], layout };
-
-        // Use showPlot for consistent rendering
-        if (typeof window.showPlot === 'function') {
-            window.showPlot(plotData, `Expression: ${gene1} | ${gene2}`);
-        }
-
-        // Click handler: use primary gene (gene1) for localization
-        setTimeout(() => {
-            const gd = document.getElementById('plotly-container');
-            if (gd) {
-                gd.on('plotly_click', (e) => {
-                    const point = e.points[0];
-                    const loc = window.CiliAI.lookups.geneMap[point.data.name]?.Localization || 'Cilium';
-                    if (loc) {
-                        window.showDiagram();
-                        SpatialManager.highlight(loc, point.data.name);
-                    }
-                });
-            }
-        }, 200);
+        responseHtml += `<p><strong>Comparing ${validGenes.length} genes</strong>:</p>
+            <table style="width:100%; font-size:13px; margin:10px 0; border-collapse:collapse;">
+                <tr style="background:#f7fafc;">
+                    <th style="text-align:left; padding:6px;">Gene</th>
+                    <th style="text-align:left; padding:6px;">Localization</th>
+                    <th style="text-align:left; padding:6px;">Ciliopathy</th>
+                </tr>`;
+        validGenes.forEach((g, i) => {
+            const data = window.CiliAI.lookups.geneMap[g];
+            const loc = data?.Localization || '—';
+            const disease = data?.Ciliopathy && data?.Ciliopathy !== 'Not specified' ? 'Yes' : 'No';
+            const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+            responseHtml += `<tr>
+                <td style="padding:6px; font-weight:600; color:${colors[i]};">${g}</td>
+                <td style="padding:6px;">${loc}</td>
+                <td style="padding:6px;">${disease}</td>
+            </tr>`;
+        });
+        responseHtml += `</table>
+            <p><em>Multi-colored overlay active on the ciliary diagram → click compartments to explore.</em></p>`;
     }
 
-    const currentDS = window.CiliAI.activeDataset || 'lung';
-    const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
-    const nextName = nextDS === 'lung' ? 'Lung Organoid' : 'Human Kidney';
-
-    responseHtml += `
-        <p><strong>Side-by-side expression comparison</strong> in <strong>${dataset.name}</strong></p>
-        <p>Left: <span style="color:#ff4444"><strong>${validGenes[0]}</strong></span>  Right: <span style="color:#44aa44"><strong>${validGenes[1] || 'second gene'}</strong></span></p>
-        <p><i>Click points to highlight localization • Same scale for fair comparison</i></p>
-        <div style="margin-top:10px; display:flex; gap:8px;">
-            <button class="ciliai-button" onclick="location.reload()">Refresh View</button>
-            <button class="ciliai-button" onclick="window.CiliAI.activeDataset='${nextDS}'; location.reload()">
-                Switch to ${nextName}
-            </button>
-        </div>
-    `;
+    responseHtml += `</div>`;
+    htmlResult = responseHtml;
+    window.addChatMessage(htmlResult, false);
+    return;
 }
 
     // Intent 14: Variants
