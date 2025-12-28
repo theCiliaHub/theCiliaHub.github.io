@@ -3090,7 +3090,8 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 /**
- * Renders Interactive UMAP – Enhanced with legend, dataset switch, and clickable points
+ * Renders Interactive UMAP – Enhanced with legend, dataset switch, clickable points,
+ * and full multi-gene expression averaging support.
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Clear previous views
@@ -3100,58 +3101,25 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const datasetKey = window.CiliAI.activeDataset || 'lung';
     const dataset = window.CiliAI.datasets?.[datasetKey];
     if (!dataset || !Array.isArray(dataset.umap)) {
-        window.addChatMessage(`⚠️ ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
+        window.addChatMessage(`Warning: ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
         return;
     }
 
-    // 3. Inputs
+    // 3. Normalize inputs
     if (!displayName) displayName = 'WDR31';
     if (typeof targetGenes === 'string') {
-        targetGenes = targetGenes.split(',').map(t => t.trim()).filter(t => t.length > 0);
+        targetGenes = targetGenes.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
     }
-    if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName];
+    if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName.toUpperCase()];
 
-    const gene = displayName.toUpperCase();
+    const primaryGene = targetGenes[0];                    // Used for title & localization click
+    const isMultiGene = targetGenes.length > 1;
     const isClusterView = displayName === 'CLUSTER_VIEW';
 
     // 4. Prepare data
     const sourceData = dataset.umap;
     const x = [], y = [], color = [], text = [], size = [], customdata = [];
     let maxExpr = 0;
-
-    // Expression handling
-    let exprData = null;
-    let isSparseArray = false;
-    let isDictionary = false;
-    let geneFound = false;
-
-    const decodeSparse = (sparse, total) => {
-        const dense = new Float32Array(total).fill(0);
-        if (!sparse) return dense;
-        for (let k = 0; k < sparse.length; k += 2) {
-            const idx = sparse[k];
-            const val = sparse[k + 1];
-            if (idx < total) dense[idx] = val;
-        }
-        return dense;
-    };
-
-    if (!isClusterView) {
-        let rawData = dataset.expression?.[gene];
-        if (!rawData && window.CiliAI.cellDataCache) {
-            rawData = window.CiliAI.cellDataCache[gene];
-        }
-        if (rawData) {
-            geneFound = true;
-            if (Array.isArray(rawData)) {
-                exprData = decodeSparse(rawData, sourceData.length);
-                isSparseArray = true;
-            } else if (typeof rawData === 'object') {
-                exprData = rawData;
-                isDictionary = true;
-            }
-        }
-    }
 
     // Unique cell types for legend
     const cellTypes = new Set();
@@ -3177,7 +3145,60 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         'lung secretory cell': '#34D399'
     };
 
-    // Build plot data
+    // Helper: decode sparse array
+    const decodeSparse = (sparse, total) => {
+        const dense = new Float32Array(total).fill(0);
+        if (!sparse) return dense;
+        for (let k = 0; k < sparse.length; k += 2) {
+            const idx = sparse[k];
+            const val = sparse[k + 1];
+            if (idx < total) dense[idx] = val;
+        }
+        return dense;
+    };
+
+    // Expression handling – now supports multi-gene averaging
+    let exprData = null;  // Will be an array of length sourceData.length
+    let geneFoundCount = 0;
+
+    if (!isClusterView) {
+        const perGeneExpr = [];
+
+        targetGenes.forEach(g => {
+            let rawData = dataset.expression?.[g] || window.CiliAI.cellDataCache?.[g];
+            if (rawData) {
+                geneFoundCount++;
+                if (Array.isArray(rawData)) {
+                    perGeneExpr.push(decodeSparse(rawData, sourceData.length));
+                } else if (typeof rawData === 'object') {
+                    // Dictionary by cell type – convert to indexed array
+                    const arr = new Float32Array(sourceData.length);
+                    sourceData.forEach((p, i) => {
+                        if (p && p.cell_type) arr[i] = rawData[p.cell_type] || 0;
+                    });
+                    perGeneExpr.push(arr);
+                }
+            }
+        });
+
+        if (geneFoundCount > 0) {
+            // Average across available genes
+            exprData = new Float32Array(sourceData.length);
+            sourceData.forEach((_, i) => {
+                let sum = 0;
+                let count = 0;
+                perGeneExpr.forEach(arr => {
+                    if (arr[i] !== undefined) {
+                        sum += arr[i];
+                        count++;
+                    }
+                });
+                exprData[i] = count > 0 ? sum / count : 0;
+            });
+        }
+    }
+
+    // Build plot data points
     sourceData.forEach((p, i) => {
         if (!p) return;
         const cellType = p.cell_type;
@@ -3189,13 +3210,17 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         y.push(p.y);
 
         let exprVal = 0;
-        if (!isClusterView && geneFound) {
-            if (isSparseArray) exprVal = exprData[i];
-            else if (isDictionary) exprVal = exprData[cellType] || 0;
+        if (!isClusterView && exprData) {
+            exprVal = exprData[i];
+            if (exprVal > maxExpr) maxExpr = exprVal;
         }
 
         text.push(`<b>${cellType}</b><br>${isClusterView ? '' : `Expression: ${exprVal.toFixed(2)} TPM`}`);
-        customdata.push({ localization: window.CiliAI.lookups.geneMap[gene]?.Localization || 'Cilium' });
+
+        // Use localization from primary gene
+        customdata.push({
+            localization: window.CiliAI.lookups.geneMap[primaryGene]?.Localization || 'Cilium'
+        });
 
         if (isClusterView) {
             color.push(clusterColors[cellType] || '#94A3B8');
@@ -3203,10 +3228,10 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         } else {
             color.push(exprVal);
             size.push(exprVal > 0 ? 8 : 4);
-            if (exprVal > maxExpr) maxExpr = exprVal;
         }
     });
 
+    // Trace configuration
     const trace = {
         x, y, text, customdata,
         mode: 'markers',
@@ -3224,14 +3249,19 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         trace.marker.cmin = 0;
         trace.marker.cmax = maxExpr > 0 ? maxExpr : 1;
         trace.marker.colorscale = dataset.colorScale || [[0, '#e2e8f0'], [0.5, '#3b82f6'], [1, '#1e40af']];
-        trace.marker.colorbar = { title: 'TPM', thickness: 15, len: 0.6 };
+        trace.marker.colorbar = {
+            title: isMultiGene ? 'Avg TPM' : 'TPM',
+            thickness: 15,
+            len: 0.6
+        };
     } else {
         trace.marker.color = color;
     }
 
+    // Layout
     const layout = {
         title: {
-            text: `<b>${isClusterView ? 'Cell Types' : gene}</b><br><sub>${dataset.name} scRNA-seq</sub>`,
+            text: `<b>${isClusterView ? 'Cell Types' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</b><br><sub>${dataset.name} scRNA-seq</sub>`,
             font: { size: 16 }
         },
         xaxis: { visible: false, showgrid: false, zeroline: false },
@@ -3244,7 +3274,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         annotations: []
     };
 
-    // Add cell type legend as annotations
+    // Cell type legend for cluster view
     if (isClusterView) {
         const legendX = 1.05;
         let legendY = 1;
@@ -3265,10 +3295,14 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         });
     }
 
-    // Render plot
+    // Render using showPlot (best layout + resize handling)
     const plotData = { data: [trace], layout };
+    const plotTitle = isClusterView
+        ? 'Cell Type Clusters'
+        : `scRNA-seq: ${isMultiGene ? targetGenes.join(' + ') : primaryGene}`;
+
     if (typeof window.showPlot === 'function') {
-        window.showPlot(plotData, isClusterView ? 'Cell Type Clusters' : `scRNA-seq: ${gene}`);
+        window.showPlot(plotData, plotTitle);
     } else {
         await Plotly.newPlot('plotly-container', [trace], layout, {
             responsive: true,
@@ -3277,19 +3311,23 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         });
     }
 
-    // Click handler: jump to diagram and highlight localization
-    const gd = window.CiliAI.currentPlot || document.querySelector('.plotly');
-    if (gd) {
-        gd.on('plotly_click', (data) => {
-            const point = data.points[0];
-            const loc = point.customdata && point.customdata.localization;
-            if (loc && typeof window.highlightCiliumLocation === 'function') {
-                window.resetViews();
-                window.highlightCiliumLocation(loc, gene);
-                window.addChatMessage(`<i>Clicked cell type: ${point.text.split('<br>')[0]}</i><br>Localization highlighted on diagram.`, false);
-            }
-        });
-    }
+    // === CRITICAL FIX: Attach click handler AFTER plot is rendered ===
+    setTimeout(() => {
+        const gd = document.getElementById('plotly-container');
+        if (gd && gd.data && gd.data.length > 0) {
+            gd.on('plotly_click', (data) => {
+                const point = data.points[0];
+                const loc = point.customdata?.localization;
+                if (loc && typeof window.highlightCiliumLocation === 'function') {
+                    window.resetViews();
+                    window.showDiagram();
+                    window.highlightCiliumLocation(loc, primaryGene);
+                    const cellName = point.text.split('<br>')[0].replace(/<b>|<\/b>/g, '');
+                    window.addChatMessage(`<i>Clicked: ${cellName}</i><br>Localization highlighted on ciliary diagram.`, false);
+                }
+            });
+        }
+    }, 100); // Small delay ensures Plotly has fully initialized the gd object
 
     // Dataset switch button
     const currentDS = datasetKey;
@@ -3298,12 +3336,20 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     window.addChatMessage(`
         <div class="ai-result-card">
-            <p><strong>${isClusterView ? 'Cell Type View' : gene}</strong> in <strong>${dataset.name}</strong></p>
-            ${isClusterView ? '<p>Colored by cell type (legend on right)</p>' : '<p>Colored by expression level</p>'}
+            <p><strong>${isClusterView ? 'Cell Type View' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</strong> in <strong>${dataset.name}</strong></p>
+            ${isClusterView 
+                ? '<p>Colored by cell type (legend on right)</p>' 
+                : `<p>Colored by ${isMultiGene ? 'average ' : ''}expression level</p>`}
             <p><i>Click any point to highlight its localization on the ciliary diagram.</i></p>
-            <button class="ciliai-button" style="margin-top:8px;" onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${displayName}', '${targetGenes.join(',')}', ${zoomToCellType ? `'${zoomToCellType}'` : 'null'})">
-                🔄 Switch to ${nextName}
-            </button>
+            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <button class="ciliai-button"
+                    onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${displayName}', '${targetGenes.join(',')}', ${zoomToCellType ? `'${zoomToCellType}'` : 'null'})">
+                    Switch to ${nextName}
+                </button>
+                <a href="#" onclick="window.downloadUMAPDataAsCSV('${targetGenes.join('_')}')" class="ai-action">
+                    Download CSV
+                </a>
+            </div>
         </div>
     `, false);
 };
@@ -5577,16 +5623,26 @@ window.showDiagram = function() {
 };
 
 window.showPlot = function(plotData, title = "Gene Expression UMAP") {
+    // Hide other views
     document.getElementById('cilia-svg').style.display = 'none';
     document.getElementById('domain-viewer').style.display = 'none';
+
     const plotContainer = document.getElementById('plotly-container');
     plotContainer.style.display = 'block';
     document.getElementById('current-viz-title').textContent = title;
+
+    // Clear previous content to avoid artifacts
     plotContainer.innerHTML = '';
+
+    // Calculate available space
     const vizCard = document.querySelector('.viz-card');
     const vizHeader = document.querySelector('.viz-header');
-    const availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
+    const availableHeight = (vizCard && vizHeader)
+        ? (vizCard.clientHeight - vizHeader.clientHeight - 40)
+        : 500;
     const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
+
+    // Merge and enhance layout
     const layout = {
         ...plotData.layout,
         autosize: true,
@@ -5599,29 +5655,70 @@ window.showPlot = function(plotData, title = "Gene Expression UMAP") {
         yaxis: { ...plotData.layout?.yaxis, automargin: true, tickfont: { size: 10 } },
         font: { size: 11 },
         showlegend: true,
-        legend: { x: 1.02, y: 1, xanchor: 'left', yanchor: 'top', bgcolor: 'rgba(255,255,255,0.8)', bordercolor: '#e1e8ed', borderwidth: 1, font: { size: 10 } }
+        legend: {
+            x: 1.02,
+            y: 1,
+            xanchor: 'left',
+            yanchor: 'top',
+            bgcolor: 'rgba(255,255,255,0.8)',
+            bordercolor: '#e1e8ed',
+            borderwidth: 1,
+            font: { size: 10 }
+        }
     };
+
+    // Purge any existing plot to prevent memory leaks and old listeners
+    if (window.CiliAI?.currentPlot) {
+        Plotly.purge('plotly-container');
+        window.CiliAI.currentPlot = null;
+    }
+
+    // Render the new plot
     Plotly.newPlot('plotly-container', plotData.data, layout, {
-        responsive: true, displayModeBar: true, displaylogo: false,
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
         modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
         scrollZoom: false
-    }).then(gd => {
-        if (window.CiliAI) window.CiliAI.currentPlot = gd;
-        gd.on('plotly_click', e => {
-            const loc = e.points?.[0]?.customdata?.localization;
-            if (!loc) return;
-            window.showDiagram();
-            if (window.SpatialManager) SpatialManager.highlight(loc, window.CiliAI?.activeGeneContext);
+    })
+    .then(() => {
+        // Now gd is the actual graph div element (not a Promise)
+        const gd = document.getElementById('plotly-container');
+
+        // Store reference
+        if (window.CiliAI) {
+            window.CiliAI.currentPlot = gd;
+        }
+
+        // Attach click handler safely
+        gd.on('plotly_click', (e) => {
+            const point = e.points?.[0];
+            const loc = point?.customdata?.localization;
+            if (loc) {
+                window.showDiagram();
+                if (window.SpatialManager && window.CiliAI?.activeGeneContext) {
+                    SpatialManager.highlight(loc, window.CiliAI.activeGeneContext);
+                }
+            }
         });
+    })
+    .catch(err => {
+        console.error("Plotly rendering failed:", err);
+        window.addChatMessage(`<p style="color:#c62828;">Failed to render plot: ${err.message}</p>`, false);
     });
-    window.addEventListener('resize', () => {
+
+    // Responsive resize handler (only one instance)
+    const resizeHandler = () => {
         const container = document.getElementById('plotly-container');
         if (window.CiliAI?.currentPlot && container && container.offsetParent !== null) {
-            setTimeout(() => Plotly.Plots.resize(window.CiliAI.currentPlot), 50);
+            Plotly.Plots.resize(window.CiliAI.currentPlot);
         }
-    });
-};
+    };
 
+    // Remove any previous listener to avoid duplicates
+    window.removeEventListener('resize', resizeHandler);
+    window.addEventListener('resize', resizeHandler);
+};
 window.showDomainViewer = function(gene) {
     document.getElementById('cilia-svg').style.display = 'none';
     document.getElementById('plotly-container').style.display = 'none';
