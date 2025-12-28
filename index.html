@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — Enhanced Gene Explorer</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
-    
+   
     <!-- External Dependencies -->
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+   
     <!-- CiliAI Engine - Centralized Logic -->
     <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
-    
+   
     <style>
         :root {
             /* Synchronized Palette from plots.html */
@@ -26,23 +26,22 @@
             --highlight-gold: #f6e05e;
             --bg: #f8fafc;
             --card: #ffffff;
-            
+           
             /* Anatomical Palette markers */
-            --color-pcm1: #5b21b6;      /* Professional Deep Violet - PCM1 (Basal Body) */
-            --color-tmem17: #475569;    /* Slate Blue - TMEM17 (Transition Zone) */
-            --color-arl13b: #0891b2;    /* Muted Cyan - ARL13B (Membrane) */
-            --color-tubulin: #2563eb;   /* Royal Blue - Beta2-tubulin (Axoneme) */
+            --color-pcm1: #5b21b6; /* Professional Deep Violet - PCM1 (Basal Body) */
+            --color-tmem17: #475569; /* Slate Blue - TMEM17 (Transition Zone) */
+            --color-arl13b: #0891b2; /* Muted Cyan - ARL13B (Membrane) */
+            --color-tubulin: #2563eb; /* Royal Blue - Beta2-tubulin (Axoneme) */
         }
-        
+       
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { 
-            height: 100%; 
-            font-family: 'Segoe UI', 'Inter', Arial, sans-serif; 
-            background: var(--bg); 
+        body, html {
+            height: 100%;
+            font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+            background: var(--bg);
             color: var(--accent-text);
-            overflow: hidden; 
+            overflow: hidden;
         }
-
         /* --- TOP NAVBAR - Harmonized with plots.html (64px height) --- */
         .top-navbar {
             background: var(--primary-blue);
@@ -58,13 +57,11 @@
             width: 100%;
             z-index: 1000;
         }
-
-        .nav-container { 
+        .nav-container {
             display: flex;
             align-items: center;
             gap: 20px;
         }
-
         .brand {
             display: flex;
             align-items: center;
@@ -72,30 +69,25 @@
             font-weight: 600;
             font-size: 20px;
         }
-
         .brand img {
             height: 40px;
             border-radius: 8px;
         }
-
         .brand-text {
             display: flex;
             flex-direction: column;
             line-height: 1.1;
         }
-
         .brand-subtitle {
             font-size: 10px;
             opacity: 0.9;
             font-weight: 400;
         }
-
         .nav-links {
             display: flex;
             list-style: none;
             gap: 4px;
         }
-
         .nav-links a {
             color: white;
             text-decoration: none;
@@ -107,16 +99,13 @@
             align-items: center;
             font-size: 15px;
         }
-
         .nav-links a:hover {
             background: rgba(255,255,255,0.15);
         }
-
         .nav-links a.active {
             background: rgba(255,255,255,0.25);
             font-weight: 600;
         }
-
         /* --- MAIN LAYOUT --- */
         .app-container {
             display: grid;
@@ -124,7 +113,6 @@
             height: calc(100vh - 64px);
             width: 100vw;
         }
-
         /* LEFT PANEL */
         .center-panel {
             display: flex;
@@ -134,55 +122,49 @@
             background: var(--bg);
             gap: 16px;
         }
-
-        .top-bar { 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             height: 44px;
             gap: 12px;
         }
-
-        .search-container { 
-            display: flex; 
-            gap: 8px; 
-            flex: 1; 
+        .search-container {
+            display: flex;
+            gap: 8px;
+            flex: 1;
             max-width: 600px;
         }
-
-        .search-input { 
-            flex: 1; 
+        .search-input {
+            flex: 1;
             padding: 0 16px;
-            border: 1px solid var(--border-light); 
-            border-radius: 8px; 
-            height: 44px; 
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            height: 44px;
             font-size: 14px;
             background: white;
         }
-
-        .search-btn { 
-            padding: 0 24px; 
-            background: var(--primary-blue); 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            font-weight: 600; 
+        .search-btn {
+            padding: 0 24px;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
             cursor: pointer;
             height: 44px;
             transition: background 0.2s;
         }
         .search-btn:hover { background: #004577; }
-
-        .status-badge { 
-            padding: 8px 14px; 
-            border-radius: 6px; 
-            font-size: 12px; 
-            font-weight: 600; 
+        .status-badge {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
         }
         .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
         .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
         .status.error { background: var(--status-error-bg); color: #c62828; }
-
         /* VIZ CARD */
         .viz-card {
             flex: 1;
@@ -195,7 +177,6 @@
             overflow: hidden;
             position: relative;
         }
-
         .viz-header {
             padding: 0 20px;
             border-bottom: 1px solid var(--border-light);
@@ -207,23 +188,20 @@
             height: 54px;
             flex-shrink: 0;
         }
-
         .viz-title-group {
             display: flex;
             align-items: center;
             gap: 16px;
             overflow: hidden;
         }
-
-        .viz-title { 
-            font-size: 15px; 
-            font-weight: 700; 
+        .viz-title {
+            font-size: 15px;
+            font-weight: 700;
             color: var(--primary-blue);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .view-tabs {
             display: flex;
             gap: 4px;
@@ -231,7 +209,6 @@
             padding: 3px;
             border-radius: 8px;
         }
-
         .view-tab {
             border: none;
             background: transparent;
@@ -245,12 +222,10 @@
             white-space: nowrap;
         }
         .view-tab.active { background: white; color: var(--primary-blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-
         .viz-actions {
             display: flex;
             gap: 6px;
         }
-
         .action-btn {
             background: var(--secondary-blue);
             color: var(--primary-blue);
@@ -266,7 +241,6 @@
             gap: 6px;
         }
         .action-btn:hover { background: var(--primary-blue); color: white; }
-
         /* ACTION BAR CONTROLS */
         .viz-controls {
             padding: 8px 20px;
@@ -278,14 +252,11 @@
             height: 44px;
             flex-shrink: 0;
         }
-
         .control-group { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: #666; }
         .control-group select { padding: 4px 8px; border-radius: 5px; border: 1px solid var(--border-light); font-size: 11px; outline: none; background: white; cursor: pointer; }
-
         .zoom-controls { display: flex; gap: 4px; }
         .zoom-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
         .zoom-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); background: #f0f7ff; }
-
         #viz-stage {
             flex: 1;
             position: relative;
@@ -293,7 +264,6 @@
             width: 100%;
             background: white;
         }
-
         #cilia-svg, #plotly-container, #domain-viewer {
             position: absolute;
             inset: 0;
@@ -301,10 +271,8 @@
             height: 100% !important;
             overflow: hidden;
         }
-
         #cilia-svg { display: flex; align-items: center; justify-content: center; }
-        
-
+       
         /* RIGHT PANEL: CHAT */
         .right-panel {
             display: flex;
@@ -313,40 +281,33 @@
             border-left: 1px solid var(--border-light);
             overflow: hidden;
         }
-
         .chat-header { padding: 18px 20px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
         .chat-header h2 { font-size: 16px; color: var(--primary-blue); font-weight: 700; }
         .chat-header p { font-size: 11px; color: #666; margin-top: 2px; }
-
-        .messages-area { 
-            flex: 1; 
-            padding: 20px; 
-            overflow-y: auto; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 16px; 
+        .messages-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
             background: #fafafa;
         }
-
         /* Streaming compatible structure */
         .ciliai-message { display: flex; flex-direction: column; gap: 4px; width: 100%; }
         .ciliai-message.user { align-items: flex-end; }
         .ciliai-message.assistant { align-items: flex-start; }
-
         .message-wrapper { max-width: 90%; display: flex; flex-direction: column; gap: 4px; }
         .ciliai-message.user .message-wrapper { align-items: flex-end; }
-
-        .ciliai-message-content { 
-            padding: 12px 16px; 
-            border-radius: 14px; 
-            font-size: 13.5px; 
-            line-height: 1.5; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+        .ciliai-message-content {
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-size: 13.5px;
+            line-height: 1.5;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-
         .user .ciliai-message-content { background: var(--primary-blue); color: white; border-bottom-right-radius: 2px; }
         .assistant .ciliai-message-content { background: white; border: 1px solid var(--border-light); border-bottom-left-radius: 2px; color: #334155; }
-
         .suggested-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
         .gene-badge {
             background: var(--secondary-blue);
@@ -360,14 +321,11 @@
             border: 1px solid transparent;
         }
         .gene-badge:hover { background: var(--primary-blue); color: white; transform: translateY(-1px); }
-
         .input-area { padding: 16px; border-top: 1px solid #e2e8f0; background: white; flex-shrink: 0; }
         .chat-input-group { display: flex; gap: 8px; }
         .chat-input { flex: 1; padding: 12px 16px; border: 2px solid var(--border-light); border-radius: 12px; font-size: 14px; outline: none; transition: border-color 0.2s; }
         .chat-input:focus { border-color: var(--primary-blue); }
         .send-btn { background: var(--primary-blue); color: white; border: none; padding: 0 24px; border-radius: 12px; font-weight: 600; cursor: pointer; }
-
-
         .quick-action-chips {
     display: flex;
     flex-wrap: wrap;
@@ -378,7 +336,6 @@
     border-radius: 10px;
     border: 1px solid #e2e8f0;
 }
-
 .action-chip {
     background: white;
     border: 1px solid #cbd5e0;
@@ -393,7 +350,6 @@
     align-items: center;
     gap: 5px;
 }
-
 .action-chip:hover {
     background: #ebf8ff;
     border-color: #4299e1;
@@ -401,7 +357,6 @@
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-
 .action-chip.show { background: #e6fffa; border-color: #38b2ac; color: #285e61; }
 .action-chip.compare { background: #fffaf0; border-color: #ed8936; color: #c05621; }
 .action-chip.export { background: #f0fff4; border-color: #48bb78; color: #22543d; }
@@ -415,7 +370,6 @@
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
-
 .workflow-card {
     display: flex;
     align-items: center;
@@ -427,38 +381,31 @@
     cursor: pointer;
     transition: all 0.2s;
 }
-
 .workflow-card:hover {
     background: #ebf8ff;
     border-color: #bee3f8;
     transform: translateX(3px);
 }
-
 .workflow-emoji {
     font-size: 24px;
     margin-right: 12px;
 }
-
 .workflow-content {
     flex: 1;
 }
-
 .workflow-title {
     font-weight: 600;
     color: #2d3748;
     margin-bottom: 3px;
 }
-
 .workflow-desc {
     font-size: 12px;
     color: #718096;
 }
-
 .workflow-arrow {
     color: #a0aec0;
     font-weight: bold;
 }
-
 .examples-dropdown {
     background: white;
     border: 1px solid #e2e8f0;
@@ -467,7 +414,6 @@
     margin: 10px 0;
     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
-
 .example-option {
     padding: 8px 12px;
     margin: 4px 0;
@@ -477,11 +423,9 @@
     transition: background 0.2s;
     font-size: 13px;
 }
-
 .example-option:hover {
     background: #ebf8ff;
 }
-
 .workflow-guidance {
     background: #f0fff4;
     border-left: 3px solid #38a169;
@@ -490,17 +434,16 @@
     margin: 10px 0;
     font-size: 13px;
 }
-
 /* Spatial Highlight Effects */
         .cilia-part { cursor: pointer; transition: all 0.3s ease; }
         .cilia-part:hover { opacity: 0.9; }
-        .cilia-part.active-highlight { 
-            fill: var(--highlight-gold) !important; 
-            stroke: var(--primary-blue); 
-            stroke-width: 2.5; 
-            filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8)); 
+        .cilia-part.active-highlight {
+            fill: var(--highlight-gold) !important;
+            stroke: var(--primary-blue);
+            stroke-width: 2.5;
+            filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8));
         }
-        
+       
         /* DASHBOARD */
         .landing-dashboard {
             display: grid;
@@ -512,27 +455,24 @@
         .stat-item { background: white; padding: 14px; border-radius: 12px; border: 1px solid var(--border-light); text-align: center; }
         .stat-value { font-size: 18px; font-weight: 800; color: var(--primary-blue); }
         .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 4px; font-weight: 700; }
-
         /* DETAIL CARD TABS */
         .detail-tabs { display: flex; border-bottom: 1px solid #eee; margin: 10px 0; }
         .detail-tab { padding: 6px 12px; font-size: 11px; font-weight: 700; cursor: pointer; opacity: 0.6; text-transform: uppercase; }
         .detail-tab.active { border-bottom: 2px solid var(--primary-blue); opacity: 1; color: var(--primary-blue); }
         .detail-content { display: none; padding: 10px 0; }
         .detail-content.active { display: block; }
-        
+       
         .expr-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 5px; }
         .expr-table td { padding: 6px 0; border-bottom: 1px solid #f5f5f5; color: #4b5563; }
         .expr-table td:last-child { text-align: right; font-weight: 700; color: var(--primary-blue); }
-
         /* LABELS */
         .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
         .labels-visible .cilia-labels text { opacity: 1; }
-        
+       
         .ai-result-card { background: white; border: 1px solid var(--border-light); border-radius: 12px; padding: 16px; margin-top: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     </style>
 </head>
 <body>
-
     <nav class="top-navbar">
         <div class="nav-container">
             <div class="brand">
@@ -550,7 +490,6 @@
             </ul>
         </div>
     </nav>
-
     <div class="app-container">
         <!-- Visualization Panel -->
         <div class="center-panel">
@@ -561,7 +500,6 @@
                 </div>
                 <div id="dataStatus" class="status-badge loading">SYNCING</div>
             </div>
-
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title-group">
@@ -579,7 +517,6 @@
                         <button class="action-btn" onclick="window.toggleFullscreen()">⛶</button>
                     </div>
                 </div>
-
                 <div class="viz-controls">
                     <div class="control-group">
                         <span>Color:</span>
@@ -602,7 +539,6 @@
                         </label>
                     </div>
                 </div>
-
                 <div id="viz-stage">
                     <div id="cilia-svg"></div>
                     <div id="plotly-container"></div>
@@ -611,7 +547,6 @@
                     <div id="vizActiveDescription" style="display:none"></div>
                 </div>
             </div>
-
             <!-- DYNAMIC DASHBOARD -->
             <div class="landing-dashboard">
                 <div class="stat-item">
@@ -628,7 +563,6 @@
                 </div>
             </div>
         </div>
-
         <!-- RIGHT PANEL -->
         <aside class="right-panel">
             <div class="chat-header">
@@ -658,10 +592,7 @@
             </div>
         </aside>
     </div>
-
 <script>
-
-
     /* ============ UI INTERFACE LAYER ============ */
         // 1. Initialize Global State WITH NEW PERSISTENCE FEATURES
         window.CiliAI = {
@@ -676,30 +607,25 @@
             lookups: {
                 geneMap: {},
                 umapByGene: {},
-                goMap: {},  // New: GO term to genes
-                pfamByGene: {}  // New: Gene to Pfam domains
+                goMap: {}, // New: GO term to genes
+                pfamByGene: {} // New: Gene to Pfam domains
             },
             cellDataCache: {},
-            lastQueryContext: { type: null, data: [], term: null }, 
+            lastQueryContext: { type: null, data: [], term: null },
             CiliAI_UMAP: null,
             currentPlot: null,
-            
+           
             // Zoom persistence state
-            zoomStateByGene: {},   // { GENE: localization }
+            zoomStateByGene: {}, // { GENE: localization }
             activeGeneContext: null
         };
-
         // =======================================================
         // (2) SPATIAL INTELLIGENCE MANAGER
         // =======================================================
-
-
     // =======================================================
 // Attach to window for global access
 // =======================================================
-
         const SpatialManager = {
-
             // Location normalization map (user → SVG IDs)
             locMap: {
                 "transition zone": "transition-zone",
@@ -715,44 +641,34 @@
                 "cytosol": "cell-body",
                 "nucleus": "nucleus"
             },
-
            // Gene-aware highlighting with persistence
             highlight: function (locTerm, gene = null) {
                 if (!locTerm) return false;
-
                 const container = document.getElementById('cilia-svg');
                 if (!container) return false;
-
                 // --- FIX: Force visibility of the diagram container ---
-                container.style.display = 'flex'; 
+                container.style.display = 'flex';
                 if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
                 if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
                 document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
-
                 // Ensure SVG exists (if it was cleared)
                 if (!container.querySelector('svg')) {
                     window.generateAndInjectSVG();
                 }
-
                 const normalized = locTerm.toLowerCase().trim();
-                
+               
                 // Map broad terms like "cilia" to specific SVG parts if needed
                 let targetId = this.locMap[normalized];
                 if (!targetId && normalized.includes('cilia')) targetId = 'axoneme'; // Fallback for general "cilia" queries
-
                 // Clear previous highlights
                 document.querySelectorAll('.cilia-part')
                     .forEach(el => el.classList.remove('active-highlight'));
-
                 if (!targetId) return false;
-
                 const element = document.getElementById(targetId);
                 if (!element) return false;
-
                 // Highlight + zoom
                 element.classList.add('active-highlight');
                 this.zoomTo(element);
-
                 // Persist gene → spatial context
                 if (gene) {
                     if (!window.CiliAI.zoomStateByGene) {
@@ -761,40 +677,31 @@
                     window.CiliAI.zoomStateByGene[gene] = locTerm;
                     window.CiliAI.activeGeneContext = gene;
                 }
-
                 return true;
             },
-
             // Smooth zoom animation to target structure
             zoomTo: function (element) {
                 const viewport = document.getElementById('viewport-group');
                 if (!viewport || !element.getBBox) return;
-
                 const box = element.getBBox();
                 const centerX = box.x + box.width / 2;
                 const centerY = box.y + box.height / 2;
-
                 const dx = 150 - centerX;
                 const dy = 200 - centerY;
-
                 viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
                 viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
                 viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
             },
-
             // Smooth animated reset
             resetZoom: function () {
                 const viewport = document.getElementById('viewport-group');
-
                 if (viewport) {
                     viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
                     viewport.style.transform = "translate(0,0) scale(1)";
                 }
-
                 document.querySelectorAll('.cilia-part')
                     .forEach(el => el.classList.remove('active-highlight'));
             },
-
             // Utility: restore spatial context by gene
             restoreByGene: function (gene) {
                 if (!gene) return false;
@@ -802,19 +709,15 @@
                 if (!loc) return false;
                 return this.highlight(loc, gene);
             },
-
             // New: Apply GO Heatmap
             applyHeatmap: function(goTerm) {
                 const svg = document.getElementById('cilia-diagram');
                 if (!svg) return;
-
                 // Remove existing overlays
                 document.querySelectorAll('.heatmap-overlay').forEach(el => el.remove());
-
                 // Get genes for GO
                 const genes = window.CiliAI.lookups.goMap[goTerm.toUpperCase()] || [];
                 if (!genes.length) return;
-
                 // Group by location
                 const locCounts = {};
                 genes.forEach(geneSymbol => {
@@ -824,9 +727,7 @@
                         locCounts[loc] = (locCounts[loc] || 0) + 1;
                     }
                 });
-
                 const maxCount = Math.max(...Object.values(locCounts), 1);
-
                 // Add overlays
                 let overlayGroup = svg.querySelector('#heatmap-group');
                 if (!overlayGroup) {
@@ -834,13 +735,11 @@
                     overlayGroup.id = 'heatmap-group';
                     svg.querySelector('#viewport-group').appendChild(overlayGroup);
                 }
-
                 Object.entries(locCounts).forEach(([loc, count]) => {
                     const svgId = this.locMap[loc];
                     if (!svgId) return;
                     const element = document.getElementById(svgId);
                     if (!element) return;
-
                     const clone = element.cloneNode(true);
                     clone.id = '';
                     clone.classList.add('heatmap-overlay');
@@ -849,19 +748,15 @@
                     clone.style.opacity = (count / maxCount) * 0.7;
                     overlayGroup.appendChild(clone);
                 });
-
                 window.showDiagram();
-                window.CiliAI.resetZoom();  // Reset to show full heatmap
+                window.CiliAI.resetZoom(); // Reset to show full heatmap
             },
-
             // New: Apply Multi-Gene Overlay
             applyMultiOverlay: function(genes) {
                 const svg = document.getElementById('cilia-diagram');
                 if (!svg) return;
-
                 // Remove existing overlays
                 document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
-
                 let overlayGroup = svg.querySelector('#multi-group');
                 if (!overlayGroup) {
                     overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -869,17 +764,14 @@
                     overlayGroup.style.mixBlendMode = 'multiply';
                     svg.querySelector('#viewport-group').appendChild(overlayGroup);
                 }
-
                 genes.forEach((geneSymbol, index) => {
                     const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
                     if (!gene || !gene.Localization) return;
-
                     const loc = gene.Localization.toLowerCase();
                     const svgId = this.locMap[loc];
                     if (!svgId) return;
                     const element = document.getElementById(svgId);
                     if (!element) return;
-
                     const clone = element.cloneNode(true);
                     clone.id = '';
                     clone.classList.add('multi-overlay');
@@ -889,17 +781,15 @@
                     clone.style.fill = colors[index % colors.length];
                     overlayGroup.appendChild(clone);
                 });
-
                 window.showDiagram();
                 window.CiliAI.resetZoom();
             },
-
             // New: Clear Overlays
             clearOverlays: function() {
                 document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
             }
-        }; 
-        
+        };
+       
         // =======================================================
         // PUBLIC BRIDGE — Legacy compatibility
         // =======================================================
@@ -907,7 +797,6 @@
         window.highlightCiliumLocation = function(locTerm, gene = null) {
         return SpatialManager.highlight(locTerm, gene);
 };
-
         // 3. SVG GENERATION FUNCTION (UPDATED WITH NEW DEFS)
         window.generateAndInjectSVG = function() {
             const container = document.getElementById('cilia-svg');
@@ -923,98 +812,96 @@
                             <stop offset="0%" style="stop-color:#E2E8F0;" />
                             <stop offset="100%" style="stop-color:#CBD5E1;" />
                         </radialGradient>
-                        
+                       
                         <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" style="stop-color:#5b21b6;" /> <stop offset="100%" style="stop-color:#4c1d95;" />
                         </linearGradient>
-                        
+                       
                         <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" style="stop-color:#475569;" /> <stop offset="100%" style="stop-color:#334155;" />
                         </linearGradient>
-                        
+                       
                         <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" style="stop-color:#0891b2;" /> <stop offset="100%" style="stop-color:#0e7490;" />
                         </linearGradient>
-                        
+                       
                         <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" style="stop-color:#2563eb;" /> <stop offset="100%" style="stop-color:#1d4ed8;" />
                         </linearGradient>
-
                         <linearGradient id="heatmapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#00ff00" stop-opacity="0.2" />
                             <stop offset="50%" stop-color="#ffff00" stop-opacity="0.5" />
                             <stop offset="100%" stop-color="#ff0000" stop-opacity="0.8" />
                         </linearGradient>
-
                         <filter id="heatmapFilter">
                             <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
-                            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 2 0 0 0  0 0 3 0 0  0 0 0 19 -9" result="heatmap" />
+                            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0 0 2 0 0 0 0 0 3 0 0 0 0 0 19 -9" result="heatmap" />
                             <feComposite in="SourceGraphic" in2="heatmap" operator="atop" />
                         </filter>
                     </defs>
-                    
+                   
                     <g id="viewport-group" transform="translate(0, 0)">
                         <path id="cell-body" class="cilia-part" tabindex="0"
                               fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
                               d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
-                        
+                       
                         <circle id="nucleus" class="cilia-part" tabindex="0"
                                 fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
                                 cx="140" cy="290" r="35"/>
-                        
-                        <rect id="basal-body" class="cilia-part" tabindex="0" 
+                       
+                        <rect id="basal-body" class="cilia-part" tabindex="0"
                               fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
                               x="130" y="165" width="20" height="15" rx="2"/>
-                        
+                       
                         <path id="transition-zone" class="cilia-part" tabindex="0"
                               fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
                               d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
-                        
+                       
                         <path id="ciliary-membrane" class="cilia-part" tabindex="0"
                               fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
                               d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
-                        
+                       
                         <path id="axoneme" class="cilia-part" tabindex="0"
                               fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
                               d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
-                        
+                       
                         <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
                             <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">
                                 PCM1
                                 <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>
                             </text>
-                            
+                           
                             <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">
                                 TMEM17
                                 <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="0.5s"/>
                             </text>
-                            
+                           
                             <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">
                                 ARL13B
                                 <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1s"/>
                             </text>
-                            
+                           
                             <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">
                                 β2-tubulin
                                 <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1.5s"/>
                             </text>
                         </g>
-                        
+                       
                         <circle cx="140" cy="172.5" r="3" fill="#5b21b6" opacity="0.6" style="pointer-events: none;">
                             <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/>
                             <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
                         </circle>
-                        
+                       
                         <circle cx="140" cy="157.5" r="3" fill="#475569" opacity="0.6" style="pointer-events: none;">
                             <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.3s"/>
                             <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.3s"/>
                         </circle>
-                        
+                       
                         <circle cx="140" cy="90" r="3" fill="#0891b2" opacity="0.6" style="pointer-events: none;">
                             <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.6s"/>
                             <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.6s"/>
                         </circle>
-                        
+                       
                         <circle cx="140" cy="42.5" r="3" fill="#2563eb" opacity="0.6" style="pointer-events: none;">
                             <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.9s"/>
                             <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.9s"/>
@@ -1022,40 +909,40 @@
                     </g>
                 </svg>
             `;
-            
+           
             container.onmouseenter = () => {
                 const labels = container.querySelector('.cilia-labels');
                 if (labels) labels.style.opacity = '1';
             };
-            
+           
             container.onmouseleave = () => {
                 const labels = container.querySelector('.cilia-labels');
                 if (labels) labels.style.opacity = '0';
             };
-            
+           
             const ciliaParts = container.querySelectorAll('.cilia-part');
             ciliaParts.forEach(part => {
                 part.addEventListener('click', (e) => {
                     e.stopPropagation();
                     document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
                     part.classList.add('active-highlight');
-                    
+                   
                     const labels = container.querySelector('.cilia-labels');
                     if (labels) {
                         labels.style.opacity = '1';
                         const partId = part.id;
                         const geneMap = {
                             'basal-body': 'PCM1',
-                            'transition-zone': 'TMEM17', 
+                            'transition-zone': 'TMEM17',
                             'ciliary-membrane': 'ARL13B',
                             'axoneme': 'β2-tubulin'
                         };
-                        
+                       
                         labels.querySelectorAll('text').forEach(text => {
                             text.style.fontWeight = '700';
                             text.style.fontSize = '12px';
                         });
-                        
+                       
                         const geneName = geneMap[partId];
                         if (geneName) {
                             labels.querySelectorAll('text').forEach(text => {
@@ -1070,8 +957,8 @@
                     SpatialManager.zoomTo(part);
                 });
             });
-            
-            container.onclick = (e) => { 
+           
+            container.onclick = (e) => {
                 if(e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
                     SpatialManager.resetZoom();
                     const labels = container.querySelector('.cilia-labels');
@@ -1089,8 +976,7 @@
                 }
             };
         };
-
-        // 4. Helper Functions 
+        // 4. Helper Functions
         window.addChatMessage = function(html, isUser = false) {
             const messages = document.getElementById('messages');
             if (!messages) return;
@@ -1100,34 +986,32 @@
             messages.appendChild(msg);
             messages.scrollTop = messages.scrollHeight;
         };
-
         window.updateStatus = function(text, state = 'normal') {
             const statusEl = document.getElementById('dataStatus');
             if (statusEl) {
                 statusEl.textContent = text;
-                statusEl.className = `status-badge status ${state}`; 
+                statusEl.className = `status-badge status ${state}`;
             }
         };
-
         window.showPlot = function(plotData, title = "Gene Expression UMAP") {
             // SAFEGUARD: Clear potential overlapping containers first
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('domain-viewer').style.display = 'none';
-            
+           
             const plotContainer = document.getElementById('plotly-container');
             plotContainer.style.display = 'block';
             document.getElementById('current-viz-title').textContent = title;
-            
+           
             // Clear previous plot to prevent artifacts
             plotContainer.innerHTML = '';
-            
+           
             const vizCard = document.querySelector('.viz-card');
             const vizHeader = document.querySelector('.viz-header');
-            
+           
             // Calculate height safely
             const availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
             const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
-            
+           
             const layout = {
                 ...plotData.layout,
                 autosize: true,
@@ -1145,7 +1029,7 @@
                     bgcolor: 'rgba(255, 255, 255, 0.8)', bordercolor: '#e1e8ed', borderwidth: 1, font: { size: 10 }
                 }
             };
-            
+           
             // FIX: Use Promise to ensure plot is ready before attaching listeners or resizing
             Plotly.newPlot('plotly-container', plotData.data, layout, {
                 responsive: true, displayModeBar: true, displaylogo: false,
@@ -1153,7 +1037,7 @@
                 scrollZoom: false
             }).then(gd => {
                 window.CiliAI.currentPlot = gd;
-                
+               
                 // Add click listener safely
                 gd.on('plotly_click', e => {
                     const loc = e.points?.[0]?.customdata?.localization;
@@ -1164,7 +1048,7 @@
                     }
                 });
             });
-            
+           
             // Resize Listener: Only resize if the container is actually visible
             window.addEventListener('resize', () => {
                 const container = document.getElementById('plotly-container');
@@ -1173,7 +1057,6 @@
                 }
             });
         };
-
         window.showDiagram = function() {
             document.getElementById('plotly-container').style.display = 'none';
             document.getElementById('domain-viewer').style.display = 'none';
@@ -1181,7 +1064,6 @@
             document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
             window.CiliAI.currentPlot = null;
         };
-
        // New: Show Domain Viewer (Fixed: Nature Colors + No Text Overlap)
         window.showDomainViewer = function(gene) {
             document.getElementById('cilia-svg').style.display = 'none';
@@ -1190,18 +1072,17 @@
             domainContainer.style.display = 'flex';
             domainContainer.innerHTML = '';
             document.getElementById('current-viz-title').textContent = `Pfam Domains: ${gene}`;
-
             // Safety check for lookup data
             const pfamLookup = window.CiliAI.lookups.pfamByGene || {};
             const pfam = pfamLookup[gene.toUpperCase()] || [];
-            
+           
             if (!pfam.length) {
                 // Check for raw text descriptions as fallback
                 const geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
                 if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
                     const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
                     const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
-                    
+                   
                     if (parts.length > 0) {
                         const domains = parts.map((part, i) => ({
                             id: `DOM_${i+1}`,
@@ -1214,22 +1095,20 @@
                         return;
                     }
                 }
-                
+               
                 domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
                 return;
             }
-
             // --- 1. Setup Canvas & Scaling ---
-            const seqLength = Math.max(...pfam.map(d => d.end), 1000); 
+            const seqLength = Math.max(...pfam.map(d => d.end), 1000);
             const svgWidth = 1000; // Internal coordinate width
             const scale = (val) => (val / seqLength) * (svgWidth - 100) + 50; // Map seq pos to SVG x
-            
+           
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('viewBox', `0 0 ${svgWidth} 200`);
             svg.setAttribute('width', '100%');
             svg.setAttribute('height', '100%');
             svg.style.fontFamily = "'Inter', sans-serif";
-
             // --- 2. Nature Journal Color Palette ---
             const natureColors = [
                 '#E64B35', // Red
@@ -1241,9 +1120,8 @@
                 '#91D1C2', // Teal
                 '#DC0000', // Dark Red
                 '#7E6148', // Brown
-                '#B09C85'  // Beige
+                '#B09C85' // Beige
             ];
-
             // --- 3. Draw Backbone Line ---
             const lineY = 100;
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1255,16 +1133,15 @@
             line.setAttribute('stroke-width', '4');
             line.setAttribute('stroke-linecap', 'round');
             svg.appendChild(line);
-
             // --- 4. Draw Domains & Labels ---
             pfam.forEach((domain, index) => {
                 const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                
+               
                 // Calculate Positions
                 const xStart = scale(domain.start);
                 const xEnd = scale(domain.end);
                 const width = Math.max(xEnd - xStart, 10); // Min width 10px
-                
+               
                 // Domain Rectangle
                 const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                 rect.setAttribute('x', xStart);
@@ -1277,18 +1154,17 @@
                 rect.setAttribute('stroke-width', '1');
                 rect.setAttribute('opacity', '0.9');
                 rect.classList.add('domain-rect');
-                
+               
                 // Tooltip
                 const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
                 rect.appendChild(title);
                 group.appendChild(rect);
-
                 // Staggered Label Logic (Alternating Heights)
                 // Even index = Top High, Odd index = Top Low (or bottom)
                 // Here we alternate two rows ABOVE the protein to avoid clutter
-                const labelY = (index % 2 === 0) ? 40 : 65; 
-                
+                const labelY = (index % 2 === 0) ? 40 : 65;
+               
                 // Connector Line (from label to domain)
                 const conn = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 conn.setAttribute('x1', xStart + width / 2);
@@ -1298,7 +1174,6 @@
                 conn.setAttribute('stroke', '#ccc');
                 conn.setAttribute('stroke-width', '1');
                 group.appendChild(conn);
-
                 // Text Label
                 const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 text.setAttribute('x', xStart + width / 2);
@@ -1308,14 +1183,13 @@
                 text.setAttribute('font-weight', '600');
                 text.setAttribute('fill', '#2c3e50');
                 text.textContent = domain.name || domain.id;
-                
+               
                 // Prevent text from going off-screen
                 // (Simple clamp logic could be added here if needed, but centering usually works)
-                
+               
                 group.appendChild(text);
                 svg.appendChild(group);
             });
-
             // Start/End Residue Numbers
             const startText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             startText.setAttribute('x', '20');
@@ -1323,17 +1197,14 @@
             startText.setAttribute('font-size', '10');
             startText.textContent = '1';
             svg.appendChild(startText);
-
             const endText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             endText.setAttribute('x', svgWidth - 40);
             endText.setAttribute('y', lineY + 5);
             endText.setAttribute('font-size', '10');
             endText.textContent = seqLength;
             svg.appendChild(endText);
-
             domainContainer.appendChild(svg);
         };
-
         window.downloadCurrentVisualization = function() {
             if (window.CiliAI.currentPlot) {
                 Plotly.downloadImage(window.CiliAI.currentPlot, { format: 'png', filename: 'ciliai-umap-plot', width: 1200, height: 800, scale: 2 });
@@ -1367,7 +1238,6 @@
                 }
             }
         };
-
         // Data Loading Logic (UPDATED WITH SPLIT KIDNEY JSON)
         window.loadCiliAIData = async function(timeoutMs = 60000) {
             const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
@@ -1381,15 +1251,13 @@
                 fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
                 fetch(base + 'kidney_expression_part2.json').then(r => r.json())
             ]);
-
             window.CiliAI.masterData = mainRes.masterData || [];
             window.CiliAI.lookups = lookupsRes.lookups || {};
-            
+           
             if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
             if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
-            
+           
             window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
-
             // Assign Kidney Multi-part data
             const mergedKidneyExpr = { ...kExpr1Res, ...kExpr2Res };
             window.CiliAI.datasets.kidney = {
@@ -1398,22 +1266,18 @@
                 expression: mergedKidneyExpr,
                 colorScale: [[0, '#e2e8f0'], [0.1, '#bee3f8'], [1, '#2b6cb0']]
             };
-
             // Assign RNA Tissue
             const rnaText = await rnaResp.text();
             window.rnaTissueExpressionData = parseTsvData(rnaText);
-
             // Populate mapping and calculate stats
             const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
             const validCiliopathyDiseases = new Set();
             const uniqueCiliopathyGenes = new Set();
-
             window.CiliAI.masterData.forEach(g => {
                 if (g.Gene) {
                     const sym = g.Gene.toUpperCase();
                     window.CiliAI.lookups.geneMap[sym] = g;
                     if(g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
-
                     if (primaryClasses.includes(g.ciliopathy_classification)) {
                         uniqueCiliopathyGenes.add(sym);
                         if (g.Ciliopathy) {
@@ -1423,12 +1287,10 @@
                     }
                 }
             });
-
             // Update Counters
             document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
             document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
             document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
-
             window.CiliAI.ready = true;
             window.updateStatus('CONNECTED', 'ready');
             return true;
@@ -1438,7 +1300,6 @@
             return false;
         }
     };
-
  // =======================================================
 // View Switching Function
 // =======================================================
@@ -1446,10 +1307,10 @@ window.switchView = function(viewType) {
     const diagramTab = document.getElementById('tab-diagram');
     const plotTab = document.getElementById('tab-plot');
     const domainTab = document.getElementById('tab-domain');
-    
+   
     // Update tab styles
     [diagramTab, plotTab, domainTab].forEach(tab => tab.classList.remove('active'));
-    
+   
     if (viewType === 'diagram') {
         diagramTab.classList.add('active');
         window.showDiagram();
@@ -1468,42 +1329,39 @@ window.switchView = function(viewType) {
         }
     }
 };
-
  // =======================================================
 // Zoom Controls
 // =======================================================
 window.zoomIn = function() {
     const viewport = document.getElementById('viewport-group');
     if (!viewport) return;
-    
+   
     const currentTransform = viewport.style.transform || 'scale(1)';
     const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
     const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
     const newScale = currentScale * 1.2;
-    
+   
     viewport.style.transition = "transform 0.3s ease";
     viewport.style.transform = currentTransform.replace(
-        /scale\([\d.]+\)/, 
+        /scale\([\d.]+\)/,
         `scale(${newScale})`
     );
 };
-
 window.zoomOut = function() {
     const viewport = document.getElementById('viewport-group');
     if (!viewport) return;
-    
+   
     const currentTransform = viewport.style.transform || 'scale(1)';
     const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
     const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
     const newScale = Math.max(0.5, currentScale * 0.8);
-    
+   
     viewport.style.transition = "transform 0.3s ease";
     viewport.style.transform = currentTransform.replace(
-        /scale\([\d.]+\)/, 
+        /scale\([\d.]+\)/,
         `scale(${newScale})`
     );
 };
-
 window.toggleLabels = function(checkbox) {
     const container = document.getElementById('cilia-svg');
     if (checkbox.checked) {
@@ -1511,8 +1369,7 @@ window.toggleLabels = function(checkbox) {
     } else {
         container.classList.remove('labels-visible');
     }
-};   
-
+};
 window.toggleFullscreen = function() {
     const container = document.querySelector('.viz-card');
     if (!document.fullscreenElement) {
@@ -1523,7 +1380,6 @@ window.toggleFullscreen = function() {
         document.exitFullscreen();
     }
 };
-
 window.downloadJournalSVG = function() {
     const svgElement = document.getElementById('cilia-diagram');
     if (svgElement) {
@@ -1538,19 +1394,16 @@ window.downloadJournalSVG = function() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
-};    
-    
+};
+   
 // ================================
 // TSV PARSER — REQUIRED BY ENGINE
 // ================================
 window.parseTsvData = function (tsvText) {
     if (!tsvText || typeof tsvText !== 'string') return [];
-
     const lines = tsvText.trim().split(/\r?\n/);
     if (lines.length < 2) return [];
-
     const headers = lines[0].split('\t').map(h => h.trim());
-
     return lines.slice(1).map(line => {
         const values = line.split('\t');
         const row = {};
@@ -1560,8 +1413,6 @@ window.parseTsvData = function (tsvText) {
         return row;
     });
 };
-
-
 window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
             const query = input.value.trim();
@@ -1570,7 +1421,6 @@ window.handleUserSend = function() {
             input.value = '';
             window.handleAIQuery(query);
         };
-
         window.searchGene = function() {
             const input = document.getElementById('geneSearch');
             const gene = input.value.trim().toUpperCase();
@@ -1578,9 +1428,37 @@ window.handleUserSend = function() {
             window.addChatMessage(`Tell me about ${gene}`, true);
             window.handleAIQuery(`What is ${gene}?`);
         };
-
         const originalHandleAIQuery = window.handleAIQuery;
-        
+        window.handleAIQuery = async function(query) {
+            originalHandleAIQuery(query);
+            const lowerQuery = query.toLowerCase().trim();
+            const localizationPatterns = [
+                /where is (.+?) localized/i,
+                /where are (.+?) localized/i,
+                /tell me localization of (.+)/i,
+                /localization of (.+)/i,
+                /(.+?) localization/i
+            ];
+            let matchedGenes = [];
+            for (const pattern of localizationPatterns) {
+                const match = lowerQuery.match(pattern);
+                if (match && match[1]) {
+                    matchedGenes = match[1].split(/[, and]+/).map(g => g.trim().toUpperCase());
+                    break;
+                }
+            }
+            if (matchedGenes.length > 0) {
+                matchedGenes.forEach(gene => {
+                    if (window.CiliAI.lookups.geneMap[gene]) {
+                        const loc = window.CiliAI.lookups.geneMap[gene].Localization;
+                        if (loc) {
+                            window.SpatialManager.highlight(loc, gene);
+                        }
+                    }
+                });
+            }
+        };
+       
         async function init() {
             window.updateStatus('Loading databases...', 'loading');
             window.generateAndInjectSVG();
@@ -1589,11 +1467,9 @@ window.handleUserSend = function() {
                 window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
             }
         }
-
         document.getElementById('chatInput').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') window.handleUserSend();
         });
-
         init();
     </script>
 </html>
