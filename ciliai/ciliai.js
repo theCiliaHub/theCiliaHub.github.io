@@ -4064,28 +4064,65 @@ window.handleAIQuery = async function (query) {
         else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
             htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
         }
-       // Intent 10: Domains (Visualizer)
-        else if (htmlResult === null && (match = qLower.match(/(?:domains? (?:of|for)|domain architecture (?:of|for))\s+(.+)/i))) {
-            const genes = window.extractMultipleGenes(match[1]);
-            if (genes.length > 0) {
-                // Ensure UI is clear before showing new viewer
-                if (typeof window.resetViews === 'function') window.resetViews();
-               
-                // Trigger the visualizer defined in index.html
-                if (typeof window.showDomainViewer === 'function') {
-                    window.showDomainViewer(genes[0]);
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>Domain Architecture: ${genes[0]}</h4>
-                        <p>Displaying Pfam domains in the main panel.</p>
-                        <p style="font-size:11px; color:#666;">(Hover over domains for details)</p>
-                    </div>`;
-                } else {
-                    htmlResult = `<div class="ai-result-card"><p>Domain viewer function is missing.</p></div>`;
-                }
-            } else {
-                htmlResult = `<div class="ai-result-card"><p>Please specify a gene to view domains (e.g., "Domains for IFT88").</p></div>`;
-            }
+       // === Intent 10: Domain Architecture Visualizer (Multi-Gene, Nature Palette, Anti-Overlap) ===
+else if (htmlResult === null && (match = qLower.match(/(?:show )?(?:domains?|domain architecture|pfa?m?s?)(?: (?:of|for|in))?\s+(.+)/i))) {
+    const rawInput = match[1];
+    const genes = window.extractMultipleGenes(rawInput);
+
+    if (genes.length === 0) {
+        htmlResult = `<div class="ai-result-card">
+            <p>No valid gene symbols found.</p>
+            <p><strong>Examples:</strong><br>
+            • "Show domains for IFT88"<br>
+            • "Domain architecture of WDR35"<br>
+            • "Pfam domains in BBS1 and BBS4"</p>
+        </div>`;
+    } else {
+        // Switch to domain view
+        window.switchView('domain');
+
+        let responseHtml = `<div class="ai-result-card">
+            <h4>🧬 Protein Domain Architecture</h4>
+            <p>Showing Pfam domains for: <strong>${genes.slice(0, 3).join(', ')}${genes.length > 3 ? ' and ' + (genes.length - 3) + ' more' : ''}</strong></p>`;
+
+        // Show first gene fully, others as compact list if many
+        if (genes.length === 1) {
+            const gene = genes[0].toUpperCase();
+            const geneData = window.CiliAI.lookups.geneMap[gene];
+            const hasDomains = geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions);
+
+            window.showDomainViewer(gene); // This already uses Nature colors + anti-overlap staggering
+
+            responseHtml += hasDomains
+                ? `<p>Interactive domain map displayed → hover for details.</p>`
+                : `<p><em>${gene}</em> has no annotated Pfam domains.</p>`;
+        } else {
+            // Multi-gene: show compact summary + trigger first one in viewer
+            window.showDomainViewer(genes[0]);
+
+            responseHtml += `<ul style="margin:10px 0; padding-left:20px; font-size:13px;">`;
+            genes.slice(0, 6).forEach(g => {
+                const geneData = window.CiliAI.lookups.geneMap[g];
+                const domainCount = geneData?.PFAM_IDs ? geneData.PFAM_IDs.split(/[,;]/).filter(Boolean).length
+                                : geneData?.Domain_Descriptions ? geneData.Domain_Descriptions.split(/[,;]/).filter(Boolean).length : 0;
+                responseHtml += `<li><strong>${g}</strong>: ${domainCount} domain${domainCount !== 1 ? 's' : ''}</li>`;
+            });
+            if (genes.length > 6) responseHtml += `<li><em>...and ${genes.length - 6} more</em></li>`;
+            responseHtml += `</ul>`;
+            responseHtml += `<p><strong>${genes[0]}</strong> is shown in full detail above. Type "domains for [other gene]" to switch.</p>`;
         }
+
+        responseHtml += `
+            <p style="margin-top:12px; font-size:12px; color:#666;">
+                🎨 Colors follow <strong>Nature journal</strong> style • Labels are staggered to prevent overlap
+            </p>
+        </div>`;
+        htmlResult = responseHtml;
+    }
+
+    window.addChatMessage(htmlResult, false);
+    return;
+}
         // Intent 11: Modules
         else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
             const gene = match[1].toUpperCase();
@@ -4203,12 +4240,105 @@ else if (
         </div>
     `;
 }
-        // Intent 13: Comparative
-        else if (htmlResult === null && (qLower.includes('compare') || qLower.includes(' vs '))) {
-            const matches = query.match(/([A-Z0-9]+)\s+vs\s+([A-Z0-9]+)/gi);
-            if (matches) htmlResult = await window.handleComparativeDashboard(matches[0]);
-            else htmlResult = await window.handleComparativeDashboard(query);
+        // === Intent 13: Compare Genes (Smart Multi-Aspect Comparison) ===
+else if (htmlResult === null && (qLower.includes('compare') || qLower.includes(' vs ') || qLower.includes(' versus ') || qLower.includes('difference between'))) {
+    const genes = window.extractMultipleGenes(query);
+
+    if (genes.length < 2) {
+        htmlResult = `<div class="ai-result-card">
+            <p>Please provide at least two genes to compare.</p>
+            <p><strong>Examples:</strong><br>
+            • "Compare WDR31 and WDR54"<br>
+            • "IFT88 vs IFT140"<br>
+            • "Compare localization of BBS1, BBS5, ELMOD3"</p>
+        </div>`;
+    } else {
+        // Limit to reasonable number
+        const compareGenes = genes.slice(0, 5).map(g => g.toUpperCase());
+        const validGenes = compareGenes.filter(g => window.CiliAI.lookups.geneMap[g]);
+        const missing = compareGenes.filter(g => !window.CiliAI.lookups.geneMap[g]);
+
+        // Switch to diagram first (default view for localization)
+        window.switchView('diagram');
+        window.showDiagram();
+        SpatialManager.clearOverlays();
+
+        let responseHtml = `<div class="ai-result-card">
+            <h4>🔬 Comparative Analysis</h4>`;
+
+        if (missing.length > 0) {
+            responseHtml += `<p><strong>Not found:</strong> ${missing.join(', ')}</p>`;
         }
+
+        if (validGenes.length < 2) {
+            responseHtml += `<p>Not enough valid genes to compare.</p></div>`;
+            window.addChatMessage(responseHtml, false);
+            return;
+        }
+
+        // Smart mode detection
+        const hasLocalizationQuery = qLower.includes('localization') || qLower.includes('located') || qLower.includes('compartment');
+        const hasExpressionQuery = qLower.includes('expression') || qLower.includes('expressed');
+
+        if (hasLocalizationQuery) {
+            // Localization comparison → multi-overlay
+            SpatialManager.applyMultiOverlay(validGenes);
+            responseHtml += `<p><strong>Localization Comparison</strong> (colored overlays):</p><ul style="margin:8px 0;">`;
+            const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+            validGenes.forEach((g, i) => {
+                const loc = window.CiliAI.lookups.geneMap[g]?.Localization || 'Not annotated';
+                responseHtml += `<li style="margin:4px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:${colors[i]}; border-radius:3px; margin-right:8px;"></span>
+                    <strong>${g}</strong>: ${loc}
+                </li>`;
+            });
+            responseHtml += `</ul>`;
+            responseHtml += `<p><em>👆 Distinct colored regions on the cilium diagram show where each protein localizes.</em></p>`;
+
+        } else if (hasExpressionQuery) {
+            // Expression comparison → suggest plot
+            responseHtml += `<p><strong>Expression Comparison</strong> in available tissues:</p>`;
+            responseHtml += `<p>Switch to <strong>Plot tab</strong> → I can generate a multi-gene expression heatmap or UMAP overlay.</p>`;
+            responseHtml += `<p>Try: <em>"Plot expression of ${validGenes.slice(0, 3).join(', ')}"</em></p>`;
+
+        } else {
+            // Default: Localization + basic info summary
+            SpatialManager.applyMultiOverlay(validGenes);
+            responseHtml += `<p><strong>Comparing ${validGenes.length} genes</strong> (colored overlays on diagram):</p>`;
+            responseHtml += `<table style="width:100%; font-size:13px; margin-top:10px; border-collapse:collapse;">`;
+            responseHtml += `<tr style="background:#f7fafc;">
+                <th style="text-align:left; padding:6px;">Gene</th>
+                <th style="text-align:left; padding:6px;">Localization</th>
+                <th style="text-align:left; padding:6px;">Ciliopathy Link</th>
+            </tr>`;
+
+            validGenes.forEach((g, i) => {
+                const data = window.CiliAI.lookups.geneMap[g];
+                const loc = data?.Localization || '—';
+                const disease = data?.Ciliopathy && data.Ciliopathy !== 'Not specified' ? 'Yes' : 'No';
+                const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+                responseHtml += `<tr>
+                    <td style="padding:6px; font-weight:600; color:${colors[i]};">${g}</td>
+                    <td style="padding:6px;">${loc}</td>
+                    <td style="padding:6px;">${disease}</td>
+                </tr>`;
+            });
+            responseHtml += `</table>`;
+            responseHtml += `<p style="margin-top:12px;"><em>Interactive multi-colored overlay active on the ciliary diagram.</em></p>`;
+        }
+
+        responseHtml += `
+            <p style="margin-top:14px; font-size:12px; color:#666;">
+                💡 Try more specific queries: "Compare expression of..." or "Compare domains of..."
+            </p>
+        </div>`;
+
+        htmlResult = responseHtml;
+    }
+
+    window.addChatMessage(htmlResult, false);
+    return;
+}
         // Intent 14: Variants
         else if (htmlResult === null && (qLower.includes('variant') || qLower.includes('mutation'))) {
             const genes = window.extractMultipleGenes(query);
@@ -4256,74 +4386,123 @@ else if (
             htmlResult = `<div class="ai-result-card"><p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p><p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p></div>`;
         }
 
-     // === 20. Intent: "Where is [GENE] located?" (Visualizer) ===
-else if (htmlResult === null && qLower.startsWith('where is') && (qLower.includes('located') || qLower.includes('localised') || qLower.includes('localized'))) {
+    // === 20. Intent: Localization queries (e.g., "Where is WDR31 localized?") ===
+else if (
+    htmlResult === null &&
+    (
+        qLower.startsWith('where is') ||
+        qLower.startsWith('where are') ||
+        qLower.includes('localization of') ||
+        qLower.includes('localisation of') ||
+        qLower.includes('localized') ||
+        qLower.includes('localised') ||
+        qLower.match(/tell me.*locali[sz]ation/)
+    ) &&
+    (qLower.includes('where') || qLower.includes('locali') || qLower.includes('located'))
+) {
     const genes = extractMultipleGenes(query);
 
     if (genes.length === 0) {
         window.addChatMessage(`
             <div class="ai-result-card">
-                <p>Please specify a gene symbol.</p>
-                <p><strong>Example:</strong> "Where is IFT88 located?" or "Where are BBS1 and FOXJ1 located?"</p>
+                <p>I couldn't identify any gene symbols in your question.</p>
+                <p><strong>Examples:</strong><br>
+                • "Where is IFT88 localized?"<br>
+                • "Where are BBS1, BBS5 and ELMOD3 located?"<br>
+                • "Tell me the localization of PCM1"</p>
             </div>
         `, false);
         return;
     }
 
-    // Force diagram visibility
-    window.resetViews();
+    // Ensure we're in diagram view
+    window.switchView('diagram');
+    window.showDiagram(); // Explicitly show diagram
+    SpatialManager.clearOverlays(); // Clean previous overlays
 
-    let responseHtml = '<div class="ai-result-card"><h4>Gene Localization</h4>';
+    let responseHtml = '<div class="ai-result-card"><h4>📍 Gene Localization in the Cilium</h4>';
 
-    genes.forEach((geneSymbol, index) => {
-        geneSymbol = geneSymbol.toUpperCase();
+    const validGenes = [];
+    const unknownGenes = [];
+
+    genes.forEach(geneSymbol => {
+        geneSymbol = geneSymbol.toUpperCase().trim();
         const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
 
-        let localization = 'Cilium (general)';
-        let highlighted = false;
-
-        if (geneData && geneData.Localization) {
-            localization = geneData.Localization.trim();
-            // Highlight on diagram
-            if (typeof window.highlightCiliumLocation === 'function') {
-                highlighted = window.highlightCiliumLocation(localization, geneSymbol);
-            }
-        } else if (geneData) {
-            // Gene exists but no localization data
-            if (typeof window.highlightCiliumLocation === 'function') {
-                highlighted = window.highlightCiliumLocation('cilia', geneSymbol); // fallback
-            }
-        } else {
-            // Gene not in database
-            responseHtml += `<p><strong>${geneSymbol}</strong>: Not found in database.</p>`;
-            return; // skip to next gene
+        if (!geneData) {
+            unknownGenes.push(geneSymbol);
+            return;
         }
 
-        const note = highlighted 
-            ? 'Highlighted on the diagram.' 
-            : 'Broad/general localization – full cilium shown.';
+        validGenes.push({
+            symbol: geneSymbol,
+            localization: geneData.Localization?.trim() || 'Unknown / Not annotated'
+        });
+    });
+
+    // Report missing genes
+    if (unknownGenes.length > 0) {
+        responseHtml += `<p><strong>Not found:</strong> ${unknownGenes.join(', ')}</p>`;
+    }
+
+    if (validGenes.length === 0) {
+        responseHtml += `<p>No known genes from your query were found in the database.</p></div>`;
+        window.addChatMessage(responseHtml, false);
+        return;
+    }
+
+    // Single gene → precise highlight + zoom
+    if (validGenes.length === 1) {
+        const { symbol, localization } = validGenes[0];
+        let highlighted = false;
+
+        if (localization && localization !== 'Unknown / Not annotated') {
+            highlighted = SpatialManager.highlight(localization, symbol);
+        }
+
+        const status = highlighted
+            ? '✅ Highlighted and zoomed on the diagram'
+            : 'ℹ️ Localization known but not mappable to specific compartment — full view shown';
 
         responseHtml += `
             <p>
-                <strong>${geneSymbol}</strong>: <span style="color:#2b6cb0;">${localization}</span><br>
-                <em>${note}</em>
+                <span class="gene-badge" style="font-size:14px; padding:6px 14px;">${symbol}</span><br><br>
+                <strong>Localized to:</strong> <span style="color:#2b6cb0; font-weight:600;">${localization}</span><br><br>
+                <em>${status}</em>
             </p>
         `;
+    }
+    // Multiple genes → multi-colored overlay
+    else {
+        SpatialManager.applyMultiOverlay(validGenes.map(g => g.symbol));
 
-        // Add separator if not last gene
-        if (index < genes.length - 1) {
-            responseHtml += '<hr style="border:0; border-top:1px solid #e2e8f0; margin:10px 0;">';
-        }
-    });
+        responseHtml += `<p><strong>Multiple genes queried:</strong></p>`;
+        validGenes.forEach(({ symbol, localization }, i) => {
+            const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+            const color = colors[i % colors.length];
+
+            responseHtml += `
+                <p style="margin:8px 0;">
+                    <span class="gene-badge" style="background:${color}; color:white;">${symbol}</span>
+                    → <strong>${localization}</strong>
+                </p>
+            `;
+        });
+
+        responseHtml += `<p style="margin-top:14px;"><em>
+            👆 Each gene is shown with a distinct colored overlay on the interactive cilium diagram.
+        </em></p>`;
+    }
 
     responseHtml += `
-        <p style="margin-top:12px;"><strong>Interactive ciliary diagram</strong> is displayed on the left with highlighted compartments.</p>
+        <p style="margin-top:16px; font-size:13px; color:#666;">
+            💡 <strong>Tip:</strong> You can click on compartments in the diagram to explore, or zoom using the controls.
+        </p>
     </div>`;
 
     window.addChatMessage(responseHtml, false);
     return;
 }
-
     
         // === 21. Intent: Multi-gene Overlay (Visualizer) ===
 else if (htmlResult === null && (qLower.startsWith('multi:') || qLower.includes('multi:'))) {
