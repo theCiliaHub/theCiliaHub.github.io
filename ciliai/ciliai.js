@@ -4635,62 +4635,61 @@ else if (
     return;
 }
     
-        // === 21. Intent: Multi-gene Overlay (Visualizer) ===
-else if (htmlResult === null && (qLower.startsWith('multi:') || qLower.includes('multi:'))) {
-    // Extract the part after "multi:" and clean it
-    let geneString = query.replace(/^multi:?/i, '').trim();
-    
-    // Remove any leading/trailing punctuation or words
-    geneString = geneString.replace(/^[:\s,]+/, '').replace(/[\.\?!]*$/, '');
+// === 21. Intent: Multi-gene Overlay (Visualizer) ===
+        else if (htmlResult === null && (qLower.startsWith('multi:') || qLower.includes('multi:'))) {
+            // Extract the part after "multi:" and clean it
+            let geneString = query.replace(/^multi:?/i, '').trim();
+            
+            // Remove any leading/trailing punctuation or words
+            geneString = geneString.replace(/^[:\s,]+/, '').replace(/[\.\?!]*$/, '');
 
-    // Use extractMultipleGenes on the cleaned string
-    let genes = extractMultipleGenes(geneString);
+            // Use extractMultipleGenes on the cleaned string
+            let genes = extractMultipleGenes(geneString);
 
-    // Fallback: if no genes found, try splitting by comma/space manually
-    if (genes.length === 0 && geneString) {
-        genes = geneString
-            .split(/[\s,]+/)
-            .map(g => g.trim().toUpperCase())
-            .filter(g => g.length >= 3 && /^[A-Z0-9]+$/.test(g));
-    }
+            // Fallback: if no genes found, try splitting by comma/space manually
+            if (genes.length === 0 && geneString) {
+                genes = geneString
+                    .split(/[\s,]+/)
+                    .map(g => g.trim().toUpperCase())
+                    .filter(g => g.length >= 3 && /^[A-Z0-9]+$/.test(g));
+            }
 
-    if (genes.length < 2) {
-        window.addChatMessage(`
-            <div class="ai-result-card">
-                <p>Please provide at least 2 valid gene symbols.</p>
-                <p><strong>Example:</strong> Multi: IFT88, FOXJ1</p>
-                <p>Or: Multi: BBS1, CEP290, TMEM67</p>
-            </div>
-        `, false);
-        return;
-    }
+            if (genes.length < 2) {
+                window.addChatMessage(`
+                    <div class="ai-result-card">
+                        <p>Please provide at least 2 valid gene symbols.</p>
+                        <p><strong>Example:</strong> Multi: IFT88, FOXJ1</p>
+                        <p>Or: Multi: BBS1, CEP290, TMEM67</p>
+                    </div>
+                `, false);
+                return;
+            }
 
-    // Success: Show diagram and apply multi-overlay
-    window.resetViews();
+            // Success: Show diagram and apply multi-overlay
+            window.resetViews();
 
-    if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
-        window.SpatialManager.applyMultiOverlay(genes);
-    }
+            if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
+                window.SpatialManager.applyMultiOverlay(genes);
+            }
 
-    const geneList = genes.join(', ');
-    const preview = genes.length > 8 ? genes.slice(0, 8).join(', ') + '...' : geneList;
+            const geneList = genes.join(', ');
+            const preview = genes.length > 8 ? genes.slice(0, 8).join(', ') + '...' : geneList;
 
-    window.addChatMessage(`
-        <div class="ai-result-card">
-            <h4>Multi-gene Localization</h4>
-            <p><strong>Genes:</strong> ${geneList} (${genes.length} total)</p>
-            <p><strong>Preview:</strong> ${preview}</p>
-            <p>Each gene is highlighted in a <strong>different color</strong> on the interactive ciliary diagram.</p>
-        </div>
-    `, false);
+            window.addChatMessage(`
+                <div class="ai-result-card">
+                    <h4>Multi-gene Localization</h4>
+                    <p><strong>Genes:</strong> ${geneList} (${genes.length} total)</p>
+                    <p><strong>Preview:</strong> ${preview}</p>
+                    <p>Each gene is highlighted in a <strong>different color</strong> on the interactive ciliary diagram.</p>
+                </div>
+            `, false);
 
-    return;
-}
+            return;
+        }
 
-    
-try {
         // === 22. Intent: GO Term / Functional Heatmap (Visualizer) ===
-        if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:')) {
+        // (Removed the stray 'try {' that was causing the syntax error here)
+        else if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:')) {
             let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
             if (!term) {
                 window.addChatMessage(`<div class="ai-result-card"><p>Please provide a GO term or functional category (e.g., "GO: intraflagellar transport").</p></div>`, false);
@@ -4804,6 +4803,7 @@ try {
         `, false);
     }
 };
+
 
 // Re-define initCiliAI (must be after all other code)
 window.initCiliAI = async function() {
