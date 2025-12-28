@@ -4688,101 +4688,120 @@ else if (htmlResult === null && (qLower.startsWith('multi:') || qLower.includes(
 }
 
     
+try {
         // === 22. Intent: GO Term / Functional Heatmap (Visualizer) ===
-else if (htmlResult === null && (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:'))) {
-    let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
+        if (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:')) {
+            let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
+            if (!term) {
+                window.addChatMessage(`<div class="ai-result-card"><p>Please provide a GO term or functional category (e.g., "GO: intraflagellar transport").</p></div>`, false);
+                return;
+            }
 
-    if (!term) {
-        window.addChatMessage(`<div class="ai-result-card"><p>Please provide a GO term or functional category (e.g., "GO: intraflagellar transport").</p></div>`, false);
-        return;
-    }
+            // Primary: Use database search if available
+            let genes = [];
+            if (typeof window.getGenesByFunction === 'function') {
+                genes = window.getGenesByFunction(term);
+            }
 
-    // Primary: Use database search if available
-    let genes = [];
-    if (typeof window.getGenesByFunction === 'function') {
-        genes = window.getGenesByFunction(term);
-    }
+            // Hardcoded fallbacks for key ciliary terms
+            const lowerTerm = term.toLowerCase();
+            const fallbackMap = {
+                'intraflagellar transport': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46', 'KIF3A', 'KIF3B', 'KIF17', 'DYNC2H1'],
+                'ift': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46'],
+                'bbsome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'TTC8', 'BBS9', 'BBIP1'],
+                'transition zone': ['TMEM67', 'TMEM216', 'TMEM237', 'CEP290', 'CC2D2A', 'TCTN1', 'TCTN2', 'MKS1', 'NPHP1', 'RPGRIP1L'],
+                'dynein arm': ['DNAH5', 'DNAH11', 'DNAI1', 'DNAI2', 'DNAAF1', 'DNAAF2', 'LRRC6'],
+                'radial spoke': ['RSPH1', 'RSPH4A', 'RSPH9', 'DRC1']
+            };
 
-    // Hardcoded fallbacks for key ciliary terms (ensures "intraflagellar transport" always works)
-    const lowerTerm = term.toLowerCase();
-    const fallbackMap = {
-        'intraflagellar transport': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46', 'KIF3A', 'KIF3B', 'KIF17', 'DYNC2H1'],
-        'ift': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46'],
-        'bbsome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'TTC8', 'BBS9', 'BBIP1'],
-        'transition zone': ['TMEM67', 'TMEM216', 'TMEM237', 'CEP290', 'CC2D2A', 'TCTN1', 'TCTN2', 'MKS1', 'NPHP1', 'RPGRIP1L'],
-        'dynein arm': ['DNAH5', 'DNAH11', 'DNAI1', 'DNAI2', 'DNAAF1', 'DNAAF2', 'LRRC6'],
-        'radial spoke': ['RSPH1', 'RSPH4A', 'RSPH9', 'DRC1']
-    };
+            if (genes.length === 0) {
+                for (const key in fallbackMap) {
+                    if (lowerTerm.includes(key)) {
+                        genes = fallbackMap[key];
+                        break;
+                    }
+                }
+            }
 
-    if (genes.length === 0) {
-        for (const key in fallbackMap) {
-            if (lowerTerm.includes(key)) {
-                genes = fallbackMap[key];
-                break;
+            if (genes.length === 0) {
+                window.addChatMessage(`
+                    <div class="ai-result-card">
+                        <p>No genes found for <strong>"${term}"</strong>.</p>
+                        <p>Try common terms like "intraflagellar transport", "bbsome", or "transition zone".</p>
+                    </div>
+                `, false);
+                return;
+            }
+
+            // Apply visualization
+            if (typeof window.resetViews === 'function') window.resetViews();
+
+            if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
+                const upperGenes = genes.map(g => g.toUpperCase());
+                window.SpatialManager.applyMultiOverlay(upperGenes);
+            }
+
+            const preview = genes.slice(0, 12).join(', ');
+            const more = genes.length > 12 ? `... and ${genes.length - 12} more` : '';
+
+            htmlResult = `
+                <div class="ai-result-card">
+                    <h4>Functional Category / GO Term: ${term}</h4>
+                    <p>Found <strong>${genes.length}</strong> genes.</p>
+                    <p><strong>Examples:</strong> ${preview}${more}</p>
+                    <p>A <strong>multi-colored overlay</strong> has been applied to the ciliary diagram showing localization of these genes.</p>
+                    <p><em>Each color represents one gene — overlapping colors indicate shared compartments.</em></p>
+                </div>
+            `;
+        }
+
+        // === Fallback Intent (if no specific intent matched above) ===
+        else {
+            const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
+            if (intent && intent.handler) {
+                htmlResult = intent.handler(intent.entity, query);
+            }
+
+            if (htmlResult === null) {
+                let term = qLower;
+                const match = qLower.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
+                if (match) term = match[1];
+                term = term.replace(/[?.]/g, '').trim().toUpperCase();
+
+                const genes = window.extractMultipleGenes ? window.extractMultipleGenes(term) : [];
+                if (genes.length > 0) {
+                    htmlResult = await window.displayFullGeneInfo(genes[0]);
+                } else {
+                    htmlResult = `
+                        <div class="ai-result-card">
+                            <p>Sorry, I didn't understand: "<strong>${query}</strong>"</p>
+                            <p>Try asking about:</p>
+                            <ul>
+                                <li>A gene (e.g., "IFT88")</li>
+                                <li>Localization (e.g., "Where is PCM1?")</li>
+                                <li>Function (e.g., "GO: intraflagellar transport")</li>
+                                <li>Expression (e.g., "Plot WDR31")</li>
+                            </ul>
+                        </div>
+                    `;
+                }
             }
         }
-    }
 
-    if (genes.length === 0) {
-        window.addChatMessage(`
-            <div class="ai-result-card">
-                <p>No genes found for <strong>"${term}"</strong>.</p>
-                <p>Try common terms like "intraflagellar transport", "bbsome", or "transition zone".</p>
-            </div>
-        `, false);
-        return;
-    }
-
-    // Apply visualization
-    window.resetViews();
-
-    if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
-        // Use multi-overlay for distinct colors per gene
-        const upperGenes = genes.map(g => g.toUpperCase());
-        window.SpatialManager.applyMultiOverlay(upperGenes);
-    }
-
-    const preview = genes.slice(0, 12).join(', ');
-    const more = genes.length > 12 ? `... and ${genes.length - 12} more` : '';
-
-    window.addChatMessage(`
-        <div class="ai-result-card">
-            <h4>Functional Category / GO Term: ${term}</h4>
-            <p>Found <strong>${genes.length}</strong> genes.</p>
-            <p><strong>Examples:</strong> ${preview}${more}</p>
-            <p>A <strong>multi-colored overlay</strong> has been applied to the ciliary diagram showing localization.</p>
-        </div>
-    `, false);
-
-    return;
-}
-// Fallback intent
-if (htmlResult === null) {
-    const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
-    if (intent && intent.handler) {
-        htmlResult = intent.handler(intent.entity, query);
-    }
-
-    if (htmlResult === null) {
-        let term = qLower;
-        const match = qLower.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
-        if (match) term = match[1];
-
-        term = term.replace(/[?.]/g, '').trim().toUpperCase();
-        const genes = window.extractMultipleGenes ? window.extractMultipleGenes(term) : [];
-
-        if (genes.length > 0) {
-            htmlResult = await window.displayFullGeneInfo(genes[0]);
-        } else {
-            htmlResult = `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, localization, or GO term.`;
+        // === Final: Display result if we have one ===
+        if (htmlResult) {
+            window.addChatMessage(htmlResult, false);
         }
-    }
-}
 
-        if (htmlResult) window.addChatMessage(htmlResult, false);
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
-        window.addChatMessage(`An internal error occurred: ${e.message}`, false);
+        window.addChatMessage(`
+            <div class="ai-result-card" style="background:#ffebee; border-left:4px solid #c62828;">
+                <p style="color:#c62828;"><strong>An internal error occurred:</strong></p>
+                <p>${e.message}</p>
+                <p>Please try again or rephrase your question.</p>
+            </div>
+        `, false);
     }
 };
 
