@@ -727,7 +727,105 @@ function clearPlot() {
     el.innerHTML = '';
     if (window.currentPlot) Plotly.purge(el);
 }
-      
+
+// NEW: SANKEY WORKFLOW DIAGRAM RENDERER
+        // ==========================================================
+        function renderWorkflowSankey(genes, custom) {
+            clearPlot();
+            const plotDivId = 'plot-display-area';
+
+            // Option 1: Full CiliaHub Pipeline (always available)
+            // Option 2: Flow of user-input genes through classification (if genes provided)
+            const useUserGenes = genes && genes.length > 0;
+
+            let workflowData;
+            if (useUserGenes) {
+                // Count how many input genes fall into each Li et al. 2014 category
+                const classCounts = { 1: 0, 2: 0, 3: 0, 4: 0 }; // Ciliary-specific, Mammalian-specific, Vertebrate-specific, Cilia-related
+                genes.forEach(g => {
+                    const liClass = g.phylogeny?.li_2014?.class;
+                    if (liClass !== undefined) classCounts[liClass]++;
+                });
+
+                workflowData = {
+                    steps: [
+                        { name: "Input Genes", size: genes.length, details: `${genes.length} genes from user input` },
+                        { name: "Ciliary-specific", size: classCounts[1], details: "Li et al. 2014 class 1" },
+                        { name: "Mammalian-specific", size: classCounts[2], details: "Li et al. 2014 class 2" },
+                        { name: "Vertebrate-specific", size: classCounts[3], details: "Li et al. 2014 class 3" },
+                        { name: "Cilia-related", size: classCounts[4], details: "Li et al. 2014 class 4" },
+                        { name: "In CiliaHub DB", size: genes.filter(g => ciliaryGeneMap.has(g.gene.toUpperCase())).length, details: "Curated master list" }
+                    ],
+                    connections: [
+                        { from: 0, to: 1, value: classCounts[1] },
+                        { from: 0, to: 2, value: classCounts[2] },
+                        { from: 0, to: 3, value: classCounts[3] },
+                        { from: 0, to: 4, value: classCounts[4] },
+                        { from: 1, to: 5, value: genes.filter(g => g.phylogeny?.li_2014?.class === 1 && ciliaryGeneMap.has(g.gene.toUpperCase())).length },
+                        { from: 2, to: 5, value: genes.filter(g => g.phylogeny?.li_2014?.class === 2 && ciliaryGeneMap.has(g.gene.toUpperCase())).length },
+                        { from: 3, to: 5, value: genes.filter(g => g.phylogeny?.li_2014?.class === 3 && ciliaryGeneMap.has(g.gene.toUpperCase())).length },
+                        { from: 4, to: 5, value: genes.filter(g => g.phylogeny?.li_2014?.class === 4 && ciliaryGeneMap.has(g.gene.toUpperCase())).length }
+                    ],
+                    title: "User Gene Flow through CiliaHub Classification"
+                };
+            } else {
+                // Default: Full platform pipeline
+                workflowData = {
+                    steps: [
+                        { name: "Phylogenetic Profiling", size: 20834, details: "Li et al. 2014: 20,834 human genes across 140 organisms" },
+                        { name: "Evolutionary Classification", size: 20834, details: "Ciliary-specific: 1,581<br>Vertebrate-specific: 310<br>Cilia-related: 18,943" },
+                        { name: "Cross-validation & Curation", size: 5000, details: "Integration with Nevers et al. 2017 + manual curation" },
+                        { name: "CiliaHub Master Database", size: ciliaryGeneMap.size, details: `~${ciliaryGeneMap.size} high-confidence ciliary genes` },
+                        { name: "Lung scRNA-seq Mapping", size: 1000, details: "Expression in 9 lung cell types (cellxgene_data.json)" },
+                        { name: "UMAP Visualization", size: 500, details: "Cell-type resolved expression patterns" }
+                    ],
+                    connections: [
+                        { from: 0, to: 1, value: 20834, label: "All genes profiled" },
+                        { from: 1, to: 2, value: 20834, label: "Full set" },
+                        { from: 2, to: 3, value: ciliaryGeneMap.size, label: "Curated ciliary genes" },
+                        { from: 3, to: 4, value: 1000, label: "Expressed in lung dataset" },
+                        { from: 4, to: 5, value: 500, label: "Visualized on UMAP" }
+                    ],
+                    title: "CiliaHub Full Analysis Workflow"
+                };
+            }
+
+            const sankeyData = {
+                type: "sankey",
+                orientation: "h",
+                node: {
+                    pad: 20,
+                    thickness: 30,
+                    line: { color: "black", width: 0.5 },
+                    label: workflowData.steps.map(s => s.name),
+                    color: ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"],
+                    hovertemplate: "<b>%{label}</b><br>%{data.info}<extra></extra>",
+                    info: workflowData.steps.map(s => s.details)
+                },
+                link: {
+                    source: workflowData.connections.map(c => c.from),
+                    target: workflowData.connections.map(c => c.to),
+                    value: workflowData.connections.map(c => c.value || 0),
+                    label: workflowData.connections.map(c => c.label || ""),
+                    color: "rgba(100, 100, 100, 0.3)",
+                    hovertemplate: "%{label}<br>Genes: %{value}<extra></extra>"
+                }
+            };
+
+            const layout = {
+                title: {
+                    text: `<b>${custom.title || workflowData.title}</b>`,
+                    font: { size: custom.titleSize || 24 }
+                },
+                font: { size: 12 },
+                height: custom.height || 700,
+                width: custom.width || 1200,
+                margin: { t: 100, l: 50, r: 50, b: 80 }
+            };
+
+            Plotly.newPlot(plotDivId, [sankeyData], layout, { responsive: true });
+        }
+        
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization based on single gene expression or gene ratio, with cluster annotations.
@@ -2701,7 +2799,8 @@ const renderers = {
     'protein_complex': renderComplexNetwork, 
     'mouse_phenotypes': renderMousePhenotypeHeatmap,
     'phylogeny': renderPhylogenyHeatmap,
-    'correlation_network': renderCorrelationNetwork
+    'correlation_network': renderCorrelationNetwork,
+    'workflow_sankey': renderWorkflowSankey  // ← NEW
 };
 
     const renderer = renderers[type];
@@ -2813,7 +2912,8 @@ function handlePlotSelection(value) {
         "protein_complex": "Complex Membership Map",
         "mouse_phenotypes": "Mouse Phenotype Enrichment Heatmap",
         "phylogeny": "Phylogenetic Conservation Heatmap",
-         "correlation_network": "Gene Expression Correlation Network"
+         "correlation_network": "Gene Expression Correlation Network",
+        "workflow_sankey": "Data Analysis Workflow (Sankey Diagram)"  // ← NEW
     };
     
     const customTitleInput = document.getElementById('custom-title');
@@ -2837,6 +2937,7 @@ function setupPage() {
                         <option value="">-- Choose Plot Type --</option>
                         <option value="screen_enrichment">Ciliary Gene Enrichment Analysis</option>
                         <option value="raw_check">Raw Ciliary Gene Check (Table)</option>
+                        <option value="workflow_sankey">Sankey Diagram</option>  <!-- NEW -->
                         <option value="gene_overview">Gene Overview / Summary</option>
                         <option value="expression_heatmap">Expression Heatmap</option>
                         <option value="scrna_dot">scRNA-seq (Lung)</option>
@@ -2967,3 +3068,4 @@ KIF17`;
 
 </body>
 </html>
+
