@@ -7,12 +7,12 @@ function parseTsvData(tsvText) {
     const data = {};
     const lines = tsvText.split('\n').filter(line => line.trim() !== '');
     if (lines.length <= 1) return data;
-    
+
     const headers = lines[0].split('\t').map(h => h.trim());
     const gIdx = headers.indexOf('Gene name');
     const tIdx = headers.indexOf('Tissue');
     const nIdx = headers.indexOf('nTPM');
-    
+
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split('\t');
         const gene = cols[gIdx];
@@ -27,18 +27,18 @@ function parseTsvData(tsvText) {
 }
 
 // Main data loading function
-window.loadCiliAIData = async function() {
+window.loadCiliAIData = async function () {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing Databases...', 'loading');
-    
+
     try {
         const [main, look, rna, kStr, kE1, kE2] = await Promise.all([
-            fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
-            fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
-            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv').then(r => r.text()),
-            fetch(base + 'kidney_structure.json').then(r => r.json()),
-            fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
-            fetch(base + 'kidney_expression_part2.json').then(r => r.json())
+            fetch(base + 'ciliAI_master_database.json').then(r => { if (!r.ok) throw new Error('Master DB Error: ' + r.status); return r.json(); }),
+            fetch(base + 'ciliAI_lookups.json').then(r => { if (!r.ok) throw new Error('Lookups Error: ' + r.status); return r.json(); }),
+            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv').then(r => { if (!r.ok) throw new Error('RNA TSV Error: ' + r.status); return r.text(); }),
+            fetch(base + 'kidney_structure.json').then(r => { if (!r.ok) throw new Error('Kidney Str Error: ' + r.status); return r.json(); }),
+            fetch(base + 'kidney_expression_part1.json').then(r => { if (!r.ok) throw new Error('Kidney Exp1 Error: ' + r.status); return r.json(); }),
+            fetch(base + 'kidney_expression_part2.json').then(r => { if (!r.ok) throw new Error('Kidney Exp2 Error: ' + r.status); return r.json(); })
         ]);
 
         window.CiliAI.masterData = main.masterData || [];
@@ -60,12 +60,12 @@ window.loadCiliAIData = async function() {
         window.CiliAI.masterData.forEach(g => {
             const sym = g.Gene.toUpperCase();
             window.CiliAI.lookups.geneMap[sym] = g;
-            if(g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
+            if (g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
 
             if (primaryClasses.includes(g.ciliopathy_classification)) {
                 validGenes.add(sym);
                 const ds = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
-                ds.forEach(d => { if(d && d !== 'N/A' && d !== 'Not specified') validDiseases.add(d); });
+                ds.forEach(d => { if (d && d !== 'N/A' && d !== 'Not specified') validDiseases.add(d); });
             }
         });
 
@@ -74,9 +74,9 @@ window.loadCiliAIData = async function() {
         const disEl = document.getElementById('stat-ciliopathys');
         const symEl = document.getElementById('stat-ciliopathy-genes');
 
-        if(genesEl) genesEl.textContent = window.CiliAI.masterData.length.toLocaleString();
-        if(disEl) disEl.textContent = validDiseases.size.toLocaleString();
-        if(symEl) symEl.textContent = validGenes.size.toLocaleString();
+        if (genesEl) genesEl.textContent = window.CiliAI.masterData.length.toLocaleString();
+        if (disEl) disEl.textContent = validDiseases.size.toLocaleString();
+        if (symEl) symEl.textContent = validGenes.size.toLocaleString();
 
         window.CiliAI.ready = true;
         window.updateStatus('CONNECTED', 'ready');
@@ -89,7 +89,7 @@ window.loadCiliAIData = async function() {
 };
 
 // Gene extraction
-window.extractMultipleGenes = function(query) {
+window.extractMultipleGenes = function (query) {
     if (!query || typeof query !== 'string') return [];
     const qLower = query.toLowerCase();
 
@@ -111,7 +111,7 @@ window.extractMultipleGenes = function(query) {
     // Regex extraction with improved stopword filter
     const geneRegex = /\b([A-Z0-9][A-Z0-9\-\.]{2,})\b/gi;
     const matches = query.match(geneRegex) || [];
-    
+
     const stopWords = new Set([
         "THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES",
         "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN", "LOSS", "FUNCTION",
@@ -130,7 +130,7 @@ window.extractMultipleGenes = function(query) {
     });
 
     const result = Array.from(found);
-    if(window.log) window.log(`[Gene Extraction] "${query}" → ${JSON.stringify(result)}`);
+    if (window.log) window.log(`[Gene Extraction] "${query}" → ${JSON.stringify(result)}`);
     return result;
 };
 
@@ -192,12 +192,12 @@ function extractCellTypeQuestion(qLower) {
 }
 
 // Variant data fetching
-window.fetchVariantData = async function(geneSymbol) {
+window.fetchVariantData = async function (geneSymbol) {
     try {
         const response = await fetch(`https://mygene.info/v3/query?q=${geneSymbol}&fields=clinvar,gnomad`);
         const data = await response.json();
         const hits = data.hits?.[0] || {};
-        
+
         return `
         <div class="variant-panel">
             <h4>🧬 Variants for ${geneSymbol}</h4>
@@ -217,7 +217,7 @@ async function ensurePhylogenyDataLoaded() {
     if (window.liPhylogenyCache && window.neversPhylogenyCache) {
         return true; // Already loaded
     }
-    
+
     addChatMessage("Loading large phylogeny datasets... this may take a moment.", false);
     log("Lazy-loading phylogeny data...");
 
@@ -227,14 +227,14 @@ async function ensurePhylogenyDataLoaded() {
             fetch(baseUrl + 'li_et_al_2014_matrix_optimized.json'),
             fetch(baseUrl + 'nevers_et_al_2017_matrix_optimized.json')
         ]);
-        
+
         if (!liRes.ok || !neversRes.ok) {
             throw new Error(`Failed to fetch phylogeny files: ${liRes.status}, ${neversRes.status}`);
         }
-        
+
         window.liPhylogenyCache = await liRes.json();
         window.neversPhylogenyCache = await neversRes.json();
-        
+
         log("Phylogeny data successfully lazy-loaded.");
         return true;
 
