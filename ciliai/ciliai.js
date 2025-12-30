@@ -736,13 +736,16 @@ function getIntentDisplayName(intent) {
     return names[intent] || intent;
 }
 
-// 4. DeepSeek intent classifier wrapper
+// DeepSeek intent classifier wrapper
 window.deepSeekClassifyIntent = async function(query) {
+    // 1. Check if DeepSeek is enabled
     if (!window.CiliAI.DeepSeek.enabled || !window.CiliAI.DeepSeek.apiKey) {
         return null;
     }
     
     const qLower = query.toLowerCase().trim();
+    
+    // 2. Skip simple/navigational queries to save API calls
     const skipQueries = [
         'hello', 'hi', 'hey', 'greetings', 'thanks', 'thank you',
         'yes', 'y', 'sure', 'show', 'list', 'no', 'n',
@@ -754,17 +757,18 @@ window.deepSeekClassifyIntent = async function(query) {
         return null;
     }
     
-    // Skip if already contains clear gene symbol with simple intent
+    // 3. Skip if it's already a clear gene lookup (e.g. "What is IFT88")
     const geneMatch = query.match(/[A-Z0-9]{3,}/);
     if (geneMatch && (qLower.includes('what is') || qLower.includes('where is'))) {
         return null;
     }
     
-    // Skip follow-up queries
-    if (lastQueryContext && lastQueryContext.type === 'list_followup') {
+    // 4. Skip follow-up context queries
+    if (window.CiliAI.lastQueryContext && window.CiliAI.lastQueryContext.type === 'list_followup') {
         return null;
     }
     
+    // 5. Call API
     try {
         const intent = await window.CiliAI.DeepSeek.classifyIntent(query);
         
@@ -6377,5 +6381,6 @@ window.loadCiliAIData = async function (timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
