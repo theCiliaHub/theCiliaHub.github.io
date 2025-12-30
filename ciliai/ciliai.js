@@ -465,6 +465,526 @@ function formatListResult(title, genes, description = "") {
     `;
 }
 
+// ==============================
+// DEEPSEEK INTENT CLASSIFIER - ADMIN ONLY API
+// ==============================
+
+// 1. DeepSeek Configuration - Invisible to users
+window.CiliAI.DeepSeek = {
+    enabled: false,
+    apiKey: null,
+    model: 'deepseek-chat',
+    lastClassification: null,
+    rateLimit: {
+        lastCall: 0,
+        cooldown: 2000 // 2 seconds between calls
+    },
+    
+    // Initialize from localStorage (admin only access)
+    init: function() {
+        const key = localStorage.getItem('ciliai_deepseek_key');
+        if (key && key.trim() !== '') {
+            this.enabled = true;
+            this.apiKey = key;
+            this.model = localStorage.getItem('ciliai_deepseek_model') || 'deepseek-chat';
+            console.log('[CiliAI] DeepSeek intent classifier enabled');
+        }
+        return this.enabled;
+    },
+    
+    // Admin-only: Save API key (called from admin panel)
+    setApiKey: function(key) {
+        localStorage.setItem('ciliai_deepseek_key', key);
+        this.apiKey = key;
+        this.enabled = true;
+        console.log('[CiliAI] DeepSeek API key saved (admin)');
+    },
+    
+    // Admin-only: Get current API key (masked for security)
+    getApiKey: function(masked = true) {
+        if (!this.apiKey) return null;
+        if (masked) {
+            const visible = 4;
+            const maskedLength = this.apiKey.length - visible;
+            return '*'.repeat(Math.max(0, maskedLength)) + this.apiKey.slice(-visible);
+        }
+        return this.apiKey;
+    },
+    
+    // Admin-only: Remove API key
+    removeApiKey: function() {
+        localStorage.removeItem('ciliai_deepseek_key');
+        localStorage.removeItem('ciliai_deepseek_model');
+        this.apiKey = null;
+        this.enabled = false;
+        console.log('[CiliAI] DeepSeek API key removed (admin)');
+    },
+    
+    // Rate limiting
+    canCall: function() {
+        const now = Date.now();
+        if (now - this.rateLimit.lastCall > this.rateLimit.cooldown) {
+            this.rateLimit.lastCall = now;
+            return true;
+        }
+        return false;
+    },
+    
+    // Intent classification (invisible to users)
+    classifyIntent: async function(query) {
+        if (!this.enabled || !this.apiKey) return null;
+        if (!this.canCall()) return null;
+        
+        try {
+            const response = await fetch("https://api.deepseek.com/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${this.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: this.model,
+                    messages: [
+                        { 
+                            role: "system", 
+                            content: `You are CiliAI intent classifier. Classify this cilia biology query into exactly ONE of these intents:
+gene_info, localization, expression, comparison, ciliopathy, ortholog, domains, list, phylogeny, screens, variants, unknown.
+Return ONLY the intent name. Do NOT answer the question.` 
+                        },
+                        { role: "user", content: query }
+                    ],
+                    temperature: 0.1,
+                    max_tokens: 20
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`DeepSeek API error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const intent = data.choices[0]?.message?.content?.trim().toLowerCase();
+            
+            // Validate intent
+            const validIntents = ['gene_info', 'localization', 'expression', 'comparison', 
+                                'ciliopathy', 'ortholog', 'domains', 'list', 'phylogeny', 
+                                'screens', 'variants'];
+            
+            if (intent && validIntents.includes(intent) && intent !== 'unknown') {
+                this.lastClassification = intent;
+                return intent;
+            }
+            
+            return null;
+        } catch (error) {
+            console.warn('[CiliAI] DeepSeek classification failed:', error);
+            return null; // Fail silently - users never see errors
+        }
+    },
+    
+    // Admin-only: Test connection
+    testConnection: async function() {
+        if (!this.enabled || !this.apiKey) {
+            return { success: false, error: 'DeepSeek not configured' };
+        }
+        
+        try {
+            const response = await fetch("https://api.deepseek.com/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${this.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: this.model,
+                    messages: [
+                        { role: "system", content: "Respond with 'OK'" },
+                        { role: "user", content: "Test" }
+                    ],
+                    max_tokens: 5
+                })
+            });
+            
+            if (response.ok) {
+                return { 
+                    success: true, 
+                    model: this.model,
+                    message: 'DeepSeek connected successfully' 
+                };
+            } else {
+                throw new Error(`API error: ${response.status}`);
+            }
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+};
+
+// 2. Initialize on page load (silently)
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        if (window.CiliAI.DeepSeek.init()) {
+            console.log('[CiliAI] DeepSeek intent classifier initialized (invisible)');
+        }
+    }, 1000);
+});
+
+// 3. Helper functions for intent classification
+function getIntentSuggestions(intent, originalQuery) {
+    const suggestions = {
+        gene_info: [
+            `"What is [GENE]?"`,
+            `"Tell me about [GENE]"`
+        ],
+        localization: [
+            `"Where is [GENE] localized?"`,
+            `"Localization of [GENE]"`
+        ],
+        expression: [
+            `"Expression of [GENE]"`,
+            `"Show UMAP for [GENE]"`
+        ],
+        comparison: [
+            `"Compare [GENE1] and [GENE2]"`,
+            `"[GENE1] vs [GENE2]"`
+        ],
+        ciliopathy: [
+            `"Genes in [DISEASE]"`,
+            `"Ciliopathy genes for [DISEASE]"`
+        ],
+        ortholog: [
+            `"Mouse ortholog of [GENE]"`,
+            `"C. elegans ortholog for [GENE]"`
+        ],
+        domains: [
+            `"Domains of [GENE]"`,
+            `"Show domain architecture for [GENE]"`
+        ],
+        list: [
+            `"List [CATEGORY] genes"`,
+            `"Show all [COMPARTMENT] genes"`
+        ],
+        phylogeny: [
+            `"Show evolution of [GENE]"`,
+            `"Phylogeny of [GENE]"`
+        ],
+        screens: [
+            `"Screen data for [GENE]"`,
+            `"Loss-of-function effect of [GENE]"`
+        ],
+        variants: [
+            `"Variants in [GENE]"`,
+            `"Mutations in [GENE]"`
+        ]
+    };
+    
+    let personalized = suggestions[intent] || suggestions.gene_info;
+    
+    // Extract potential gene symbol
+    const geneMatch = originalQuery.match(/[A-Z0-9]{3,}/);
+    if (geneMatch) {
+        personalized = personalized.map(s => s.replace('[GENE]', geneMatch[0]));
+    }
+    
+    return personalized;
+}
+
+function getIntentDisplayName(intent) {
+    const names = {
+        gene_info: 'Gene Information',
+        localization: 'Gene Localization',
+        expression: 'Gene Expression',
+        comparison: 'Gene Comparison',
+        ciliopathy: 'Ciliopathy Information',
+        ortholog: 'Ortholog Lookup',
+        domains: 'Protein Domains',
+        list: 'Gene Lists',
+        phylogeny: 'Evolution/Phylogeny',
+        screens: 'Screen Data',
+        variants: 'Genetic Variants'
+    };
+    return names[intent] || intent;
+}
+
+// 4. DeepSeek intent classifier wrapper
+window.deepSeekClassifyIntent = async function(query) {
+    if (!window.CiliAI.DeepSeek.enabled || !window.CiliAI.DeepSeek.apiKey) {
+        return null;
+    }
+    
+    const qLower = query.toLowerCase().trim();
+    const skipQueries = [
+        'hello', 'hi', 'hey', 'greetings', 'thanks', 'thank you',
+        'yes', 'y', 'sure', 'show', 'list', 'no', 'n',
+        'plot default umap', 'plot default phylogeny',
+        'switch to kidney', 'switch to lung'
+    ];
+    
+    if (skipQueries.includes(qLower)) {
+        return null;
+    }
+    
+    // Skip if already contains clear gene symbol with simple intent
+    const geneMatch = query.match(/[A-Z0-9]{3,}/);
+    if (geneMatch && (qLower.includes('what is') || qLower.includes('where is'))) {
+        return null;
+    }
+    
+    // Skip follow-up queries
+    if (lastQueryContext && lastQueryContext.type === 'list_followup') {
+        return null;
+    }
+    
+    try {
+        const intent = await window.CiliAI.DeepSeek.classifyIntent(query);
+        
+        if (!intent) {
+            return null;
+        }
+        
+        return {
+            intent: intent,
+            suggestions: getIntentSuggestions(intent, query),
+            confidence: 0.9
+        };
+        
+    } catch (error) {
+        console.warn('[CiliAI] DeepSeek classification failed:', error);
+        return null;
+    }
+};
+
+// 5. ADMIN PANEL - Only accessible via secret URL or admin mode
+window.showDeepSeekAdminPanel = function() {
+    const currentKey = window.CiliAI.DeepSeek.getApiKey(true);
+    const status = window.CiliAI.DeepSeek.enabled ? '🟢 Enabled' : '🔴 Disabled';
+    
+    const adminHTML = `
+    <div class="modal" id="deepseek-admin-modal">
+        <div class="modal-content" style="max-width: 600px; background: #f8f9fa;">
+            <div class="admin-header" style="background: #2c3e50; color: white; padding: 15px 20px; border-radius: 8px 8px 0 0;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    🔐 DeepSeek Admin Panel
+                    <span style="font-size: 12px; background: #34495e; padding: 2px 8px; border-radius: 12px;">
+                        ${status}
+                    </span>
+                </h3>
+            </div>
+            
+            <div class="admin-body" style="padding: 20px;">
+                <!-- Current Status -->
+                <div class="admin-section" style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <h4 style="margin-top: 0; color: #2c3e50;">Current Configuration</h4>
+                    <p><strong>Status:</strong> ${status}</p>
+                    <p><strong>Model:</strong> ${window.CiliAI.DeepSeek.model}</p>
+                    <p><strong>API Key:</strong> ${currentKey || 'Not configured'}</p>
+                    <p><strong>Last Classification:</strong> ${window.CiliAI.DeepSeek.lastClassification || 'None'}</p>
+                </div>
+                
+                <!-- Update API Key -->
+                <div class="admin-section" style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <h4 style="margin-top: 0; color: #2c3e50;">Update API Key</h4>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">
+                            DeepSeek API Key (sk-...)
+                        </label>
+                        <input type="password" 
+                               id="deepseek-admin-key" 
+                               placeholder="Enter new API key" 
+                               style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;">
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button class="ciliai-button" 
+                                onclick="window.saveDeepSeekConfig()"
+                                style="background: #27ae60; color: white;">
+                            💾 Save & Test
+                        </button>
+                        <button class="ciliai-button" 
+                                onclick="window.testDeepSeekConfig()"
+                                style="background: #3498db; color: white;">
+                            🔄 Test Connection
+                        </button>
+                        <button class="ciliai-button" 
+                                onclick="window.removeDeepSeekConfig()"
+                                style="background: #e74c3c; color: white;">
+                            🗑️ Remove
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Test Results -->
+                <div id="deepseek-test-result" style="display: none;"></div>
+                
+                <!-- Usage Statistics -->
+                <div class="admin-section" style="padding: 15px; background: white; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <h4 style="margin-top: 0; color: #2c3e50;">Usage Information</h4>
+                    <p><strong>Function:</strong> Invisible intent classifier</p>
+                    <p><strong>Purpose:</strong> Routes ambiguous queries to correct handlers</p>
+                    <p><strong>Visibility:</strong> Users never see DeepSeek responses</p>
+                    <p><strong>Cost:</strong> ~$0.20/month for 100 queries/day</p>
+                    <p style="font-size: 12px; color: #7f8c8d; margin-top: 10px;">
+                        💡 DeepSeek works silently in the background to improve query routing.
+                        Users see helpful suggestions, not AI-generated answers.
+                    </p>
+                </div>
+                
+                <!-- Close Button -->
+                <div style="text-align: right; margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+                    <button class="ciliai-button" 
+                            onclick="document.getElementById('deepseek-admin-modal').remove()"
+                            style="background: #95a5a6; color: white;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    
+    // Remove existing modal if any
+    document.getElementById('deepseek-admin-modal')?.remove();
+    
+    // Add new modal
+    document.body.insertAdjacentHTML('beforeend', adminHTML);
+};
+
+// 6. Admin functions
+window.saveDeepSeekConfig = async function() {
+    const keyInput = document.getElementById('deepseek-admin-key');
+    const newKey = keyInput.value.trim();
+    
+    if (!newKey) {
+        alert('Please enter a DeepSeek API key');
+        return;
+    }
+    
+    if (!newKey.startsWith('sk-')) {
+        alert('Invalid DeepSeek API key format. Should start with "sk-"');
+        return;
+    }
+    
+    // Save the key
+    window.CiliAI.DeepSeek.setApiKey(newKey);
+    
+    // Test connection
+    const result = await window.CiliAI.DeepSeek.testConnection();
+    
+    const resultDiv = document.getElementById('deepseek-test-result');
+    if (result.success) {
+        resultDiv.innerHTML = `
+            <div style="margin-top: 15px; padding: 15px; background: #d4edda; color: #155724; border-radius: 6px; border: 1px solid #c3e6cb;">
+                <h4 style="margin-top: 0;">✅ Configuration Saved & Tested</h4>
+                <p><strong>Status:</strong> Connected successfully</p>
+                <p><strong>Model:</strong> ${result.model}</p>
+                <p><strong>Message:</strong> ${result.message}</p>
+                <p style="font-size: 12px;">DeepSeek intent classifier is now active and invisible to users.</p>
+            </div>
+        `;
+    } else {
+        resultDiv.innerHTML = `
+            <div style="margin-top: 15px; padding: 15px; background: #f8d7da; color: #721c24; border-radius: 6px; border: 1px solid #f5c6cb;">
+                <h4 style="margin-top: 0;">❌ Connection Failed</h4>
+                <p><strong>Error:</strong> ${result.error}</p>
+                <p style="font-size: 12px;">Please check your API key and try again.</p>
+            </div>
+        `;
+    }
+    resultDiv.style.display = 'block';
+    
+    // Clear input
+    keyInput.value = '';
+};
+
+window.testDeepSeekConfig = async function() {
+    const result = await window.CiliAI.DeepSeek.testConnection();
+    
+    const resultDiv = document.getElementById('deepseek-test-result');
+    if (result.success) {
+        resultDiv.innerHTML = `
+            <div style="margin-top: 15px; padding: 15px; background: #d4edda; color: #155724; border-radius: 6px; border: 1px solid #c3e6cb;">
+                <h4 style="margin-top: 0;">✅ Connection Successful</h4>
+                <p><strong>Model:</strong> ${result.model}</p>
+                <p><strong>Status:</strong> ${result.message}</p>
+                <p style="font-size: 12px;">DeepSeek intent classifier is working properly.</p>
+            </div>
+        `;
+    } else {
+        resultDiv.innerHTML = `
+            <div style="margin-top: 15px; padding: 15px; background: #f8d7da; color: #721c24; border-radius: 6px; border: 1px solid #f5c6cb;">
+                <h4 style="margin-top: 0;">❌ Connection Failed</h4>
+                <p><strong>Error:</strong> ${result.error}</p>
+                <p style="font-size: 12px;">DeepSeek intent classifier is not available.</p>
+            </div>
+        `;
+    }
+    resultDiv.style.display = 'block';
+};
+
+window.removeDeepSeekConfig = function() {
+    if (confirm('Are you sure you want to remove the DeepSeek API key? Intent classification will be disabled.')) {
+        window.CiliAI.DeepSeek.removeApiKey();
+        
+        const resultDiv = document.getElementById('deepseek-test-result');
+        resultDiv.innerHTML = `
+            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; color: #856404; border-radius: 6px; border: 1px solid #ffeaa7;">
+                <h4 style="margin-top: 0;">⚠️ API Key Removed</h4>
+                <p>DeepSeek intent classifier has been disabled.</p>
+                <p style="font-size: 12px;">Add a new API key to re-enable intent classification.</p>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+        
+        // Refresh the admin panel
+        setTimeout(() => {
+            document.getElementById('deepseek-admin-modal').remove();
+            window.showDeepSeekAdminPanel();
+        }, 1000);
+    }
+};
+
+
+// 8. Add admin access key (secret shortcut)
+// Add this to your existing keyboard shortcuts or create a secret way to access
+document.addEventListener('keydown', function(e) {
+    // Secret key combination: Ctrl+Alt+Shift+D
+    if (e.ctrlKey && e.altKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        window.showDeepSeekAdminPanel();
+        console.log('[CiliAI] DeepSeek admin panel opened');
+    }
+});
+
+// 9. Remove Gemini/Groq AI settings from the interface
+// Add this CSS to hide the AI settings button from users
+const hideAISettingsCSS = `
+<style id="hide-ai-settings">
+    #ai-settings-btn {
+        display: none !important;
+    }
+</style>
+`;
+document.head.insertAdjacentHTML('beforeend', hideAISettingsCSS);
+
+// 10. Clean up any existing AI settings code
+// Remove these lines from your existing code:
+// - All references to Gemini (gemini-key, gemini-model)
+// - All references to Groq (groq-key, groq-model)
+// - The entire AI Settings modal creation
+// - The saveAISettings function
+// - Any AI fallback code that calls Gemini/Groq
+
+// Instead, add this minimal admin access instruction
+console.log(`
+╔══════════════════════════════════════════════════════════════╗
+║                 CiliAI DeepSeek Admin Access                 ║
+╠══════════════════════════════════════════════════════════════╣
+║ To access DeepSeek admin panel:                              ║
+║ Press Ctrl+Alt+Shift+D simultaneously                        ║
+║                                                              ║
+║ DeepSeek works invisibly to route queries to correct intents ║
+║ Users never see DeepSeek responses                           ║
+╚══════════════════════════════════════════════════════════════╝
+`);
 
 function handleUserSend() {
     const chatInput = document.getElementById('chatInput');
@@ -4712,101 +5232,74 @@ window.handleAIQuery = async function (query) {
 
             return;
         }
-        // Fallback intent
-        if (htmlResult === null) {
-            const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
-            if (intent && intent.handler) {
-                htmlResult = intent.handler(intent.entity, query);
-            }
+// === MODIFIED FALLBACK SECTION ===
+if (htmlResult === null) {
+    const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
+    if (intent && intent.handler) {
+        htmlResult = intent.handler(intent.entity, query);
+    }
 
-            if (htmlResult === null) {
-                let term = qLower;
-                const match = qLower.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
-                if (match) term = match[1];
-
-                term = term.replace(/[?.]/g, '').trim().toUpperCase();
-                const genes = window.extractMultipleGenes ? window.extractMultipleGenes(term) : [];
-
-                if (genes.length > 0) {
-                    htmlResult = await window.displayFullGeneInfo(genes[0]);
-                } else {
-                    // Check if AI is enabled and can answer
-                    const aiProvider = localStorage.getItem('ciliai_active_provider');
-                    const hasGeminiKey = localStorage.getItem('ciliai_gemini_key');
-                    const hasGroqKey = localStorage.getItem('ciliai_groq_key');
-                    const aiEnabled = (aiProvider === 'gemini' && hasGeminiKey) || (aiProvider === 'groq' && hasGroqKey);
-                    console.log('[CiliAI] AI Check:', aiProvider, 'enabled:', aiEnabled);
-
-                    if (aiEnabled) {
-                        try {
-                            // Show loading instead of "didn't understand"
-                            const loadingMsg = document.createElement('div');
-                            loadingMsg.className = 'ciliai-message assistant';
-                            loadingMsg.id = 'ai-loading';
-                            loadingMsg.innerHTML = `<div class="ciliai-message-content">${window.getAIBadge ? window.getAIBadge() : '🤖'} <em>AI yanıt hazırlıyor...</em></div>`;
-                            chatWindow.appendChild(loadingMsg);
-                            chatWindow.scrollTop = chatWindow.scrollHeight;
-
-                            // Call AI directly
-                            let aiResponse = null;
-                            const geminiKey = localStorage.getItem('ciliai_gemini_key');
-                            const groqKey = localStorage.getItem('ciliai_groq_key');
-                            const provider = localStorage.getItem('ciliai_active_provider');
-
-                            if (provider === 'gemini' && geminiKey) {
-                                const model = localStorage.getItem('ciliai_gemini_model') || 'gemini-2.5-flash';
-                                const systemPrompt = 'You are CiliAI assistant - expert in cilia biology and ciliopathy diseases. IMPORTANT: Respond in the SAME LANGUAGE as the question. If question is in Turkish, answer in Turkish. If question is in English, answer in English. Use HTML format: <p>, <strong>, <ul>, <li>.';
-                                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt + '\\n\\nSoru: ' + query }] }] })
-                                });
-                                if (response.ok) {
-                                    const data = await response.json();
-                                    aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-                                }
-                            } else if (provider === 'groq' && groqKey) {
-                                const model = localStorage.getItem('ciliai_groq_model') || 'llama-3.3-70b-versatile';
-                                const systemPrompt = 'You are CiliAI assistant - expert in cilia biology and ciliopathy diseases. IMPORTANT: Respond in the SAME LANGUAGE as the question. If question is in Turkish, answer in Turkish. If question is in English, answer in English. Use HTML format: <p>, <strong>, <ul>, <li>.';
-                                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
-                                    body: JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: query }], max_tokens: 1024 })
-                                });
-                                if (response.ok) {
-                                    const data = await response.json();
-                                    aiResponse = data.choices?.[0]?.message?.content || null;
-                                }
-                            }
-
-                            document.getElementById('ai-loading')?.remove();
-
-                            if (aiResponse) {
-                                // Only show AI response, skip "didn't understand" message
-                                const badge = provider === 'gemini' ? '<span style="background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:4px;font-size:11px;">✨ Gemini</span>' : '<span style="background:#FFF3E0;color:#E65100;padding:2px 8px;border-radius:4px;font-size:11px;">⚡ Groq</span>';
-                                window.addChatMessage(`${badge} ${aiResponse}`, false);
-                                htmlResult = ''; // Clear to prevent duplicate message
-                            } else {
-                                htmlResult = `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, localization, or GO term.`;
-                            }
-                        } catch (aiError) {
-                            document.getElementById('ai-loading')?.remove();
-                            console.error('AI Error:', aiError);
-                            htmlResult = `❌ AI Hatası: ${aiError.message}`;
-                        }
-                    } else {
-                        htmlResult = `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, localization, or GO term.`;
-                    }
-                }
+    if (htmlResult === null) {
+        // === DEEPSEEK INTENT CLASSIFICATION (INVISIBLE HELPER) ===
+        if (window.CiliAI && window.CiliAI.DeepSeek && window.CiliAI.DeepSeek.enabled) {
+            const deepSeekResult = await window.deepSeekClassifyIntent(query);
+            
+            if (deepSeekResult) {
+                const displayName = getIntentDisplayName(deepSeekResult.intent);
+                
+                htmlResult = `
+                <div class="ai-result-card" style="border-left: 4px solid #4caf50;">
+                    <h4>💡 I Can Help With: ${displayName}</h4>
+                    <p>For "<strong>${query}</strong>", try one of these formats:</p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        ${deepSeekResult.suggestions.map(s => `<li>${s}</li>`).join('')}
+                    </ul>
+                    <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                        <em>Tip: Use specific gene symbols or disease names for best results.</em>
+                    </p>
+                </div>`;
+                
+                window.addChatMessage(htmlResult, false);
+                return; // Stop further processing
             }
         }
+        
+        // === ORIGINAL GENE SYMBOL DETECTION ===
+        let term = qLower;
+        const match = qLower.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
+        if (match) term = match[1];
 
-        if (htmlResult) window.addChatMessage(htmlResult, false);
-    } catch (e) {
-        console.error("Error in handleAIQuery:", e);
-        window.addChatMessage(`An internal error occurred: ${e.message}`, false);
+        term = term.replace(/[?.]/g, '').trim().toUpperCase();
+        const genes = window.extractMultipleGenes ? window.extractMultipleGenes(term) : [];
+
+        if (genes.length > 0) {
+            htmlResult = await window.displayFullGeneInfo(genes[0]);
+        } else {
+            // === GENERIC HELP - NO AI FALLBACK ===
+            htmlResult = `
+            <div class="ai-result-card">
+                <h4>🔍 How Can I Help?</h4>
+                <p>I didn't understand: "<strong>${query}</strong>"</p>
+                <p>Try one of these:</p>
+                <ul style="columns: 2; margin: 10px 0;">
+                    <li>"What is IFT88?"</li>
+                    <li>"Where is WDR31 localized?"</li>
+                    <li>"Expression of FOXJ1"</li>
+                    <li>"Compare IFT88 and IFT140"</li>
+                    <li>"Genes in Joubert syndrome"</li>
+                    <li>"Mouse ortholog of ARL13B"</li>
+                    <li>"Domains of BBS1"</li>
+                    <li>"List transition zone genes"</li>
+                </ul>
+            </div>`;
+        }
     }
-};
+
+    if (htmlResult) window.addChatMessage(htmlResult, false);
+} catch (e) {
+    console.error("Error in handleAIQuery:", e);
+    window.addChatMessage(`An internal error occurred: ${e.message}`, false);
+}
 
 // Re-define initCiliAI (must be after all other code)
 window.initCiliAI = async function () {
@@ -6015,3 +6508,4 @@ window.loadCiliAIData = async function (timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
