@@ -638,26 +638,53 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// DeepSeek Classifier Wrapper
+// 4. DeepSeek intent classifier wrapper
 window.deepSeekClassifyIntent = async function(query) {
-    if (!window.CiliAI.DeepSeek.enabled) return null;
-    const intent = await window.CiliAI.DeepSeek.classifyIntent(query);
-    if (!intent) return null;
+    if (!window.CiliAI.DeepSeek.enabled || !window.CiliAI.DeepSeek.apiKey) {
+        return null;
+    }
     
-    // Suggest formats based on intent
-    const suggestions = {
-        gene_info: [`"What is [GENE]?"`, `"Tell me about [GENE]"`],
-        localization: [`"Where is [GENE]?"`, `"Localization of [GENE]"`],
-        expression: [`"Expression of [GENE]"`, `"Show UMAP for [GENE]"`],
-        comparison: [`"Compare [GENE1] and [GENE2]"`],
-        ciliopathy: [`"Genes in [DISEASE]"`],
-        phylogeny: [`"Show evolution of [GENE]"`],
-        screens: [`"Screen data for [GENE]"`]
-    };
+    const qLower = query.toLowerCase().trim();
+    const skipQueries = [
+        'hello', 'hi', 'hey', 'greetings', 'thanks', 'thank you',
+        'yes', 'y', 'sure', 'show', 'list', 'no', 'n',
+        'plot default umap', 'plot default phylogeny',
+        'switch to kidney', 'switch to lung'
+    ];
     
-    return { intent, suggestions: suggestions[intent] || [] };
+    if (skipQueries.includes(qLower)) {
+        return null;
+    }
+    
+    // Skip if already contains clear gene symbol with simple intent
+    const geneMatch = query.match(/[A-Z0-9]{3,}/);
+    if (geneMatch && (qLower.includes('what is') || qLower.includes('where is'))) {
+        return null;
+    }
+    
+    // Skip follow-up queries
+    if (window.CiliAI.lastQueryContext && window.CiliAI.lastQueryContext.type === 'list_followup') {
+        return null;
+    }
+    
+    try {
+        const intent = await window.CiliAI.DeepSeek.classifyIntent(query);
+        
+        if (!intent) {
+            return null;
+        }
+        
+        return {
+            intent: intent,
+            suggestions: getIntentSuggestions(intent, query),
+            confidence: 0.9
+        };
+        
+    } catch (error) {
+        console.warn('[CiliAI] DeepSeek classification failed:', error);
+        return null;
+    }
 };
-
 
 // 3. Helper functions for intent classification
 function getIntentSuggestions(intent, originalQuery) {
@@ -6381,6 +6408,7 @@ window.loadCiliAIData = async function (timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
