@@ -465,22 +465,21 @@ function formatListResult(title, genes, description = "") {
     `;
 }
 
-// ==============================
-// DEEPSEEK INTENT CLASSIFIER - ADMIN ONLY API
-// ==============================
+// ==========================================================
+// 3. DEEPSEEK API INTEGRATION (ONLY)
+// ==========================================================
 
-// 1. DeepSeek Configuration - Invisible to users
+// ==========================================================
+// 3. DEEPSEEK API INTEGRATION (REPLACES GEMINI)
+// ==========================================================
+
 window.CiliAI.DeepSeek = {
     enabled: false,
     apiKey: null,
     model: 'deepseek-chat',
     lastClassification: null,
-    rateLimit: {
-        lastCall: 0,
-        cooldown: 2000 // 2 seconds between calls
-    },
     
-    // Initialize from localStorage (admin only access)
+    // Initialize from localStorage
     init: function() {
         const key = localStorage.getItem('ciliai_deepseek_key');
         if (key && key.trim() !== '') {
@@ -492,48 +491,33 @@ window.CiliAI.DeepSeek = {
         return this.enabled;
     },
     
-    // Admin-only: Save API key (called from admin panel)
+    // Save API key
     setApiKey: function(key) {
         localStorage.setItem('ciliai_deepseek_key', key);
         this.apiKey = key;
         this.enabled = true;
-        console.log('[CiliAI] DeepSeek API key saved (admin)');
+        console.log('[CiliAI] DeepSeek API key saved');
     },
     
-    // Admin-only: Get current API key (masked for security)
     getApiKey: function(masked = true) {
         if (!this.apiKey) return null;
         if (masked) {
             const visible = 4;
-            const maskedLength = this.apiKey.length - visible;
-            return '*'.repeat(Math.max(0, maskedLength)) + this.apiKey.slice(-visible);
+            return 'sk-...' + this.apiKey.slice(-visible);
         }
         return this.apiKey;
     },
     
-    // Admin-only: Remove API key
     removeApiKey: function() {
         localStorage.removeItem('ciliai_deepseek_key');
-        localStorage.removeItem('ciliai_deepseek_model');
         this.apiKey = null;
         this.enabled = false;
-        console.log('[CiliAI] DeepSeek API key removed (admin)');
+        console.log('[CiliAI] DeepSeek API key removed');
     },
     
-    // Rate limiting
-    canCall: function() {
-        const now = Date.now();
-        if (now - this.rateLimit.lastCall > this.rateLimit.cooldown) {
-            this.rateLimit.lastCall = now;
-            return true;
-        }
-        return false;
-    },
-    
-    // Intent classification (invisible to users)
+    // Intent Classification
     classifyIntent: async function(query) {
         if (!this.enabled || !this.apiKey) return null;
-        if (!this.canCall()) return null;
         
         try {
             const response = await fetch("https://api.deepseek.com/chat/completions", {
@@ -549,7 +533,7 @@ window.CiliAI.DeepSeek = {
                             role: "system", 
                             content: `You are CiliAI intent classifier. Classify this cilia biology query into exactly ONE of these intents:
 gene_info, localization, expression, comparison, ciliopathy, ortholog, domains, list, phylogeny, screens, variants, unknown.
-Return ONLY the intent name. Do NOT answer the question.` 
+Return ONLY the intent name.` 
                         },
                         { role: "user", content: query }
                     ],
@@ -558,36 +542,25 @@ Return ONLY the intent name. Do NOT answer the question.`
                 })
             });
             
-            if (!response.ok) {
-                throw new Error(`DeepSeek API error: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`);
             
             const data = await response.json();
             const intent = data.choices[0]?.message?.content?.trim().toLowerCase();
-            
-            // Validate intent
-            const validIntents = ['gene_info', 'localization', 'expression', 'comparison', 
-                                'ciliopathy', 'ortholog', 'domains', 'list', 'phylogeny', 
-                                'screens', 'variants'];
+            const validIntents = ['gene_info', 'localization', 'expression', 'comparison', 'ciliopathy', 'ortholog', 'domains', 'list', 'phylogeny', 'screens', 'variants'];
             
             if (intent && validIntents.includes(intent) && intent !== 'unknown') {
                 this.lastClassification = intent;
                 return intent;
             }
-            
             return null;
         } catch (error) {
             console.warn('[CiliAI] DeepSeek classification failed:', error);
-            return null; // Fail silently - users never see errors
+            return null;
         }
     },
-    
-    // Admin-only: Test connection
+
     testConnection: async function() {
-        if (!this.enabled || !this.apiKey) {
-            return { success: false, error: 'DeepSeek not configured' };
-        }
-        
+        if (!this.enabled || !this.apiKey) return { success: false, error: 'DeepSeek not configured' };
         try {
             const response = await fetch("https://api.deepseek.com/chat/completions", {
                 method: "POST",
@@ -597,37 +570,94 @@ Return ONLY the intent name. Do NOT answer the question.`
                 },
                 body: JSON.stringify({
                     model: this.model,
-                    messages: [
-                        { role: "system", content: "Respond with 'OK'" },
-                        { role: "user", content: "Test" }
-                    ],
+                    messages: [{ role: "user", content: "Test" }],
                     max_tokens: 5
                 })
             });
-            
-            if (response.ok) {
-                return { 
-                    success: true, 
-                    model: this.model,
-                    message: 'DeepSeek connected successfully' 
-                };
-            } else {
-                throw new Error(`API error: ${response.status}`);
-            }
+            if (response.ok) return { success: true, model: this.model, message: 'DeepSeek connected' };
+            else throw new Error(`API error: ${response.status}`);
         } catch (error) {
             return { success: false, error: error.message };
         }
     }
 };
 
-// 2. Initialize on page load (silently)
+// Initialize silently on load
 document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        if (window.CiliAI.DeepSeek.init()) {
-            console.log('[CiliAI] DeepSeek intent classifier initialized (invisible)');
-        }
-    }, 1000);
+    window.CiliAI.DeepSeek.init();
 });
+
+
+// Admin Panel Logic (Ctrl+Alt+Shift+D)
+window.showDeepSeekAdminPanel = function() {
+    const currentKey = window.CiliAI.DeepSeek.getApiKey(true);
+    const status = window.CiliAI.DeepSeek.enabled ? '🟢 Enabled' : '🔴 Disabled';
+    
+    const adminHTML = `
+    <div class="modal" id="deepseek-admin-modal" style="display:flex;">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3>🔐 DeepSeek Admin Panel</h3>
+            <p>Status: <strong>${status}</strong></p>
+            <div style="margin: 15px 0;">
+                <label>API Key (sk-...)</label>
+                <input type="password" id="deepseek-admin-key" class="cilia-input" placeholder="Enter DeepSeek API Key">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="ciliai-button" style="background:#e74c3c;" onclick="window.removeDeepSeekConfig(); document.getElementById('deepseek-admin-modal').remove()">Remove</button>
+                <button class="ciliai-button" onclick="window.saveDeepSeekConfig()">Save & Test</button>
+                <button class="ciliai-button" style="background:#95a5a6;" onclick="document.getElementById('deepseek-admin-modal').remove()">Close</button>
+            </div>
+            <div id="deepseek-test-result" style="margin-top:10px;"></div>
+        </div>
+    </div>`;
+    
+    // Remove existing if present
+    document.getElementById('deepseek-admin-modal')?.remove();
+    document.body.insertAdjacentHTML('beforeend', adminHTML);
+};
+
+window.saveDeepSeekConfig = async function() {
+    const key = document.getElementById('deepseek-admin-key').value.trim();
+    if (!key) return;
+    window.CiliAI.DeepSeek.setApiKey(key);
+    const res = await window.CiliAI.DeepSeek.testConnection();
+    const resultDiv = document.getElementById('deepseek-test-result');
+    if (res.success) resultDiv.innerHTML = `<span style="color:green">✅ Connected!</span>`;
+    else resultDiv.innerHTML = `<span style="color:red">❌ Failed: ${res.error}</span>`;
+};
+
+window.removeDeepSeekConfig = function() {
+    window.CiliAI.DeepSeek.removeApiKey();
+    alert('DeepSeek API Key Removed');
+};
+
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.altKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        window.showDeepSeekAdminPanel();
+    }
+});
+
+// DeepSeek Classifier Wrapper
+window.deepSeekClassifyIntent = async function(query) {
+    if (!window.CiliAI.DeepSeek.enabled) return null;
+    const intent = await window.CiliAI.DeepSeek.classifyIntent(query);
+    if (!intent) return null;
+    
+    // Suggest formats based on intent
+    const suggestions = {
+        gene_info: [`"What is [GENE]?"`, `"Tell me about [GENE]"`],
+        localization: [`"Where is [GENE]?"`, `"Localization of [GENE]"`],
+        expression: [`"Expression of [GENE]"`, `"Show UMAP for [GENE]"`],
+        comparison: [`"Compare [GENE1] and [GENE2]"`],
+        ciliopathy: [`"Genes in [DISEASE]"`],
+        phylogeny: [`"Show evolution of [GENE]"`],
+        screens: [`"Screen data for [GENE]"`]
+    };
+    
+    return { intent, suggestions: suggestions[intent] || [] };
+};
+
 
 // 3. Helper functions for intent classification
 function getIntentSuggestions(intent, originalQuery) {
@@ -754,146 +784,7 @@ window.deepSeekClassifyIntent = async function(query) {
     }
 };
 
-// 5. ADMIN PANEL - Only accessible via secret URL or admin mode
-window.showDeepSeekAdminPanel = function() {
-    const currentKey = window.CiliAI.DeepSeek.getApiKey(true);
-    const status = window.CiliAI.DeepSeek.enabled ? '🟢 Enabled' : '🔴 Disabled';
-    
-    const adminHTML = `
-    <div class="modal" id="deepseek-admin-modal">
-        <div class="modal-content" style="max-width: 600px; background: #f8f9fa;">
-            <div class="admin-header" style="background: #2c3e50; color: white; padding: 15px 20px; border-radius: 8px 8px 0 0;">
-                <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
-                    🔐 DeepSeek Admin Panel
-                    <span style="font-size: 12px; background: #34495e; padding: 2px 8px; border-radius: 12px;">
-                        ${status}
-                    </span>
-                </h3>
-            </div>
-            
-            <div class="admin-body" style="padding: 20px;">
-                <!-- Current Status -->
-                <div class="admin-section" style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #e0e0e0;">
-                    <h4 style="margin-top: 0; color: #2c3e50;">Current Configuration</h4>
-                    <p><strong>Status:</strong> ${status}</p>
-                    <p><strong>Model:</strong> ${window.CiliAI.DeepSeek.model}</p>
-                    <p><strong>API Key:</strong> ${currentKey || 'Not configured'}</p>
-                    <p><strong>Last Classification:</strong> ${window.CiliAI.DeepSeek.lastClassification || 'None'}</p>
-                </div>
-                
-                <!-- Update API Key -->
-                <div class="admin-section" style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #e0e0e0;">
-                    <h4 style="margin-top: 0; color: #2c3e50;">Update API Key</h4>
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">
-                            DeepSeek API Key (sk-...)
-                        </label>
-                        <input type="password" 
-                               id="deepseek-admin-key" 
-                               placeholder="Enter new API key" 
-                               style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;">
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px;">
-                        <button class="ciliai-button" 
-                                onclick="window.saveDeepSeekConfig()"
-                                style="background: #27ae60; color: white;">
-                            💾 Save & Test
-                        </button>
-                        <button class="ciliai-button" 
-                                onclick="window.testDeepSeekConfig()"
-                                style="background: #3498db; color: white;">
-                            🔄 Test Connection
-                        </button>
-                        <button class="ciliai-button" 
-                                onclick="window.removeDeepSeekConfig()"
-                                style="background: #e74c3c; color: white;">
-                            🗑️ Remove
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Test Results -->
-                <div id="deepseek-test-result" style="display: none;"></div>
-                
-                <!-- Usage Statistics -->
-                <div class="admin-section" style="padding: 15px; background: white; border-radius: 6px; border: 1px solid #e0e0e0;">
-                    <h4 style="margin-top: 0; color: #2c3e50;">Usage Information</h4>
-                    <p><strong>Function:</strong> Invisible intent classifier</p>
-                    <p><strong>Purpose:</strong> Routes ambiguous queries to correct handlers</p>
-                    <p><strong>Visibility:</strong> Users never see DeepSeek responses</p>
-                    <p><strong>Cost:</strong> ~$0.20/month for 100 queries/day</p>
-                    <p style="font-size: 12px; color: #7f8c8d; margin-top: 10px;">
-                        💡 DeepSeek works silently in the background to improve query routing.
-                        Users see helpful suggestions, not AI-generated answers.
-                    </p>
-                </div>
-                
-                <!-- Close Button -->
-                <div style="text-align: right; margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
-                    <button class="ciliai-button" 
-                            onclick="document.getElementById('deepseek-admin-modal').remove()"
-                            style="background: #95a5a6; color: white;">
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>`;
-    
-    // Remove existing modal if any
-    document.getElementById('deepseek-admin-modal')?.remove();
-    
-    // Add new modal
-    document.body.insertAdjacentHTML('beforeend', adminHTML);
-};
 
-// 6. Admin functions
-window.saveDeepSeekConfig = async function() {
-    const keyInput = document.getElementById('deepseek-admin-key');
-    const newKey = keyInput.value.trim();
-    
-    if (!newKey) {
-        alert('Please enter a DeepSeek API key');
-        return;
-    }
-    
-    if (!newKey.startsWith('sk-')) {
-        alert('Invalid DeepSeek API key format. Should start with "sk-"');
-        return;
-    }
-    
-    // Save the key
-    window.CiliAI.DeepSeek.setApiKey(newKey);
-    
-    // Test connection
-    const result = await window.CiliAI.DeepSeek.testConnection();
-    
-    const resultDiv = document.getElementById('deepseek-test-result');
-    if (result.success) {
-        resultDiv.innerHTML = `
-            <div style="margin-top: 15px; padding: 15px; background: #d4edda; color: #155724; border-radius: 6px; border: 1px solid #c3e6cb;">
-                <h4 style="margin-top: 0;">✅ Configuration Saved & Tested</h4>
-                <p><strong>Status:</strong> Connected successfully</p>
-                <p><strong>Model:</strong> ${result.model}</p>
-                <p><strong>Message:</strong> ${result.message}</p>
-                <p style="font-size: 12px;">DeepSeek intent classifier is now active and invisible to users.</p>
-            </div>
-        `;
-    } else {
-        resultDiv.innerHTML = `
-            <div style="margin-top: 15px; padding: 15px; background: #f8d7da; color: #721c24; border-radius: 6px; border: 1px solid #f5c6cb;">
-                <h4 style="margin-top: 0;">❌ Connection Failed</h4>
-                <p><strong>Error:</strong> ${result.error}</p>
-                <p style="font-size: 12px;">Please check your API key and try again.</p>
-            </div>
-        `;
-    }
-    resultDiv.style.display = 'block';
-    
-    // Clear input
-    keyInput.value = '';
-};
 
 window.testDeepSeekConfig = async function() {
     const result = await window.CiliAI.DeepSeek.testConnection();
@@ -918,28 +809,6 @@ window.testDeepSeekConfig = async function() {
         `;
     }
     resultDiv.style.display = 'block';
-};
-
-window.removeDeepSeekConfig = function() {
-    if (confirm('Are you sure you want to remove the DeepSeek API key? Intent classification will be disabled.')) {
-        window.CiliAI.DeepSeek.removeApiKey();
-        
-        const resultDiv = document.getElementById('deepseek-test-result');
-        resultDiv.innerHTML = `
-            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; color: #856404; border-radius: 6px; border: 1px solid #ffeaa7;">
-                <h4 style="margin-top: 0;">⚠️ API Key Removed</h4>
-                <p>DeepSeek intent classifier has been disabled.</p>
-                <p style="font-size: 12px;">Add a new API key to re-enable intent classification.</p>
-            </div>
-        `;
-        resultDiv.style.display = 'block';
-        
-        // Refresh the admin panel
-        setTimeout(() => {
-            document.getElementById('deepseek-admin-modal').remove();
-            window.showDeepSeekAdminPanel();
-        }, 1000);
-    }
 };
 
 
@@ -6508,4 +6377,5 @@ window.loadCiliAIData = async function (timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
