@@ -70,137 +70,6 @@ if (typeof window.addChatMessage !== "function") {
     };
 }
 
-// ==========================================================
-// 3. DEEPSEEK API INTEGRATION (REAL API + RATE LIMITING)
-// ==========================================================
-
-window.CiliAI.DeepSeek = {
-    enabled: false,
-    apiKey: null,
-    model: 'deepseek-chat',
-    rateLimit: 5, // Max requests per minute
-    lastRequestTime: 0,
-    
-    init: function() {
-        const key = localStorage.getItem('ciliai_deepseek_key');
-        if (key && key.trim() !== '') {
-            this.enabled = true;
-            this.apiKey = key;
-            this.model = localStorage.getItem('ciliai_deepseek_model') || 'deepseek-chat';
-            console.log('[CiliAI] DeepSeek intent classifier enabled');
-        }
-        return this.enabled;
-    },
-    
-    setApiKey: function(key) {
-        localStorage.setItem('ciliai_deepseek_key', key);
-        this.apiKey = key;
-        this.enabled = true;
-        console.log('[CiliAI] DeepSeek API key saved');
-    },
-    
-    getApiKey: function(masked = true) {
-        if (!this.apiKey) return null;
-        if (masked) return 'sk-...' + this.apiKey.slice(-4);
-        return this.apiKey;
-    },
-    
-    removeApiKey: function() {
-        localStorage.removeItem('ciliai_deepseek_key');
-        this.apiKey = null;
-        this.enabled = false;
-        console.log('[CiliAI] DeepSeek API key removed');
-    },
-
-    canMakeRequest: function() {
-        const now = Date.now();
-        const timeSinceLast = now - this.lastRequestTime;
-        const minInterval = 60000 / this.rateLimit; // ms between requests
-        return timeSinceLast > minInterval;
-    },
-    
-    // REAL API CALL
-    classifyIntent: async function(query) {
-        if (!this.enabled || !this.apiKey) return null;
-        
-        if (!this.canMakeRequest()) {
-            console.warn('[CiliAI] Rate limit exceeded. Using fallback logic.');
-            return null;
-        }
-
-        this.lastRequestTime = Date.now();
-        
-        try {
-            const response = await fetch("https://api.deepseek.com/chat/completions", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: this.model,
-                    messages: [
-                        { 
-                            role: "system", 
-                            content: `You are a cilia biology expert. Classify the user's query into one of these intents:
-                            1. gene_info - Asking about a specific gene (e.g., "What is IFT88?")
-                            2. visualize_expression - Wanting to see expression plots (e.g., "Show UMAP", "Expression of...")
-                            3. phylogeny - Asking about evolution/conservation
-                            4. ciliopathy - Asking about diseases
-                            5. localization - Asking where a gene is located
-                            6. comparison - Comparing genes
-                            7. list_request - Asking for lists of genes
-                            8. unknown - Anything else
-                            
-                            Respond ONLY with a JSON object: {"intent": string, "confidence": number, "entity": string|null}
-                            Entity should be the gene symbol if found, or null.` 
-                        },
-                        { role: "user", content: query }
-                    ],
-                    temperature: 0.1,
-                    max_tokens: 100,
-                    response_format: { type: "json_object" } // Force JSON mode
-                })
-            });
-            
-            if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`);
-            
-            const data = await response.json();
-            const aiResponse = data.choices[0]?.message?.content;
-            
-            // Parse JSON response
-            const parsed = JSON.parse(aiResponse);
-            return parsed; // Returns {intent, confidence, entity}
-
-        } catch (error) {
-            console.warn('[CiliAI] DeepSeek classification failed:', error);
-            return null;
-        }
-    },
-
-    testConnection: async function() {
-        if (!this.enabled || !this.apiKey) return { success: false, error: 'DeepSeek not configured' };
-        try {
-            const response = await fetch("https://api.deepseek.com/chat/completions", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: this.model,
-                    messages: [{ role: "user", content: "Test" }],
-                    max_tokens: 5
-                })
-            });
-            if (response.ok) return { success: true, model: this.model, message: 'DeepSeek connected' };
-            else throw new Error(`API error: ${response.status}`);
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    }
-};
-
 // Global variables for lazy loading
 window.liPhylogenyCache = null;
 window.neversPhylogenyCache = null;
@@ -3594,64 +3463,12 @@ window.handleCellTypeQuestion = function(query) {
     return html;
 };
 
-
-// DeepSeek Intent Classifier (Invisible, Admin-only Router)
-// This is a lightweight fallback implementation.
-// In production, replace the body with an actual fetch() to DeepSeek API using a classification prompt.
-async function deepseek_classify_intent(query) {
-    const qLower = query.toLowerCase();
-    const genePattern = /[A-Z0-9]{3,}/g;
-    if (genePattern.test(query) || qLower.includes('gene') || qLower.includes('what is') || qLower.includes('tell me about') || qLower.includes('where is') || qLower.includes('locali')) {
-        const match = query.match(genePattern);
-        return { intent: 'gene_info', confidence: 0.95, entity: match ? match[0] : null };
-    }
-    if (qLower.includes('plot') || qLower.includes('umap') || qLower.includes('expression') || qLower.includes('scrna') || qLower.includes('display')) {
-        return { intent: 'visualize_expression', confidence: 0.92 };
-    }
-    if (qLower.includes('evolution') || qLower.includes('phylogen') || qLower.includes('conservation') || qLower.includes('li') || qLower.includes('nevers')) {
-        return { intent: 'phylogeny', confidence: 0.88 };
-    }
-    if (qLower.includes('ciliopathy') || qLower.includes('disease') || qLower.includes('joubert') || qLower.includes('bbs') || qLower.includes('pcd')) {
-        return { intent: 'ciliopathy', confidence: 0.85 };
-    }
-    return { intent: 'unrecognized', confidence: 0.4 };
-}
-
-// Wrapper for handleAIQuery to access
-window.deepSeekClassifyIntent = async function(query) {
-    if (!window.CiliAI.DeepSeek.enabled || !window.CiliAI.DeepSeek.apiKey) return null;
-    
-    const qLower = query.toLowerCase().trim();
-    // Skip simple queries to save API calls
-    if (['hello', 'hi', 'show', 'list', 'help'].includes(qLower)) return null;
-    
-    // Skip if Regex likely caught it already (optimization)
-    if (query.match(/[A-Z0-9]{3,}/) && (qLower.includes('what is') || qLower.includes('where is'))) return null;
-
-    try {
-        const result = await window.CiliAI.DeepSeek.classifyIntent(query);
-        
-        if (!result || !result.intent || result.intent === 'unknown') return null;
-        
-        return {
-            intent: result.intent,
-            entity: result.entity,
-            suggestions: getIntentSuggestions(result.intent, query) // Re-use existing helper
-        };
-    } catch (error) {
-        console.warn('[CiliAI] DeepSeek wrapper failed:', error);
-        return null;
-    }
-};
-
-
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
     if (!query) return;
     const qLower = query.toLowerCase().trim();
-
-    // === 1. HIGHEST PRIORITY: Cell-type specific questions ===
+    // === 1. HIGHEST PRIORITY: Cell-type specific questions (your existing fix) ===
     if (qLower.includes('cilia-restricted') ||
         qLower.includes('cilia restricted') ||
         qLower.includes('ciliary-restricted') ||
@@ -3665,99 +3482,11 @@ window.handleAIQuery = async function (query) {
             return;
         }
     }
-
     if (window.log) window.log(`Routing query: ${query}`);
-
     try {
         if (!window.CiliAI || !window.CiliAI.ready) {
             window.addChatMessage("Data is still loading, please wait...", false);
             return;
-        }
-
-        let htmlResult = null;
-        let match;
-
-        // === 2. GENERALIZED: "Where is [GENE] expressed?" ===
-        if (htmlResult === null && qLower.includes('where is') && qLower.includes('expressed')) {
-             const genes = extractMultipleGenes(query);
-             if (genes.length > 0) {
-                 const geneSymbol = genes[0];
-                 const gene = window.CiliAI.lookups.geneMap[geneSymbol];
-                 if (!gene) {
-                     htmlResult = `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in database.</p></div>`;
-                 } else {
-                     const loc = gene.Localization || 'Not specified';
-                     htmlResult = `<div class="ai-result-card"><h4>Expression of ${geneSymbol}</h4><p>Localization: ${loc}</p></div>`;
-                 }
-             }
-        }
-
-        // === 3. FALLBACK & DEEPSEEK ROUTING ===
-        if (htmlResult === null) {
-            // 1. Try flexible intent parser (Hardcoded keyword match)
-            const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
-            if (intent && intent.handler) {
-                htmlResult = intent.handler(intent.entity, query);
-            }
-
-            // 2. If still null, Try DeepSeek (Invisible Classifier)
-            if (htmlResult === null && window.CiliAI.DeepSeek && window.CiliAI.DeepSeek.enabled) {
-                window.addChatMessage('<span style="color:#666; font-size:11px;">Thinking...</span>', false);
-                
-                const deepSeekResult = await window.deepSeekClassifyIntent(query);
-                
-                if (deepSeekResult) {
-                    // AUTO-TRIGGER LOGIC based on DeepSeek intent + entity
-                    if (deepSeekResult.entity) {
-                        const gene = deepSeekResult.entity.toUpperCase();
-                        
-                        if (deepSeekResult.intent === 'visualize_expression') {
-                            window.renderUMAPPlot(gene);
-                            htmlResult = `DeepSeek identified visualization request for <strong>${gene}</strong>. Generating plot...`;
-                        } 
-                        else if (deepSeekResult.intent === 'gene_info') {
-                            htmlResult = await window.displayFullGeneInfo(gene);
-                        }
-                        else if (deepSeekResult.intent === 'phylogeny') {
-                            htmlResult = await window.handlePhylogenyVisualizationQuery([gene], 'li'); // Default to Li
-                        }
-                        else if (deepSeekResult.intent === 'localization') {
-                             const gData = window.CiliAI.lookups.geneMap[gene];
-                             if(gData) htmlResult = `<div class="ai-result-card"><h4>Localization: ${gene}</h4><p>${gData.Localization || 'Not annotated'}</p></div>`;
-                        }
-                    }
-
-                    // If no auto-trigger happened, show suggestions
-                    if (!htmlResult) {
-                        const displayName = getIntentDisplayName(deepSeekResult.intent);
-                        htmlResult = `
-                        <div class="ai-result-card" style="border-left: 4px solid #4caf50;">
-                            <h4>💡 I Can Help With: ${displayName}</h4>
-                            <p>I understood the intent, but need a specific gene or term.</p>
-                            <ul style="margin: 10px 0; padding-left: 20px;">
-                                ${deepSeekResult.suggestions.map(s => `<li>${s}</li>`).join('')}
-                            </ul>
-                        </div>`;
-                    }
-                }
-            }
-
-            // 3. Absolute Fallback (No AI)
-            if (htmlResult === null) {
-                htmlResult = `
-                <div class="ai-result-card">
-                    <h4>🔍 How Can I Help?</h4>
-                    <p>I didn't understand: "<strong>${query}</strong>"</p>
-                    <p>Try one of these:</p>
-                    <ul style="columns: 2; margin: 10px 0;">
-                        <li>"What is IFT88?"</li>
-                        <li>"Where is WDR31 localized?"</li>
-                        <li>"Expression of FOXJ1"</li>
-                        <li>"Compare IFT88 and IFT140"</li>
-                        <li>"Genes in Joubert syndrome"</li>
-                    </ul>
-                </div>`;
-            }
         }
         let htmlResult = null;
         let match;
