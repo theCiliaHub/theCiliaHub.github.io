@@ -1,326 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — Enhanced Gene Explorer</title>
-    <link rel="icon" type="image/png"
-        href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
-
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
+   
     <!-- External Dependencies -->
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- AI API Functions - Must load before ciliai.js -->
-    <script>
-        // Early AI Configuration & Management
-
-        // 1. Configuration State
-        window.AIConfig = {
-            geminiApiKey: localStorage.getItem('ciliai_gemini_key') || '',
-            groqApiKey: localStorage.getItem('ciliai_groq_key') || '',
-            geminiModel: localStorage.getItem('ciliai_gemini_model') || 'gemini-2.5-flash',
-            groqModel: localStorage.getItem('ciliai_groq_model') || 'llama-3.3-70b-versatile',
-            activeProvider: localStorage.getItem('ciliai_active_provider') || 'none'
-        };
-
-        // 2. Expert System Prompt
-        window.getCiliAISystemPrompt = function () {
-            return `Sen CiliAI asistanısın - silia (kirpiksi uzantılar/cilia) biyolojisi, gen ifadesi ve siliopati hastalıkları konusunda dünyaca uzman bir yapay zeka asistanısın.
-
-## 🔬 Uzmanlık Alanların:
-
-### 1. Silia Biyolojisi
-- **Primer Silia**: Hücre yüzeyinden uzanan, sinyal algılayan, hareketsiz organeller
-- **Motil Silia**: Sıvı akışı sağlayan, 9+2 mikrotübül yapısına sahip hareketli silia
-- **Silia Yapısı**:
-  - Aksonem (axoneme): Mikrotübül çekirdeği, β2-tubulin markeri
-  - Bazal Cisim (basal body): Silia kökü, PCM1 markeri  
-  - Geçiş Bölgesi (transition zone): Siliyer kapı, TMEM17/MKS/NPHP kompleksleri
-  - Silia Membranı: ARL13B markeri
-  - Silia Ucu (ciliary tip): IFT parçacık dönüşüm bölgesi
-
-### 2. İntrasiliyer Transport (IFT)
-- **IFT-B Kompleksi**: Anterograd transport (bazalden uca), kinesin-2 motoru
-  - Genler: IFT88, IFT172, IFT80, IFT57, IFT52, IFT46, IFT27, IFT20
-- **IFT-A Kompleksi**: Retrograd transport (uçtan bazale), sitoplazmatik dinein-2
-  - Genler: WDR19, IFT140, IFT122, WDR35, TTC21B, IFT43
-- **Motor Proteinleri**: KIF3A, KIF3B (kinesin), DYNC2H1 (dinein)
-
-### 3. Protein Kompleksleri
-- **BBSome**: BBS1, BBS2, BBS4, BBS5, BBS7, TTC8, BBS9, BBIP1 - membran protein taşınması
-- **MKS Modülü**: MKS1, TMEM67, TMEM216, B9D1, B9D2, CC2D2A - geçiş bölgesi
-- **NPHP Modülü**: NPHP1, NPHP3, NPHP4, CEP290, RPGRIP1L - geçiş bölgesi
-- **Radyal Spoke**: RSPH1, RSPH4A, RSPH9 - motil silia yapısı
-- **Dinein Kolları**: DNAH5, DNAH11, DNAI1, DNAI2 - silia hareketi
-
-### 4. Siliopati Hastalıkları
-- **Joubert Sendromu**: Serebellar vermis hipoplazisi, "molar tooth sign", genler: CEP290, AHI1, CC2D2A, TMEM67
-- **Bardet-Biedl Sendromu (BBS)**: Obezite, retinal distrofi, polidaktili, genler: BBS1-BBS21
-- **Polikistik Böbrek Hastalığı (PKD)**: Böbrekte kistler, genler: PKD1, PKD2, PKHD1
-- **Primer Siliyer Diskinezi (PCD)**: Kronik solunum yolu enfeksiyonları, situs inversus, genler: DNAH5, DNAI1
-- **Meckel-Gruber Sendromu**: Ensefalose, polikistik böbrek, polidaktili, genler: MKS1, TMEM67, CEP290
-- **Nefronofitizis (NPHP)**: Böbrek yetmezliği, genler: NPHP1, NPHP3, NPHP4
-- **Alström Sendromu**: Obezite, retinal distrofi, işitme kaybı, gen: ALMS1
-- **Senior-Løken Sendromu**: NPHP + retinal distrofi
-- **Leber Konjenital Amaurozis**: Erken körlük, genler: CEP290, LCA5
-
-## 📊 CiliAI Platformu Özellikleri:
-- **2,365+ siliyer gen** veritabanı
-- **58 siliopati hastalığı** ve **203 hastalık geni**
-- **scRNA-seq ekspresyon verileri**: İnsan akciğer organoidi (bazal hücre, siliyal hücre, goblet hücre, club hücre)
-- **Filogenetik koruma verileri**: 20+ organizmada evrimsel koruma (Li et al. 2014, Nevers et al. 2017)
-- **Pfam protein domain** bilgileri
-- **UMAP görselleştirmeleri**: Gen ekspresyon haritaları
-- **İnteraktif silia diyagramı**: Lokalizasyon görselleştirme
-
-## 📝 Cevaplama Kuralları:
-1. **Dil**: Türkçe soru → Türkçe cevap, İngilizce soru → İngilizce cevap
-2. **Uzunluk**: Kısa ve öz (2-4 paragraf), gerekirse liste kullan
-3. **Veritabanı**: Sağlanan bilgileri mutlaka cevaba dahil et
-4. **Gen İsimleri**: BÜYÜK HARF ile yaz (IFT88, BBS1, CEP290)
-5. **Format**: HTML kullan: <p>, <strong>, <ul>, <li>, <br>, <em>
-6. **Bilimsellik**: Doğru terminoloji kullan, yanlış bilgi verme
-7. **Samimiyet**: Selamlaşma ve genel sorulara nazik cevap ver
-8. **Dürüstlük**: Bilmediğin konularda "Bu konuda detaylı bilgim yok" de
-
-## 💡 Örnek Cevap Formatları:
-
-**Gen Sorusu**: "IFT88 nedir?"
-→ Gen fonksiyonu, lokalizasyonu, ilişkili hastalıklar, hangi komplekste yer aldığı
-
-**Hastalık Sorusu**: "Joubert Sendromu nedir?"  
-→ Hastalık tanımı, semptomlar, ilgili genler, kalıtım paterni
-
-**Lokalizasyon Sorusu**: "Geçiş bölgesi genleri neler?"
-→ O bölgedeki genlerin listesi ve fonksiyonları
-
-**Karşılaştırma**: "BBS1 ve BBS2 farkı?"
-→ Her iki genin özellikleri, benzerlikleri ve farkları
-
-**Genel**: "Selam, silia nedir?"
-→ Samimi selamlama + silia tanımı ve önemi`;
-        };
-
-        // 3. UI Management Functions
-        window.openAPISettings = function () {
-            const modal = document.getElementById('apiSettingsModal');
-            if (modal) {
-                modal.style.display = 'flex';
-                modal.classList.add('active');
-
-                // Load saved values
-                document.getElementById('geminiApiKey').value = window.AIConfig.geminiApiKey;
-                document.getElementById('groqApiKey').value = window.AIConfig.groqApiKey;
-                document.getElementById('geminiModel').value = window.AIConfig.geminiModel;
-                document.getElementById('groqModel').value = window.AIConfig.groqModel;
-                document.getElementById('activeProvider').value = window.AIConfig.activeProvider;
-
-                window.updateAPIStatus();
-            } else {
-                console.error("API Modal not found in DOM");
-            }
-        };
-
-        window.closeAPISettings = function () {
-            const modal = document.getElementById('apiSettingsModal');
-            if (modal) {
-                modal.style.display = 'none';
-                modal.classList.remove('active');
-            }
-        };
-
-        window.switchAPIProvider = function (provider) {
-            document.querySelectorAll('.api-provider-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.api-settings-panel').forEach(panel => panel.style.display = 'none');
-            const tab = document.getElementById(`tab-${provider}`);
-            const panel = document.getElementById(`${provider}-settings`);
-            if (tab) tab.classList.add('active');
-            if (panel) panel.style.display = 'block';
-        };
-
-        window.toggleApiKeyVisibility = function (inputId) {
-            const input = document.getElementById(inputId);
-            if (input) input.type = input.type === 'password' ? 'text' : 'password';
-        };
-
-        window.setActiveProvider = function (provider) {
-            window.AIConfig.activeProvider = provider;
-        };
-
-        window.saveAPISettings = function () {
-            const geminiKey = document.getElementById('geminiApiKey').value.trim();
-            const groqKey = document.getElementById('groqApiKey').value.trim();
-            const geminiModel = document.getElementById('geminiModel').value;
-            const groqModel = document.getElementById('groqModel').value;
-            const activeProvider = document.getElementById('activeProvider').value;
-
-            localStorage.setItem('ciliai_gemini_key', geminiKey);
-            localStorage.setItem('ciliai_groq_key', groqKey);
-            localStorage.setItem('ciliai_gemini_model', geminiModel);
-            localStorage.setItem('ciliai_groq_model', groqModel);
-            localStorage.setItem('ciliai_active_provider', activeProvider);
-
-            window.AIConfig = { geminiApiKey: geminiKey, groqApiKey: groqKey, geminiModel, groqModel, activeProvider };
-
-            window.updateAPIStatus();
-            window.closeAPISettings();
-
-            if (activeProvider !== 'none') {
-                const providerName = activeProvider === 'gemini' ? 'Google Gemini' : 'Groq';
-                if (window.addChatMessage) {
-                    window.addChatMessage(`✅ <strong>${providerName}</strong> AI aktif edildi. Artık sorularınıza AI destekli cevaplar alabilirsiniz!`, false);
-                }
-            }
-        };
-
-        window.clearAPISettings = function () {
-            if (!confirm('Tüm API ayarlarını silmek istediğinizden emin misiniz?')) return;
-
-            localStorage.removeItem('ciliai_gemini_key');
-            localStorage.removeItem('ciliai_groq_key');
-            localStorage.removeItem('ciliai_gemini_model');
-            localStorage.removeItem('ciliai_groq_model');
-            localStorage.removeItem('ciliai_active_provider');
-
-            window.AIConfig = {
-                geminiApiKey: '', groqApiKey: '',
-                geminiModel: 'gemini-2.5-flash', groqModel: 'llama-3.3-70b-versatile',
-                activeProvider: 'none'
-            };
-
-            document.getElementById('geminiApiKey').value = '';
-            document.getElementById('groqApiKey').value = '';
-            document.getElementById('activeProvider').value = 'none';
-
-            window.updateAPIStatus();
-        };
-
-        window.updateAPIStatus = function () {
-            const statusEl = document.getElementById('apiConnectionStatus');
-            if (!statusEl) return;
-
-            const provider = window.AIConfig.activeProvider;
-
-            if (provider === 'none') {
-                statusEl.className = 'api-status disconnected';
-                statusEl.innerHTML = '<span>⚠️</span> AI kapalı - Sadece veritabanı sorguları aktif';
-            } else if (provider === 'gemini' && window.AIConfig.geminiApiKey) {
-                statusEl.className = 'api-status connected';
-                statusEl.innerHTML = '<span>✅</span> Google Gemini bağlı';
-            } else if (provider === 'groq' && window.AIConfig.groqApiKey) {
-                statusEl.className = 'api-status connected';
-                statusEl.innerHTML = '<span>✅</span> Groq bağlı';
-            } else {
-                statusEl.className = 'api-status error';
-                statusEl.innerHTML = '<span>❌</span> API key eksik - Lütfen key girin';
-            }
-        };
-
-        // 4. API Call Functions
-        window.callGeminiAPI = async function (prompt, context = '') {
-            const apiKey = window.AIConfig.geminiApiKey;
-            const model = window.AIConfig.geminiModel;
-
-            if (!apiKey) throw new Error('Gemini API key bulunamadı');
-
-            const systemPrompt = window.getCiliAISystemPrompt();
-            const fullPrompt = context ? `${systemPrompt}\n\nVeritabanı Bilgisi:\n${context}\n\nKullanıcı Sorusu: ${prompt}` : `${systemPrompt}\n\nKullanıcı Sorusu: ${prompt}`;
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: fullPrompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 1024
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || 'Gemini API hatası');
-            }
-
-            const data = await response.json();
-            return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Cevap alınamadı';
-        };
-
-        window.callGroqAPI = async function (prompt, context = '') {
-            const apiKey = window.AIConfig.groqApiKey;
-            const model = window.AIConfig.groqModel;
-
-            if (!apiKey) throw new Error('Groq API key bulunamadı');
-
-            const systemPrompt = window.getCiliAISystemPrompt();
-            const messages = [{ role: 'system', content: systemPrompt }];
-
-            if (context) {
-                messages.push({ role: 'user', content: `Veritabanı Bilgisi:\n${context}` });
-                messages.push({ role: 'assistant', content: 'Anladım, bu bilgileri kullanarak cevap vereceğim.' });
-            }
-
-            messages.push({ role: 'user', content: prompt });
-
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: model,
-                    messages: messages,
-                    temperature: 0.7,
-                    max_tokens: 1024
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || 'Groq API hatası');
-            }
-
-            const data = await response.json();
-            return data.choices?.[0]?.message?.content || 'Cevap alınamadı';
-        };
-
-        window.askAI = async function (prompt, context = '') {
-            const provider = window.AIConfig.activeProvider;
-            if (provider === 'none') return null;
-
-            try {
-                if (provider === 'gemini') return await window.callGeminiAPI(prompt, context);
-                else if (provider === 'groq') return await window.callGroqAPI(prompt, context);
-            } catch (error) {
-                console.error('AI API Error:', error);
-                throw error;
-            }
-            return null;
-        };
-
-        window.isAIEnabled = function () {
-            const provider = window.AIConfig.activeProvider;
-            if (provider === 'gemini' && window.AIConfig.geminiApiKey) return true;
-            if (provider === 'groq' && window.AIConfig.groqApiKey) return true;
-            return false;
-        };
-
-        window.getAIBadge = function () {
-            const provider = window.AIConfig.activeProvider;
-            if (provider === 'gemini') return '<span class="ai-indicator gemini">✨ Gemini</span>';
-            if (provider === 'groq') return '<span class="ai-indicator groq">⚡ Groq</span>';
-            return '';
-        };
-    </script>
-
+   
     <!-- CiliAI Engine - Centralized Logic -->
-    <script src="ciliai/ciliai-data.js"></script>
-    <script src="ciliai/ciliai.js"></script>
-
+    <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
+   
     <style>
         :root {
             /* Synchronized Palette from plots.html */
@@ -334,110 +26,86 @@
             --highlight-gold: #f6e05e;
             --bg: #f8fafc;
             --card: #ffffff;
-
+           
             /* Anatomical Palette markers */
-            --color-pcm1: #5b21b6;
-            /* Professional Deep Violet - PCM1 (Basal Body) */
-            --color-tmem17: #475569;
-            /* Slate Blue - TMEM17 (Transition Zone) */
-            --color-arl13b: #0891b2;
-            /* Muted Cyan - ARL13B (Membrane) */
-            --color-tubulin: #2563eb;
-            /* Royal Blue - Beta2-tubulin (Axoneme) */
+            --color-pcm1: #5b21b6; /* Professional Deep Violet - PCM1 (Basal Body) */
+            --color-tmem17: #475569; /* Slate Blue - TMEM17 (Transition Zone) */
+            --color-arl13b: #0891b2; /* Muted Cyan - ARL13B (Membrane) */
+            --color-tubulin: #2563eb; /* Royal Blue - Beta2-tubulin (Axoneme) */
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+       
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html {
+            height: 100%;
+            font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--accent-text);
+            overflow: hidden;
         }
-
-* { 
-    margin: 0; 
-    padding: 0; 
-    box-sizing: border-box; 
-}
-
-/* Match index.html body behavior */
-body {
-    font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #f8fafc;
-    color: var(--accent-text);
-    padding-top: 64px;   /* MUST match navbar height */
-    min-height: 100vh;
-}
-
-/* --- TOP NAVBAR — CANONICAL (USED ON ALL PAGES) --- */
-.top-navbar {
-    background: var(--primary-blue);
-    color: white;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 32px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    position: sticky;
-    top: 0;
-    width: 100%;
-    z-index: 1000;
-}
-
-/* Inner container — REQUIRED for identical geometry */
-.nav-container {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-/* Brand */
-.brand {
-    font-family: 'Inter', sans-serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-right: 30px;
-}
-
-/* Subtitle */
-.brand div div:last-child {
-    font-size: 10px;
-    font-weight: 400;
-    opacity: 0.8;
-    line-height: 1.2;
-}
-
-/* Navigation list */
-.nav-links {
-    display: flex;
-    list-style: none;
-    gap: 20px;
-    height: 100%;
-}
-
-/* Navigation links */
-.nav-links a {
-    font-family: 'Inter', sans-serif;
-    font-size: 19px;
-    font-weight: 500;
-    color: #ffffff;
-    text-decoration: none;
-    padding: 0 15px;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    transition: background-color 0.3s;
-}
-
-/* Active tab */
-.nav-links a.active {
-    background-color: rgba(255, 255, 255, 0.15);
-}
-
-
+        /* --- TOP NAVBAR - Harmonized with plots.html (64px height) --- */
+        .top-navbar {
+            background: var(--primary-blue);
+            color: white;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+        .nav-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            font-size: 20px;
+        }
+        .brand img {
+            height: 40px;
+            border-radius: 8px;
+        }
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+        .brand-subtitle {
+            font-size: 10px;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 4px;
+        }
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            font-size: 15px;
+        }
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.15);
+        }
+        .nav-links a.active {
+            background: rgba(255,255,255,0.25);
+            font-weight: 600;
+        }
         /* --- MAIN LAYOUT --- */
         .app-container {
             display: grid;
@@ -445,7 +113,6 @@ body {
             height: calc(100vh - 64px);
             width: 100vw;
         }
-
         /* LEFT PANEL */
         .center-panel {
             display: flex;
@@ -455,7 +122,6 @@ body {
             background: var(--bg);
             gap: 16px;
         }
-
         .top-bar {
             display: flex;
             align-items: center;
@@ -463,14 +129,12 @@ body {
             height: 44px;
             gap: 12px;
         }
-
         .search-container {
             display: flex;
             gap: 8px;
             flex: 1;
             max-width: 600px;
         }
-
         .search-input {
             flex: 1;
             padding: 0 16px;
@@ -480,7 +144,6 @@ body {
             font-size: 14px;
             background: white;
         }
-
         .search-btn {
             padding: 0 24px;
             background: var(--primary-blue);
@@ -492,46 +155,28 @@ body {
             height: 44px;
             transition: background 0.2s;
         }
-
-        .search-btn:hover {
-            background: #004577;
-        }
-
+        .search-btn:hover { background: #004577; }
         .status-badge {
             padding: 8px 14px;
             border-radius: 6px;
             font-size: 12px;
             font-weight: 600;
         }
-
-        .status.loading {
-            background: var(--status-loading-bg);
-            color: var(--primary-blue);
-        }
-
-        .status.ready {
-            background: var(--status-ready-bg);
-            color: #2e7d32;
-        }
-
-        .status.error {
-            background: var(--status-error-bg);
-            color: #c62828;
-        }
-
+        .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
+        .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
+        .status.error { background: var(--status-error-bg); color: #c62828; }
         /* VIZ CARD */
         .viz-card {
             flex: 1;
             background: var(--card);
             border-radius: 12px;
             border: 1px solid var(--border-light);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
             display: flex;
             flex-direction: column;
             overflow: hidden;
             position: relative;
         }
-
         .viz-header {
             padding: 0 20px;
             border-bottom: 1px solid var(--border-light);
@@ -543,14 +188,12 @@ body {
             height: 54px;
             flex-shrink: 0;
         }
-
         .viz-title-group {
             display: flex;
             align-items: center;
             gap: 16px;
             overflow: hidden;
         }
-
         .viz-title {
             font-size: 15px;
             font-weight: 700;
@@ -559,7 +202,6 @@ body {
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .view-tabs {
             display: flex;
             gap: 4px;
@@ -567,7 +209,6 @@ body {
             padding: 3px;
             border-radius: 8px;
         }
-
         .view-tab {
             border: none;
             background: transparent;
@@ -580,18 +221,11 @@ body {
             transition: all 0.2s;
             white-space: nowrap;
         }
-
-        .view-tab.active {
-            background: white;
-            color: var(--primary-blue);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
+        .view-tab.active { background: white; color: var(--primary-blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .viz-actions {
             display: flex;
             gap: 6px;
         }
-
         .action-btn {
             background: var(--secondary-blue);
             color: var(--primary-blue);
@@ -606,12 +240,7 @@ body {
             align-items: center;
             gap: 6px;
         }
-
-        .action-btn:hover {
-            background: var(--primary-blue);
-            color: white;
-        }
-
+        .action-btn:hover { background: var(--primary-blue); color: white; }
         /* ACTION BAR CONTROLS */
         .viz-controls {
             padding: 8px 20px;
@@ -623,51 +252,11 @@ body {
             height: 44px;
             flex-shrink: 0;
         }
-
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #666;
-        }
-
-        .control-group select {
-            padding: 4px 8px;
-            border-radius: 5px;
-            border: 1px solid var(--border-light);
-            font-size: 11px;
-            outline: none;
-            background: white;
-            cursor: pointer;
-        }
-
-        .zoom-controls {
-            display: flex;
-            gap: 4px;
-        }
-
-        .zoom-btn {
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: white;
-            border: 1px solid var(--border-light);
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .zoom-btn:hover {
-            border-color: var(--primary-blue);
-            color: var(--primary-blue);
-            background: #f0f7ff;
-        }
-
+        .control-group { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: #666; }
+        .control-group select { padding: 4px 8px; border-radius: 5px; border: 1px solid var(--border-light); font-size: 11px; outline: none; background: white; cursor: pointer; }
+        .zoom-controls { display: flex; gap: 4px; }
+        .zoom-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .zoom-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); background: #f0f7ff; }
         #viz-stage {
             flex: 1;
             position: relative;
@@ -675,23 +264,15 @@ body {
             width: 100%;
             background: white;
         }
-
-        #cilia-svg,
-        #plotly-container,
-        #domain-viewer {
+        #cilia-svg, #plotly-container, #domain-viewer {
             position: absolute;
             inset: 0;
             width: 100% !important;
             height: 100% !important;
             overflow: hidden;
         }
-
-        #cilia-svg {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
+        #cilia-svg { display: flex; align-items: center; justify-content: center; }
+       
         /* RIGHT PANEL: CHAT */
         .right-panel {
             display: flex;
@@ -700,25 +281,9 @@ body {
             border-left: 1px solid var(--border-light);
             overflow: hidden;
         }
-
-        .chat-header {
-            padding: 18px 20px;
-            border-bottom: 1px solid var(--border-light);
-            flex-shrink: 0;
-        }
-
-        .chat-header h2 {
-            font-size: 16px;
-            color: var(--primary-blue);
-            font-weight: 700;
-        }
-
-        .chat-header p {
-            font-size: 11px;
-            color: #666;
-            margin-top: 2px;
-        }
-
+        .chat-header { padding: 18px 20px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+        .chat-header h2 { font-size: 16px; color: var(--primary-blue); font-weight: 700; }
+        .chat-header p { font-size: 11px; color: #666; margin-top: 2px; }
         .messages-area {
             flex: 1;
             padding: 20px;
@@ -728,62 +293,22 @@ body {
             gap: 16px;
             background: #fafafa;
         }
-
         /* Streaming compatible structure */
-        .ciliai-message {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            width: 100%;
-        }
-
-        .ciliai-message.user {
-            align-items: flex-end;
-        }
-
-        .ciliai-message.assistant {
-            align-items: flex-start;
-        }
-
-        .message-wrapper {
-            max-width: 90%;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .ciliai-message.user .message-wrapper {
-            align-items: flex-end;
-        }
-
+        .ciliai-message { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+        .ciliai-message.user { align-items: flex-end; }
+        .ciliai-message.assistant { align-items: flex-start; }
+        .message-wrapper { max-width: 90%; display: flex; flex-direction: column; gap: 4px; }
+        .ciliai-message.user .message-wrapper { align-items: flex-end; }
         .ciliai-message-content {
             padding: 12px 16px;
             border-radius: 14px;
             font-size: 13.5px;
             line-height: 1.5;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-
-        .user .ciliai-message-content {
-            background: var(--primary-blue);
-            color: white;
-            border-bottom-right-radius: 2px;
-        }
-
-        .assistant .ciliai-message-content {
-            background: white;
-            border: 1px solid var(--border-light);
-            border-bottom-left-radius: 2px;
-            color: #334155;
-        }
-
-        .suggested-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 10px;
-        }
-
+        .user .ciliai-message-content { background: var(--primary-blue); color: white; border-bottom-right-radius: 2px; }
+        .assistant .ciliai-message-content { background: white; border: 1px solid var(--border-light); border-bottom-left-radius: 2px; color: #334155; }
+        .suggested-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
         .gene-badge {
             background: var(--secondary-blue);
             color: var(--primary-blue);
@@ -795,209 +320,130 @@ body {
             transition: all 0.2s;
             border: 1px solid transparent;
         }
-
-        .gene-badge:hover {
-            background: var(--primary-blue);
-            color: white;
-            transform: translateY(-1px);
-        }
-
-        .input-area {
-            padding: 16px;
-            border-top: 1px solid #e2e8f0;
-            background: white;
-            flex-shrink: 0;
-        }
-
-        .chat-input-group {
-            display: flex;
-            gap: 8px;
-        }
-
-        .chat-input {
-            flex: 1;
-            padding: 12px 16px;
-            border: 2px solid var(--border-light);
-            border-radius: 12px;
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .chat-input:focus {
-            border-color: var(--primary-blue);
-        }
-
-        .send-btn {
-            background: var(--primary-blue);
-            color: white;
-            border: none;
-            padding: 0 24px;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
+        .gene-badge:hover { background: var(--primary-blue); color: white; transform: translateY(-1px); }
+        .input-area { padding: 16px; border-top: 1px solid #e2e8f0; background: white; flex-shrink: 0; }
+        .chat-input-group { display: flex; gap: 8px; }
+        .chat-input { flex: 1; padding: 12px 16px; border: 2px solid var(--border-light); border-radius: 12px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .chat-input:focus { border-color: var(--primary-blue); }
+        .send-btn { background: var(--primary-blue); color: white; border: none; padding: 0 24px; border-radius: 12px; font-weight: 600; cursor: pointer; }
         .quick-action-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin: 15px 0;
-            padding: 10px;
-            background: #f8fafc;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-        }
-
-        .action-chip {
-            background: white;
-            border: 1px solid #cbd5e0;
-            border-radius: 20px;
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: #4a5568;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .action-chip:hover {
-            background: #ebf8ff;
-            border-color: #4299e1;
-            color: #2b6cb0;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .action-chip.show {
-            background: #e6fffa;
-            border-color: #38b2ac;
-            color: #285e61;
-        }
-
-        .action-chip.compare {
-            background: #fffaf0;
-            border-color: #ed8936;
-            color: #c05621;
-        }
-
-        .action-chip.export {
-            background: #f0fff4;
-            border-color: #48bb78;
-            color: #22543d;
-        }
-
-        .action-chip.explain {
-            background: #ebf8ff;
-            border-color: #4299e1;
-            color: #2b6cb0;
-        }
-
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 15px 0;
+    padding: 10px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+.action-chip {
+    background: white;
+    border: 1px solid #cbd5e0;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #4a5568;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.action-chip:hover {
+    background: #ebf8ff;
+    border-color: #4299e1;
+    color: #2b6cb0;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.action-chip.show { background: #e6fffa; border-color: #38b2ac; color: #285e61; }
+.action-chip.compare { background: #fffaf0; border-color: #ed8936; color: #c05621; }
+.action-chip.export { background: #f0fff4; border-color: #48bb78; color: #22543d; }
+.action-chip.explain { background: #ebf8ff; border-color: #4299e1; color: #2b6cb0; }
         /* Add to existing styles */
-        .workflow-panel {
-            padding: 15px;
-            background: white;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .workflow-card {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            margin: 8px 0;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .workflow-card:hover {
-            background: #ebf8ff;
-            border-color: #bee3f8;
-            transform: translateX(3px);
-        }
-
-        .workflow-emoji {
-            font-size: 24px;
-            margin-right: 12px;
-        }
-
-        .workflow-content {
-            flex: 1;
-        }
-
-        .workflow-title {
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 3px;
-        }
-
-        .workflow-desc {
-            font-size: 12px;
-            color: #718096;
-        }
-
-        .workflow-arrow {
-            color: #a0aec0;
-            font-weight: bold;
-        }
-
-        .examples-dropdown {
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 10px;
-            margin: 10px 0;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        }
-
-        .example-option {
-            padding: 8px 12px;
-            margin: 4px 0;
-            background: #f7fafc;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.2s;
-            font-size: 13px;
-        }
-
-        .example-option:hover {
-            background: #ebf8ff;
-        }
-
-        .workflow-guidance {
-            background: #f0fff4;
-            border-left: 3px solid #38a169;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-            font-size: 13px;
-        }
-
-        /* Spatial Highlight Effects */
-        .cilia-part {
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .cilia-part:hover {
-            opacity: 0.9;
-        }
-
+.workflow-panel {
+    padding: 15px;
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.workflow-card {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    margin: 8px 0;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.workflow-card:hover {
+    background: #ebf8ff;
+    border-color: #bee3f8;
+    transform: translateX(3px);
+}
+.workflow-emoji {
+    font-size: 24px;
+    margin-right: 12px;
+}
+.workflow-content {
+    flex: 1;
+}
+.workflow-title {
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 3px;
+}
+.workflow-desc {
+    font-size: 12px;
+    color: #718096;
+}
+.workflow-arrow {
+    color: #a0aec0;
+    font-weight: bold;
+}
+.examples-dropdown {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 10px 0;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+.example-option {
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: #f7fafc;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 13px;
+}
+.example-option:hover {
+    background: #ebf8ff;
+}
+.workflow-guidance {
+    background: #f0fff4;
+    border-left: 3px solid #38a169;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+    font-size: 13px;
+}
+/* Spatial Highlight Effects */
+        .cilia-part { cursor: pointer; transition: all 0.3s ease; }
+        .cilia-part:hover { opacity: 0.9; }
         .cilia-part.active-highlight {
             fill: var(--highlight-gold) !important;
             stroke: var(--primary-blue);
             stroke-width: 2.5;
             filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8));
         }
-
+       
         /* DASHBOARD */
         .landing-dashboard {
             display: grid;
@@ -1006,422 +452,33 @@ body {
             padding: 0 0 8px 0;
             flex-shrink: 0;
         }
-
-        .stat-item {
-            background: white;
-            padding: 14px;
-            border-radius: 12px;
-            border: 1px solid var(--border-light);
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 18px;
-            font-weight: 800;
-            color: var(--primary-blue);
-        }
-
-        .stat-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #64748b;
-            margin-top: 4px;
-            font-weight: 700;
-        }
-
+        .stat-item { background: white; padding: 14px; border-radius: 12px; border: 1px solid var(--border-light); text-align: center; }
+        .stat-value { font-size: 18px; font-weight: 800; color: var(--primary-blue); }
+        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 4px; font-weight: 700; }
         /* DETAIL CARD TABS */
-        .detail-tabs {
-            display: flex;
-            border-bottom: 1px solid #eee;
-            margin: 10px 0;
-        }
-
-        .detail-tab {
-            padding: 6px 12px;
-            font-size: 11px;
-            font-weight: 700;
-            cursor: pointer;
-            opacity: 0.6;
-            text-transform: uppercase;
-        }
-
-        .detail-tab.active {
-            border-bottom: 2px solid var(--primary-blue);
-            opacity: 1;
-            color: var(--primary-blue);
-        }
-
-        .detail-content {
-            display: none;
-            padding: 10px 0;
-        }
-
-        .detail-content.active {
-            display: block;
-        }
-
-        .expr-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-            margin-top: 5px;
-        }
-
-        .expr-table td {
-            padding: 6px 0;
-            border-bottom: 1px solid #f5f5f5;
-            color: #4b5563;
-        }
-
-        .expr-table td:last-child {
-            text-align: right;
-            font-weight: 700;
-            color: var(--primary-blue);
-        }
-
+        .detail-tabs { display: flex; border-bottom: 1px solid #eee; margin: 10px 0; }
+        .detail-tab { padding: 6px 12px; font-size: 11px; font-weight: 700; cursor: pointer; opacity: 0.6; text-transform: uppercase; }
+        .detail-tab.active { border-bottom: 2px solid var(--primary-blue); opacity: 1; color: var(--primary-blue); }
+        .detail-content { display: none; padding: 10px 0; }
+        .detail-content.active { display: block; }
+       
+        .expr-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 5px; }
+        .expr-table td { padding: 6px 0; border-bottom: 1px solid #f5f5f5; color: #4b5563; }
+        .expr-table td:last-child { text-align: right; font-weight: 700; color: var(--primary-blue); }
         /* LABELS */
-        .cilia-labels text {
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-
-        .labels-visible .cilia-labels text {
-            opacity: 1;
-        }
-
-        .ai-result-card {
-            background: white;
-            border: 1px solid var(--border-light);
-            border-radius: 12px;
-            padding: 16px;
-            margin-top: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-        /* API Settings Button - High Visibility */
-        .settings-btn {
-            background: var(--primary-blue);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 12px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0, 50, 100, 0.2);
-        }
-
-        .settings-btn:hover {
-            background: #004577;
-            /* Darker blue */
-            transform: translateY(-1px);
-            box-shadow: 0 4px 6px rgba(0, 50, 100, 0.3);
-        }
-
-        /* API Settings Modal */
-        .api-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: none !important;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        }
-
-        .api-modal-overlay.active {
-            display: flex !important;
-        }
-
-        .api-modal {
-            background: white;
-            border-radius: 16px;
-            width: 480px;
-            max-width: 95vw;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            animation: modalSlide 0.3s ease;
-        }
-
-        @keyframes modalSlide {
-            from {
-                transform: translateY(-20px);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .api-modal-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid var(--border-light);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .api-modal-header h3 {
-            margin: 0;
-            color: var(--primary-blue);
-            font-size: 18px;
-        }
-
-        .api-modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #64748b;
-            padding: 0;
-            line-height: 1;
-        }
-
-        .api-modal-close:hover {
-            color: #c62828;
-        }
-
-        .api-modal-body {
-            padding: 24px;
-        }
-
-        .api-provider-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 20px;
-        }
-
-        .api-provider-tab {
-            flex: 1;
-            padding: 12px;
-            border: 2px solid var(--border-light);
-            border-radius: 10px;
-            background: white;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.2s;
-        }
-
-        .api-provider-tab:hover {
-            border-color: var(--secondary-blue);
-        }
-
-        .api-provider-tab.active {
-            border-color: var(--primary-blue);
-            background: #f0f7ff;
-        }
-
-        .api-provider-tab .provider-icon {
-            font-size: 24px;
-            margin-bottom: 4px;
-        }
-
-        .api-provider-tab .provider-name {
-            font-weight: 600;
-            font-size: 13px;
-            color: var(--accent-text);
-        }
-
-        .api-form-group {
-            margin-bottom: 16px;
-        }
-
-        .api-form-group label {
-            display: block;
-            font-weight: 600;
-            font-size: 12px;
-            color: #64748b;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .api-input {
-            width: 100%;
-            padding: 12px 14px;
-            border: 2px solid var(--border-light);
-            border-radius: 10px;
-            font-size: 14px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            transition: border-color 0.2s;
-        }
-
-        .api-input:focus {
-            outline: none;
-            border-color: var(--primary-blue);
-        }
-
-        .api-input-wrapper {
-            position: relative;
-        }
-
-        .api-input-wrapper .toggle-visibility {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            color: #64748b;
-        }
-
-        .api-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
-
-        .api-status.connected {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-
-        .api-status.disconnected {
-            background: #fff3e0;
-            color: #e65100;
-        }
-
-        .api-status.error {
-            background: #ffebee;
-            color: #c62828;
-        }
-
-        .api-modal-footer {
-            padding: 16px 24px;
-            border-top: 1px solid var(--border-light);
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-
-        .api-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .api-btn-secondary {
-            background: white;
-            border: 1px solid var(--border-light);
-            color: var(--accent-text);
-        }
-
-        .api-btn-secondary:hover {
-            background: #f8fafc;
-        }
-
-        .api-btn-primary {
-            background: var(--primary-blue);
-            border: 1px solid var(--primary-blue);
-            color: white;
-        }
-
-        .api-btn-primary:hover {
-            background: #004577;
-        }
-
-        .api-btn-danger {
-            background: #ffebee;
-            border: 1px solid #ffcdd2;
-            color: #c62828;
-        }
-
-        .api-btn-danger:hover {
-            background: #ffcdd2;
-        }
-
-        .api-help-text {
-            font-size: 11px;
-            color: #94a3b8;
-            margin-top: 6px;
-        }
-
-        .api-help-text a {
-            color: var(--primary-blue);
-        }
-
-        .model-select {
-            width: 100%;
-            padding: 10px 14px;
-            border: 2px solid var(--border-light);
-            border-radius: 10px;
-            font-size: 13px;
-            background: white;
-            cursor: pointer;
-            color: #333;
-            -webkit-appearance: menulist;
-            -moz-appearance: menulist;
-            appearance: menulist;
-        }
-
-        .model-select:focus {
-            outline: none;
-            border-color: var(--primary-blue);
-        }
-
-        .model-select option {
-            padding: 10px;
-            background: white;
-            color: #333;
-        }
-
-        .ai-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            background: #e3f2fd;
-            color: var(--primary-blue);
-            font-weight: 600;
-        }
-
-        .ai-indicator.gemini {
-            background: #e8f5e9;
-            color: #1b5e20;
-        }
-
-        .ai-indicator.groq {
-            background: #fff3e0;
-            color: #e65100;
-        }
-        .brand-logo {
-    height: 36px;
-    width: auto;
-    border-radius: 6px;
-    display: block;
-}
-
+        .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .labels-visible .cilia-labels text { opacity: 1; }
+       
+        .ai-result-card { background: white; border: 1px solid var(--border-light); border-radius: 12px; padding: 16px; margin-top: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     </style>
 </head>
-
 <body>
     <nav class="top-navbar">
         <div class="nav-container">
             <div class="brand">
-                <img
-                    src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png"
-                    alt="CiliAI Logo"
-                    class="brand-logo">
+                <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo">
                 <div class="brand-text">
-                    <div class="brand-title">CiliAI</div>
+                    <div>CiliAI</div>
                     <div class="brand-subtitle">Gene Explorer</div>
                 </div>
             </div>
@@ -1438,8 +495,7 @@ body {
         <div class="center-panel">
             <div class="top-bar">
                 <div class="search-container">
-                    <input type="text" id="geneSearch" class="search-input"
-                        placeholder="Search gene symbol (IFT88, FOXJ1, PCM1)...">
+                    <input type="text" id="geneSearch" class="search-input" placeholder="Search gene symbol (IFT88, FOXJ1, PCM1)...">
                     <button class="search-btn" onclick="window.searchGene()">Visualize</button>
                 </div>
                 <div id="dataStatus" class="status-badge loading">SYNCING</div>
@@ -1448,14 +504,11 @@ body {
                 <div class="viz-header">
                     <div class="viz-title-group">
                         <!-- Corrected IDs resolve console errors in engine -->
-                        <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial
-                                Intelligence</span></div>
+                        <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
                         <div class="view-tabs">
-                            <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐
-                                Diagram</button>
+                            <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
                             <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')">📊 Plot</button>
-                            <button class="view-tab" id="tab-domain" onclick="window.switchView('domain')">🧬
-                                Domains</button>
+                            <button class="view-tab" id="tab-domain" onclick="window.switchView('domain')">🧬 Domains</button>
                         </div>
                     </div>
                     <div class="viz-actions">
@@ -1477,8 +530,7 @@ body {
                         <div class="zoom-controls">
                             <button class="zoom-btn" title="Zoom In" onclick="window.zoomIn()">🔍+</button>
                             <button class="zoom-btn" title="Zoom Out" onclick="window.zoomOut()">🔍−</button>
-                            <button class="zoom-btn" title="Reset View"
-                                onclick="window.SpatialManager.resetZoom()">↻</button>
+                            <button class="zoom-btn" title="Reset View" onclick="window.SpatialManager.resetZoom()">↻</button>
                         </div>
                     </div>
                     <div class="control-group">
@@ -1513,32 +565,20 @@ body {
         </div>
         <!-- RIGHT PANEL -->
         <aside class="right-panel">
-            <div class="chat-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h2>CiliAI Assistant</h2>
-                    <p>Interactive biological logic mapping</p>
-                </div>
-                <button onclick="window.openAPISettings()" class="settings-btn" title="API Ayarları"
-                    style="display: flex; align-items: center; gap: 6px;">
-                    <span>🔑</span> API Keys
-                </button>
+            <div class="chat-header">
+                <h2>CiliAI Assistant</h2>
+                <p>Interactive biological logic mapping</p>
             </div>
             <div class="messages-area" id="messages">
                 <div class="ciliai-message assistant">
                     <div class="message-wrapper">
                         <div class="ciliai-message-content">
-                            👋 Welcome to CiliAI. I can help you visualize gene expression and map localizations. Try
-                            asking:
+                            👋 Welcome to CiliAI. I can help you visualize gene expression and map localizations. Try asking:
                             <div class="suggested-chips">
-                                <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">IFT88
-                                    Details</span>
-                                <span class="gene-badge"
-                                    onclick="window.handleAIQuery('Please list the genes for Joubert Syndrome')">Joubert
-                                    Syndrome</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Where is PCM1?')">PCM1
-                                    Mapping</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Plot FOXJ1')">FOXJ1
-                                    Expression</span>
+                                <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">IFT88 Details</span>
+                                <span class="gene-badge" onclick="window.handleAIQuery('Please list the genes for Joubert Syndrome')">Joubert Syndrome</span>
+                                <span class="gene-badge" onclick="window.handleAIQuery('Where is PCM1?')">PCM1 Mapping</span>
+                                <span class="gene-badge" onclick="window.handleAIQuery('Plot FOXJ1')">FOXJ1 Expression</span>
                             </div>
                         </div>
                     </div>
@@ -1546,107 +586,14 @@ body {
             </div>
             <div class="input-area">
                 <div class="chat-input-group">
-                    <input type="text" id="chatInput" class="chat-input"
-                        placeholder="Ask about a gene, structure, or disease...">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask about a gene, structure, or disease...">
                     <button class="send-btn" onclick="window.handleUserSend()">Send</button>
                 </div>
             </div>
         </aside>
     </div>
-
-    <!-- API Settings Modal -->
-    <div id="apiSettingsModal" class="api-modal-overlay" onclick="if(event.target === this) window.closeAPISettings()">
-        <div class="api-modal">
-            <div class="api-modal-header">
-                <h3>🔑 AI API Ayarları</h3>
-                <button class="api-modal-close" onclick="window.closeAPISettings()">&times;</button>
-            </div>
-            <div class="api-modal-body">
-                <div id="apiConnectionStatus" class="api-status disconnected">
-                    <span>⚠️</span> Henüz API bağlantısı yok
-                </div>
-
-                <div class="api-provider-tabs">
-                    <button class="api-provider-tab active" onclick="window.switchAPIProvider('gemini')"
-                        id="tab-gemini">
-                        <div class="provider-icon">✨</div>
-                        <div class="provider-name">Google Gemini</div>
-                    </button>
-                    <button class="api-provider-tab" onclick="window.switchAPIProvider('groq')" id="tab-groq">
-                        <div class="provider-icon">⚡</div>
-                        <div class="provider-name">Groq</div>
-                    </button>
-                </div>
-
-                <!-- Gemini Settings -->
-                <div id="gemini-settings" class="api-settings-panel">
-                    <div class="api-form-group">
-                        <label>Gemini API Key</label>
-                        <div class="api-input-wrapper">
-                            <input type="password" id="geminiApiKey" class="api-input" placeholder="AIza...">
-                            <button class="toggle-visibility"
-                                onclick="window.toggleApiKeyVisibility('geminiApiKey')">👁️</button>
-                        </div>
-                        <p class="api-help-text">
-                            API anahtarını <a href="https://ai.google.dev/gemini-api/docs?hl=tr" target="_blank">Google
-                                AI Studio</a>'dan alabilirsiniz.
-                        </p>
-                    </div>
-                    <div class="api-form-group">
-                        <label>Model</label>
-                        <select id="geminiModel" class="model-select">
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Önerilen)</option>
-                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Groq Settings -->
-                <div id="groq-settings" class="api-settings-panel" style="display: none;">
-                    <div class="api-form-group">
-                        <label>Groq API Key</label>
-                        <div class="api-input-wrapper">
-                            <input type="password" id="groqApiKey" class="api-input" placeholder="gsk_...">
-                            <button class="toggle-visibility"
-                                onclick="window.toggleApiKeyVisibility('groqApiKey')">👁️</button>
-                        </div>
-                        <p class="api-help-text">
-                            API anahtarını <a href="https://console.groq.com/docs/overview" target="_blank">Groq
-                                Console</a>'dan alabilirsiniz.
-                        </p>
-                    </div>
-                    <div class="api-form-group">
-                        <label>Model</label>
-                        <select id="groqModel" class="model-select">
-                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Önerilen)</option>
-                            <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant</option>
-                            <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
-                            <option value="gemma2-9b-it">Gemma 2 9B</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="api-form-group">
-                    <label>Aktif Provider</label>
-                    <select id="activeProvider" class="model-select" onchange="window.setActiveProvider(this.value)">
-                        <option value="none">AI Kapalı (Sadece Veritabanı)</option>
-                        <option value="gemini">Google Gemini</option>
-                        <option value="groq">Groq</option>
-                    </select>
-                    <p class="api-help-text">Sorularınıza AI destekli cevaplar için bir provider seçin.</p>
-                </div>
-            </div>
-            <div class="api-modal-footer">
-                <button class="api-btn api-btn-danger" onclick="window.clearAPISettings()">Temizle</button>
-                <button class="api-btn api-btn-secondary" onclick="window.closeAPISettings()">İptal</button>
-                <button class="api-btn api-btn-primary" onclick="window.saveAPISettings()">Kaydet</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        /* ============ UI INTERFACE LAYER ============ */
+<script>
+    /* ============ UI INTERFACE LAYER ============ */
         // 1. Initialize Global State WITH NEW PERSISTENCE FEATURES
         window.CiliAI = {
             activeDataset: 'lung',
@@ -1667,7 +614,7 @@ body {
             lastQueryContext: { type: null, data: [], term: null },
             CiliAI_UMAP: null,
             currentPlot: null,
-
+           
             // Zoom persistence state
             zoomStateByGene: {}, // { GENE: localization }
             activeGeneContext: null
@@ -1675,9 +622,9 @@ body {
         // =======================================================
         // (2) SPATIAL INTELLIGENCE MANAGER
         // =======================================================
-        // =======================================================
-        // Attach to window for global access
-        // =======================================================
+    // =======================================================
+// Attach to window for global access
+// =======================================================
         const SpatialManager = {
             // Location normalization map (user → SVG IDs)
             locMap: {
@@ -1694,22 +641,22 @@ body {
                 "cytosol": "cell-body",
                 "nucleus": "nucleus"
             },
-            // Gene-aware highlighting with persistence
+           // Gene-aware highlighting with persistence
             highlight: function (locTerm, gene = null) {
                 if (!locTerm) return false;
                 const container = document.getElementById('cilia-svg');
                 if (!container) return false;
                 // --- FIX: Force visibility of the diagram container ---
                 container.style.display = 'flex';
-                if (document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
-                if (document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
+                if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
+                if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
                 document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
                 // Ensure SVG exists (if it was cleared)
                 if (!container.querySelector('svg')) {
                     window.generateAndInjectSVG();
                 }
                 const normalized = locTerm.toLowerCase().trim();
-
+               
                 // Map broad terms like "cilia" to specific SVG parts if needed
                 let targetId = this.locMap[normalized];
                 if (!targetId && normalized.includes('cilia')) targetId = 'axoneme'; // Fallback for general "cilia" queries
@@ -1763,7 +710,7 @@ body {
                 return this.highlight(loc, gene);
             },
             // New: Apply GO Heatmap
-            applyHeatmap: function (goTerm) {
+            applyHeatmap: function(goTerm) {
                 const svg = document.getElementById('cilia-diagram');
                 if (!svg) return;
                 // Remove existing overlays
@@ -1805,7 +752,7 @@ body {
                 window.CiliAI.resetZoom(); // Reset to show full heatmap
             },
             // New: Apply Multi-Gene Overlay
-            applyMultiOverlay: function (genes) {
+            applyMultiOverlay: function(genes) {
                 const svg = document.getElementById('cilia-diagram');
                 if (!svg) return;
                 // Remove existing overlays
@@ -1838,20 +785,20 @@ body {
                 window.CiliAI.resetZoom();
             },
             // New: Clear Overlays
-            clearOverlays: function () {
+            clearOverlays: function() {
                 document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
             }
         };
-
+       
         // =======================================================
         // PUBLIC BRIDGE — Legacy compatibility
         // =======================================================
         window.SpatialManager = SpatialManager;
-        window.highlightCiliumLocation = function (locTerm, gene = null) {
-            return SpatialManager.highlight(locTerm, gene);
-        };
+        window.highlightCiliumLocation = function(locTerm, gene = null) {
+        return SpatialManager.highlight(locTerm, gene);
+};
         // 3. SVG GENERATION FUNCTION (UPDATED WITH NEW DEFS)
-        window.generateAndInjectSVG = function () {
+        window.generateAndInjectSVG = function() {
             const container = document.getElementById('cilia-svg');
             document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
             container.innerHTML = `
@@ -1962,24 +909,24 @@ body {
                     </g>
                 </svg>
             `;
-
+           
             container.onmouseenter = () => {
                 const labels = container.querySelector('.cilia-labels');
                 if (labels) labels.style.opacity = '1';
             };
-
+           
             container.onmouseleave = () => {
                 const labels = container.querySelector('.cilia-labels');
                 if (labels) labels.style.opacity = '0';
             };
-
+           
             const ciliaParts = container.querySelectorAll('.cilia-part');
             ciliaParts.forEach(part => {
                 part.addEventListener('click', (e) => {
                     e.stopPropagation();
                     document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
                     part.classList.add('active-highlight');
-
+                   
                     const labels = container.querySelector('.cilia-labels');
                     if (labels) {
                         labels.style.opacity = '1';
@@ -1990,12 +937,12 @@ body {
                             'ciliary-membrane': 'ARL13B',
                             'axoneme': 'β2-tubulin'
                         };
-
+                       
                         labels.querySelectorAll('text').forEach(text => {
                             text.style.fontWeight = '700';
                             text.style.fontSize = '12px';
                         });
-
+                       
                         const geneName = geneMap[partId];
                         if (geneName) {
                             labels.querySelectorAll('text').forEach(text => {
@@ -2010,9 +957,9 @@ body {
                     SpatialManager.zoomTo(part);
                 });
             });
-
+           
             container.onclick = (e) => {
-                if (e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
+                if(e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
                     SpatialManager.resetZoom();
                     const labels = container.querySelector('.cilia-labels');
                     if (labels) {
@@ -2030,7 +977,7 @@ body {
             };
         };
         // 4. Helper Functions
-        window.addChatMessage = function (html, isUser = false) {
+        window.addChatMessage = function(html, isUser = false) {
             const messages = document.getElementById('messages');
             if (!messages) return;
             const msg = document.createElement('div');
@@ -2039,32 +986,32 @@ body {
             messages.appendChild(msg);
             messages.scrollTop = messages.scrollHeight;
         };
-        window.updateStatus = function (text, state = 'normal') {
+        window.updateStatus = function(text, state = 'normal') {
             const statusEl = document.getElementById('dataStatus');
             if (statusEl) {
                 statusEl.textContent = text;
                 statusEl.className = `status-badge status ${state}`;
             }
         };
-        window.showPlot = function (plotData, title = "Gene Expression UMAP") {
+        window.showPlot = function(plotData, title = "Gene Expression UMAP") {
             // SAFEGUARD: Clear potential overlapping containers first
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('domain-viewer').style.display = 'none';
-
+           
             const plotContainer = document.getElementById('plotly-container');
             plotContainer.style.display = 'block';
             document.getElementById('current-viz-title').textContent = title;
-
+           
             // Clear previous plot to prevent artifacts
             plotContainer.innerHTML = '';
-
+           
             const vizCard = document.querySelector('.viz-card');
             const vizHeader = document.querySelector('.viz-header');
-
+           
             // Calculate height safely
             const availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
             const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
-
+           
             const layout = {
                 ...plotData.layout,
                 autosize: true,
@@ -2082,7 +1029,7 @@ body {
                     bgcolor: 'rgba(255, 255, 255, 0.8)', bordercolor: '#e1e8ed', borderwidth: 1, font: { size: 10 }
                 }
             };
-
+           
             // FIX: Use Promise to ensure plot is ready before attaching listeners or resizing
             Plotly.newPlot('plotly-container', plotData.data, layout, {
                 responsive: true, displayModeBar: true, displaylogo: false,
@@ -2090,18 +1037,18 @@ body {
                 scrollZoom: false
             }).then(gd => {
                 window.CiliAI.currentPlot = gd;
-
+               
                 // Add click listener safely
                 gd.on('plotly_click', e => {
                     const loc = e.points?.[0]?.customdata?.localization;
                     if (!loc) return;
                     window.showDiagram();
-                    if (window.SpatialManager) {
+                    if(window.SpatialManager) {
                         window.SpatialManager.highlight(loc, window.CiliAI.activeGeneContext);
                     }
                 });
             });
-
+           
             // Resize Listener: Only resize if the container is actually visible
             window.addEventListener('resize', () => {
                 const container = document.getElementById('plotly-container');
@@ -2110,15 +1057,15 @@ body {
                 }
             });
         };
-        window.showDiagram = function () {
+        window.showDiagram = function() {
             document.getElementById('plotly-container').style.display = 'none';
             document.getElementById('domain-viewer').style.display = 'none';
             document.getElementById('cilia-svg').style.display = 'flex';
             document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
             window.CiliAI.currentPlot = null;
         };
-        // New: Show Domain Viewer (Fixed: Nature Colors + No Text Overlap)
-        window.showDomainViewer = function (gene) {
+       // New: Show Domain Viewer (Fixed: Nature Colors + No Text Overlap)
+        window.showDomainViewer = function(gene) {
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('plotly-container').style.display = 'none';
             const domainContainer = document.getElementById('domain-viewer');
@@ -2128,17 +1075,17 @@ body {
             // Safety check for lookup data
             const pfamLookup = window.CiliAI.lookups.pfamByGene || {};
             const pfam = pfamLookup[gene.toUpperCase()] || [];
-
+           
             if (!pfam.length) {
                 // Check for raw text descriptions as fallback
                 const geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
                 if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
                     const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
                     const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
-
+                   
                     if (parts.length > 0) {
                         const domains = parts.map((part, i) => ({
-                            id: `DOM_${i + 1}`,
+                            id: `DOM_${i+1}`,
                             name: part.trim(),
                             start: (i * 200) + 50,
                             end: (i * 200) + 150
@@ -2148,7 +1095,7 @@ body {
                         return;
                     }
                 }
-
+               
                 domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
                 return;
             }
@@ -2156,7 +1103,7 @@ body {
             const seqLength = Math.max(...pfam.map(d => d.end), 1000);
             const svgWidth = 1000; // Internal coordinate width
             const scale = (val) => (val / seqLength) * (svgWidth - 100) + 50; // Map seq pos to SVG x
-
+           
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('viewBox', `0 0 ${svgWidth} 200`);
             svg.setAttribute('width', '100%');
@@ -2189,12 +1136,12 @@ body {
             // --- 4. Draw Domains & Labels ---
             pfam.forEach((domain, index) => {
                 const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-
+               
                 // Calculate Positions
                 const xStart = scale(domain.start);
                 const xEnd = scale(domain.end);
                 const width = Math.max(xEnd - xStart, 10); // Min width 10px
-
+               
                 // Domain Rectangle
                 const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                 rect.setAttribute('x', xStart);
@@ -2207,7 +1154,7 @@ body {
                 rect.setAttribute('stroke-width', '1');
                 rect.setAttribute('opacity', '0.9');
                 rect.classList.add('domain-rect');
-
+               
                 // Tooltip
                 const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
@@ -2217,7 +1164,7 @@ body {
                 // Even index = Top High, Odd index = Top Low (or bottom)
                 // Here we alternate two rows ABOVE the protein to avoid clutter
                 const labelY = (index % 2 === 0) ? 40 : 65;
-
+               
                 // Connector Line (from label to domain)
                 const conn = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 conn.setAttribute('x1', xStart + width / 2);
@@ -2236,10 +1183,10 @@ body {
                 text.setAttribute('font-weight', '600');
                 text.setAttribute('fill', '#2c3e50');
                 text.textContent = domain.name || domain.id;
-
+               
                 // Prevent text from going off-screen
                 // (Simple clamp logic could be added here if needed, but centering usually works)
-
+               
                 group.appendChild(text);
                 svg.appendChild(group);
             });
@@ -2258,14 +1205,14 @@ body {
             svg.appendChild(endText);
             domainContainer.appendChild(svg);
         };
-        window.downloadCurrentVisualization = function () {
+        window.downloadCurrentVisualization = function() {
             if (window.CiliAI.currentPlot) {
                 Plotly.downloadImage(window.CiliAI.currentPlot, { format: 'png', filename: 'ciliai-umap-plot', width: 1200, height: 800, scale: 2 });
             } else if (document.getElementById('domain-viewer').style.display !== 'none') {
                 const svgElement = document.getElementById('domain-viewer').querySelector('svg');
                 if (svgElement) {
                     const svgData = new XMLSerializer().serializeToString(svgElement);
-                    const blob = new Blob([svgData], { type: 'image/svg+xml' });
+                    const blob = new Blob([svgData], {type: 'image/svg+xml'});
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
@@ -2279,7 +1226,7 @@ body {
                 const svgElement = document.getElementById('cilia-diagram');
                 if (svgElement) {
                     const svgData = new XMLSerializer().serializeToString(svgElement);
-                    const blob = new Blob([svgData], { type: 'image/svg+xml' });
+                    const blob = new Blob([svgData], {type: 'image/svg+xml'});
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
@@ -2292,141 +1239,181 @@ body {
             }
         };
         // Data Loading Logic (UPDATED WITH SPLIT KIDNEY JSON)
-        // Data Loading Logic is now handled in ciliai/ciliai.js
-        // window.loadCiliAIData definition removed to avoid duplication
-        // =======================================================
-        // View Switching Function
-        // =======================================================
-        window.switchView = function (viewType) {
-            const diagramTab = document.getElementById('tab-diagram');
-            const plotTab = document.getElementById('tab-plot');
-            const domainTab = document.getElementById('tab-domain');
-
-            const diagramContainer = document.getElementById('cilia-svg');
-            const plotContainer = document.getElementById('plotly-container');
-            const domainContainer = document.getElementById('domain-viewer');
-
-            // Update tab styles
-            [diagramTab, plotTab, domainTab].forEach(tab => tab.classList.remove('active'));
-
-            // Hide all containers first
-            if (diagramContainer) diagramContainer.style.display = 'none';
-            if (plotContainer) plotContainer.style.display = 'none';
-            if (domainContainer) domainContainer.style.display = 'none';
-
-            if (viewType === 'diagram') {
-                diagramTab.classList.add('active');
-                if (diagramContainer) diagramContainer.style.display = 'flex';
-                window.showDiagram();
-            } else if (viewType === 'plot') {
-                plotTab.classList.add('active');
-                if (plotContainer) plotContainer.style.display = 'block';
-
-                // Trigger plot generation if a gene is selected
-                const gene = document.getElementById('geneSearch').value.trim();
-                if (gene && window.renderUMAPPlot) {
-                    window.renderUMAPPlot(gene);
-                } else if (window.CiliAI.activeGeneContext && window.renderUMAPPlot) {
-                    window.renderUMAPPlot(window.CiliAI.activeGeneContext);
+        window.loadCiliAIData = async function(timeoutMs = 60000) {
+            const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+        window.updateStatus('Syncing...', 'loading');
+        try {
+            const [mainRes, lookupsRes, rnaResp, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
+                fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
+                fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
+                fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
+                fetch(base + 'kidney_structure.json').then(r => r.json()),
+                fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
+                fetch(base + 'kidney_expression_part2.json').then(r => r.json())
+            ]);
+            window.CiliAI.masterData = mainRes.masterData || [];
+            window.CiliAI.lookups = lookupsRes.lookups || {};
+           
+            if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+            if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
+           
+            window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
+            // Assign Kidney Multi-part data
+            const mergedKidneyExpr = { ...kExpr1Res, ...kExpr2Res };
+            window.CiliAI.datasets.kidney = {
+                name: "Human Kidney",
+                umap: kStructRes.umap,
+                expression: mergedKidneyExpr,
+                colorScale: [[0, '#e2e8f0'], [0.1, '#bee3f8'], [1, '#2b6cb0']]
+            };
+            // Assign RNA Tissue
+            const rnaText = await rnaResp.text();
+            window.rnaTissueExpressionData = parseTsvData(rnaText);
+            // Populate mapping and calculate stats
+            const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+            const validCiliopathyDiseases = new Set();
+            const uniqueCiliopathyGenes = new Set();
+            window.CiliAI.masterData.forEach(g => {
+                if (g.Gene) {
+                    const sym = g.Gene.toUpperCase();
+                    window.CiliAI.lookups.geneMap[sym] = g;
+                    if(g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
+                    if (primaryClasses.includes(g.ciliopathy_classification)) {
+                        uniqueCiliopathyGenes.add(sym);
+                        if (g.Ciliopathy) {
+                            const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                            diseases.forEach(d => { if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d); });
+                        }
+                    }
                 }
-            } else if (viewType === 'domain') {
-                domainTab.classList.add('active');
-                if (domainContainer) domainContainer.style.display = 'block';
-
-                // Trigger domain viewer if a gene is selected
-                const gene = document.getElementById('geneSearch').value.trim();
-                if (gene && window.showDomainViewer) {
-                    window.showDomainViewer(gene);
-                } else if (window.CiliAI.activeGeneContext && window.showDomainViewer) {
-                    window.showDomainViewer(window.CiliAI.activeGeneContext);
-                }
-            }
-        };
-        // =======================================================
-        // Zoom Controls
-        // =======================================================
-        window.zoomIn = function () {
-            const viewport = document.getElementById('viewport-group');
-            if (!viewport) return;
-
-            const currentTransform = viewport.style.transform || 'scale(1)';
-            const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
-            const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
-            const newScale = currentScale * 1.2;
-
-            viewport.style.transition = "transform 0.3s ease";
-            viewport.style.transform = currentTransform.replace(
-                /scale\([\d.]+\)/,
-                `scale(${newScale})`
-            );
-        };
-        window.zoomOut = function () {
-            const viewport = document.getElementById('viewport-group');
-            if (!viewport) return;
-
-            const currentTransform = viewport.style.transform || 'scale(1)';
-            const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
-            const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
-            const newScale = Math.max(0.5, currentScale * 0.8);
-
-            viewport.style.transition = "transform 0.3s ease";
-            viewport.style.transform = currentTransform.replace(
-                /scale\([\d.]+\)/,
-                `scale(${newScale})`
-            );
-        };
-        window.toggleLabels = function (checkbox) {
-            const container = document.getElementById('cilia-svg');
-            if (checkbox.checked) {
-                container.classList.add('labels-visible');
-            } else {
-                container.classList.remove('labels-visible');
-            }
-        };
-        window.toggleFullscreen = function () {
-            const container = document.querySelector('.viz-card');
-            if (!document.fullscreenElement) {
-                container.requestFullscreen().catch(err => {
-                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        };
-        window.downloadJournalSVG = function () {
-            const svgElement = document.getElementById('cilia-diagram');
-            if (svgElement) {
-                const svgData = new XMLSerializer().serializeToString(svgElement);
-                const blob = new Blob([svgData], { type: 'image/svg+xml' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'ciliai-journal-diagram.svg';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
-        };
-
-        // ================================
-        // TSV PARSER — REQUIRED BY ENGINE
-        // ================================
-        window.parseTsvData = function (tsvText) {
-            if (!tsvText || typeof tsvText !== 'string') return [];
-            const lines = tsvText.trim().split(/\r?\n/);
-            if (lines.length < 2) return [];
-            const headers = lines[0].split('\t').map(h => h.trim());
-            return lines.slice(1).map(line => {
-                const values = line.split('\t');
-                const row = {};
-                headers.forEach((h, i) => {
-                    row[h] = values[i]?.trim() ?? '';
-                });
-                return row;
             });
-        };
-        window.handleUserSend = function () {
+            // Update Counters
+            document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
+            document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
+            document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
+            window.CiliAI.ready = true;
+            window.updateStatus('CONNECTED', 'ready');
+            return true;
+        } catch (err) {
+            console.error("Load failed:", err);
+            window.updateStatus('SYNC ERROR', 'error');
+            return false;
+        }
+    };
+ // =======================================================
+// View Switching Function
+// =======================================================
+window.switchView = function(viewType) {
+    const diagramTab = document.getElementById('tab-diagram');
+    const plotTab = document.getElementById('tab-plot');
+    const domainTab = document.getElementById('tab-domain');
+   
+    // Update tab styles
+    [diagramTab, plotTab, domainTab].forEach(tab => tab.classList.remove('active'));
+   
+    if (viewType === 'diagram') {
+        diagramTab.classList.add('active');
+        window.showDiagram();
+    } else if (viewType === 'plot') {
+        plotTab.classList.add('active');
+        // You might need to trigger a plot generation here
+        const gene = document.getElementById('geneSearch').value.trim();
+        if (gene) {
+            // Call your plotting function
+        }
+    } else if (viewType === 'domain') {
+        domainTab.classList.add('active');
+        const gene = document.getElementById('geneSearch').value.trim();
+        if (gene) {
+            window.showDomainViewer(gene);
+        }
+    }
+};
+ // =======================================================
+// Zoom Controls
+// =======================================================
+window.zoomIn = function() {
+    const viewport = document.getElementById('viewport-group');
+    if (!viewport) return;
+   
+    const currentTransform = viewport.style.transform || 'scale(1)';
+    const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+    const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+    const newScale = currentScale * 1.2;
+   
+    viewport.style.transition = "transform 0.3s ease";
+    viewport.style.transform = currentTransform.replace(
+        /scale\([\d.]+\)/,
+        `scale(${newScale})`
+    );
+};
+window.zoomOut = function() {
+    const viewport = document.getElementById('viewport-group');
+    if (!viewport) return;
+   
+    const currentTransform = viewport.style.transform || 'scale(1)';
+    const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+    const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+    const newScale = Math.max(0.5, currentScale * 0.8);
+   
+    viewport.style.transition = "transform 0.3s ease";
+    viewport.style.transform = currentTransform.replace(
+        /scale\([\d.]+\)/,
+        `scale(${newScale})`
+    );
+};
+window.toggleLabels = function(checkbox) {
+    const container = document.getElementById('cilia-svg');
+    if (checkbox.checked) {
+        container.classList.add('labels-visible');
+    } else {
+        container.classList.remove('labels-visible');
+    }
+};
+window.toggleFullscreen = function() {
+    const container = document.querySelector('.viz-card');
+    if (!document.fullscreenElement) {
+        container.requestFullscreen().catch(err => {
+            console.log(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+};
+window.downloadJournalSVG = function() {
+    const svgElement = document.getElementById('cilia-diagram');
+    if (svgElement) {
+        const svgData = new XMLSerializer().serializeToString(svgElement);
+        const blob = new Blob([svgData], {type: 'image/svg+xml'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ciliai-journal-diagram.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+};
+   
+// ================================
+// TSV PARSER — REQUIRED BY ENGINE
+// ================================
+window.parseTsvData = function (tsvText) {
+    if (!tsvText || typeof tsvText !== 'string') return [];
+    const lines = tsvText.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split('\t').map(h => h.trim());
+    return lines.slice(1).map(line => {
+        const values = line.split('\t');
+        const row = {};
+        headers.forEach((h, i) => {
+            row[h] = values[i]?.trim() ?? '';
+        });
+        return row;
+    });
+};
+window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
             const query = input.value.trim();
             if (!query) return;
@@ -2434,7 +1421,7 @@ body {
             input.value = '';
             window.handleAIQuery(query);
         };
-        window.searchGene = function () {
+        window.searchGene = function() {
             const input = document.getElementById('geneSearch');
             const gene = input.value.trim().toUpperCase();
             if (!gene) return;
@@ -2442,132 +1429,42 @@ body {
             window.handleAIQuery(`What is ${gene}?`);
         };
         const originalHandleAIQuery = window.handleAIQuery;
-        window.handleAIQuery = async function (query) {
-            try {
-                const lowerQuery = query.toLowerCase().trim();
-
-                // First check if AI should handle this query BEFORE database query
-                const isAIQuery = window.isAIEnabled() && (
-                    lowerQuery.includes('explain') ||
-                    lowerQuery.includes('açıkla') ||
-                    lowerQuery.includes('nedir') ||
-                    lowerQuery.includes('why') ||
-                    lowerQuery.includes('neden') ||
-                    lowerQuery.includes('how does') ||
-                    lowerQuery.includes('nasıl') ||
-                    lowerQuery.includes('tell me') ||
-                    lowerQuery.includes('daha fazla') ||
-                    lowerQuery.includes('ai:') ||
-                    lowerQuery.startsWith('?') ||
-                    lowerQuery.includes('merhaba') ||
-                    lowerQuery.includes('selam') ||
-                    lowerQuery.includes('hello') ||
-                    lowerQuery.includes('hi ') ||
-                    lowerQuery === 'hi' ||
-                    lowerQuery.includes('teşekkür') ||
-                    lowerQuery.includes('thanks') ||
-                    lowerQuery.includes('yardım') ||
-                    lowerQuery.includes('help') ||
-                    lowerQuery.includes('sendrom') ||
-                    lowerQuery.includes('syndrome') ||
-                    lowerQuery.includes('hastalık') ||
-                    lowerQuery.includes('disease') ||
-                    lowerQuery.includes('what is') ||
-                    lowerQuery.includes('silia') ||
-                    lowerQuery.includes('cilia')
-                );
-
-                // If this is an AI query, handle with AI directly
-                if (isAIQuery) {
-                    try {
-                        // User message already added by sendMessage, skip duplicate
-
-                        // Get context from database if available
-                        let context = '';
-                        const genes = window.extractMultipleGenes ? window.extractMultipleGenes(query) : [];
-                        if (genes.length > 0) {
-                            const geneData = window.CiliAI.lookups.geneMap[genes[0]];
-                            if (geneData) {
-                                context = `Gen: ${genes[0]}
-Açıklama: ${geneData['Gene.Description'] || 'N/A'}
-Lokalizasyon: ${geneData.Localization || 'N/A'}
-Siliopati: ${geneData.Ciliopathy || 'N/A'}
-İşlev: ${geneData['Molecular_Function'] || 'N/A'}`;
-                            }
-                        }
-
-                        // Show loading indicator
-                        const loadingMsg = document.createElement('div');
-                        loadingMsg.className = 'ciliai-message assistant';
-                        loadingMsg.id = 'ai-loading';
-                        loadingMsg.innerHTML = `<div class="ciliai-message-content">${window.getAIBadge()} <em>AI yanıt hazırlıyor...</em></div>`;
-                        document.getElementById('messages').appendChild(loadingMsg);
-                        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-
-                        // Call AI
-                        const aiResponse = await window.askAI(query, context);
-
-                        // Remove loading and show response
-                        document.getElementById('ai-loading')?.remove();
-
-                        if (aiResponse) {
-                            window.addChatMessage(`${window.getAIBadge()} ${aiResponse}`, false);
-                        }
-                    } catch (error) {
-                        document.getElementById('ai-loading')?.remove();
-                        window.addChatMessage(`<span style="color: #c62828;">❌ AI Hatası: ${error.message}</span>`, false);
-                    }
-                } else {
-                    // Non-AI query - use original database handler
-                    await originalHandleAIQuery(query);
-
-                    // Handle localization highlighting
-                    const localizationPatterns = [
-                        /where is (.+?) localized/i,
-                        /where are (.+?) localized/i,
-                        /tell me localization of (.+)/i,
-                        /localization of (.+)/i,
-                        /(.+?) localization/i
-                    ];
-                    let matchedGenes = [];
-
-                    for (const pattern of localizationPatterns) {
-                        const match = lowerQuery.match(pattern);
-                        if (match) {
-                            matchedGenes = match[1].split(/[, and]+/).map(g => g.trim().toUpperCase());
-                            break;
-                        }
-                    }
-                    if (matchedGenes.length > 0) {
-                        matchedGenes.forEach(gene => {
-                            if (window.CiliAI.lookups.geneMap[gene]) {
-                                const loc = window.CiliAI.lookups.geneMap[gene].Localization;
-                                if (loc) {
-                                    window.SpatialManager.highlight(loc, gene);
-                                }
-                            }
-                        });
-                    }
+        window.handleAIQuery = async function(query) {
+            originalHandleAIQuery(query);
+            const lowerQuery = query.toLowerCase().trim();
+            const localizationPatterns = [
+                /where is (.+?) localized/i,
+                /where are (.+?) localized/i,
+                /tell me localization of (.+)/i,
+                /localization of (.+)/i,
+                /(.+?) localization/i
+            ];
+            let matchedGenes = [];
+            for (const pattern of localizationPatterns) {
+                const match = lowerQuery.match(pattern);
+                if (match && match[1]) {
+                    matchedGenes = match[1].split(/[, and]+/).map(g => g.trim().toUpperCase());
+                    break;
                 }
-            } catch (err) {
-                console.error("Critical Query Error:", err);
-                window.addChatMessage(`<span style="color: #c62828;">⚠️ <strong>Sistem Hatası:</strong> İşlem sırasında bir sorun oluştu. (API Key kontrol ediniz)</span>`, false);
+            }
+            if (matchedGenes.length > 0) {
+                matchedGenes.forEach(gene => {
+                    if (window.CiliAI.lookups.geneMap[gene]) {
+                        const loc = window.CiliAI.lookups.geneMap[gene].Localization;
+                        if (loc) {
+                            window.SpatialManager.highlight(loc, gene);
+                        }
+                    }
+                });
             }
         };
-
+       
         async function init() {
             window.updateStatus('Loading databases...', 'loading');
             window.generateAndInjectSVG();
             const loaded = await window.loadCiliAIData();
             if (loaded) {
                 window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-
-                // Show AI status in welcome message
-                if (window.isAIEnabled()) {
-                    const provider = window.AIConfig.activeProvider;
-                    const providerName = provider === 'gemini' ? 'Google Gemini' : 'Groq';
-                    window.addChatMessage(`${window.getAIBadge()} <strong>${providerName}</strong> AI aktif. Sorularınıza AI destekli cevaplar alabilirsiniz!<br><small>💡 İpucu: "ai:" ile başlayan veya "açıkla", "explain" içeren sorular AI tarafından yanıtlanır.</small>`, false);
-                }
             }
         }
         document.getElementById('chatInput').addEventListener('keydown', (e) => {
@@ -2575,8 +1472,4 @@ Siliopati: ${geneData.Ciliopathy || 'N/A'}
         });
         init();
     </script>
-
-
 </html>
-
-
