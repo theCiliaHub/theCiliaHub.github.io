@@ -128,6 +128,13 @@
             border-bottom: none;
         }
 
+       .brand-logo {
+    height: 36px;
+    width: auto;
+    border-radius: 6px;
+    display: block;
+}
+ 
         /* Download Button Styling */
         .download-btn {
             display: inline-flex;
@@ -156,22 +163,26 @@
     </style>
 </head>
 <body>
-   <nav class="top-navbar">
-        <div class="brand">
-            <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
-            <div>
-                <div>CiliAI</div>
-                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
+    <nav class="top-navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <img
+                    src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png"
+                    alt="CiliAI Logo"
+                    class="brand-logo">
+                <div class="brand-text">
+                    <div class="brand-title">CiliAI</div>
+                    <div class="brand-subtitle">Gene Explorer</div>
+                </div>
             </div>
+            <ul class="nav-links">
+                <li><a href="index.html" class="active">Home</a></li>
+                <li><a href="plots.html">Cilia Analysis</a></li>
+                <li><a href="ciliahub.html">CiliaHub</a></li>
+                <li><a href="about.html">About</a></li>
+            </ul>
         </div>
-        
-        <ul class="nav-links">
-            <li><a href="index.html">Home</a></li>
-            <li><a href="plots.html" >Cilia Analysis</a></li>
-            <li><a href="ciliahub.html">CiliaHub</a></li>
-            <li><a href="about.html" class="active">About</a></li>
-        </ul>
-    </nav> 
+    </nav>
     
     <div class="content-wrapper">
     
@@ -267,3 +278,4 @@
         
     </div> </body>
 </html>
+
