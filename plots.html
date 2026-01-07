@@ -24,34 +24,45 @@
             --text: #333333;
             --primary: #005b96;
         }
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #f8fafc;
-            color: var(--accent-text);
-            padding-top: 60px;
-            min-height: 100vh;
-        }
+/* Match index.html body behavior */
+body {
+    font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f8fafc;
+    color: var(--accent-text);
+    padding-top: 64px;   /* MUST match navbar height */
+    min-height: 100vh;
+}
 
-        /* Top Navigation Bar - Matching index.html exactly */
-        .top-navbar {
-            background: var(--primary-blue);
-            color: white;
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            height: 60px;
-            border-bottom: 1px solid var(--primary-blue);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            position: fixed;
-            width: 100%;
-            top: 0;
-            z-index: 1000;
-        }
+/* --- TOP NAVBAR — CANONICAL (USED ON ALL PAGES) --- */
+.top-navbar {
+    background: var(--primary-blue);
+    color: white;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+}
 
-       /* Brand title: "CiliAI" */
+/* Inner container — REQUIRED for identical geometry */
+.nav-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Brand */
 .brand {
     font-family: 'Inter', sans-serif;
     font-size: 18px;
@@ -59,11 +70,11 @@
     color: #ffffff;
     display: flex;
     align-items: center;
-    gap: 10px;              /* distance between logo and text */
-    margin-right: 30px;    /* distance from menu items */
+    gap: 10px;
+    margin-right: 30px;
 }
 
-/* Subtitle: "Gene Explorer" */
+/* Subtitle */
 .brand div div:last-child {
     font-size: 10px;
     font-weight: 400;
@@ -71,34 +82,33 @@
     line-height: 1.2;
 }
 
-/* Navigation list container */
-/* Force equal spacing and alignment for nav menu */
+/* Navigation list */
 .nav-links {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 15px; /* consistent distance between items */
+    list-style: none;
+    gap: 20px;
+    height: 100%;
 }
 
-
-/* Navigation links: Home, Cilia Analysis, CiliaHub */
+/* Navigation links */
 .nav-links a {
     font-family: 'Inter', sans-serif;
     font-size: 19px;
     font-weight: 500;
     color: #ffffff;
     text-decoration: none;
-    padding: 0 15px;        /* horizontal spacing inside each tab */
+    padding: 0 15px;
     height: 100%;
     display: flex;
     align-items: center;
     transition: background-color 0.3s;
 }
 
-/* Active tab highlight */
+/* Active tab */
 .nav-links a.active {
     background-color: rgba(255, 255, 255, 0.15);
 }
+
         
 
         /* Main Layout */
@@ -305,6 +315,15 @@
             display: none;
             margin-top: 12px;
         }
+        .nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
         .brand-logo {
     height: 36px;
     width: auto;
@@ -2993,6 +3012,7 @@ KIF17`;
 
 </body>
 </html>
+
 
 
 
