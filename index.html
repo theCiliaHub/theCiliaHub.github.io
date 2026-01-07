@@ -383,57 +383,52 @@
             gap: 20px;
         }
 
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-weight: 600;
-            font-size: 20px;
-        }
+/* Brand title: "CiliAI" */
+.brand {
+    font-family: 'Inter', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 10px;              /* distance between logo and text */
+    margin-right: 30px;    /* distance from menu items */
+}
 
-        .brand img {
-            height: 40px;
-            border-radius: 8px;
-        }
+/* Subtitle: "Gene Explorer" */
+.brand div div:last-child {
+    font-size: 10px;
+    font-weight: 400;
+    opacity: 0.8;
+    line-height: 1.2;
+}
 
-        .brand-text {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.1;
-        }
+/* Navigation list container */
+.nav-links {
+    display: flex;
+    list-style: none;
+    gap: 20px;              /* distance between menu items */
+    height: 100%;
+}
 
-        .brand-subtitle {
-            font-size: 10px;
-            opacity: 0.9;
-            font-weight: 400;
-        }
+/* Navigation links: Home, Cilia Analysis, CiliaHub */
+.nav-links a {
+    font-family: 'Inter', sans-serif;
+    font-size: 19px;
+    font-weight: 500;
+    color: #ffffff;
+    text-decoration: none;
+    padding: 0 15px;        /* horizontal spacing inside each tab */
+    height: 100%;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.3s;
+}
 
-        .nav-links {
-            display: flex;
-            list-style: none;
-            gap: 4px;
-        }
-
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            padding: 12px 15px;
-            border-radius: 6px;
-            font-weight: 500;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            font-size: 15px;
-        }
-
-        .nav-links a:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        .nav-links a.active {
-            background: rgba(255, 255, 255, 0.25);
-            font-weight: 600;
-        }
+/* Active tab highlight */
+.nav-links a.active {
+    background-color: rgba(255, 255, 255, 0.15);
+}
 
         /* --- MAIN LAYOUT --- */
         .app-container {
@@ -2563,5 +2558,6 @@ Siliopati: ${geneData.Ciliopathy || 'N/A'}
         });
         init();
     </script>
+
 
 </html>
