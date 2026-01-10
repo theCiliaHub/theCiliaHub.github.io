@@ -3153,24 +3153,52 @@ window.terminologyQueries = {
 // ==========================================================
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
-/**
+//**
  * Renders Interactive UMAP – Enhanced with legend, dataset switch, clickable points,
  * and full multi-gene expression averaging support.
+ * FIXED: Added safety checks for missing CiliAI.umapControls to prevent 'sizeMultiplier' errors.
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
+    // --- SAFETY FIX START ---
+    // Ensure CiliAI global state exists
+    if (!window.CiliAI) window.CiliAI = {};
+    
+    // Ensure umapControls exists to prevent "Cannot read properties of undefined (reading 'sizeMultiplier')"
+    if (!window.CiliAI.umapControls) {
+        console.warn("CiliAI.umapControls was missing. Re-initializing default controls.");
+        window.CiliAI.umapControls = {
+            sizeMultiplier: 1.0,
+            opacity: 0.85
+        };
+    }
+    // --- SAFETY FIX END ---
+
     // 1. Clear previous views
     if (typeof window.resetViews === 'function') window.resetViews();
 
     // 2. Active dataset
     const datasetKey = window.CiliAI.activeDataset || 'lung';
     const dataset = window.CiliAI.datasets?.[datasetKey];
+    
+    // Check if dataset is loaded
     if (!dataset || !Array.isArray(dataset.umap)) {
-        window.addChatMessage(`Warning: ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
+        if (typeof window.addChatMessage === 'function') {
+            window.addChatMessage(`Warning: ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
+        } else {
+            console.warn(`Warning: ${datasetKey} dataset not loaded yet.`);
+        }
         return;
     }
 
     // 3. Normalize inputs
-    if (!displayName) displayName = 'WDR31';
+    // If displayName is missing or generic, try to use targetGenes
+    if (!displayName && Array.isArray(targetGenes) && targetGenes.length > 0) {
+        displayName = targetGenes[0];
+    } else if (!displayName) {
+        displayName = 'WDR31'; // Final fallback
+    }
+
+    // Handle targetGenes input types
     if (typeof targetGenes === 'string') {
         targetGenes = targetGenes.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
     }
@@ -3229,7 +3257,9 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         const perGeneExpr = [];
 
         targetGenes.forEach(g => {
-            let rawData = dataset.expression?.[g] || window.CiliAI.cellDataCache?.[g];
+            // Check datasets and cache
+            let rawData = dataset.expression?.[g] || (window.CiliAI.cellDataCache && window.CiliAI.cellDataCache[g]);
+            
             if (rawData) {
                 geneFoundCount++;
                 if (Array.isArray(rawData)) {
@@ -3263,6 +3293,9 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     }
 
     // Build plot data points
+    // Safety ref for controls inside the loop
+    const controls = window.CiliAI.umapControls || { sizeMultiplier: 1.0, opacity: 0.85 };
+
     sourceData.forEach((p, i) => {
         if (!p) return;
         const cellType = p.cell_type;
@@ -3282,17 +3315,18 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         text.push(`<b>${cellType}</b><br>${isClusterView ? '' : `Expression: ${exprVal.toFixed(2)} TPM`}`);
 
         // Use localization from primary gene
+        const geneInfo = window.CiliAI.lookups?.geneMap?.[primaryGene];
         customdata.push({
-            localization: window.CiliAI.lookups.geneMap[primaryGene]?.Localization || 'Cilium'
+            localization: geneInfo?.Localization || 'Cilium'
         });
 
         if (isClusterView) {
             color.push(clusterColors[cellType] || '#94A3B8');
-            size.push(6 * window.CiliAI.umapControls.sizeMultiplier);
+            size.push(6 * controls.sizeMultiplier);
         } else {
             color.push(exprVal);
             const baseSize = exprVal > 0 ? 8 : 4;
-        size.push(baseSize * window.CiliAI.umapControls.sizeMultiplier);
+            size.push(baseSize * controls.sizeMultiplier);
         }
     });
 
@@ -3304,7 +3338,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         hoverinfo: 'text',
         marker: {
             size,
-            opacity: window.CiliAI.umapControls.opacity,
+            opacity: controls.opacity,
             line: { width: 0.5, color: '#fff' }
         }
     };
@@ -3399,81 +3433,85 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
     const nextName = nextDS === 'lung' ? 'Lung Organoid' : 'Human Kidney';
 
-  window.addChatMessage(`
-    <div class="ai-result-card">
-        <p>
-            <strong>${isClusterView ? 'Cell Type View' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</strong>
-            in <strong>${dataset.name}</strong>
-        </p>
+    // Prepare HTML for the chat/status area
+    // NOTE: This assumes addChatMessage is available.
+    if (typeof window.addChatMessage === 'function') {
+        const htmlContent = `
+            <div class="ai-result-card">
+                <p>
+                    <strong>${isClusterView ? 'Cell Type View' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</strong>
+                    in <strong>${dataset.name}</strong>
+                </p>
 
-        ${isClusterView 
-            ? '<p>Colored by cell type (legend on right)</p>' 
-            : `<p>Colored by ${isMultiGene ? 'average ' : ''}expression level</p>`}
+                ${isClusterView 
+                    ? '<p>Colored by cell type (legend on right)</p>' 
+                    : `<p>Colored by ${isMultiGene ? 'average ' : ''}expression level</p>`}
 
-        <p><i>Click any point to highlight its localization on the ciliary diagram.</i></p>
+                <p><i>Click any point to highlight its localization on the ciliary diagram.</i></p>
 
-        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <button class="ciliai-button"
-                onclick="
-                    window.CiliAI.activeDataset='${nextDS}';
-                    window.renderUMAPPlot(
-                        '${displayName}',
-                        '${targetGenes.join(',')}',
-                        ${zoomToCellType ? `'${zoomToCellType}'` : 'null'}
-                    );
+                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <button class="ciliai-button"
+                        onclick="
+                            window.CiliAI.activeDataset='${nextDS}';
+                            window.renderUMAPPlot(
+                                '${displayName}',
+                                '${targetGenes.join(',')}',
+                                ${zoomToCellType ? `'${zoomToCellType}'` : 'null'}
+                            );
+                        ">
+                        Switch to ${nextName}
+                    </button>
+
+                    <a href="#"
+                       onclick="window.downloadUMAPDataAsCSV('${targetGenes.join('_')}')"
+                       class="ai-action">
+                       Download CSV
+                    </a>
+                </div>
+
+                <div style="
+                    margin-top:14px;
+                    padding-top:10px;
+                    border-top:1px solid #e5e7eb;
+                    display:flex;
+                    flex-direction:column;
+                    gap:8px;
                 ">
-                Switch to ${nextName}
-            </button>
 
-            <a href="#"
-               onclick="window.downloadUMAPDataAsCSV('${targetGenes.join('_')}')"
-               class="ai-action">
-                Download CSV
-            </a>
-        </div>
+                    <label style="font-size:12px;">
+                        Circle Size
+                        <input type="range" min="0.5" max="3" step="0.1" value="${controls.sizeMultiplier}"
+                            style="width:100%;"
+                            oninput="
+                                const gd = document.getElementById('plotly-container');
+                                if (!gd || !gd.data) return;
 
-        <!-- UMAP CONTROLS -->
-        <div style="
-            margin-top:14px;
-            padding-top:10px;
-            border-top:1px solid #e5e7eb;
-            display:flex;
-            flex-direction:column;
-            gap:8px;
-        ">
+                                const old = window.CiliAI.umapControls.sizeMultiplier;
+                                const val = parseFloat(this.value);
+                                window.CiliAI.umapControls.sizeMultiplier = val;
 
-            <label style="font-size:12px;">
-                Circle Size
-                <input type="range" min="0.5" max="3" step="0.1" value="1"
-                    style="width:100%;"
-                    oninput="
-                        const gd = document.getElementById('plotly-container');
-                        if (!gd || !gd.data) return;
+                                const sizes = gd.data[0].marker.size.map(s => (s / old) * val);
+                                Plotly.restyle(gd, { 'marker.size': [sizes] });
+                            ">
+                    </label>
 
-                        const old = window.CiliAI.umapControls.sizeMultiplier;
-                        const val = parseFloat(this.value);
-                        window.CiliAI.umapControls.sizeMultiplier = val;
+                    <label style="font-size:12px;">
+                        Transparency
+                        <input type="range" min="0.1" max="1" step="0.05" value="${controls.opacity}"
+                            style="width:100%;"
+                            oninput="
+                                window.CiliAI.umapControls.opacity = parseFloat(this.value);
+                                Plotly.restyle('plotly-container', {
+                                    'marker.opacity': window.CiliAI.umapControls.opacity
+                                });
+                            ">
+                    </label>
 
-                        const sizes = gd.data[0].marker.size.map(s => (s / old) * val);
-                        Plotly.restyle(gd, { 'marker.size': [sizes] });
-                    ">
-            </label>
-
-            <label style="font-size:12px;">
-                Transparency
-                <input type="range" min="0.1" max="1" step="0.05" value="0.85"
-                    style="width:100%;"
-                    oninput="
-                        window.CiliAI.umapControls.opacity = parseFloat(this.value);
-                        Plotly.restyle('plotly-container', {
-                            'marker.opacity': window.CiliAI.umapControls.opacity
-                        });
-                    ">
-            </label>
-
-        </div>
-    </div>
-`, false);
+                </div>
+            </div>
+        `;
+        window.addChatMessage(htmlContent, false);
+    }
 };
 
 // Helper: Get scRNA expression map for a gene (safe)
@@ -6030,6 +6068,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
