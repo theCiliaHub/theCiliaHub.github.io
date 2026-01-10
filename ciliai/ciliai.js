@@ -6,42 +6,85 @@
  * CiliAI – Global State (MUST BE FIRST)
  * ============================================================== */
 window.CiliAI = {
+    /* ---------------------------
+     * Dataset state
+     * --------------------------- */
     activeDataset: 'lung',
+
     datasets: {
-        lung: { 
-            name: 'Human Lung Organoid', 
-            umap: null, 
-            colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] 
+        lung: {
+            name: 'Human Lung Organoid',
+            umap: null,
+            expression: null,
+            colorScale: [
+                [0, '#e2e8f0'],
+                [0.1, '#fed7d7'],
+                [1, '#c53030']
+            ]
         },
-        kidney: { 
-            name: 'Human Kidney', 
-            umap: null, 
-            expression: null, 
-            colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']] 
+        kidney: {
+            name: 'Human Kidney',
+            umap: null,
+            expression: null,
+            colorScale: [
+                [0, '#F3F4F6'],
+                [0.2, '#C4B5FD'],
+                [0.5, '#8B5CF6'],
+                [1, '#4C1D95']
+            ]
         }
     },
-    data: { umap: [] },
+
+    /* ---------------------------
+     * Core data containers
+     * --------------------------- */
+    data: {
+        umap: []
+    },
+
     masterData: [],
     ready: false,
+
+    /* ---------------------------
+     * Lookup tables
+     * --------------------------- */
     lookups: {
-        geneMap: {},
-        umapByGene: {},
-        goMap: {},
-        pfamByGene: {}
+        geneMap: {},        // gene → metadata
+        umapByGene: {},     // gene → UMAP subset
+        goMap: {},          // GO term → genes
+        pfamByGene: {}      // gene → PFAM domains
     },
+
+    /* ---------------------------
+     * Caches & context
+     * --------------------------- */
     cellDataCache: {},
-    lastQueryContext: { type: null, data: [], term: null },
 
-    CiliAI_UMAP: null,
-    currentPlot: null,
-
-    // ✅ REQUIRED for UMAP size / opacity sliders
-    umapControls: {
-        sizeMultiplier: 1.0,
-        opacity: 0.85
+    lastQueryContext: {
+        type: null,        // gene | go | celltype | phylogeny | etc.
+        data: [],
+        term: null
     },
 
-    zoomStateByGene: {},
+    /* ---------------------------
+     * Plot handles
+     * --------------------------- */
+    CiliAI_UMAP: null,     // raw UMAP matrix
+    currentPlot: null,    // Plotly graph div
+
+    /* ---------------------------
+     * LIVE UMAP CONTROLS
+     * (used by sliders – MUST EXIST)
+     * --------------------------- */
+    umapControls: {
+        sizeMultiplier: 1.0,   // Circle size scaling
+        opacity: 0.85          // Marker transparency
+    },
+
+    /* ---------------------------
+     * Zoom & interaction memory
+     * --------------------------- */
+    zoomStateByGene: {},   // gene → Plotly relayout state
     activeGeneContext: null
 };
 
@@ -5987,6 +6030,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
