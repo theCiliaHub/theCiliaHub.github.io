@@ -3333,7 +3333,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
     const nextName = nextDS === 'lung' ? 'Lung Organoid' : 'Human Kidney';
 
-   window.addChatMessage(`
+  window.addChatMessage(`
     <div class="ai-result-card">
         <p>
             <strong>${isClusterView ? 'Cell Type View' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</strong>
@@ -3346,7 +3346,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
         <p><i>Click any point to highlight its localization on the ciliary diagram.</i></p>
 
-        <!-- ACTION BUTTONS -->
         <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
             <button class="ciliai-button"
                 onclick="
@@ -3409,6 +3408,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         </div>
     </div>
 `, false);
+};
 
 // Helper: Get scRNA expression map for a gene (safe)
 function getScRNAExpression(geneSymbol) {
@@ -5964,4 +5964,5 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
