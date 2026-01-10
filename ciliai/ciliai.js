@@ -7,25 +7,36 @@
  * ============================================================== */
 window.CiliAI = {
     activeDataset: 'lung',
-    datasets: { ... },
+    datasets: {
+        lung: { 
+            name: 'Human Lung Organoid', 
+            umap: null, 
+            colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] 
+        },
+        kidney: { 
+            name: 'Human Kidney', 
+            umap: null, 
+            expression: null, 
+            colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']] 
+        }
+    },
     data: { umap: [] },
     masterData: [],
     ready: false,
-
     lookups: {
         geneMap: {},
         umapByGene: {},
         goMap: {},
         pfamByGene: {}
     },
-
     cellDataCache: {},
     lastQueryContext: { type: null, data: [], term: null },
 
     CiliAI_UMAP: null,
     currentPlot: null,
 
-    umapControls: {              // ← ADD THIS
+    // ✅ REQUIRED for UMAP size / opacity sliders
+    umapControls: {
         sizeMultiplier: 1.0,
         opacity: 0.85
     },
@@ -34,23 +45,23 @@ window.CiliAI = {
     activeGeneContext: null
 };
 
-
+// ==========================================================
 // 1. GLOBAL STATE & UTILITIES
 // ==========================================================
-// 5. Ensure these are exposed globally
+
+// Ensure these are exposed globally
 window.extractMultipleGenes = extractMultipleGenes;
 window.getTPMInCellType = getTPMInCellType;
 
-
-// 6. Auto-run the fixed router
+// Auto-run the fixed router
 console.log("CiliAI v7.2 – Cell-Type Questions FIXED & Fully Supported");
-
 
 // Define logger first to prevent ReferenceErrors
 if (typeof window.log !== "function") {
-    window.log = function (msg) { console.log(`CiliAI LOG: ${msg}`); };
+    window.log = function (msg) {
+        console.log(`CiliAI LOG: ${msg}`);
+    };
 }
-
 
 // Chat Handler
 if (typeof window.addChatMessage !== "function") {
@@ -68,24 +79,36 @@ if (typeof window.addChatMessage !== "function") {
     };
 }
 
+// ==========================================================
 // Global variables for lazy loading
+// ==========================================================
 window.liPhylogenyCache = null;
 window.neversPhylogenyCache = null;
 
 // Default genes for phylogeny queries
-window.DEFAULT_PHYLO_GENES = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+window.DEFAULT_PHYLO_GENES = [
+    "ZC2HC1A",
+    "CEP41",
+    "BBS1",
+    "BBS2",
+    "BBS5",
+    "ZNF474",
+    "IFT81",
+    "BBS7"
+];
 
-    // --- Global variables to hold your data ---
+// --- Global variables to hold your data ---
 let ciliaryGeneMap = new Map();
 let screenDatabase = {};
 let lastQueryContext = { type: null, data: [], term: null };
+
 // Phylogeny data is lazy-loaded, so it starts as null
 window.liPhylogenyCache = null;
 window.neversPhylogenyCache = null;
 window.CiliAI_UMAP = null; // This will be populated from the master DB
 
-   
-    // --- Data Maps (These are now just for the AI brain) ---
+
+// --- Data Maps (These are now just for the AI brain) ---
 
 
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
@@ -5964,5 +5987,6 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
