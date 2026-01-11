@@ -1238,38 +1238,27 @@
                 }
             }
         };
-// 2. DATA LOADING FUNCTION
-window.loadCiliAIData = async function(timeoutMs = 60000) {
+// 3. DATA LOADING ENGINE
+window.loadCiliAIData = async function() {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     const umapFolder = base + 'UMAP_Data/';
     
     window.updateStatus('Loading datasets...', 'loading');
 
-    // Helper: Fetches split JSON parts and merges them
     const fetchParts = async (prefix, count) => {
         if (!count || count === 0) return {}; 
         const promises = [];
         for (let i = 1; i <= count; i++) {
             promises.push(
                 fetch(`${umapFolder}${prefix}_part${i}.json`)
-                .then(r => {
-                    if (!r.ok) throw new Error(`Missing ${prefix}_part${i}.json`);
-                    return r.json();
-                })
-                .catch(e => {
-                    console.warn(`Skipping part ${i} of ${prefix}`, e);
-                    return [];
-                })
+                .then(r => r.ok ? r.json() : [])
+                .catch(e => [])
             );
         }
         const parts = await Promise.all(promises);
-        
-        // Merge Logic
         if (parts.length > 0 && Array.isArray(parts[0])) {
-            const flattened = parts.flat();
-            // Convert Array to Object Map { cell_id: data } for fast lookup
             const map = {};
-            flattened.forEach((item, idx) => {
+            parts.flat().forEach((item, idx) => {
                 const id = item.cell_id || item.CellID || `cell_${idx}`;
                 map[id] = item;
             });
@@ -1280,99 +1269,59 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
     };
 
     try {
-        // --- 1. Load Core Databases ---
-        const [mainRes, lookupsRes, rnaResp] = await Promise.all([
+        // --- A. Load Core Data ---
+        const [mainRes, lookupsRes] = await Promise.all([
             fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
-            fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
-            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv')
+            fetch(base + 'ciliAI_lookups.json').then(r => r.json())
         ]);
 
         window.CiliAI.masterData = mainRes.masterData || [];
         window.CiliAI.lookups = lookupsRes.lookups || {};
         
-        // Populate Gene Map
         window.CiliAI.masterData.forEach(g => {
             if(g.Gene) window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g;
         });
 
-        // --- 2. Load Datasets ---
-        // Initialize datasets object
-        const datasets = {};
-        Object.keys(DATASET_CONFIG).forEach(key => {
-            datasets[key] = { ...DATASET_CONFIG[key], umap: [], expression: {} };
-        });
+        // --- B. Load Specific Datasets ---
 
-        // A. Lung Organoid (Legacy - from Master DB)
-        datasets.lung_organoid.umap = mainRes.umapData || [];
+        // 1. Lung Organoid
+        window.CiliAI.datasets.lung_organoid.umap = mainRes.umapData || [];
 
-        // B. Kidney (Structure in root, Expression in parts)
-        const kStructReq = fetch(base + DATASET_CONFIG.kidney.structureFile).then(r => r.json());
-        const kExprReq = fetchParts(DATASET_CONFIG.kidney.prefix, DATASET_CONFIG.kidney.parts);
-        const [kStruct, kExpr] = await Promise.all([kStructReq, kExprReq]);
-        datasets.kidney.umap = kStruct.umap || [];
-        datasets.kidney.expression = kExpr;
+        // 2. Kidney
+        const kStruct = await fetch(base + DATASET_CONFIG.kidney.structureFile).then(r => r.json());
+        const kExpr = await fetchParts(DATASET_CONFIG.kidney.prefix, DATASET_CONFIG.kidney.parts);
+        window.CiliAI.datasets.kidney.umap = kStruct.umap || [];
+        window.CiliAI.datasets.kidney.expression = kExpr;
 
-        // C. Hypothalamus (Split Structure + Split Expression)
-        const hStructReq = fetchParts(DATASET_CONFIG.hypothalamus.structurePrefix, DATASET_CONFIG.hypothalamus.structureParts);
-        const hExprReq = fetchParts(DATASET_CONFIG.hypothalamus.prefix, DATASET_CONFIG.hypothalamus.parts);
-        const [hStruct, hExpr] = await Promise.all([hStructReq, hExprReq]);
-        datasets.hypothalamus.umap = hStruct;
-        datasets.hypothalamus.expression = hExpr;
+        // 3. Hypothalamus
+        const hStruct = await fetchParts(DATASET_CONFIG.hypothalamus.structurePrefix, DATASET_CONFIG.hypothalamus.structureParts);
+        const hExpr = await fetchParts(DATASET_CONFIG.hypothalamus.prefix, DATASET_CONFIG.hypothalamus.parts);
+        window.CiliAI.datasets.hypothalamus.umap = hStruct;
+        window.CiliAI.datasets.hypothalamus.expression = hExpr;
 
-        // D. Parallel Load for Standard Split Datasets (Lung Atlas, Liver, Pancreas, etc.)
-        const loadSplitDataset = async (key) => {
+        // 4. Unified Split Datasets
+        const loadSplit = async (key) => {
             const cfg = DATASET_CONFIG[key];
             if(cfg.isMaster || key === 'kidney' || key === 'hypothalamus') return;
-            
             const data = await fetchParts(cfg.prefix, cfg.parts);
-            // Combined files use the same object for UMAP and Expression
-            datasets[key].umap = data;
-            datasets[key].expression = data; 
+            window.CiliAI.datasets[key].umap = data;
+            window.CiliAI.datasets[key].expression = data; 
         };
 
         await Promise.all([
-            loadSplitDataset('lung_atlas'),
-            loadSplitDataset('liver'),
-            loadSplitDataset('pancreas'),
-            loadSplitDataset('olfactory'),
-            loadSplitDataset('chondrocyte')
+            loadSplit('lung_atlas'),
+            loadSplit('liver'),
+            loadSplit('pancreas'),
+            loadSplit('olfactory'),
+            loadSplit('chondrocyte')
         ]);
 
-        // --- 3. Finalize ---
-        window.CiliAI.datasets = datasets;
-        window.CiliAI.activeDataset = 'lung_atlas'; // Default dataset
-
-        // RNA Tissue Consensus
-        const rnaText = await rnaResp.text();
-        if (typeof window.parseTsvData === 'function') {
-            window.rnaTissueExpressionData = window.parseTsvData(rnaText);
-        }
-
-        // Cache scRNA from Lung Organoid to main gene map (Legacy support)
+        // --- C. Finalize ---
         window.CiliAI.masterData.forEach(g => {
              if (g.Gene && g.expression?.scRNA) {
                 window.CiliAI.cellDataCache[g.Gene.toUpperCase()] = g.expression.scRNA;
             }
         });
-
-        // Update UI Stats
-        const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
-        const validCiliopathyDiseases = new Set();
-        const uniqueCiliopathyGenes = new Set();
-
-        window.CiliAI.masterData.forEach(g => {
-            if (g.Gene && primaryClasses.includes(g.ciliopathy_classification)) {
-                uniqueCiliopathyGenes.add(g.Gene);
-                if (g.Ciliopathy) {
-                    const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
-                    diseases.forEach(d => { if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d); });
-                }
-            }
-        });
-
-        if(document.getElementById('stat-genes')) document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
-        if(document.getElementById('stat-ciliopathys')) document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
-        if(document.getElementById('stat-ciliopathy-genes')) document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
 
         window.CiliAI.ready = true;
         window.updateStatus('Ready', 'ready');
@@ -1384,6 +1333,8 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         return false;
     }
 };
+    
+    
  // =======================================================
 // View Switching Function
 // =======================================================
@@ -1557,3 +1508,4 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
