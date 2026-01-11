@@ -1,41 +1,93 @@
 /* ==============================================================
- * CiliAI – Unified Logic Engine (v7.1 – Safe Initialization)
+ * CiliAI – Unified Data Engine (v14.0 - Final Production)
  * ============================================================== */
 
-/* ==============================================================
- * CiliAI – Global State (MUST BE FIRST)
- * ============================================================== */
-window.CiliAI = {
-    activeDataset: 'lung',
-    datasets: {
-        lung: { 
-            name: 'Human Lung Organoid', 
-            umap: null, 
-            colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] 
-        },
-        kidney: { 
-            name: 'Human Kidney', 
-            umap: null, 
-            expression: null, 
-            colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']] 
-        }
+// 1. DATASET CONFIGURATION
+const DATASET_CONFIG = {
+    lung_atlas: {
+        name: "Human Lung Atlas (HLCA)",
+        prefix: "lung_downsampled",
+        parts: 15,
+        colorScale: [[0, '#fffaf0'], [0.1, '#feebc8'], [1, '#dd6b20']], // Orange
+        ref: "Sikkema et al., Nat Med (2023)."
     },
+    lung_organoid: {
+        name: "Lung Organoid (Alveolar)",
+        isMaster: true,
+        colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']], // Red
+        ref: "Miller et al., Stem Cell Reports (2019)."
+    },
+    kidney: {
+        name: "Human Kidney",
+        prefix: "kidney_expression",
+        parts: 2, 
+        structureFile: "kidney_structure.json",
+        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']], // Purple
+        ref: "Stewart et al., Science (2019)."
+    },
+    liver: {
+        name: "Human Liver",
+        prefix: "liver",
+        parts: 6,
+        colorScale: [[0, '#f0fff4'], [0.1, '#9ae6b4'], [1, '#2f855a']], // Green
+        ref: "Aizarani et al., Nature (2019)."
+    },
+    hypothalamus: {
+        name: "Hypothalamus",
+        prefix: "hypothalamus_expression",
+        parts: 6,
+        structurePrefix: "hypothalamus_structure",
+        structureParts: 2,
+        colorScale: [[0, '#fff5f5'], [0.1, '#fc8181'], [1, '#9b2c2c']], // Brown
+        ref: "Kim et al., Nat Commun (2020)."
+    },
+    pancreas: {
+        name: "Pancreas (Islets)",
+        prefix: "pancreas",
+        parts: 15,
+        colorScale: [[0, '#fff5f7'], [0.1, '#fbb6ce'], [1, '#b83280']], // Pink
+        ref: "Craig-Schapiro et al., Nat Commun (2025)."
+    },
+    olfactory: {
+        name: "Olfactory Epithelium",
+        prefix: "olfactory",
+        parts: 15,
+        colorScale: [[0, '#fffbe6'], [0.1, '#ffe58f'], [1, '#d48806']], // Gold
+        ref: "Durante et al., Nat Neurosci (2020)."
+    },
+    chondrocyte: {
+        name: "Chondrocytes (IVD)",
+        prefix: "chondrocyte",
+        parts: 3,
+        colorScale: [[0, '#f7fafc'], [0.1, '#cbd5e0'], [1, '#4a5568']], // Gray
+        ref: "Gan et al., (GSE104782)."
+    }
+};
+
+// 2. GLOBAL STATE
+window.CiliAI = {
+    activeDataset: 'lung_atlas', 
+    datasets: {}, 
     data: { umap: [] },
     masterData: [],
     ready: false,
-    lookups: {
-        geneMap: {},
-        umapByGene: {},
-        goMap: {},
-        pfamByGene: {}
-    },
+    lookups: { geneMap: {}, umapByGene: {}, goMap: {}, pfamByGene: {} },
     cellDataCache: {},
     lastQueryContext: { type: null, data: [], term: null },
-    CiliAI_UMAP: null,
-    currentPlot: null,
-    zoomStateByGene: {},
-    activeGeneContext: null
+    currentPlot: null
 };
+
+// Initialize datasets object
+Object.keys(DATASET_CONFIG).forEach(key => {
+    window.CiliAI.datasets[key] = {
+        name: DATASET_CONFIG[key].name,
+        umap: [], 
+        expression: {},
+        colorScale: DATASET_CONFIG[key].colorScale,
+        ref: DATASET_CONFIG[key].ref
+    };
+});
+
 
 // 1. GLOBAL STATE & UTILITIES
 // ==========================================================
@@ -3089,270 +3141,172 @@ window.terminologyQueries = {
 // ==========================================================
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
-/**
- * Renders Interactive UMAP – Enhanced with legend, dataset switch, clickable points,
- * and full multi-gene expression averaging support.
- */
+// ==============================================================
+// 5. VISUALIZATION ENGINE (With Liver Colors)
+// ==============================================================
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
-    // 1. Clear previous views
     if (typeof window.resetViews === 'function') window.resetViews();
+    
+    let datasetKey = window.CiliAI.activeDataset || 'lung_atlas';
+    const dataset = window.CiliAI.datasets[datasetKey];
 
-    // 2. Active dataset
-    const datasetKey = window.CiliAI.activeDataset || 'lung';
-    const dataset = window.CiliAI.datasets?.[datasetKey];
-    if (!dataset || !Array.isArray(dataset.umap)) {
-        window.addChatMessage(`Warning: ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
+    if (!dataset || !dataset.umap || (Array.isArray(dataset.umap) && dataset.umap.length === 0)) {
+        window.addChatMessage(`⚠️ <strong>${dataset?.name || datasetKey}</strong> is loading. Please wait...`, false);
         return;
     }
 
-    // 3. Normalize inputs
     if (!displayName) displayName = 'WDR31';
-    if (typeof targetGenes === 'string') {
-        targetGenes = targetGenes.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
-    }
+    if (typeof targetGenes === 'string') targetGenes = targetGenes.split(',').filter(t => t);
     if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName.toUpperCase()];
-
-    const primaryGene = targetGenes[0];                    // Used for title & localization click
+    const primaryGene = targetGenes[0];
     const isMultiGene = targetGenes.length > 1;
     const isClusterView = displayName === 'CLUSTER_VIEW';
 
-    // 4. Prepare data
-    const sourceData = dataset.umap;
-    const x = [], y = [], color = [], text = [], size = [], customdata = [];
+    // --- COMPREHENSIVE COLOR MAP ---
+    const clusterColors = {
+        // --- Liver ---
+        'Hepatocyte': '#2F855A', 'Cholangiocyte': '#3182CE', 'LSEC': '#E53E3E', 
+        'Kupffer Cell': '#D69E2E', 'Hepatic Stellate Cell': '#805AD5',
+        'T Cell': '#4299E1', 'B Cell': '#63B3ED', 'NK Cell': '#2B6CB0', 'Erythroid': '#FC8181',
+
+        // --- Lung (Atlas) ---
+        'Fibroblast': '#1D4ED8', 'Endothelial Cell': '#059669', 'Immune Cell': '#1E3A8A',
+        'Pericyte': '#7C3AED', 'Smooth Muscle': '#DB2777', 
+        
+        // --- Lung (Organoid) ---
+        'Ciliated Cell': '#E11D48', 'Basal Cell': '#F59E0B', 'Club Cell': '#3B82F6', 
+        'Goblet Cell': '#10B981', 'Neuroendocrine Cell': '#8B5CF6', 
+        'Pulmonary Alveolar Type 1 Cell': '#60A5FA', 'Pulmonary Alveolar Type 2 Cell': '#2563EB',
+
+        // --- Kidney ---
+        'Proximal Tubule Cell': '#3B82F6', 'Thick Ascending Limb Cell': '#60A5FA',
+        'Distal Convoluted Tubule Cell': '#93C5FD', 'Collecting Duct Principal Cell': '#BFDBFE',
+        'Podocyte': '#1E40AF',
+
+        // --- Pancreas ---
+        'Alpha Cell': '#E11D48', 'Beta Cell': '#3B82F6', 'Delta Cell': '#10B981', 'PP Cell': '#F59E0B',
+        'Acinar': '#8B5CF6', 'Ductal': '#6366F1', 'Stellate': '#EC4899',
+
+        // --- Olfactory ---
+        'Mature OSN': '#D97706', 'Immature OSN': '#FBBF24', 'Horizontal Basal Cell': '#10B981',
+        'Globose Basal Cell': '#34D399', 'Sustentacular Cell': '#3B82F6', 'Bowmans Gland Cell': '#60A5FA',
+        'Ionocyte': '#EF4444',
+
+        // --- Chondrocyte ---
+        'Chondroblast': '#3B82F6', 'Homeostatic Chondrocyte': '#10B981', 
+        'Regulatory Chondrocyte': '#8B5CF6', 'Proliferative Chondrocyte': '#EF4444',
+        
+        // --- Hypothalamus ---
+        'Neuron': '#8B5CF6', 'Astrocyte': '#F59E0B', 'Oligodendrocyte': '#10B981', 
+        'Microglia': '#EF4444', 'Tanycyte': '#3B82F6'
+    };
+
+    const sourceData = Array.isArray(dataset.umap) ? dataset.umap : Object.values(dataset.umap);
+    const x = [], y = [], color = [], text = [], customdata = [];
     let maxExpr = 0;
 
-    // Unique cell types for legend
-    const cellTypes = new Set();
-    const clusterColors = {
-        'Proximal Tubule Cell': '#3B82F6',
-        'Thick Ascending Limb Cell': '#60A5FA',
-        'Distal Convoluted Tubule Cell': '#93C5FD',
-        'Collecting Duct Principal Cell': '#BFDBFE',
-        'Collecting Duct Intercalated Cell': '#DBEAFE',
-        'Podocyte': '#1E40AF',
-        'Fibroblast': '#1D4ED8',
-        'Endothelial Cell': '#2563EB',
-        'Immune Cell': '#1E3A8A',
-        'Cycling Cell': '#172554',
-        'Ciliated Cell': '#E11D48',
-        'stem cell': '#E11D48',
-        'club cell': '#3B82F6',
-        'goblet cell': '#10B981',
-        'basal cell': '#F59E0B',
-        'neuroendocrine cell': '#8B5CF6',
-        'pulmonary alveolar type 1 cell': '#60A5FA',
-        'pulmonary alveolar type 2 cell': '#2563EB',
-        'lung secretory cell': '#34D399'
+    const getExpr = (item, gene) => {
+        if(item[gene] !== undefined) return item[gene];
+        if(dataset.expression && dataset.expression[gene]) {
+            return dataset.expression[gene][item.cell_id || item.cell_type] || 0;
+        }
+        return 0;
     };
 
-    // Helper: decode sparse array
-    const decodeSparse = (sparse, total) => {
-        const dense = new Float32Array(total).fill(0);
-        if (!sparse) return dense;
-        for (let k = 0; k < sparse.length; k += 2) {
-            const idx = sparse[k];
-            const val = sparse[k + 1];
-            if (idx < total) dense[idx] = val;
+    sourceData.forEach(p => {
+        const rawType = p.cell_type || p.cluster || "Unknown";
+        if (zoomToCellType && rawType !== zoomToCellType) return;
+
+        x.push(p.umap_1 || p.umap_x || p.x);
+        y.push(p.umap_2 || p.umap_y || p.y);
+
+        let val = 0;
+        if (!isClusterView) {
+            targetGenes.forEach(g => { val += getExpr(p, g); });
+            if (isMultiGene) val /= targetGenes.length;
+            if (val > maxExpr) maxExpr = val;
         }
-        return dense;
-    };
-
-    // Expression handling – now supports multi-gene averaging
-    let exprData = null;  // Will be an array of length sourceData.length
-    let geneFoundCount = 0;
-
-    if (!isClusterView) {
-        const perGeneExpr = [];
-
-        targetGenes.forEach(g => {
-            let rawData = dataset.expression?.[g] || window.CiliAI.cellDataCache?.[g];
-            if (rawData) {
-                geneFoundCount++;
-                if (Array.isArray(rawData)) {
-                    perGeneExpr.push(decodeSparse(rawData, sourceData.length));
-                } else if (typeof rawData === 'object') {
-                    // Dictionary by cell type – convert to indexed array
-                    const arr = new Float32Array(sourceData.length);
-                    sourceData.forEach((p, i) => {
-                        if (p && p.cell_type) arr[i] = rawData[p.cell_type] || 0;
-                    });
-                    perGeneExpr.push(arr);
-                }
-            }
-        });
-
-        if (geneFoundCount > 0) {
-            // Average across available genes
-            exprData = new Float32Array(sourceData.length);
-            sourceData.forEach((_, i) => {
-                let sum = 0;
-                let count = 0;
-                perGeneExpr.forEach(arr => {
-                    if (arr[i] !== undefined) {
-                        sum += arr[i];
-                        count++;
-                    }
-                });
-                exprData[i] = count > 0 ? sum / count : 0;
-            });
-        }
-    }
-
-    // Build plot data points
-    sourceData.forEach((p, i) => {
-        if (!p) return;
-        const cellType = p.cell_type;
-        cellTypes.add(cellType);
-
-        if (zoomToCellType && cellType !== zoomToCellType) return;
-
-        x.push(p.x);
-        y.push(p.y);
-
-        let exprVal = 0;
-        if (!isClusterView && exprData) {
-            exprVal = exprData[i];
-            if (exprVal > maxExpr) maxExpr = exprVal;
-        }
-
-        text.push(`<b>${cellType}</b><br>${isClusterView ? '' : `Expression: ${exprVal.toFixed(2)} TPM`}`);
-
-        // Use localization from primary gene
-        customdata.push({
-            localization: window.CiliAI.lookups.geneMap[primaryGene]?.Localization || 'Cilium'
-        });
 
         if (isClusterView) {
-            color.push(clusterColors[cellType] || '#94A3B8');
-            size.push(6);
+            let c = clusterColors[rawType];
+            if (!c) {
+                const key = Object.keys(clusterColors).find(k => rawType.toLowerCase().includes(k.toLowerCase()));
+                c = key ? clusterColors[key] : '#94A3B8';
+            }
+            color.push(c);
         } else {
-            color.push(exprVal);
-            size.push(exprVal > 0 ? 8 : 4);
+            color.push(val);
         }
+
+        text.push(`<b>${rawType}</b>${isClusterView ? '' : `<br>Expr: ${val.toFixed(2)} TPM`}`);
+        customdata.push({ localization: window.CiliAI.lookups.geneMap[primaryGene]?.Localization || 'Cilium' });
     });
 
-    // Trace configuration
     const trace = {
-        x, y, text, customdata,
+        x: x, y: y, text: text, customdata: customdata,
         mode: 'markers',
         type: 'scattergl',
         hoverinfo: 'text',
         marker: {
-            size,
-            opacity: 0.85,
+            size: isClusterView ? 5 : 4,
+            color: color,
+            opacity: 0.8,
             line: { width: 0.5, color: '#fff' }
         }
     };
 
     if (!isClusterView) {
-        trace.marker.color = color;
+        trace.marker.colorscale = dataset.colorScale;
         trace.marker.cmin = 0;
         trace.marker.cmax = maxExpr > 0 ? maxExpr : 1;
-        trace.marker.colorscale = dataset.colorScale || [[0, '#e2e8f0'], [0.5, '#3b82f6'], [1, '#1e40af']];
-        trace.marker.colorbar = {
-            title: isMultiGene ? 'Avg TPM' : 'TPM',
-            thickness: 15,
-            len: 0.6
-        };
-    } else {
-        trace.marker.color = color;
+        trace.marker.showscale = true;
+        trace.marker.colorbar = { title: 'Expr', thickness: 10 };
     }
 
-    // Layout
     const layout = {
         title: {
-            text: `<b>${isClusterView ? 'Cell Types' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</b><br><sub>${dataset.name} scRNA-seq</sub>`,
+            text: `<b>${isClusterView ? 'Cell Types' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</b><br><sub>${dataset.name}</sub>`,
             font: { size: 16 }
         },
-        xaxis: { visible: false, showgrid: false, zeroline: false },
-        yaxis: { visible: false, showgrid: false, zeroline: false },
+        xaxis: { visible: false },
+        yaxis: { visible: false },
         hovermode: 'closest',
         margin: { t: 60, b: 40, l: 40, r: 40 },
-        plot_bgcolor: '#fff',
-        paper_bgcolor: '#fff',
-        showlegend: false,
-        annotations: []
+        showlegend: isClusterView 
     };
 
-    // Cell type legend for cluster view
-    if (isClusterView) {
-        const legendX = 1.05;
-        let legendY = 1;
-        const legendStep = 0.06;
-        Array.from(cellTypes).sort().forEach((ct, idx) => {
-            const col = clusterColors[ct] || '#666';
-            layout.annotations.push({
-                x: legendX,
-                y: legendY - idx * legendStep,
-                xref: 'paper',
-                yref: 'paper',
-                text: `<span style="color:${col}">●</span> ${ct}`,
-                showarrow: false,
-                font: { size: 11 },
-                align: 'left',
-                xanchor: 'left'
-            });
-        });
-    }
+    await Plotly.newPlot('plotly-container', [trace], layout, { responsive: true, displaylogo: false });
 
-    // Render using showPlot (best layout + resize handling)
-    const plotData = { data: [trace], layout };
-    const plotTitle = isClusterView
-        ? 'Cell Type Clusters'
-        : `scRNA-seq: ${isMultiGene ? targetGenes.join(' + ') : primaryGene}`;
-
-    if (typeof window.showPlot === 'function') {
-        window.showPlot(plotData, plotTitle);
-    } else {
-        await Plotly.newPlot('plotly-container', [trace], layout, {
-            responsive: true,
-            displaylogo: false,
-            modeBarButtonsToRemove: ['lasso2d', 'select2d', 'zoom2d']
-        });
-    }
-
-    // === CRITICAL FIX: Attach click handler AFTER plot is rendered ===
-    setTimeout(() => {
-        const gd = document.getElementById('plotly-container');
-        if (gd && gd.data && gd.data.length > 0) {
-            gd.on('plotly_click', (data) => {
-                const point = data.points[0];
-                const loc = point.customdata?.localization;
-                if (loc && typeof window.highlightCiliumLocation === 'function') {
-                    window.resetViews();
-                    window.showDiagram();
-                    window.highlightCiliumLocation(loc, primaryGene);
-                    const cellName = point.text.split('<br>')[0].replace(/<b>|<\/b>/g, '');
-                    window.addChatMessage(`<i>Clicked: ${cellName}</i><br>Localization highlighted on ciliary diagram.`, false);
-                }
-            });
-        }
-    }, 100); // Small delay ensures Plotly has fully initialized the gd object
-
-    // Dataset switch button
-    const currentDS = datasetKey;
-    const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
-    const nextName = nextDS === 'lung' ? 'Lung Organoid' : 'Human Kidney';
+    // Interactive Dropdown
+    const genesArg = targetGenes.join(',');
+    const zoomArg = zoomToCellType || '';
+    
+    let optionsHtml = '';
+    Object.keys(DATASET_CONFIG).forEach(key => {
+        const selected = key === datasetKey ? 'selected' : '';
+        optionsHtml += `<option value="${key}" ${selected}>${DATASET_CONFIG[key].name}</option>`;
+    });
 
     window.addChatMessage(`
         <div class="ai-result-card">
-            <p><strong>${isClusterView ? 'Cell Type View' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</strong> in <strong>${dataset.name}</strong></p>
-            ${isClusterView 
-                ? '<p>Colored by cell type (legend on right)</p>' 
-                : `<p>Colored by ${isMultiGene ? 'average ' : ''}expression level</p>`}
-            <p><i>Click any point to highlight its localization on the ciliary diagram.</i></p>
-            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <button class="ciliai-button"
-                    onclick="window.CiliAI.activeDataset='${nextDS}'; window.renderUMAPPlot('${displayName}', '${targetGenes.join(',')}', ${zoomToCellType ? `'${zoomToCellType}'` : 'null'})">
-                    Switch to ${nextName}
-                </button>
-                <a href="#" onclick="window.downloadUMAPDataAsCSV('${targetGenes.join('_')}')" class="ai-action">
-                    Download CSV
-                </a>
+            <p><strong>${isClusterView ? 'Cell Types' : primaryGene}</strong> in <strong>${dataset.name}</strong></p>
+            <p style="font-size:11px; color:#666; margin-bottom:10px;">${dataset.ref}</p>
+            
+            <div style="background:#f7fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+                <label style="font-size:11px; font-weight:700; color:#4a5568; display:block; margin-bottom:4px;">SWITCH TISSUE:</label>
+                <select class="cilia-select" style="width:100%; font-size:13px;" 
+                    onchange="window.CiliAI.activeDataset = this.value; window.renderUMAPPlot('${displayName}', '${genesArg}', '${zoomArg}')">
+                    ${optionsHtml}
+                </select>
+            </div>
+            
+            <div style="margin-top:10px; display:flex; gap:8px;">
+                <a href="#" onclick="window.downloadUMAPDataAsCSV('${primaryGene}')" class="ai-action">⬇️ CSV</a>
             </div>
         </div>
     `, false);
 };
+
 
 // Helper: Get scRNA expression map for a gene (safe)
 function getScRNAExpression(geneSymbol) {
@@ -4177,7 +4131,6 @@ else if (htmlResult === null && (match = qLower.match(/(?:show )?(?:domains?|dom
             else htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
         }
 // =======================================================
-// =======================================================
 // (12) INTENT: Expression / UMAP Plot (Single Gene or Complex)
 // =======================================================
 else if (
@@ -4188,44 +4141,77 @@ else if (
         qLower.includes('heatmap') ||
         qLower.includes('umap') ||
         qLower.includes('scrna') ||
-        qLower.includes('expression')
+        qLower.includes('expression') ||
+        qLower.startsWith('switch to') // Handle explicit switch commands here too
     ) &&
-    !qLower.includes('compare') &&  // ← Critical: prevent overlap with compare intent
+    !qLower.includes('compare') &&  // Critical: prevent overlap with compare intent
     !qLower.includes(' vs ') &&
     !qLower.includes(' versus ')
 ) {
     // ---------------------------------------------------
-    // Explicit dataset switching (standalone commands)
+    // A. Explicit Dataset Switching (e.g., "switch to liver")
     // ---------------------------------------------------
-    if (qLower === 'switch to kidney') {
-        window.CiliAI.activeDataset = 'kidney';
-        window.addChatMessage('Switched to Kidney scRNA-seq dataset.', false);
-        return;
+    const configKeys = Object.keys(DATASET_CONFIG);
+    let explicitSwitch = false;
+
+    if (qLower.startsWith('switch to')) {
+        for (const key of configKeys) {
+            // Check against key (e.g., 'lung_atlas') or name (e.g., 'pancreas')
+            const nameParts = DATASET_CONFIG[key].name.toLowerCase().split(' ');
+            const simpleName = key.split('_')[0]; // e.g. 'lung' from 'lung_organoid'
+            
+            if (qLower.includes(key) || qLower.includes(simpleName) || nameParts.some(n => qLower.includes(n) && n.length > 3)) {
+                window.CiliAI.activeDataset = key;
+                window.addChatMessage(`Switched active dataset to <strong>${DATASET_CONFIG[key].name}</strong>.`, false);
+                explicitSwitch = true;
+                break;
+            }
+        }
+        if (explicitSwitch) return; // Exit if it was just a switch command
     }
-    if (qLower === 'switch to lung') {
-        window.CiliAI.activeDataset = 'lung';
-        window.addChatMessage('Switched to Lung scRNA-seq dataset.', false);
-        return;
+
+    // ---------------------------------------------------
+    // B. Dataset Inference from Query (e.g., "plot IFT88 in Pancreas")
+    // ---------------------------------------------------
+    // We check if the query contains any dataset keywords and set activeDataset accordingly
+    for (const key of configKeys) {
+        // Keywords: the key itself (liver), or parts of the name (olfactory, chondrocyte)
+        const keywords = [key, key.replace('_', ' '), DATASET_CONFIG[key].name.toLowerCase()];
+        // Special mapping for common terms
+        if(key === 'chondrocyte') keywords.push('ivd', 'disc');
+        if(key === 'olfactory') keywords.push('nose', 'nasal');
+        if(key === 'pancreas') keywords.push('islet');
+        
+        if (keywords.some(kw => qLower.includes(kw.toLowerCase()))) {
+            window.CiliAI.activeDataset = key;
+            break; // Stop after first match
+        }
     }
+
     // ---------------------------------------------------
-    // Dataset inference from query
+    // C. Target Gene / Complex Parsing
     // ---------------------------------------------------
-    if (qLower.includes('kidney')) window.CiliAI.activeDataset = 'kidney';
-    else if (qLower.includes('lung')) window.CiliAI.activeDataset = 'lung';
-    // ---------------------------------------------------
-    // Target gene / complex parsing
-    // ---------------------------------------------------
-    let target = 'WDR31';
-    match = qLower.match(/(?:for|of|in)\s+(.+)/i);
-    if (match) {
-        target = match[1]
-            .replace(/lung|kidney|scrna-seq|scrna|expression|umap|plot|display|in/gi, '')
-            .trim();
-        if (target.length < 2) target = 'WDR31';
-    }
+    let target = 'WDR31'; // Default
+    
+    // Remove command words and dataset names to isolate the gene
+    let cleanQuery = qLower;
+    const removeTerms = [
+        'plot', 'display', 'show', 'umap', 'expression', 'scrna-seq', 'scrna', 'heatmap', 'for', 'of', 'in', 'the',
+        'lung', 'kidney', 'liver', 'pancreas', 'olfactory', 'hypothalamus', 'chondrocyte', 'retina',
+        'atlas', 'organoid', 'human', 'cell', 'data'
+    ];
+    removeTerms.forEach(term => {
+        cleanQuery = cleanQuery.replace(new RegExp(`\\b${term}\\b`, 'gi'), '');
+    });
+    
+    cleanQuery = cleanQuery.trim();
+    if (cleanQuery.length > 1) target = cleanQuery;
+
     let genes = window.extractMultipleGenes(target);
     let isComplex = false;
     let finalTargetTerm = target;
+
+    // Fallback: Check if target is a complex (e.g., "BBSome")
     if (genes.length === 0 && target) {
         const complexName = window.extractComplexIntent(target);
         if (complexName) {
@@ -4237,59 +4223,38 @@ else if (
             }
         }
     }
+
     const finalGenes = genes.length > 0 ? genes : ['WDR31'];
     const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
+
     // ---------------------------------------------------
-    // Optional zoom-to-cell-type
+    // D. Optional Zoom-to-Cell-Type
     // ---------------------------------------------------
-    const zoomMatch = qLower.match(
-        /zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i
-    );
-    const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
-  // ---------------------------------------------------
-    // Render UMAP (SINGLE source of truth)
+    // We scan the query for any known cell type in the cluster list
+    // (This is a simplified check; more robust regex can be added if needed)
+    const cellTypeKeywords = [
+        'ciliated', 'basal', 'club', 'goblet', 'neuroendocrine', 'alveolar', 
+        'fibroblast', 'endothelial', 'immune', 'proximal', 'podocyte', 
+        'alpha', 'beta', 'delta', 'acinar', 'ductal', 'stellate', 
+        'hepatocyte', 'cholangiocyte', 'kupffer', 'neuron', 'astrocyte', 'microglia',
+        'chondroblast', 'osn', 'sustentacular'
+    ];
+    let zoomToCellType = null;
+    for(const ct of cellTypeKeywords) {
+        if(qLower.includes(ct)) {
+            // We pass the partial match, renderUMAPPlot handles the exact mapping
+            zoomToCellType = ct; 
+            break;
+        }
+    }
+
+    // ---------------------------------------------------
+    // E. Render
     // ---------------------------------------------------
     await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
-    // ---------------------------------------------------
-    // Dataset labels & switch target
-    // ---------------------------------------------------
-    const currentDS = window.CiliAI.activeDataset || 'lung';
-    const dsName = window.CiliAI.datasets[currentDS]
-        ? window.CiliAI.datasets[currentDS].name
-        : 'scRNA-seq';
-    const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
-    const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
-   
-    // Prepare safe arguments for HTML attributes
-    const genesArg = finalGenes.join(',');
-    const zoomArg = zoomToCellType || '';
-    // ---------------------------------------------------
-    // Chat output + safe switch button
-    // ---------------------------------------------------
-    htmlResult = `
-        <div class="ai-result-card">
-            <p>
-                Displaying <strong>${dsName}</strong> scRNA-seq UMAP for
-                <strong>${geneSymbol}</strong>
-                (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.
-            </p>
-            ${zoomToCellType ? `<p>Zoomed to the <strong>${zoomToCellType}</strong> cluster.</p>` : ''}
-            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <button class="ciliai-button"
-                    style="width:auto; margin:0; background:#B8E2F2;"
-                    onclick="window.switchDatasetAndPlot('${nextDS}', '${geneSymbol}', '${genesArg}', '${zoomArg}')">
-                    🔄 Switch to ${nextDSLabel}
-                </button>
-                <a href="#"
-                   class="ai-action"
-                   onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')"
-                   style="margin-left:5px; font-weight:600;">
-                   ⬇️ CSV
-                </a>
-            </div>
-        </div>
-    `;
+    return;
 }
+    
 // =======================================================
 // (13) INTENT: Compare Genes — NOW WITH EXPRESSION PLOTTING SUPPORT
 // =======================================================
@@ -5908,3 +5873,4 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
