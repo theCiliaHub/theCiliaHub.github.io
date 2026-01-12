@@ -1239,23 +1239,38 @@
             }
         };
 
-  // 3. DATA LOADING ENGINE
+// 3. DATA LOADING ENGINE
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-    const umapBase = base + 'UMAP_Data/';
     
     if (window.updateStatus) window.updateStatus('Loading datasets...', 'loading');
 
-    // Helper: Fetch split parts
+    // Helper: Build correct URL based on folder location
+    const getUrl = (folder, filename) => {
+        if (!folder || folder === '') {
+            return base + filename; // Root folder
+        }
+        return base + folder + '/' + filename; // Subfolder
+    };
+
+    // Helper: Fetch split parts with correct paths
     const fetchParts = async (prefix, count, folder) => {
-        if (!count || count === 0) return null; // Return null instead of []
+        if (!count || count === 0) return null;
         const promises = [];
         for (let i = 1; i <= count; i++) {
+            const filename = `${prefix}_part${i}.json`;
+            const url = getUrl(folder, filename);
             promises.push(
-                fetch(`${folder}${prefix}_part${i}.json`)
-                    .then(r => r.ok ? r.json() : null)
+                fetch(url)
+                    .then(r => {
+                        if (!r.ok) {
+                            console.warn(`Failed to fetch ${filename} from ${folder || 'root'}: ${r.status}`);
+                            return null;
+                        }
+                        return r.json();
+                    })
                     .catch(e => {
-                        console.warn(`Missing ${prefix}_part${i}`);
+                        console.warn(`Error fetching ${filename}:`, e.message);
                         return null;
                     })
             );
@@ -1263,7 +1278,12 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         const results = await Promise.all(promises);
         const validResults = results.filter(r => r !== null);
         
-        if (validResults.length === 0) return null;
+        if (validResults.length === 0) {
+            console.warn(`No valid data found for ${prefix} (${count} parts expected)`);
+            return null;
+        }
+        
+        console.log(`Loaded ${validResults.length}/${count} parts for ${prefix}`);
         
         // Merge Logic
         if (Array.isArray(validResults[0])) {
@@ -1274,105 +1294,156 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
     };
 
     try {
-        // --- A. Load Core & Legacy Data (ROOT) ---
-        const [mainRes, lookupsRes, kStructRes, kExpr1Res, kExpr2Res, rnaResp] = await Promise.all([
-            fetch(base + 'ciliAI_master_database.json').then(r => r.json()).catch(e => ({ masterData: [] })),
-            fetch(base + 'ciliAI_lookups.json').then(r => r.json()).catch(e => ({ lookups: {} })),
-            fetch(base + 'kidney_structure.json').then(r => r.json()).catch(e => ({ umap: [] })),
-            fetch(base + 'kidney_expression_part1.json').then(r => r.json()).catch(e => ({})),
-            fetch(base + 'kidney_expression_part2.json').then(r => r.json()).catch(e => ({})),
-            fetch(base + 'rna_tissue_consensus.tsv').catch(e => ({ ok: false }))
+        // --- A. Load Core Data & Lookups (ROOT folder) ---
+        console.log('Loading core data from root folder...');
+        const [mainRes, lookupsRes, rnaResp] = await Promise.all([
+            fetch(base + 'ciliAI_master_database.json')
+                .then(r => r.ok ? r.json() : { masterData: [] })
+                .catch(e => { console.error('Failed to load master database:', e); return { masterData: [] }; }),
+            fetch(base + 'ciliAI_lookups.json')
+                .then(r => r.ok ? r.json() : { lookups: {} })
+                .catch(e => { console.error('Failed to load lookups:', e); return { lookups: {} }; }),
+            fetch(base + 'rna_tissue_consensus.tsv')
+                .catch(e => { console.warn('RNA tissue data not available:', e); return { ok: false }; })
         ]);
 
         window.CiliAI.masterData = mainRes.masterData || [];
         window.CiliAI.lookups = lookupsRes.lookups || {};
+        
+        console.log(`Loaded ${window.CiliAI.masterData.length} genes from master database`);
         
         // Build gene lookup map
         window.CiliAI.masterData.forEach(g => {
             if(g.Gene) window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g;
         });
 
-        // 1. Lung Organoid (Legacy - from master)
+        // --- B. Load Legacy Datasets (ROOT folder) ---
+        console.log('Loading legacy datasets from root folder...');
+        
+        // 1. Lung Organoid (from master database)
         if (window.CiliAI.datasets.lung_organoid) {
             window.CiliAI.datasets.lung_organoid.umap = mainRes.umapData || [];
+            console.log(`Lung Organoid: ${window.CiliAI.datasets.lung_organoid.umap.length} points`);
         }
 
-        // 2. Kidney (Legacy - Parts in ROOT)
+        // 2. Kidney (structure + expression parts in ROOT)
         if (window.CiliAI.datasets.kidney) {
-            window.CiliAI.datasets.kidney.umap = kStructRes.umap || [];
-            window.CiliAI.datasets.kidney.expression = { ...kExpr1Res, ...kExpr2Res };
+            const [kStruct, kExpr] = await Promise.all([
+                fetch(base + 'kidney_structure.json')
+                    .then(r => r.ok ? r.json() : { umap: [] })
+                    .catch(e => { console.error('Failed to load kidney structure:', e); return { umap: [] }; }),
+                fetchParts('kidney_expression', 2, '') // Empty string = root folder
+            ]);
+            
+            window.CiliAI.datasets.kidney.umap = kStruct.umap || [];
+            window.CiliAI.datasets.kidney.expression = kExpr || {};
+            console.log(`Kidney: ${window.CiliAI.datasets.kidney.umap.length} structure points, ${Object.keys(window.CiliAI.datasets.kidney.expression).length} expression keys`);
         }
 
-        // --- B. Load New Datasets (UMAP_Data) ---
+        // --- C. Load New Datasets (UMAP_Data folder) ---
+        console.log('Loading datasets from UMAP_Data folder...');
+        
         const loadNewDataset = async (key) => {
             const cfg = DATASET_CONFIG[key];
-            if (!cfg || cfg.isMaster || key === 'kidney') return; // Skip legacy
+            if (!cfg || cfg.isMaster || key === 'kidney' || key === 'lung_organoid') return;
             if (cfg.parts === 0) {
-                console.log(`Skipping ${key} - no data files configured`);
+                console.log(`⏭️  Skipping ${key} - ${cfg.status || 'no files configured'}`);
                 return;
             }
 
-            // Special Case: Hypothalamus (has separate structure files)
+            // Safety check
+            if (!window.CiliAI.datasets[key]) {
+                console.error(`Dataset ${key} not initialized!`);
+                window.CiliAI.datasets[key] = {
+                    name: cfg.name,
+                    umap: null,
+                    expression: null,
+                    colorScale: cfg.colorScale,
+                    ref: cfg.ref
+                };
+            }
+
+            console.log(`📊 Loading ${key}...`);
+
+            // Special Case: Hypothalamus (separate structure + expression files)
             if (key === 'hypothalamus') {
-                const hStruct = await fetchParts(cfg.structurePrefix, cfg.structureParts, umapBase);
-                const hExpr = await fetchParts(cfg.prefix, cfg.parts, umapBase);
+                const [hStruct, hExpr] = await Promise.all([
+                    fetchParts(cfg.structurePrefix, cfg.structureParts, cfg.folder),
+                    fetchParts(cfg.prefix, cfg.parts, cfg.folder)
+                ]);
                 window.CiliAI.datasets[key].umap = hStruct;
                 window.CiliAI.datasets[key].expression = hExpr;
+                console.log(`   ✓ Hypothalamus: ${hStruct?.length || 0} structure points, ${Object.keys(hExpr || {}).length} expression keys`);
                 return;
             }
 
-            // Standard Split Loading
-            const data = await fetchParts(cfg.prefix, cfg.parts, umapBase);
+            // Standard loading (combined structure + expression)
+            const data = await fetchParts(cfg.prefix, cfg.parts, cfg.folder);
             if (data) {
                 window.CiliAI.datasets[key].umap = data;
                 window.CiliAI.datasets[key].expression = data;
+                const count = Array.isArray(data) ? data.length : Object.keys(data).length;
+                console.log(`   ✓ ${cfg.name}: ${count} records`);
+            } else {
+                console.warn(`   ✗ No data loaded for ${key}`);
             }
         };
 
-        // Load all new datasets in parallel
+        // Load all UMAP_Data datasets in parallel
         await Promise.all([
-            loadNewDataset('lung_atlas'),
-            loadNewDataset('liver'),
-            loadNewDataset('pancreas'),
-            loadNewDataset('olfactory'),
-            loadNewDataset('chondrocyte'),
-            loadNewDataset('hypothalamus')
+            loadNewDataset('lung_atlas'),      // 15 parts ✓
+            loadNewDataset('liver'),           // 6 parts ✓
+            loadNewDataset('hypothalamus'),    // 6 expr + 2 struct ✓
+            loadNewDataset('chondrocyte'),     // 1 part ✓
+            loadNewDataset('pancreas'),        // 0 parts (pending)
+            loadNewDataset('olfactory')        // 0 parts (pending)
         ]);
 
-        // --- C. Load RNA Tissue Expression Data ---
+        // --- D. Load RNA Tissue Expression Data ---
         if (window.parseTsvData && rnaResp.ok) {
             const tsvText = await rnaResp.text();
             window.rnaTissueExpressionData = window.parseTsvData(tsvText);
+            console.log('✓ RNA tissue expression data loaded');
         }
 
-        // --- D. Build Cell Data Cache ---
+        // --- E. Build Cell Data Cache ---
         window.CiliAI.masterData.forEach(g => {
             if (g.Gene && g.expression?.scRNA) {
                 window.CiliAI.cellDataCache[g.Gene.toUpperCase()] = g.expression.scRNA;
             }
         });
 
-        // --- E. Finalize ---
+        // --- F. Finalize & Report ---
         window.CiliAI.ready = true;
         const totalGenes = window.CiliAI.masterData.length;
-        const loadedDatasets = Object.keys(window.CiliAI.datasets).filter(
-            k => window.CiliAI.datasets[k].umap && window.CiliAI.datasets[k].umap.length > 0
-        ).length;
+        const loadedDatasets = Object.keys(window.CiliAI.datasets).filter(k => {
+            const ds = window.CiliAI.datasets[k];
+            if (!ds.umap) return false;
+            return Array.isArray(ds.umap) ? ds.umap.length > 0 : Object.keys(ds.umap).length > 0;
+        });
         
-        if(window.updateStatus) {
-            window.updateStatus(`Ready: ${totalGenes} genes, ${loadedDatasets} datasets`, 'ready');
-        }
+        const statusMsg = `Ready: ${totalGenes} genes, ${loadedDatasets.length} datasets`;
+        if(window.updateStatus) window.updateStatus(statusMsg, 'ready');
         
-        console.log(`CiliAI Data Loaded: ${totalGenes} genes across ${loadedDatasets} datasets`);
+        console.log('═══════════════════════════════════════════');
+        console.log(`🎉 CiliAI Ready: ${totalGenes} genes`);
+        console.log(`📂 Loaded datasets (${loadedDatasets.length}):`);
+        loadedDatasets.forEach(k => {
+            const ds = window.CiliAI.datasets[k];
+            const count = Array.isArray(ds.umap) ? ds.umap.length : Object.keys(ds.umap || {}).length;
+            console.log(`   • ${ds.name}: ${count} records`);
+        });
+        console.log('═══════════════════════════════════════════');
+        
         return true;
 
     } catch (err) {
         console.error("Critical Data Load Error:", err);
+        console.error("Error stack:", err.stack);
         if(window.updateStatus) window.updateStatus('Load failed', 'error');
         return false;
     }
 };
-
     
 
     // 3. UI CONTROLS (Views, Zoom, Fullscreen)
@@ -1631,6 +1702,7 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
 
