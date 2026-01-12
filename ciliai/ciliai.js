@@ -4116,7 +4116,7 @@ else if (
 ) {
 
     // ---------------------------------------------------
-    // A. Explicit Dataset Switching
+    // A. Explicit Dataset Switching (e.g. "switch to liver")
     // ---------------------------------------------------
     const configKeys = Object.keys(DATASET_CONFIG);
     let explicitSwitch = false;
@@ -4130,7 +4130,7 @@ else if (
             if (
                 qLower.includes(key) ||
                 qLower.includes(simpleKey) ||
-                nameParts.some(p => p.length > 3 && new RegExp(`\\b${p}\\b`, 'i').test(qLower))
+                nameParts.some(p => p.length > 3 && qLower.includes(p))
             ) {
                 window.CiliAI.activeDataset = key;
                 window.addChatMessage(
@@ -4141,16 +4141,11 @@ else if (
                 break;
             }
         }
-
-        // FIX: Only exit if query was *only* a switch command
-        if (explicitSwitch) {
-            const remainder = qLower.replace('switch to', '').trim();
-            if (remainder.split(/\s+/).length <= 2) return;
-        }
+        if (explicitSwitch) return;
     }
 
     // ---------------------------------------------------
-    // B. Dataset Inference from Query (safe word boundaries)
+    // B. Dataset Inference from Query Text
     // ---------------------------------------------------
     for (const key of configKeys) {
         const dataset = DATASET_CONFIG[key];
@@ -4164,14 +4159,20 @@ else if (
         if (key === 'olfactory') keywords.push('nose', 'nasal');
         if (key === 'pancreas') keywords.push('islet');
 
-        if (
-            keywords.some(k =>
-                new RegExp(`\\b${k.replace('_',' ')}\\b`, 'i').test(qLower)
-            )
-        ) {
+        if (keywords.some(k => qLower.includes(k))) {
             window.CiliAI.activeDataset = key;
             break;
         }
+    }
+
+    // ---------------------------------------------------
+    // B2. DATASET SAFETY FALLBACK (CRITICAL FIX)
+    // ---------------------------------------------------
+    if (
+        !window.CiliAI.activeDataset ||
+        !DATASET_CONFIG[window.CiliAI.activeDataset]
+    ) {
+        window.CiliAI.activeDataset = 'lung_organoid';
     }
 
     const activeDatasetKey = window.CiliAI.activeDataset;
@@ -4183,14 +4184,20 @@ else if (
     let cleanQuery = qLower;
 
     const removeTerms = [
-        'plot', 'display', 'show', 'umap', 'expression', 'scrna', 'scrna-seq',
-        'heatmap', 'for', 'of', 'in', 'the',
-        'lung', 'kidney', 'liver', 'pancreas', 'olfactory', 'hypothalamus',
-        'chondrocyte', 'retina', 'atlas', 'organoid', 'human', 'cell', 'data'
+        'plot', 'display', 'show', 'umap', 'expression',
+        'scrna', 'scrna-seq', 'heatmap',
+        'for', 'of', 'in', 'the',
+        'lung', 'kidney', 'liver', 'pancreas',
+        'olfactory', 'hypothalamus', 'chondrocyte',
+        'retina', 'atlas', 'organoid',
+        'human', 'cell', 'data'
     ];
 
     removeTerms.forEach(term => {
-        cleanQuery = cleanQuery.replace(new RegExp(`\\b${term}\\b`, 'gi'), '');
+        cleanQuery = cleanQuery.replace(
+            new RegExp(`\\b${term}\\b`, 'gi'),
+            ''
+        );
     });
 
     cleanQuery = cleanQuery.trim();
@@ -4200,17 +4207,7 @@ else if (
     let isComplex = false;
     let finalTargetTerm = target;
 
-    // FIX: Recover gene symbols from leftover words
-    if (genes.length === 0 && target) {
-        const possibleGenes = target
-            .split(/\s+/)
-            .filter(w => /^[A-Z0-9]{3,}$/.test(w.toUpperCase()));
-        if (possibleGenes.length) {
-            genes = possibleGenes.map(g => g.toUpperCase());
-        }
-    }
-
-    // Complex fallback (e.g. BBSome)
+    // --- Complex fallback (e.g. BBSome)
     if (genes.length === 0 && target) {
         const complexName = window.extractComplexIntent(target);
         if (complexName) {
@@ -4230,14 +4227,8 @@ else if (
     const geneLabel = isComplex ? finalTargetTerm : finalGenes[0];
     const isMultiGene = finalGenes.length > 1 && !isComplex;
 
-    const geneMode = isComplex
-        ? 'complex'
-        : isMultiGene
-            ? 'multi'
-            : 'single';
-
     // ---------------------------------------------------
-    // D. Optional Zoom-to-Cell-Type
+    // D. Optional Zoom-to-Cell-Type Detection
     // ---------------------------------------------------
     const cellTypeKeywords = [
         'ciliated', 'basal', 'club', 'goblet', 'neuroendocrine',
@@ -4251,34 +4242,26 @@ else if (
 
     let zoomToCellType = null;
     for (const ct of cellTypeKeywords) {
-        if (new RegExp(`\\b${ct}\\b`, 'i').test(qLower)) {
+        if (qLower.includes(ct)) {
             zoomToCellType = ct;
             break;
         }
     }
 
-    // Auto-zoom ciliated cells for cilia genes
-    if (!zoomToCellType) {
-        const ciliaPrefixes = ['IFT', 'BBS', 'CEP', 'KIF', 'ARL13'];
-        if (finalGenes.some(g => ciliaPrefixes.some(p => g.startsWith(p)))) {
-            zoomToCellType = 'ciliated';
-        }
-    }
-
     // ---------------------------------------------------
-    // E. Chat Card + Render (safe)
+    // E. Chat Card (Informational)
     // ---------------------------------------------------
     window.addChatMessage(`
         <div class="ai-result-card">
             <p>
-                <strong>${geneMode === 'complex' ? 'Complex' : geneMode === 'multi' ? 'Multi-gene' : 'Gene'}:</strong>
+                <strong>${isComplex ? 'Complex' : isMultiGene ? 'Multi-gene' : 'Gene'}:</strong>
                 <strong>${geneLabel}</strong>
                 in <strong>${activeDataset.name}</strong>
             </p>
             ${
-                geneMode === 'complex'
+                isComplex
                     ? `<p>Colored by summed expression of ${finalGenes.length} complex members</p>`
-                    : geneMode === 'multi'
+                    : isMultiGene
                         ? `<p>Colored by combined expression (${finalGenes.join(' + ')})</p>`
                         : `<p>Colored by ${finalGenes[0]} expression</p>`
             }
@@ -4286,23 +4269,18 @@ else if (
         </div>
     `, false);
 
-    try {
-        await window.renderUMAPPlot(
-            geneLabel,
-            finalGenes,
-            zoomToCellType,
-            geneMode
-        );
-    } catch (e) {
-        console.error(e);
-        window.addChatMessage(
-            `<p style="color:#b00;">Unable to render plot: ${e.message}</p>`,
-            false
-        );
-    }
+    // ---------------------------------------------------
+    // F. Render UMAP
+    // ---------------------------------------------------
+    await window.renderUMAPPlot(
+        geneLabel,
+        finalGenes,
+        zoomToCellType
+    );
 
     return;
 }
+
     
 // =======================================================
 // (13) INTENT: Compare Genes — NOW WITH EXPRESSION PLOTTING SUPPORT
@@ -5998,5 +5976,6 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
