@@ -1238,160 +1238,68 @@
                 }
             }
         };
-/* ==============================================================
- * 3. DATA LOADING ENGINE (Corrected Paths for Kidney/Lung)
- * ============================================================== */
-window.loadCiliAIData = async function() {
-    // Define Paths explicitly
-    const rootUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-    const umapUrl = rootUrl + 'UMAP_Data/';
-    
-    if (window.updateStatus) window.updateStatus('Loading datasets...', 'loading');
-
-    // Helper: Fetch Parts (Now requires folderUrl to avoid assumptions)
-    const fetchParts = async (prefix, count, folderUrl) => {
-        if (!count || count === 0) return {}; 
-        const promises = [];
-        for (let i = 1; i <= count; i++) {
-            promises.push(
-                fetch(`${folderUrl}${prefix}_part${i}.json`)
-                .then(r => {
-                    if (!r.ok) throw new Error(`404: ${prefix}_part${i}.json`);
-                    return r.json();
-                })
-                .catch(e => {
-                    console.warn(`Skipping ${prefix}_part${i} (Not found in ${folderUrl})`);
-                    return [];
-                })
-            );
-        }
-        const parts = await Promise.all(promises);
-        
-        // Merge logic
-        if (parts.length > 0 && Array.isArray(parts[0])) {
-            const map = {};
-            parts.flat().forEach((item, idx) => {
-                // Ensure ID exists
-                const id = item.cell_id || item.CellID || `cell_${idx}`;
-                map[id] = item;
+        // Data Loading Logic (UPDATED WITH SPLIT KIDNEY JSON)
+        window.loadCiliAIData = async function(timeoutMs = 60000) {
+            const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+        window.updateStatus('Syncing...', 'loading');
+        try {
+            const [mainRes, lookupsRes, rnaResp, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
+                fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
+                fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
+                fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
+                fetch(base + 'kidney_structure.json').then(r => r.json()),
+                fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
+                fetch(base + 'kidney_expression_part2.json').then(r => r.json())
+            ]);
+            window.CiliAI.masterData = mainRes.masterData || [];
+            window.CiliAI.lookups = lookupsRes.lookups || {};
+           
+            if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+            if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
+           
+            window.CiliAI.datasets.lung.umap = mainRes.umapData || [];
+            // Assign Kidney Multi-part data
+            const mergedKidneyExpr = { ...kExpr1Res, ...kExpr2Res };
+            window.CiliAI.datasets.kidney = {
+                name: "Human Kidney",
+                umap: kStructRes.umap,
+                expression: mergedKidneyExpr,
+                colorScale: [[0, '#e2e8f0'], [0.1, '#bee3f8'], [1, '#2b6cb0']]
+            };
+            // Assign RNA Tissue
+            const rnaText = await rnaResp.text();
+            window.rnaTissueExpressionData = parseTsvData(rnaText);
+            // Populate mapping and calculate stats
+            const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+            const validCiliopathyDiseases = new Set();
+            const uniqueCiliopathyGenes = new Set();
+            window.CiliAI.masterData.forEach(g => {
+                if (g.Gene) {
+                    const sym = g.Gene.toUpperCase();
+                    window.CiliAI.lookups.geneMap[sym] = g;
+                    if(g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
+                    if (primaryClasses.includes(g.ciliopathy_classification)) {
+                        uniqueCiliopathyGenes.add(sym);
+                        if (g.Ciliopathy) {
+                            const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                            diseases.forEach(d => { if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d); });
+                        }
+                    }
+                }
             });
-            return map;
-        } else {
-            return Object.assign({}, ...parts);
+            // Update Counters
+            document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
+            document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
+            document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
+            window.CiliAI.ready = true;
+            window.updateStatus('CONNECTED', 'ready');
+            return true;
+        } catch (err) {
+            console.error("Load failed:", err);
+            window.updateStatus('SYNC ERROR', 'error');
+            return false;
         }
     };
-
-    try {
-        // --- A. Initialize Global State ---
-        if (!window.CiliAI) window.CiliAI = {};
-        if (!window.CiliAI.datasets) window.CiliAI.datasets = {};
-        if (!window.CiliAI.lookups) window.CiliAI.lookups = {};
-        if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
-        if (!window.CiliAI.cellDataCache) window.CiliAI.cellDataCache = {};
-
-        // Pre-fill dataset objects to avoid undefined errors
-        Object.keys(DATASET_CONFIG).forEach(key => {
-            if (!window.CiliAI.datasets[key]) {
-                window.CiliAI.datasets[key] = {
-                    name: DATASET_CONFIG[key].name,
-                    umap: [], 
-                    expression: {},
-                    colorScale: DATASET_CONFIG[key].colorScale,
-                    ref: DATASET_CONFIG[key].ref
-                };
-            }
-        });
-
-        // --- B. Load Core Databases (ROOT) ---
-        const [mainRes, lookupsRes, rnaResp] = await Promise.all([
-            fetch(rootUrl + 'ciliAI_master_database.json').then(r => r.json()),
-            fetch(rootUrl + 'ciliAI_lookups.json').then(r => r.json()),
-            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv')
-        ]);
-
-        window.CiliAI.masterData = mainRes.masterData || [];
-        window.CiliAI.lookups = lookupsRes.lookups || {};
-        window.CiliAI.masterData.forEach(g => {
-            if(g.Gene) window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g;
-        });
-
-        // --- C. Load Specific Datasets (Explicit Paths) ---
-
-        // 1. Lung Organoid (ROOT - Legacy)
-        window.CiliAI.datasets.lung_organoid.umap = mainRes.umapData || [];
-
-        // 2. Kidney (ROOT) - Fetched from rootUrl
-        const kStruct = await fetch(rootUrl + DATASET_CONFIG.kidney.structureFile).then(r => r.json());
-        const kExpr = await fetchParts(DATASET_CONFIG.kidney.prefix, DATASET_CONFIG.kidney.parts, rootUrl); // <--- ROOT URL
-        
-        window.CiliAI.datasets.kidney.umap = kStruct.umap || [];
-        window.CiliAI.datasets.kidney.expression = kExpr;
-
-        // 3. Hypothalamus (UMAP_Data)
-        const hStruct = await fetchParts(DATASET_CONFIG.hypothalamus.structurePrefix, DATASET_CONFIG.hypothalamus.structureParts, umapUrl);
-        const hExpr = await fetchParts(DATASET_CONFIG.hypothalamus.prefix, DATASET_CONFIG.hypothalamus.parts, umapUrl);
-        window.CiliAI.datasets.hypothalamus.umap = hStruct;
-        window.CiliAI.datasets.hypothalamus.expression = hExpr;
-
-        // 4. Unified Split Datasets (UMAP_Data)
-        const loadSplitDataset = async (key) => {
-            const cfg = DATASET_CONFIG[key];
-            if(cfg.isMaster || key === 'kidney' || key === 'hypothalamus') return;
-            
-            const data = await fetchParts(cfg.prefix, cfg.parts, umapUrl); // <--- UMAP_Data URL
-            window.CiliAI.datasets[key].umap = data;
-            window.CiliAI.datasets[key].expression = data; 
-        };
-
-        await Promise.all([
-            loadSplitDataset('lung_atlas'),
-            loadSplitDataset('liver'),
-            loadSplitDataset('pancreas'),
-            loadSplitDataset('olfactory'),
-            loadSplitDataset('chondrocyte')
-        ]);
-
-        // --- D. Finalize ---
-        const rnaText = await rnaResp.text();
-        if (typeof window.parseTsvData === 'function') {
-            window.rnaTissueExpressionData = window.parseTsvData(rnaText);
-        }
-
-        window.CiliAI.masterData.forEach(g => {
-             if (g.Gene && g.expression?.scRNA) {
-                window.CiliAI.cellDataCache[g.Gene.toUpperCase()] = g.expression.scRNA;
-            }
-        });
-
-        // Update Stats
-        const validCiliopathyDiseases = new Set();
-        const uniqueCiliopathyGenes = new Set();
-        window.CiliAI.masterData.forEach(g => {
-            if (g.ciliopathy_classification && g.ciliopathy_classification !== 'N/A') {
-                uniqueCiliopathyGenes.add(g.Gene);
-                if (g.Ciliopathy) {
-                    const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
-                    diseases.forEach(d => validCiliopathyDiseases.add(d));
-                }
-            }
-        });
-
-        if(document.getElementById('stat-genes')) document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
-        if(document.getElementById('stat-ciliopathys')) document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
-        if(document.getElementById('stat-ciliopathy-genes')) document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
-
-        window.CiliAI.ready = true;
-        if (window.updateStatus) window.updateStatus('Ready', 'ready');
-        return true;
-
-    } catch (e) {
-        console.error("Critical Data Load Error:", e);
-        if (window.updateStatus) window.updateStatus('Error loading data', 'error');
-        return false;
-    }
-};
-    
-    
  // =======================================================
 // View Switching Function
 // =======================================================
@@ -1565,7 +1473,3 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
-
-
-
-
