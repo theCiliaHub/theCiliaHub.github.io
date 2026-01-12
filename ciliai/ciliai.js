@@ -2,65 +2,73 @@
  * CiliAI – Unified Data Engine (v14.0 - Final Production)
  * ============================================================== */
 
+/* ==============================================================
+ * CiliAI – Data Configuration & Loading (v15.0 - Path Fixed)
+ * ============================================================== */
+
 // 1. DATASET CONFIGURATION
 const DATASET_CONFIG = {
+    // --- UMAP_Data FOLDER DATASETS ---
     lung_atlas: {
         name: "Human Lung Atlas (HLCA)",
         prefix: "lung_downsampled",
-        parts: 15,
-        colorScale: [[0, '#fffaf0'], [0.1, '#feebc8'], [1, '#dd6b20']], // Orange
+        parts: 15, // Loads from UMAP_Data/lung_downsampled_part1...15.json
+        colorScale: [[0, '#fffaf0'], [0.1, '#feebc8'], [1, '#dd6b20']], 
         ref: "Sikkema et al., Nat Med (2023)."
-    },
-    lung_organoid: {
-        name: "Lung Organoid (Alveolar)",
-        isMaster: true,
-        colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']], // Red
-        ref: "Miller et al., Stem Cell Reports (2019)."
-    },
-    kidney: {
-        name: "Human Kidney",
-        prefix: "kidney_expression",
-        parts: 2, 
-        structureFile: "kidney_structure.json",
-        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']], // Purple
-        ref: "Stewart et al., Science (2019)."
     },
     liver: {
         name: "Human Liver",
         prefix: "liver",
-        parts: 6,
-        colorScale: [[0, '#f0fff4'], [0.1, '#9ae6b4'], [1, '#2f855a']], // Green
+        parts: 6, // Loads from UMAP_Data/liver_part1...6.json
+        colorScale: [[0, '#f0fff4'], [0.1, '#9ae6b4'], [1, '#2f855a']], 
         ref: "Aizarani et al., Nature (2019)."
     },
     hypothalamus: {
         name: "Hypothalamus",
         prefix: "hypothalamus_expression",
         parts: 6,
-        structurePrefix: "hypothalamus_structure",
+        structurePrefix: "hypothalamus_structure", // UMAP_Data/hypothalamus_structure_part1...2.json
         structureParts: 2,
-        colorScale: [[0, '#fff5f5'], [0.1, '#fc8181'], [1, '#9b2c2c']], // Brown
+        colorScale: [[0, '#fff5f5'], [0.1, '#fc8181'], [1, '#9b2c2c']], 
         ref: "Kim et al., Nat Commun (2020)."
     },
+    chondrocyte: {
+        name: "Chondrocytes (IVD)",
+        prefix: "chondrocyte",
+        parts: 1, // Updated based on your file list (part1 only)
+        colorScale: [[0, '#f7fafc'], [0.1, '#cbd5e0'], [1, '#4a5568']], 
+        ref: "Gan et al., (GSE104782)."
+    },
+    // --- MISSING FILES (Kept for future upload support) ---
     pancreas: {
         name: "Pancreas (Islets)",
         prefix: "pancreas",
-        parts: 15,
-        colorScale: [[0, '#fff5f7'], [0.1, '#fbb6ce'], [1, '#b83280']], // Pink
-        ref: "Craig-Schapiro et al., Nat Commun (2025)."
+        parts: 15, 
+        colorScale: [[0, '#fff5f7'], [0.1, '#fbb6ce'], [1, '#b83280']], 
+        ref: "Craig-Schapiro et al. (2025)."
     },
     olfactory: {
         name: "Olfactory Epithelium",
         prefix: "olfactory",
         parts: 15,
-        colorScale: [[0, '#fffbe6'], [0.1, '#ffe58f'], [1, '#d48806']], // Gold
+        colorScale: [[0, '#fffbe6'], [0.1, '#ffe58f'], [1, '#d48806']], 
         ref: "Durante et al., Nat Neurosci (2020)."
     },
-    chondrocyte: {
-        name: "Chondrocytes (IVD)",
-        prefix: "chondrocyte",
-        parts: 3,
-        colorScale: [[0, '#f7fafc'], [0.1, '#cbd5e0'], [1, '#4a5568']], // Gray
-        ref: "Gan et al., (GSE104782)."
+    
+    // --- ROOT FOLDER DATASETS ---
+    lung_organoid: {
+        name: "Lung Organoid (Alveolar)",
+        isMaster: true, // Inside ciliAI_master_database.json (ROOT)
+        colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']], 
+        ref: "Miller et al., Stem Cell Reports (2019)."
+    },
+    kidney: {
+        name: "Human Kidney",
+        prefix: "kidney_expression",
+        parts: 2, // Loads from ROOT/kidney_expression_part1...2.json
+        structureFile: "kidney_structure.json", // Loads from ROOT
+        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']], 
+        ref: "Stewart et al., Science (2019)."
     }
 };
 
@@ -5873,4 +5881,5 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
