@@ -4,102 +4,115 @@
 
 // 1. DATASET CONFIGURATION
 const DATASET_CONFIG = {
-    // --- UMAP_Data FOLDER DATASETS ---
+    // --- UMAP_Data FOLDER DATASETS (All files verified from GitHub) ---
     lung_atlas: {
         name: "Human Lung Atlas (HLCA)",
         prefix: "lung_downsampled",
-        parts: 15,
+        parts: 15, // ✓ Verified: lung_downsampled_part1.json through part15.json
         structureParts: 0,
+        folder: 'UMAP_Data',
         colorScale: [[0, '#fffaf0'], [0.1, '#feebc8'], [1, '#dd6b20']], 
         ref: "Sikkema et al., Nat Med (2023)."
     },
     liver: {
         name: "Human Liver",
         prefix: "liver",
-        parts: 6,
+        parts: 6, // ✓ Verified: liver_part1.json through part6.json
         structureParts: 0,
+        folder: 'UMAP_Data',
         colorScale: [[0, '#f0fff4'], [0.1, '#9ae6b4'], [1, '#2f855a']], 
         ref: "Aizarani et al., Nature (2019)."
     },
     hypothalamus: {
         name: "Hypothalamus",
         prefix: "hypothalamus_expression",
-        parts: 6,
+        parts: 6, // ✓ Verified: hypothalamus_expression_part1.json through part6.json
         structurePrefix: "hypothalamus_structure",
-        structureParts: 2,
+        structureParts: 2, // ✓ Verified: hypothalamus_structure_part1.json and part2.json
+        folder: 'UMAP_Data',
         colorScale: [[0, '#fff5f5'], [0.1, '#fc8181'], [1, '#9b2c2c']], 
         ref: "Kim et al., Nat Commun (2020)."
     },
     chondrocyte: {
         name: "Chondrocytes (IVD)",
         prefix: "chondrocyte",
-        parts: 1,
+        parts: 1, // ✓ Verified: chondrocyte_part1.json
         structureParts: 0,
+        folder: 'UMAP_Data',
         colorScale: [[0, '#f7fafc'], [0.1, '#cbd5e0'], [1, '#4a5568']], 
         ref: "Gan et al., (GSE104782)."
     },
     
-    // --- PENDING DATASETS (0 parts = Disabled) ---
+    // --- PENDING DATASETS (Not yet uploaded - 0 parts = Disabled) ---
     pancreas: {
         name: "Pancreas (Islets)",
         prefix: "pancreas",
-        parts: 0,
+        parts: 0, // ✗ No files found - disabled
         structureParts: 0,
+        folder: 'UMAP_Data',
         colorScale: [[0, '#fff5f7'], [0.1, '#fbb6ce'], [1, '#b83280']], 
-        ref: "Craig-Schapiro et al. (2025)."
+        ref: "Craig-Schapiro et al. (2025).",
+        status: "pending" // Will be enabled when files are uploaded
     },
     olfactory: {
         name: "Olfactory Epithelium",
         prefix: "olfactory",
-        parts: 0,
+        parts: 0, // ✗ No files found - disabled
         structureParts: 0,
+        folder: 'UMAP_Data',
         colorScale: [[0, '#fffbe6'], [0.1, '#ffe58f'], [1, '#d48806']], 
-        ref: "Durante et al., Nat Neurosci (2020)."
+        ref: "Durante et al., Nat Neurosci (2020).",
+        status: "pending" // Will be enabled when files are uploaded
     },
     
-    // --- ROOT FOLDER DATASETS (Legacy) ---
+    // --- ROOT FOLDER DATASETS (Legacy - Original location) ---
     lung_organoid: {
         name: "Lung Organoid (Alveolar)",
         isMaster: true,
         parts: 0,
+        folder: '', // Root folder
+        file: 'ciliAI_master_database.json', // Contains umapData field
         colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']], 
         ref: "Miller et al., Stem Cell Reports (2019)."
     },
     kidney: {
         name: "Human Kidney",
         prefix: "kidney_expression",
-        parts: 2,
-        structureFile: "kidney_structure.json",
+        parts: 2, // ✓ Verified: kidney_expression_part1.json and part2.json (in root)
+        structureFile: "kidney_structure.json", // ✓ Verified (in root)
+        folder: '', // Root folder
         colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']], 
         ref: "Stewart et al., Science (2019)."
     }
 };
 
 // 2. GLOBAL STATE INITIALIZATION
-window.CiliAI = {
-    activeDataset: 'lung_atlas', 
-    datasets: {}, 
-    data: { umap: [] },
-    masterData: [],
-    ready: false,
-    lookups: { geneMap: {}, umapByGene: {}, goMap: {}, pfamByGene: {} },
-    cellDataCache: {},
-    lastQueryContext: { type: null, data: [], term: null },
-    currentPlot: null,
-    zoomStateByGene: {},
-    activeGeneContext: null
-};
+window.CiliAI = window.CiliAI || {};
+window.CiliAI.activeDataset = 'lung_atlas';
+window.CiliAI.datasets = {};
+window.CiliAI.data = { umap: [] };
+window.CiliAI.masterData = [];
+window.CiliAI.ready = false;
+window.CiliAI.lookups = { geneMap: {}, umapByGene: {}, goMap: {}, pfamByGene: {} };
+window.CiliAI.cellDataCache = {};
+window.CiliAI.lastQueryContext = { type: null, data: [], term: null };
+window.CiliAI.currentPlot = null;
+window.CiliAI.zoomStateByGene = {};
+window.CiliAI.activeGeneContext = null;
 
 // Initialize all dataset objects from config
 Object.keys(DATASET_CONFIG).forEach(key => {
     window.CiliAI.datasets[key] = {
         name: DATASET_CONFIG[key].name,
-        umap: null,  // Changed from [] to null to match loading function expectations
-        expression: null,  // Changed from {} to null
+        umap: null,
+        expression: null,
         colorScale: DATASET_CONFIG[key].colorScale,
-        ref: DATASET_CONFIG[key].ref
+        ref: DATASET_CONFIG[key].ref,
+        status: DATASET_CONFIG[key].status || 'active'
     };
 });
+
+console.log('CiliAI datasets initialized:', Object.keys(window.CiliAI.datasets));
 
 
 // 1. GLOBAL STATE & UTILITIES
@@ -107,11 +120,6 @@ Object.keys(DATASET_CONFIG).forEach(key => {
 // 5. Ensure these are exposed globally
 window.extractMultipleGenes = extractMultipleGenes;
 window.getTPMInCellType = getTPMInCellType;
-
-
-// 6. Auto-run the fixed router
-console.log("CiliAI v7.2 – Cell-Type Questions FIXED & Fully Supported");
-
 
 // Define logger first to prevent ReferenceErrors
 if (typeof window.log !== "function") {
@@ -5921,6 +5929,7 @@ window.updateStatus = function(text, state = 'normal') {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
