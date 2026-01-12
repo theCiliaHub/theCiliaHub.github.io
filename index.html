@@ -1239,6 +1239,7 @@
             }
         };
 // Data Loading Logic (UPDATED WITH CORRECTED PATHS)
+// Data Loading Logic (FIXED: All multi-part datasets pointed to UMAP_Data/)
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
@@ -1251,44 +1252,45 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             lungParts, liverParts, hypothalamusExprParts, hypothalamusStructParts,
             chondrocytePart, pancreasParts, olfactoryParts
         ] = await Promise.all([
+            // ROOT FILES (Confirmed working)
             fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
-            fetch(base + 'ciliAI_lookups.json').then(r => r.json()), // FIXED: lookuks -> lookups
+            fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
             fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
             fetch(base + 'kidney_structure.json').then(r => r.json()),
             fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
             fetch(base + 'kidney_expression_part2.json').then(r => r.json()),
             
-            // Load lung downsampled parts (15 files) - MOVED TO ROOT to fix 404s
+            // LUNG DOWNSAMPLED (15 parts) -> UMAP_Data/
             Promise.all(Array.from({length: 15}, (_, i) => 
-                fetch(`${base}lung_downsampled_part${i+1}.json`).then(r => r.json())
+                fetch(`${base}UMAP_Data/lung_downsampled_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load liver parts (6 files) - Kept in UMAP_Data (No errors reported)
+            // LIVER (6 parts) -> UMAP_Data/
             Promise.all(Array.from({length: 6}, (_, i) => 
                 fetch(`${base}UMAP_Data/liver_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load hypothalamus expression parts (6 files) - Kept in UMAP_Data
+            // HYPOTHALAMUS EXPRESSION (6 parts) -> UMAP_Data/
             Promise.all(Array.from({length: 6}, (_, i) => 
                 fetch(`${base}UMAP_Data/hypothalamus_expression_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load hypothalamus structure parts (2 files) - Kept in UMAP_Data
+            // HYPOTHALAMUS STRUCTURE (2 parts) -> UMAP_Data/
             Promise.all(Array.from({length: 2}, (_, i) => 
                 fetch(`${base}UMAP_Data/hypothalamus_structure_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load chondrocyte part - Kept in UMAP_Data
+            // CHONDROCYTE -> UMAP_Data/
             fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json()),
             
-            // Load pancreas parts (15 files) - MOVED TO ROOT to fix 404s
+            // PANCREAS (15 parts) -> UMAP_Data/
             Promise.all(Array.from({length: 15}, (_, i) => 
-                fetch(`${base}pancreas_part${i+1}.json`).then(r => r.json())
+                fetch(`${base}UMAP_Data/pancreas_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load olfactory parts (15 files) - MOVED TO ROOT to fix 404s
+            // OLFACTORY (15 parts) -> UMAP_Data/
             Promise.all(Array.from({length: 15}, (_, i) => 
-                fetch(`${base}olfactory_part${i+1}.json`).then(r => r.json())
+                fetch(`${base}UMAP_Data/olfactory_part${i+1}.json`).then(r => r.json())
             ))
         ]);
         
@@ -1817,4 +1819,5 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
