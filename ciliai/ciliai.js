@@ -2,6 +2,75 @@
  * CiliAI – Data Configuration & Loading (v15.0 - Path Fixed)
  * ============================================================== */
 
+// 1. DATASET CONFIGURATION
+// Pancreas & Olfactory set to 0 parts to stop 404 errors until files are uploaded.
+const DATASET_CONFIG = {
+    // --- UMAP_Data FOLDER DATASETS ---
+    lung_atlas: {
+        name: "Human Lung Atlas (HLCA)",
+        prefix: "lung_downsampled",
+        parts: 15,
+        colorScale: [[0, '#fffaf0'], [0.1, '#feebc8'], [1, '#dd6b20']], 
+        ref: "Sikkema et al., Nat Med (2023)."
+    },
+    liver: {
+        name: "Human Liver",
+        prefix: "liver",
+        parts: 6,
+        colorScale: [[0, '#f0fff4'], [0.1, '#9ae6b4'], [1, '#2f855a']], 
+        ref: "Aizarani et al., Nature (2019)."
+    },
+    hypothalamus: {
+        name: "Hypothalamus",
+        prefix: "hypothalamus_expression",
+        parts: 6,
+        structurePrefix: "hypothalamus_structure",
+        structureParts: 2,
+        colorScale: [[0, '#fff5f5'], [0.1, '#fc8181'], [1, '#9b2c2c']], 
+        ref: "Kim et al., Nat Commun (2020)."
+    },
+    chondrocyte: {
+        name: "Chondrocytes (IVD)",
+        prefix: "chondrocyte",
+        parts: 1, // Matches your current file list
+        colorScale: [[0, '#f7fafc'], [0.1, '#cbd5e0'], [1, '#4a5568']], 
+        ref: "Gan et al., (GSE104782)."
+    },
+    
+    // --- PENDING DATASETS (0 parts = Disabled) ---
+    pancreas: {
+        name: "Pancreas (Islets)",
+        prefix: "pancreas",
+        parts: 0, // Set to 0 to stop 404s
+        colorScale: [[0, '#fff5f7'], [0.1, '#fbb6ce'], [1, '#b83280']], 
+        ref: "Craig-Schapiro et al. (2025)."
+    },
+    olfactory: {
+        name: "Olfactory Epithelium",
+        prefix: "olfactory",
+        parts: 0, // Set to 0 to stop 404s
+        colorScale: [[0, '#fffbe6'], [0.1, '#ffe58f'], [1, '#d48806']], 
+        ref: "Durante et al., Nat Neurosci (2020)."
+    },
+    
+    // --- ROOT FOLDER DATASETS ---
+    lung_organoid: {
+        name: "Lung Organoid (Alveolar)",
+        isMaster: true,
+        colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']], 
+        ref: "Miller et al., Stem Cell Reports (2019)."
+    },
+    kidney: {
+        name: "Human Kidney",
+        prefix: "kidney_expression",
+        parts: 2, 
+        structureFile: "kidney_structure.json",
+        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']], 
+        ref: "Stewart et al., Science (2019)."
+    }
+};
+
+// 2. GLOBAL STATE
 window.CiliAI = {
     activeDataset: 'lung_atlas', 
     datasets: {}, 
@@ -5869,5 +5938,6 @@ window.updateStatus = function(text, state = 'normal') {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
