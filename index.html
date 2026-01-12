@@ -1238,7 +1238,7 @@
                 }
             }
         };
-// Data Loading Logic (UPDATED WITH SPLIT KIDNEY JSON)
+// Data Loading Logic (UPDATED WITH CORRECTED PATHS)
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
@@ -1252,43 +1252,43 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             chondrocytePart, pancreasParts, olfactoryParts
         ] = await Promise.all([
             fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
-            fetch(base + 'ciliAI_lookuks.json').then(r => r.json()),
+            fetch(base + 'ciliAI_lookups.json').then(r => r.json()), // FIXED: lookuks -> lookups
             fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
             fetch(base + 'kidney_structure.json').then(r => r.json()),
             fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
             fetch(base + 'kidney_expression_part2.json').then(r => r.json()),
             
-            // Load lung downsampled parts (15 files - COMPLETE LUNG TISSUE)
+            // Load lung downsampled parts (15 files) - MOVED TO ROOT to fix 404s
             Promise.all(Array.from({length: 15}, (_, i) => 
-                fetch(`${base}UMAP_Data/lung_downsampled_part${i+1}.json`).then(r => r.json())
+                fetch(`${base}lung_downsampled_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load liver parts (6 files)
+            // Load liver parts (6 files) - Kept in UMAP_Data (No errors reported)
             Promise.all(Array.from({length: 6}, (_, i) => 
                 fetch(`${base}UMAP_Data/liver_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load hypothalamus expression parts (6 files)
+            // Load hypothalamus expression parts (6 files) - Kept in UMAP_Data
             Promise.all(Array.from({length: 6}, (_, i) => 
                 fetch(`${base}UMAP_Data/hypothalamus_expression_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load hypothalamus structure parts (2 files)
+            // Load hypothalamus structure parts (2 files) - Kept in UMAP_Data
             Promise.all(Array.from({length: 2}, (_, i) => 
                 fetch(`${base}UMAP_Data/hypothalamus_structure_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load chondrocyte part
+            // Load chondrocyte part - Kept in UMAP_Data
             fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json()),
             
-            // Load pancreas parts (15 files)
+            // Load pancreas parts (15 files) - MOVED TO ROOT to fix 404s
             Promise.all(Array.from({length: 15}, (_, i) => 
-                fetch(`${base}UMAP_Data/pancreas_part${i+1}.json`).then(r => r.json())
+                fetch(`${base}pancreas_part${i+1}.json`).then(r => r.json())
             )),
             
-            // Load olfactory parts (15 files)
+            // Load olfactory parts (15 files) - MOVED TO ROOT to fix 404s
             Promise.all(Array.from({length: 15}, (_, i) => 
-                fetch(`${base}UMAP_Data/olfactory_part${i+1}.json`).then(r => r.json())
+                fetch(`${base}olfactory_part${i+1}.json`).then(r => r.json())
             ))
         ]);
         
@@ -1581,13 +1581,15 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
         
         // Add organ counter
-        const organCounter = document.createElement('div');
-        organCounter.className = 'stat-item';
-        organCounter.innerHTML = `
-            <div class="stat-value" id="stat-organs">${Object.keys(window.CiliAI.datasets).length}</div>
-            <div class="stat-label">Tissues</div>
-        `;
-        document.querySelector('.landing-dashboard').appendChild(organCounter);
+        const existingOrganStat = document.getElementById('stat-organs');
+        if (!existingOrganStat) {
+             const organCounter = document.createElement('div');
+             organCounter.className = 'stat-item';
+             organCounter.innerHTML = `<div class="stat-value" id="stat-organs">${Object.keys(window.CiliAI.datasets).length}</div><div class="stat-label">Tissues</div>`;
+             document.querySelector('.landing-dashboard').appendChild(organCounter);
+        } else {
+             existingOrganStat.textContent = Object.keys(window.CiliAI.datasets).length;
+        }
         
         window.CiliAI.ready = true;
         window.updateStatus('CONNECTED', 'ready');
@@ -1606,7 +1608,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         return false;
     }
 };
-
+    
 // Helper function to process dataset parts
 function processDataset(parts, organName) {
     const result = { umap: [], cells: {}, cell_type_counts: {} };
@@ -1815,3 +1817,4 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
