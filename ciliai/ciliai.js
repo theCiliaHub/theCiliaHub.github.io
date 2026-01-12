@@ -1,90 +1,107 @@
 /* ==============================================================
  * CiliAI – Data Configuration & Loading (v15.1 - Fully Aligned)
  * ============================================================== */
+// ==============================================================
+// 1. DATASET CONFIGURATION (FIXED: ROOT FOLDER)
+// ==============================================================
 
-// 1. DATASET CONFIGURATION
 const DATASET_CONFIG = {
-    // --- UMAP_Data FOLDER DATASETS (All files verified from GitHub) ---
+
+    // --- ROOT FOLDER DATASETS (ACTIVE & VERIFIED) ---
+
     lung_atlas: {
         name: "Human Lung Atlas (HLCA)",
         prefix: "lung_downsampled",
-        parts: 15, // ✓ Verified: lung_downsampled_part1.json through part15.json
+        parts: 15, // lung_downsampled_part1.json → part15.json
         structureParts: 0,
-        folder: 'UMAP_Data',
-        colorScale: [[0, '#fffaf0'], [0.1, '#feebc8'], [1, '#dd6b20']], 
+        folder: '', // ✅ FIX: files are in ROOT
+        colorScale: [[0, '#fffaf0'], [0.1, '#feebc8'], [1, '#dd6b20']],
         ref: "Sikkema et al., Nat Med (2023)."
     },
+
     liver: {
         name: "Human Liver",
         prefix: "liver",
-        parts: 6, // ✓ Verified: liver_part1.json through part6.json
+        parts: 6, // liver_part1.json → part6.json
         structureParts: 0,
-        folder: 'UMAP_Data',
-        colorScale: [[0, '#f0fff4'], [0.1, '#9ae6b4'], [1, '#2f855a']], 
+        folder: '', // ✅ FIX
+        colorScale: [[0, '#f0fff4'], [0.1, '#9ae6b4'], [1, '#2f855a']],
         ref: "Aizarani et al., Nature (2019)."
     },
+
     hypothalamus: {
         name: "Hypothalamus",
         prefix: "hypothalamus_expression",
-        parts: 6, // ✓ Verified: hypothalamus_expression_part1.json through part6.json
+        parts: 6, // hypothalamus_expression_part1.json → part6.json
         structurePrefix: "hypothalamus_structure",
-        structureParts: 2, // ✓ Verified: hypothalamus_structure_part1.json and part2.json
-        folder: 'UMAP_Data',
-        colorScale: [[0, '#fff5f5'], [0.1, '#fc8181'], [1, '#9b2c2c']], 
+        structureParts: 2, // hypothalamus_structure_part1.json → part2.json
+        folder: '', // ✅ FIX
+        colorScale: [[0, '#fff5f5'], [0.1, '#fc8181'], [1, '#9b2c2c']],
         ref: "Kim et al., Nat Commun (2020)."
     },
+
     chondrocyte: {
         name: "Chondrocytes (IVD)",
         prefix: "chondrocyte",
-        parts: 1, // ✓ Verified: chondrocyte_part1.json
+        parts: 1, // chondrocyte_part1.json
         structureParts: 0,
-        folder: 'UMAP_Data',
-        colorScale: [[0, '#f7fafc'], [0.1, '#cbd5e0'], [1, '#4a5568']], 
-        ref: "Gan et al., (GSE104782)."
+        folder: '', // ✅ FIX
+        colorScale: [[0, '#f7fafc'], [0.1, '#cbd5e0'], [1, '#4a5568']],
+        ref: "Gan et al., GSE104782."
     },
-    
-    // --- PENDING DATASETS (Not yet uploaded - 0 parts = Disabled) ---
+
+    // --- PENDING DATASETS (DISABLED – NO FILES YET) ---
+
     pancreas: {
         name: "Pancreas (Islets)",
         prefix: "pancreas",
-        parts: 0, // ✗ No files found - disabled
+        parts: 0, // ❌ disabled
         structureParts: 0,
-        folder: 'UMAP_Data',
-        colorScale: [[0, '#fff5f7'], [0.1, '#fbb6ce'], [1, '#b83280']], 
+        folder: '',
+        colorScale: [[0, '#fff5f7'], [0.1, '#fbb6ce'], [1, '#b83280']],
         ref: "Craig-Schapiro et al. (2025).",
-        status: "pending" // Will be enabled when files are uploaded
+        status: "pending"
     },
+
     olfactory: {
         name: "Olfactory Epithelium",
         prefix: "olfactory",
-        parts: 0, // ✗ No files found - disabled
+        parts: 0, // ❌ disabled
         structureParts: 0,
-        folder: 'UMAP_Data',
-        colorScale: [[0, '#fffbe6'], [0.1, '#ffe58f'], [1, '#d48806']], 
+        folder: '',
+        colorScale: [[0, '#fffbe6'], [0.1, '#ffe58f'], [1, '#d48806']],
         ref: "Durante et al., Nat Neurosci (2020).",
-        status: "pending" // Will be enabled when files are uploaded
+        status: "pending"
     },
-    
-    // --- ROOT FOLDER DATASETS (Legacy - Original location) ---
+
+    // --- LEGACY / SPECIAL DATASETS ---
+
     lung_organoid: {
         name: "Lung Organoid (Alveolar)",
         isMaster: true,
         parts: 0,
-        folder: '', // Root folder
-        file: 'ciliAI_master_database.json', // Contains umapData field
-        colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']], 
+        folder: '', // root
+        file: 'ciliAI_master_database.json', // contains umapData
+        colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']],
         ref: "Miller et al., Stem Cell Reports (2019)."
     },
+
     kidney: {
         name: "Human Kidney",
         prefix: "kidney_expression",
-        parts: 2, // ✓ Verified: kidney_expression_part1.json and part2.json (in root)
-        structureFile: "kidney_structure.json", // ✓ Verified (in root)
-        folder: '', // Root folder
-        colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']], 
+        parts: 2, // kidney_expression_part1.json → part2.json
+        structureFile: "kidney_structure.json",
+        folder: '', // root
+        colorScale: [
+            [0, '#F3F4F6'],
+            [0.2, '#C4B5FD'],
+            [0.5, '#8B5CF6'],
+            [1, '#4C1D95']
+        ],
         ref: "Stewart et al., Science (2019)."
     }
 };
+
 
 // 2. GLOBAL STATE INITIALIZATION
 window.CiliAI = window.CiliAI || {};
@@ -5929,6 +5946,7 @@ window.updateStatus = function(text, state = 'normal') {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
