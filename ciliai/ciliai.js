@@ -4,17 +4,20 @@
 // ==============================================================
 // 1. DATASET CONFIGURATION (FIXED: ROOT FOLDER)
 // ==============================================================
+// ==============================================================
+// 1. DATASET CONFIGURATION (Correct UMAP_Data paths)
+// ==============================================================
 
 const DATASET_CONFIG = {
 
-    // --- ROOT FOLDER DATASETS (ACTIVE & VERIFIED) ---
+    // --- UMAP_Data FOLDER ACTIVE DATASETS ---
 
     lung_atlas: {
         name: "Human Lung Atlas (HLCA)",
         prefix: "lung_downsampled",
-        parts: 15, // lung_downsampled_part1.json → part15.json
+        parts: 15, // expected lung_downsampled_part1.json → part15.json
         structureParts: 0,
-        folder: '', // ✅ FIX: files are in ROOT
+        folder: 'UMAP_Data',  // ✅ data is in UMAP_Data/
         colorScale: [[0, '#fffaf0'], [0.1, '#feebc8'], [1, '#dd6b20']],
         ref: "Sikkema et al., Nat Med (2023)."
     },
@@ -24,7 +27,7 @@ const DATASET_CONFIG = {
         prefix: "liver",
         parts: 6, // liver_part1.json → part6.json
         structureParts: 0,
-        folder: '', // ✅ FIX
+        folder: 'UMAP_Data',  // ✅
         colorScale: [[0, '#f0fff4'], [0.1, '#9ae6b4'], [1, '#2f855a']],
         ref: "Aizarani et al., Nature (2019)."
     },
@@ -34,8 +37,8 @@ const DATASET_CONFIG = {
         prefix: "hypothalamus_expression",
         parts: 6, // hypothalamus_expression_part1.json → part6.json
         structurePrefix: "hypothalamus_structure",
-        structureParts: 2, // hypothalamus_structure_part1.json → part2.json
-        folder: '', // ✅ FIX
+        structureParts: 2, // hypothalamus_structure_part1.json and part2.json
+        folder: 'UMAP_Data',  // ✅
         colorScale: [[0, '#fff5f5'], [0.1, '#fc8181'], [1, '#9b2c2c']],
         ref: "Kim et al., Nat Commun (2020)."
     },
@@ -45,43 +48,39 @@ const DATASET_CONFIG = {
         prefix: "chondrocyte",
         parts: 1, // chondrocyte_part1.json
         structureParts: 0,
-        folder: '', // ✅ FIX
+        folder: 'UMAP_Data',  // ✅ confirmed
         colorScale: [[0, '#f7fafc'], [0.1, '#cbd5e0'], [1, '#4a5568']],
         ref: "Gan et al., GSE104782."
     },
 
-    // --- PENDING DATASETS (DISABLED – NO FILES YET) ---
+    // --- PENDING DATASETS ---
 
     pancreas: {
         name: "Pancreas (Islets)",
         prefix: "pancreas",
-        parts: 0, // ❌ disabled
+        parts: 0,
         structureParts: 0,
-        folder: '',
-        colorScale: [[0, '#fff5f7'], [0.1, '#fbb6ce'], [1, '#b83280']],
-        ref: "Craig-Schapiro et al. (2025).",
+        folder: 'UMAP_Data',
         status: "pending"
     },
 
     olfactory: {
         name: "Olfactory Epithelium",
         prefix: "olfactory",
-        parts: 0, // ❌ disabled
+        parts: 0,
         structureParts: 0,
-        folder: '',
-        colorScale: [[0, '#fffbe6'], [0.1, '#ffe58f'], [1, '#d48806']],
-        ref: "Durante et al., Nat Neurosci (2020).",
+        folder: 'UMAP_Data',
         status: "pending"
     },
 
-    // --- LEGACY / SPECIAL DATASETS ---
+    // --- LEGACY ROOT FOLDER DATASETS ---
 
     lung_organoid: {
         name: "Lung Organoid (Alveolar)",
         isMaster: true,
         parts: 0,
-        folder: '', // root
-        file: 'ciliAI_master_database.json', // contains umapData
+        folder: '',
+        file: 'ciliAI_master_database.json',
         colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']],
         ref: "Miller et al., Stem Cell Reports (2019)."
     },
@@ -89,9 +88,9 @@ const DATASET_CONFIG = {
     kidney: {
         name: "Human Kidney",
         prefix: "kidney_expression",
-        parts: 2, // kidney_expression_part1.json → part2.json
+        parts: 2,
         structureFile: "kidney_structure.json",
-        folder: '', // root
+        folder: '',  // ✓ kidney is still in root
         colorScale: [
             [0, '#F3F4F6'],
             [0.2, '#C4B5FD'],
@@ -101,6 +100,7 @@ const DATASET_CONFIG = {
         ref: "Stewart et al., Science (2019)."
     }
 };
+
 
 
 // 2. GLOBAL STATE INITIALIZATION
@@ -5946,6 +5946,7 @@ window.updateStatus = function(text, state = 'normal') {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
