@@ -5934,7 +5934,7 @@ window.updateStatus = function(text, state = 'normal') {
 };
 
 /* ==============================================================
- * CiliAI – FULL DATA LOADING ENGINE (UMAP_Data Aware)
+ * CiliAI – FULL DATA LOADING ENGINE (Root vs UMAP_Data Aware)
  * ============================================================== */
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
@@ -5942,9 +5942,9 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
     if (window.updateStatus) window.updateStatus('Loading datasets...', 'loading');
 
-    /* ----------------------------------------------------------
-     * Helper: load split JSON parts and COMBINE like Kidney
-     * ---------------------------------------------------------- */
+    // ----------------------------------------------------------
+    // Helper: Fetch split parts from a specific folder
+    // ----------------------------------------------------------
     const loadSplitParts = async (prefix, parts, folder, mode) => {
         if (!parts || parts === 0) return mode === 'umap' ? [] : {};
 
@@ -5952,36 +5952,44 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         for (let i = 1; i <= parts; i++) {
             promises.push(
                 fetch(`${folder}${prefix}_part${i}.json`)
-                    .then(r => r.ok ? r.json() : null)
-                    .catch(() => null)
+                    .then(r => {
+                        if (!r.ok) throw new Error(`Missing ${prefix}_part${i}`);
+                        return r.json();
+                    })
+                    .catch(err => {
+                        console.warn(`Skipped ${prefix}_part${i}:`, err);
+                        return null;
+                    })
             );
         }
 
         const loaded = (await Promise.all(promises)).filter(Boolean);
 
+        // Merge Logic
         if (mode === 'umap') {
-            // UMAP is ALWAYS an array
+            // UMAP is always an Array of objects -> Flatten
             return loaded.flat();
+        } else {
+            // Expression is always an Object Map -> Merge keys
+            return Object.assign({}, ...loaded);
         }
-
-        // Expression is ALWAYS an object
-        return Object.assign({}, ...loaded);
     };
 
     try {
-        /* ----------------------------------------------------------
-         * A. Initialize global state
-         * ---------------------------------------------------------- */
+        // ----------------------------------------------------------
+        // A. Initialize Global State & Config
+        // ----------------------------------------------------------
         if (!window.CiliAI) window.CiliAI = {};
         if (!window.CiliAI.datasets) window.CiliAI.datasets = {};
         if (!window.CiliAI.lookups) window.CiliAI.lookups = { geneMap: {} };
         if (!window.CiliAI.cellDataCache) window.CiliAI.cellDataCache = {};
 
+        // Pre-fill dataset placeholders so UI doesn't crash
         Object.keys(DATASET_CONFIG).forEach(key => {
             if (!window.CiliAI.datasets[key]) {
                 window.CiliAI.datasets[key] = {
                     name: DATASET_CONFIG[key].name,
-                    umap: [],
+                    umap: [], // Start empty
                     expression: {},
                     colorScale: DATASET_CONFIG[key].colorScale,
                     ref: DATASET_CONFIG[key].ref
@@ -5989,85 +5997,95 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             }
         });
 
-        /* ----------------------------------------------------------
-         * B. Load core DBs (ROOT)
-         * ---------------------------------------------------------- */
+        // ----------------------------------------------------------
+        // B. Load Core Databases (ROOT)
+        // ----------------------------------------------------------
         const [mainRes, lookupsRes, rnaResp] = await Promise.all([
             fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
             fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
-            fetch(base + 'rna_tissue_consensus.tsv')
+            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv')
         ]);
 
         window.CiliAI.masterData = mainRes.masterData || [];
         window.CiliAI.lookups = lookupsRes.lookups || {};
 
         window.CiliAI.masterData.forEach(g => {
-            if (g.Gene)
-                window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g;
+            if (g.Gene) window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g;
         });
 
-        /* ----------------------------------------------------------
-         * C. ROOT-based datasets
-         * ---------------------------------------------------------- */
+        // ----------------------------------------------------------
+        // C. Load Legacy Datasets (FROM ROOT)
+        // ----------------------------------------------------------
+        
+        // 1. Lung Organoid (Alveolar)
+        // Source: Embedded inside ciliAI_master_database.json
+        if (mainRes.umapData) {
+            window.CiliAI.datasets.lung_organoid.umap = mainRes.umapData;
+            // Note: Expression for this is usually inside masterData objects, handled in Finalize
+        }
 
-        // Lung Organoid (legacy, master DB)
-        window.CiliAI.datasets.lung_organoid.umap = mainRes.umapData || [];
-
-        // Kidney (structure + multi-part expression in ROOT)
+        // 2. Kidney (Multi-part in ROOT)
+        // Source: kidney_structure.json + kidney_expression_part1/2.json (in ROOT)
         const kStruct = await fetch(base + DATASET_CONFIG.kidney.structureFile).then(r => r.json());
         const kExpr = await loadSplitParts(
-            DATASET_CONFIG.kidney.prefix,
-            DATASET_CONFIG.kidney.parts,
-            base,
+            DATASET_CONFIG.kidney.prefix, 
+            DATASET_CONFIG.kidney.parts, 
+            base, // <--- IMPORTANT: Uses ROOT base
             'expression'
         );
 
         window.CiliAI.datasets.kidney.umap = kStruct.umap || [];
         window.CiliAI.datasets.kidney.expression = kExpr;
 
-        /* ----------------------------------------------------------
-         * D. UMAP_Data folder datasets (NEW DATA)
-         * ---------------------------------------------------------- */
+        // ----------------------------------------------------------
+        // D. Load New Datasets (FROM UMAP_Data FOLDER)
+        // ----------------------------------------------------------
 
-        // Lung Atlas (15 parts)
-        window.CiliAI.datasets.lung_atlas.umap =
-            await loadSplitParts('lung_downsampled', 15, umapBase, 'umap');
+        // 3. Human Lung Atlas (15 parts)
+        const lungAtlasData = await loadSplitParts('lung_downsampled', 15, umapBase, 'umap');
+        // New combined format: UMAP array contains expression properties directly
+        window.CiliAI.datasets.lung_atlas.umap = lungAtlasData;
+        window.CiliAI.datasets.lung_atlas.expression = lungAtlasData; 
 
-        // Liver (6 parts)
-        window.CiliAI.datasets.liver.umap =
-            await loadSplitParts('liver', 6, umapBase, 'umap');
+        // 4. Liver (6 parts)
+        const liverData = await loadSplitParts('liver', 6, umapBase, 'umap');
+        window.CiliAI.datasets.liver.umap = liverData;
+        window.CiliAI.datasets.liver.expression = liverData;
 
-        // Hypothalamus (structure + expression)
-        window.CiliAI.datasets.hypothalamus.umap =
-            await loadSplitParts('hypothalamus_structure', 2, umapBase, 'umap');
+        // 5. Hypothalamus (Structure + Expression split)
+        const hStruct = await loadSplitParts('hypothalamus_structure', 2, umapBase, 'umap');
+        const hExpr = await loadSplitParts('hypothalamus_expression', 6, umapBase, 'expression');
+        
+        window.CiliAI.datasets.hypothalamus.umap = hStruct;
+        window.CiliAI.datasets.hypothalamus.expression = hExpr;
 
-        window.CiliAI.datasets.hypothalamus.expression =
-            await loadSplitParts('hypothalamus_expression', 6, umapBase, 'expression');
+        // 6. Chondrocyte (1 part currently)
+        const chondroData = await loadSplitParts('chondrocyte', 1, umapBase, 'umap');
+        window.CiliAI.datasets.chondrocyte.umap = chondroData;
+        window.CiliAI.datasets.chondrocyte.expression = chondroData;
 
-        // Chondrocyte (single part)
-        window.CiliAI.datasets.chondrocyte.umap =
-            await loadSplitParts('chondrocyte', 1, umapBase, 'umap');
+        // 7. Pancreas & Olfactory (Placeholders - 0 parts for now)
+        // (Logic handles 0 parts gracefully by returning empty)
 
-        /* ----------------------------------------------------------
-         * E. RNA consensus
-         * ---------------------------------------------------------- */
+        // ----------------------------------------------------------
+        // E. Finalize & Cache
+        // ----------------------------------------------------------
+        
+        // Process RNA Consensus
         if (window.parseTsvData && rnaResp) {
             const rnaText = await rnaResp.text();
             window.rnaTissueExpressionData = window.parseTsvData(rnaText);
         }
 
-        /* ----------------------------------------------------------
-         * F. Cache scRNA
-         * ---------------------------------------------------------- */
+        // Cache scRNA for Lung Organoid (Legacy support)
         window.CiliAI.masterData.forEach(g => {
             if (g.Gene && g.expression?.scRNA) {
-                window.CiliAI.cellDataCache[g.Gene.toUpperCase()] =
-                    g.expression.scRNA;
+                window.CiliAI.cellDataCache[g.Gene.toUpperCase()] = g.expression.scRNA;
             }
         });
 
         window.CiliAI.ready = true;
-        if (window.updateStatus)
+        if (window.updateStatus) 
             window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
 
         return true;
@@ -6082,6 +6100,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
