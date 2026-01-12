@@ -4542,7 +4542,6 @@ else if (htmlResult === null && (match = qLower.match(/(?:show )?(?:domains?|dom
             else htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
         }
 // =======================================================
-// =======================================================
 // (12) INTENT: Expression / UMAP Plot (Single Gene or Complex)
 // =======================================================
 else if (
@@ -4560,37 +4559,63 @@ else if (
     !qLower.includes(' versus ')
 ) {
     // ---------------------------------------------------
-    // Explicit dataset switching (standalone commands)
+    // 1. Dynamic Dataset Inference & Switching
     // ---------------------------------------------------
-    if (qLower === 'switch to kidney') {
-        window.CiliAI.activeDataset = 'kidney';
-        window.addChatMessage('Switched to Kidney scRNA-seq dataset.', false);
-        return;
+    const availableDatasets = Object.keys(window.CiliAI.datasets);
+    // Sort by length desc to ensure "lung_downsampled" matches before "lung"
+    availableDatasets.sort((a, b) => b.length - a.length);
+
+    let detectedDS = null;
+    
+    // Check query for dataset names or aliases
+    for (const dsKey of availableDatasets) {
+        let isMatch = qLower.includes(dsKey);
+        
+        // Add specific aliases for better UX
+        if (dsKey === 'olfactory' && (qLower.includes('nose') || qLower.includes('smell'))) isMatch = true;
+        if (dsKey === 'hypothalamus' && qLower.includes('brain')) isMatch = true;
+        if (dsKey === 'chondrocyte' && (qLower.includes('cartilage') || qLower.includes('disc'))) isMatch = true;
+        
+        if (isMatch) {
+            detectedDS = dsKey;
+            break; // Stop at first valid match
+        }
     }
-    if (qLower === 'switch to lung') {
-        window.CiliAI.activeDataset = 'lung';
-        window.addChatMessage('Switched to Lung scRNA-seq dataset.', false);
-        return;
+
+    // Apply switch if detected
+    if (detectedDS) {
+        window.CiliAI.activeDataset = detectedDS;
+        // If the query was *only* a switch command (e.g., "switch to liver"), stop here
+        if (qLower.startsWith('switch to') && qLower.split(' ').length <= 4) {
+            window.addChatMessage(`Switched to <strong>${window.CiliAI.datasets[detectedDS].name}</strong> dataset.`, false);
+            return;
+        }
     }
+
     // ---------------------------------------------------
-    // Dataset inference from query
+    // 2. Target Gene / Complex Parsing
     // ---------------------------------------------------
-    if (qLower.includes('kidney')) window.CiliAI.activeDataset = 'kidney';
-    else if (qLower.includes('lung')) window.CiliAI.activeDataset = 'lung';
-    // ---------------------------------------------------
-    // Target gene / complex parsing
-    // ---------------------------------------------------
-    let target = 'WDR31';
+    let target = 'WDR31'; // Default
     match = qLower.match(/(?:for|of|in)\s+(.+)/i);
+    
     if (match) {
-        target = match[1]
-            .replace(/lung|kidney|scrna-seq|scrna|expression|umap|plot|display|in/gi, '')
-            .trim();
-        if (target.length < 2) target = 'WDR31';
+        // Remove keywords and tissue names from the target string
+        let cleaner = match[1].replace(/scrna-seq|scrna|expression|umap|plot|display|in/gi, '');
+        availableDatasets.forEach(ds => {
+            cleaner = cleaner.replace(new RegExp(ds, 'gi'), '');
+        });
+        // Remove aliases
+        cleaner = cleaner.replace(/brain|nose|cartilage|organoid|tissue/gi, '');
+        
+        target = cleaner.trim();
+        if (target.length < 2) target = 'WDR31'; // Fallback
     }
+
+    // Resolve Genes
     let genes = window.extractMultipleGenes(target);
     let isComplex = false;
     let finalTargetTerm = target;
+
     if (genes.length === 0 && target) {
         const complexName = window.extractComplexIntent(target);
         if (complexName) {
@@ -4602,54 +4627,68 @@ else if (
             }
         }
     }
+
     const finalGenes = genes.length > 0 ? genes : ['WDR31'];
     const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
+
     // ---------------------------------------------------
-    // Optional zoom-to-cell-type
+    // 3. Generalized Zoom-to-Cell-Type
     // ---------------------------------------------------
-    const zoomMatch = qLower.match(
-        /zoom to\s+(ciliated cell|stem cell|club cell|goblet cell|neuroendocrine cell|basal cell|pulmonary alveolar type 1 cell|pulmonary alveolar type 2 cell|lung secretory cell)/i
-    );
-    const zoomToCellType = zoomMatch ? zoomMatch[1] : null;
-  // ---------------------------------------------------
-    // Render UMAP (SINGLE source of truth)
+    // Matches "zoom to [anything]" until end of string or ' in/for'
+    const zoomMatch = qLower.match(/zoom to\s+([\w\s\-\(\)]+?)(?:\s+(?:in|for)|$)/i);
+    const zoomToCellType = zoomMatch ? zoomMatch[1].trim() : null;
+
+    // ---------------------------------------------------
+    // 4. Render UMAP
     // ---------------------------------------------------
     await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
+
     // ---------------------------------------------------
-    // Dataset labels & switch target
+    // 5. Generate Dynamic UI (Switch Chips)
     // ---------------------------------------------------
-    const currentDS = window.CiliAI.activeDataset || 'lung';
-    const dsName = window.CiliAI.datasets[currentDS]
-        ? window.CiliAI.datasets[currentDS].name
-        : 'scRNA-seq';
-    const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
-    const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
-   
-    // Prepare safe arguments for HTML attributes
+    const currentDS = window.CiliAI.activeDataset;
+    const currentName = window.CiliAI.datasets[currentDS].name;
+    
+    // Create argument strings for the buttons
     const genesArg = finalGenes.join(',');
     const zoomArg = zoomToCellType || '';
+
+    // Generate chips for ALL other datasets
+    const switchButtons = availableDatasets
+        .filter(ds => ds !== currentDS)
+        .map(ds => {
+            const shortName = window.CiliAI.datasets[ds].name.replace('Human ', '').replace('Organoid', 'Org.');
+            return `
+                <button class="ciliai-button"
+                    style="font-size:10px; padding:4px 8px; background:#f0f9ff; color:#005b96; border:1px solid #b3cde0;"
+                    onclick="window.switchDatasetAndPlot('${ds}', '${geneSymbol}', '${genesArg}', '${zoomArg}')">
+                    📍 ${shortName}
+                </button>
+            `;
+        }).join('');
+
     // ---------------------------------------------------
-    // Chat output + safe switch button
+    // 6. Final HTML Output
     // ---------------------------------------------------
     htmlResult = `
         <div class="ai-result-card">
             <p>
-                Displaying <strong>${dsName}</strong> scRNA-seq UMAP for
+                Displaying <strong>${currentName}</strong> scRNA-seq UMAP for
                 <strong>${geneSymbol}</strong>
-                (${isComplex ? 'Complex Avg.' : 'Single Gene'}) on the left.
+                (${isComplex ? 'Complex Avg.' : 'Single Gene'}).
             </p>
-            ${zoomToCellType ? `<p>Zoomed to the <strong>${zoomToCellType}</strong> cluster.</p>` : ''}
-            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <button class="ciliai-button"
-                    style="width:auto; margin:0; background:#B8E2F2;"
-                    onclick="window.switchDatasetAndPlot('${nextDS}', '${geneSymbol}', '${genesArg}', '${zoomArg}')">
-                    🔄 Switch to ${nextDSLabel}
-                </button>
-                <a href="#"
-                   class="ai-action"
-                   onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')"
-                   style="margin-left:5px; font-weight:600;">
-                   ⬇️ CSV
+            ${zoomToCellType ? `<p style="font-size:12px; color:#666;">Zoomed to: <em>${zoomToCellType}</em></p>` : ''}
+            
+            <div style="margin-top:12px; border-top:1px solid #eee; padding-top:8px;">
+                <div style="font-size:11px; font-weight:600; color:#666; margin-bottom:6px;">Compare in other tissues:</div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    ${switchButtons}
+                </div>
+            </div>
+            
+            <div style="margin-top:10px; text-align:right;">
+                <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')">
+                   ⬇️ Download Data (CSV)
                 </a>
             </div>
         </div>
@@ -6273,3 +6312,4 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
