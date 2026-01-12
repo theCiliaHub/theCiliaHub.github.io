@@ -3184,171 +3184,176 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 // 4. VISUALIZATION ENGINE (ALL ORGANS & COLORS)
-    window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
-        if (typeof window.resetViews === 'function') window.resetViews();
-        
-        // 1. Default to Lung Atlas if nothing active
-        if (!window.CiliAI.activeDataset) window.CiliAI.activeDataset = 'lung_atlas';
-        
-        let datasetKey = window.CiliAI.activeDataset;
-        const dataset = window.CiliAI.datasets[datasetKey];
+window.renderUMAPPlot = async function (
+    displayName,
+    targetGenes = [],
+    zoomToCellType = null
+) {
+    if (typeof window.resetViews === 'function') window.resetViews();
 
-        // 2. Loading Check
-        if (!dataset || !dataset.umap || (Array.isArray(dataset.umap) && dataset.umap.length === 0)) {
-            if(window.addChatMessage) window.addChatMessage(`⚠️ <strong>${dataset?.name || datasetKey}</strong> is loading. Please wait...`, false);
-            return;
+    // 1. Default dataset
+    if (!window.CiliAI.activeDataset) window.CiliAI.activeDataset = 'lung_atlas';
+
+    const datasetKey = window.CiliAI.activeDataset;
+    const dataset = window.CiliAI.datasets[datasetKey];
+
+    // 2. Loading guard
+    if (!dataset || !dataset.umap || (Array.isArray(dataset.umap) && dataset.umap.length === 0)) {
+        if (window.addChatMessage) {
+            window.addChatMessage(
+                `⚠️ <strong>${dataset?.name || datasetKey}</strong> is loading. Please wait...`,
+                false
+            );
         }
-
-        if (!displayName) displayName = 'WDR31';
-        if (typeof targetGenes === 'string') targetGenes = targetGenes.split(',').filter(t => t);
-        if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName.toUpperCase()];
-        
-        const primaryGene = targetGenes[0];
-        const isMultiGene = targetGenes.length > 1;
-        const isClusterView = displayName === 'CLUSTER_VIEW';
-
-        // 3. COMPREHENSIVE COLOR MAP (ALL 8 TISSUES)
-        const clusterColors = {
-            // --- Lung (Atlas & Organoid) ---
-            'Ciliated': '#E11D48', 'Ciliated Cell': '#E11D48',
-            'Basal': '#F59E0B', 'Basal Cell': '#F59E0B',
-            'Club': '#3B82F6', 'Club Cell': '#3B82F6',
-            'Goblet': '#10B981', 'Goblet Cell': '#10B981',
-            'Neuroendocrine': '#8B5CF6', 'Neuroendocrine Cell': '#8B5CF6',
-            'AT1': '#60A5FA', 'Alveolar Type 1': '#60A5FA', 'Pulmonary Alveolar Type 1 Cell': '#60A5FA',
-            'AT2': '#2563EB', 'Alveolar Type 2': '#2563EB', 'Pulmonary Alveolar Type 2 Cell': '#2563EB',
-            'Fibroblast': '#1D4ED8', 'Myofibroblast': '#1E40AF',
-            'Endothelial': '#059669', 'Endothelial Cell': '#059669',
-            'Immune': '#1E3A8A', 'Macrophage': '#4C1D95', 'Monocyte': '#5B21B6',
-            'Lung Secretory Cell': '#34D399',
-
-            // --- Kidney ---
-            'Podocyte': '#1E40AF', 
-            'Proximal Tubule': '#3B82F6', 'Proximal Tubule Cell': '#3B82F6',
-            'Distal Tubule': '#93C5FD', 'Distal Convoluted Tubule Cell': '#93C5FD',
-            'Loop of Henle': '#60A5FA', 'Thick Ascending Limb Cell': '#60A5FA',
-            'Collecting Duct': '#BFDBFE', 'Collecting Duct Principal Cell': '#BFDBFE',
-            'Intercalated': '#DBEAFE', 'Collecting Duct Intercalated Cell': '#DBEAFE',
-            'Mesangial': '#6B7280',
-
-            // --- Liver ---
-            'Hepatocyte': '#2F855A', 
-            'Cholangiocyte': '#3182CE', 
-            'LSEC': '#E53E3E', 
-            'Kupffer': '#D69E2E', 'Kupffer Cell': '#D69E2E',
-            'Stellate': '#805AD5', 'Hepatic Stellate Cell': '#805AD5',
-            'T Cell': '#4299E1', 'B Cell': '#63B3ED', 'NK Cell': '#2B6CB0', 'Erythroid': '#FC8181',
-
-            // --- Pancreas ---
-            'Alpha': '#E11D48', 'Alpha Cell': '#E11D48',
-            'Beta': '#3B82F6', 'Beta Cell': '#3B82F6',
-            'Delta': '#10B981', 'Delta Cell': '#10B981',
-            'PP': '#F59E0B', 'PP Cell': '#F59E0B', 'Gamma': '#F59E0B',
-            'Acinar': '#8B5CF6', 
-            'Ductal': '#6366F1', 
-            'Stellate': '#EC4899', 'Activated Stellate': '#BE185D', 'Quiescent Stellate': '#F472B6',
-            'Mast': '#64748B', 'Macrophage': '#475569',
-
-            // --- Olfactory ---
-            'Mature OSN': '#D97706', 
-            'Immature OSN': '#FBBF24', 
-            'HBC': '#10B981', 'Horizontal Basal Cell': '#10B981',
-            'GBC': '#34D399', 'Globose Basal Cell': '#34D399',
-            'Sustentacular': '#3B82F6', 'Sustentacular Cell': '#3B82F6',
-            'Bowmans Gland': '#60A5FA', 'Bowmans Gland Cell': '#60A5FA',
-            'Ionocyte': '#EF4444', 
-            'Microvillar': '#8B5CF6', 'Microvillar Cell': '#8B5CF6',
-
-            // --- Hypothalamus ---
-            'Neuron': '#8B5CF6', 'GABAergic': '#7C3AED', 'Glutamatergic': '#6D28D9',
-            'POMC': '#D97706', 'AgRP': '#F59E0B', 'Dopaminergic': '#B45309',
-            'Astrocyte': '#F59E0B', 
-            'Oligodendrocyte': '#10B981', 'OPC': '#34D399',
-            'Microglia': '#EF4444', 
-            'Tanycyte': '#3B82F6', 
-            'Ependymal': '#6366F1',
-
-            // --- Chondrocyte (Intervertebral Disc) ---
-            'Chondroblast': '#3B82F6', 
-            'Homeostatic': '#10B981', 'Homeostatic Chondrocyte': '#10B981',
-            'Regulatory': '#8B5CF6', 'Regulatory Chondrocyte': '#8B5CF6',
-            'Proliferative': '#EF4444', 'Proliferative Chondrocyte': '#EF4444',
-            'PreHypertrophic': '#F59E0B', 'PreHypertrophic Chondrocyte': '#F59E0B',
-            'Hypertrophic': '#D97706', 'Hypertrophic Chondrocyte': '#D97706',
-            'Fibrocartilage': '#64748B'
-        };
-
-       const sourceData = Array.isArray(dataset.umap)
-    ? dataset.umap
-    : Object.values(dataset.umap);
-
-sourceData.forEach((p, i) => {
-
-    const coords = getUMAPCoords(p);
-    if (!coords) return;
-
-    const rawType = p.cell_type || p.cluster || "Unknown";
-
-    if (zoomToCellType &&
-        !rawType.toLowerCase().includes(zoomToCellType.toLowerCase())) return;
-
-    x.push(coords.x);
-    y.push(coords.y);
-
-    let val = 0;
-    if (!isClusterView) {
-        targetGenes.forEach(g => {
-            val += getExpressionValue(dataset, p, g, i);
-        });
-        if (isMultiGene) val /= targetGenes.length;
-        maxExpr = Math.max(maxExpr, val);
+        return;
     }
 
-    if (isClusterView) {
-        let c = clusterColors[rawType];
-        if (!c) {
-            const key = Object.keys(clusterColors)
-                .find(k => rawType.includes(k) || k.includes(rawType));
-            c = key ? clusterColors[key] : '#94A3B8';
-        }
-        color.push(c);
-    } else {
-        color.push(val);
+    // 3. Gene handling
+    if (!displayName) displayName = 'WDR31';
+    if (typeof targetGenes === 'string') {
+        targetGenes = targetGenes.split(',').map(t => t.trim()).filter(Boolean);
     }
+    if (!targetGenes.length) targetGenes = [displayName.toUpperCase()];
 
-    text.push(`<b>${rawType}</b>${isClusterView ? '' : `<br>Expr: ${val.toFixed(2)}`}`);
-});
+    const primaryGene = targetGenes[0];
+    const isMultiGene = targetGenes.length > 1;
+    const isClusterView = displayName === 'CLUSTER_VIEW';
 
-        await Plotly.newPlot('plotly-container', [trace], layout, { responsive: true, displaylogo: false });
+    // 4. DATA ARRAYS (❗ REQUIRED FIX)
+    const x = [];
+    const y = [];
+    const color = [];
+    const text = [];
+    let maxExpr = 0;
 
-        // 4. Build Interactive "Switch" Card
-        const genesArg = targetGenes.join(',');
-        const zoomArg = zoomToCellType || '';
-        
-        let optionsHtml = '';
-        Object.keys(DATASET_CONFIG).forEach(key => {
-            const cfg = DATASET_CONFIG[key];
-            if (cfg.parts > 0 || cfg.isMaster || key === 'kidney') {
-                const selected = key === datasetKey ? 'selected' : '';
-                optionsHtml += `<option value="${key}" ${selected}>${cfg.name}</option>`;
+    // 5. SOURCE DATA
+    const sourceData = Array.isArray(dataset.umap)
+        ? dataset.umap
+        : Object.values(dataset.umap);
+
+    // 6. ITERATE POINTS
+    sourceData.forEach((p, i) => {
+        const coords = getUMAPCoords(p);
+        if (!coords) return;
+
+        const rawType = p.cell_type || p.cluster || 'Unknown';
+
+        if (
+            zoomToCellType &&
+            !rawType.toLowerCase().includes(zoomToCellType.toLowerCase())
+        ) return;
+
+        x.push(coords.x);
+        y.push(coords.y);
+
+        let val = 0;
+        if (!isClusterView) {
+            targetGenes.forEach(g => {
+                val += getExpressionValue(dataset, p, g, i);
+            });
+            if (isMultiGene) val /= targetGenes.length;
+            maxExpr = Math.max(maxExpr, val);
+        }
+
+        if (isClusterView) {
+            let c = clusterColors[rawType];
+            if (!c) {
+                const key = Object.keys(clusterColors)
+                    .find(k => rawType.includes(k) || k.includes(rawType));
+                c = key ? clusterColors[key] : '#94A3B8';
             }
-        });
+            color.push(c);
+        } else {
+            color.push(val);
+        }
 
-        if(window.addChatMessage) window.addChatMessage(`
+        text.push(
+            `<b>${rawType}</b>${isClusterView ? '' : `<br>Expr: ${val.toFixed(2)}`}`
+        );
+    });
+
+    // 7. TRACE (❗ WAS MISSING)
+    const trace = {
+        x,
+        y,
+        text,
+        mode: 'markers',
+        type: 'scattergl',
+        hoverinfo: 'text',
+        marker: {
+            size: isClusterView ? 5 : 4,
+            opacity: 0.85,
+            color: color,
+            line: { width: 0.4, color: '#ffffff' }
+        }
+    };
+
+    if (!isClusterView) {
+        trace.marker.colorscale = dataset.colorScale;
+        trace.marker.cmin = 0;
+        trace.marker.cmax = maxExpr || 1;
+        trace.marker.showscale = true;
+        trace.marker.colorbar = {
+            title: 'Expr',
+            thickness: 10
+        };
+    }
+
+    // 8. LAYOUT (❗ WAS MISSING)
+    const layout = {
+        title: {
+            text: `<b>${isClusterView ? 'Cell Types' : primaryGene}</b><br><sub>${dataset.name}</sub>`,
+            font: { size: 16 }
+        },
+        xaxis: { visible: false },
+        yaxis: { visible: false },
+        hovermode: 'closest',
+        margin: { t: 60, b: 40, l: 40, r: 40 },
+        showlegend: false
+    };
+
+    // 9. PLOT
+    await Plotly.newPlot(
+        'plotly-container',
+        [trace],
+        layout,
+        { responsive: true, displaylogo: false }
+    );
+
+    // 10. DATASET SWITCH CARD (UNCHANGED)
+    const genesArg = targetGenes.join(',');
+    const zoomArg = zoomToCellType || '';
+
+    let optionsHtml = '';
+    Object.keys(DATASET_CONFIG).forEach(key => {
+        const cfg = DATASET_CONFIG[key];
+        if (cfg.parts > 0 || cfg.isMaster || key === 'kidney') {
+            const selected = key === datasetKey ? 'selected' : '';
+            optionsHtml += `<option value="${key}" ${selected}>${cfg.name}</option>`;
+        }
+    });
+
+    if (window.addChatMessage) {
+        window.addChatMessage(`
             <div class="ai-result-card">
-                <div style="display:flex; justify-content:space-between;">
-                    <div>
-                        <strong style="color:#005b96; font-size:15px;">${isClusterView ? 'Cell Type Map' : primaryGene}</strong>
-                        <div style="font-size:12px; color:#666;">${dataset.name}</div>
+                <div>
+                    <strong style="color:#005b96; font-size:15px;">
+                        ${isClusterView ? 'Cell Type Map' : primaryGene}
+                    </strong>
+                    <div style="font-size:12px; color:#666;">
+                        ${dataset.name}
                     </div>
                 </div>
 
-                <div style="margin-top:12px; padding:10px; background:#f0f9ff; border:1px solid #b3cde0; border-radius:8px;">
-                    <label style="font-size:11px; font-weight:700; color:#005b96; display:block; margin-bottom:5px;">
+                <div style="margin-top:12px; padding:10px; background:#f0f9ff;
+                            border:1px solid #b3cde0; border-radius:8px;">
+                    <label style="font-size:11px; font-weight:700; color:#005b96;">
                         🔄 SWITCH DATASET:
                     </label>
-                    <select class="cilia-select" style="width:100%; font-size:13px; padding:6px; border:1px solid #90cdf4;" 
-                        onchange="window.CiliAI.activeDataset = this.value; window.renderUMAPPlot('${displayName}', '${genesArg}', '${zoomArg}')">
+                    <select class="cilia-select"
+                        style="width:100%; font-size:13px; padding:6px;"
+                        onchange="window.CiliAI.activeDataset=this.value;
+                                  window.renderUMAPPlot('${displayName}','${genesArg}','${zoomArg}')">
                         ${optionsHtml}
                     </select>
                     <div style="margin-top:6px; font-size:10px; color:#555;">
@@ -3357,7 +3362,8 @@ sourceData.forEach((p, i) => {
                 </div>
             </div>
         `, false);
-    };
+    }
+};
 
 // Helper: Get scRNA expression map for a gene (safe)
 function getScRNAExpression(geneSymbol) {
@@ -5597,34 +5603,60 @@ window.runDashboardSearch = function() {
         }).join('');
 };
 
+/* ==========================================================
+ * UMAP COORDINATE RESOLVER (ALL SCHEMAS)
+ * ========================================================== */
 function getUMAPCoords(p) {
-    if (p.umap) return { x: p.umap.x, y: p.umap.y };
-    if (p.umap_x !== undefined) return { x: p.umap_x, y: p.umap_y };
-    if (p.umap_1 !== undefined) return { x: p.umap_1, y: p.umap_2 };
-    if (p.x !== undefined) return { x: p.x, y: p.y };
+    if (!p || typeof p !== 'object') return null;
+
+    if (p.umap_1 !== undefined && p.umap_2 !== undefined) {
+        return { x: p.umap_1, y: p.umap_2 };
+    }
+    if (p.umap_x !== undefined && p.umap_y !== undefined) {
+        return { x: p.umap_x, y: p.umap_y };
+    }
+    if (p.x !== undefined && p.y !== undefined) {
+        return { x: p.x, y: p.y };
+    }
     return null;
 }
 
-function getExpressionValue(dataset, p, gene, index) {
+
+/* ==========================================================
+ * EXPRESSION RESOLVER (WIDE / NESTED / BINARY / LEGACY)
+ * ========================================================== */
+function getExpressionValue(dataset, point, gene, index) {
     gene = gene.toUpperCase();
 
-    // SCHEMA: Binary (hypothalamus)
-    if (dataset.schema === 'binary') {
-        return dataset.expression?.[gene]?.has(index) ? 1 : 0;
+    // 1. Wide matrix (gene column in each row)
+    if (point[gene] !== undefined) return Number(point[gene]) || 0;
+
+    // 2. Nested expression object
+    if (dataset.expression && dataset.expression[gene]) {
+        const key = point.cell_id || point.id || index;
+        return Number(dataset.expression[gene][key]) || 0;
     }
 
-    // SCHEMA: Nested (liver)
-    if (p.expression && p.expression[gene] !== undefined) {
-        return p.expression[gene];
+    // 3. Legacy master DB cache
+    if (window.CiliAI.cellDataCache?.[gene]?.[index] !== undefined) {
+        return Number(window.CiliAI.cellDataCache[gene][index]) || 0;
     }
 
-    // SCHEMA: Wide numeric (lung, chondrocyte)
-    if (p[gene] !== undefined) {
-        return p[gene];
-    }
+    // 4. Binary (hypothalamus structure view)
+    if (dataset.schema === 'binary') return 1;
 
     return 0;
 }
+
+function resolveActiveDataset(requestedDataset) {
+    if (requestedDataset && window.CiliAI.datasets[requestedDataset]?.umap) {
+        return requestedDataset;
+    }
+
+    // Default fallback: whole lung atlas
+    return 'lung_atlas';
+}
+
 
 /* ==============================================================
  * MODULE: UI LAYOUT FIXES (Prevents Overflow)
@@ -5943,3 +5975,4 @@ window.updateStatus = function(text, state = 'normal') {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
