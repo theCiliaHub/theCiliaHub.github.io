@@ -1238,8 +1238,9 @@
                 }
             }
         };
-// Data Loading Logic (UPDATED WITH CORRECTED PATHS)
+
 // Data Loading Logic (FIXED: All multi-part datasets pointed to UMAP_Data/)
+// Data Loading Logic (FIXED: Multi-part datasets pointed to UMAP_Data/)
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
@@ -1819,5 +1820,6 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
