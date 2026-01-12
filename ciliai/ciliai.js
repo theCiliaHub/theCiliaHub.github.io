@@ -1,9 +1,7 @@
 /* ==============================================================
  * CiliAI – Data Configuration & Loading (v15.1 - Fully Aligned)
  * ============================================================== */
-// ==============================================================
-// 1. DATASET CONFIGURATION (FIXED: ROOT FOLDER)
-// ==============================================================
+
 // ==============================================================
 // 1. DATASET CONFIGURATION (Correct UMAP_Data paths)
 // ==============================================================
@@ -117,15 +115,21 @@ window.CiliAI.currentPlot = null;
 window.CiliAI.zoomStateByGene = {};
 window.CiliAI.activeGeneContext = null;
 
-// Initialize all dataset objects from config
 Object.keys(DATASET_CONFIG).forEach(key => {
+    const cfg = DATASET_CONFIG[key];
+
     window.CiliAI.datasets[key] = {
-        name: DATASET_CONFIG[key].name,
+        name: cfg.name,
         umap: null,
         expression: null,
-        colorScale: DATASET_CONFIG[key].colorScale,
-        ref: DATASET_CONFIG[key].ref,
-        status: DATASET_CONFIG[key].status || 'active'
+        schema:
+            key === 'hypothalamus' ? 'binary' :
+            (key === 'liver' ? 'nested' :
+            (key === 'lung_atlas' || key === 'chondrocyte' ? 'wide' :
+            'legacy')),
+        colorScale: cfg.colorScale,
+        ref: cfg.ref,
+        status: cfg.status || 'active'
     };
 });
 
@@ -3274,81 +3278,46 @@ window.terminologyQueries = {
             'Fibrocartilage': '#64748B'
         };
 
-        const sourceData = Array.isArray(dataset.umap) ? dataset.umap : Object.values(dataset.umap);
-        const x = [], y = [], color = [], text = [], customdata = [];
-        let maxExpr = 0;
+       const sourceData = Array.isArray(dataset.umap)
+    ? dataset.umap
+    : Object.values(dataset.umap);
 
-        const getExpr = (item, gene) => {
-            if(item[gene] !== undefined) return item[gene];
-            if(dataset.expression && dataset.expression[gene]) {
-                return dataset.expression[gene][item.cell_id || item.cell_type] || 0;
-            }
-            return 0;
-        };
+sourceData.forEach((p, i) => {
 
-        sourceData.forEach(p => {
-            const rawType = p.cell_type || p.cluster || "Unknown";
-            // Filter by Zoom
-            if (zoomToCellType && !rawType.toLowerCase().includes(zoomToCellType.toLowerCase())) return;
+    const coords = getUMAPCoords(p);
+    if (!coords) return;
 
-            x.push(p.umap_1 || p.umap_x || p.x);
-            y.push(p.umap_2 || p.umap_y || p.y);
+    const rawType = p.cell_type || p.cluster || "Unknown";
 
-            let val = 0;
-            if (!isClusterView) {
-                targetGenes.forEach(g => val += getExpr(p, g));
-                if (isMultiGene) val /= targetGenes.length;
-                if (val > maxExpr) maxExpr = val;
-            }
+    if (zoomToCellType &&
+        !rawType.toLowerCase().includes(zoomToCellType.toLowerCase())) return;
 
-            if (isClusterView) {
-                // Find color key (fuzzy match)
-                let c = clusterColors[rawType];
-                if(!c) {
-                    const key = Object.keys(clusterColors).find(k => rawType.includes(k) || k.includes(rawType));
-                    c = key ? clusterColors[key] : '#94A3B8'; // Fallback Grey
-                }
-                color.push(c);
-            } else {
-                color.push(val);
-            }
+    x.push(coords.x);
+    y.push(coords.y);
 
-            text.push(`<b>${rawType}</b>${isClusterView ? '' : `<br>Expr: ${val.toFixed(2)}`}`);
-            customdata.push({ localization: window.CiliAI.lookups.geneMap[primaryGene]?.Localization || 'Cilium' });
+    let val = 0;
+    if (!isClusterView) {
+        targetGenes.forEach(g => {
+            val += getExpressionValue(dataset, p, g, i);
         });
+        if (isMultiGene) val /= targetGenes.length;
+        maxExpr = Math.max(maxExpr, val);
+    }
 
-        const trace = {
-            x, y, text, customdata,
-            mode: 'markers',
-            type: 'scattergl',
-            hoverinfo: 'text',
-            marker: {
-                size: isClusterView ? 5 : 4,
-                color: color,
-                opacity: 0.8,
-                line: { width: 0.5, color: '#fff' }
-            }
-        };
-
-        if (!isClusterView) {
-            trace.marker.colorscale = dataset.colorScale;
-            trace.marker.cmin = 0;
-            trace.marker.cmax = maxExpr > 0 ? maxExpr : 1;
-            trace.marker.showscale = true;
-            trace.marker.colorbar = { title: 'Expr', thickness: 10 };
+    if (isClusterView) {
+        let c = clusterColors[rawType];
+        if (!c) {
+            const key = Object.keys(clusterColors)
+                .find(k => rawType.includes(k) || k.includes(rawType));
+            c = key ? clusterColors[key] : '#94A3B8';
         }
+        color.push(c);
+    } else {
+        color.push(val);
+    }
 
-        const layout = {
-            title: {
-                text: `<b>${isClusterView ? 'Cell Types' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</b><br><sub>${dataset.name}</sub>`,
-                font: { size: 16 }
-            },
-            xaxis: { visible: false },
-            yaxis: { visible: false },
-            hovermode: 'closest',
-            margin: { t: 60, b: 40, l: 40, r: 40 },
-            showlegend: isClusterView 
-        };
+    text.push(`<b>${rawType}</b>${isClusterView ? '' : `<br>Expr: ${val.toFixed(2)}`}`);
+});
 
         await Plotly.newPlot('plotly-container', [trace], layout, { responsive: true, displaylogo: false });
 
@@ -5628,6 +5597,34 @@ window.runDashboardSearch = function() {
         }).join('');
 };
 
+function getUMAPCoords(p) {
+    if (p.umap) return { x: p.umap.x, y: p.umap.y };
+    if (p.umap_x !== undefined) return { x: p.umap_x, y: p.umap_y };
+    if (p.umap_1 !== undefined) return { x: p.umap_1, y: p.umap_2 };
+    if (p.x !== undefined) return { x: p.x, y: p.y };
+    return null;
+}
+
+function getExpressionValue(dataset, p, gene, index) {
+    gene = gene.toUpperCase();
+
+    // SCHEMA: Binary (hypothalamus)
+    if (dataset.schema === 'binary') {
+        return dataset.expression?.[gene]?.has(index) ? 1 : 0;
+    }
+
+    // SCHEMA: Nested (liver)
+    if (p.expression && p.expression[gene] !== undefined) {
+        return p.expression[gene];
+    }
+
+    // SCHEMA: Wide numeric (lung, chondrocyte)
+    if (p[gene] !== undefined) {
+        return p[gene];
+    }
+
+    return 0;
+}
 
 /* ==============================================================
  * MODULE: UI LAYOUT FIXES (Prevents Overflow)
@@ -5946,11 +5943,3 @@ window.updateStatus = function(text, state = 'normal') {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
-
-
-
