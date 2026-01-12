@@ -1378,15 +1378,19 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             }
 
             // Standard loading (combined structure + expression)
-            const data = await fetchParts(cfg.prefix, cfg.parts, cfg.folder);
-            if (data) {
-                window.CiliAI.datasets[key].umap = data;
-                window.CiliAI.datasets[key].expression = data;
-                const count = Array.isArray(data) ? data.length : Object.keys(data).length;
-                console.log(`   ✓ ${cfg.name}: ${count} records`);
-            } else {
-                console.warn(`   ✗ No data loaded for ${key}`);
-            }
+// Standard loading (combined structure + expression)
+const data = await fetchParts(cfg.prefix, cfg.parts, cfg.folder);
+if (data) {
+    window.CiliAI.datasets[key].umap = data;
+
+    // ⚠️ DO NOT blindly assign expression
+    if (window.CiliAI.datasets[key].schema === 'nested') {
+        window.CiliAI.datasets[key].expression = data;
+    }
+
+    const count = Array.isArray(data) ? data.length : Object.keys(data).length;
+    console.log(`   ✓ ${cfg.name}: ${count} records`);
+}
         };
 
         // Load all UMAP_Data datasets in parallel
@@ -1446,7 +1450,9 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 };
     
 
-    // 3. UI CONTROLS (Views, Zoom, Fullscreen)
+
+    
+// 3. UI CONTROLS (Views, Zoom, Fullscreen)
     
 window.switchView = function(viewType) {
         ['tab-diagram', 'tab-plot', 'tab-domain'].forEach(id => {
@@ -1702,6 +1708,7 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
 
