@@ -3146,34 +3146,131 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 // ==============================================================
-// 5. VISUALIZATION ENGINE (With Liver Colors)
+// 5. VISUALIZATION ENGINE (ORGAN-AWARE & COLOR-CODED)
 // ==============================================================
-window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
+window.renderUMAPPlot = async function (displayName, targetGenes = [], zoomToCellType = null) {
     if (typeof window.resetViews === 'function') window.resetViews();
 
-    let datasetKey = window.CiliAI.activeDataset || 'lung_atlas';
+    const datasetKey = window.CiliAI.activeDataset || 'lung_atlas';
     const dataset = window.CiliAI.datasets[datasetKey];
 
     if (!dataset || !dataset.umap || (Array.isArray(dataset.umap) && dataset.umap.length === 0)) {
-        window.addChatMessage(`⚠️ <strong>${dataset?.name || datasetKey}</strong> is loading. Please wait...`, false);
+        window.addChatMessage(
+            `⚠️ <strong>${dataset?.name || datasetKey}</strong> is loading. Please wait...`,
+            false
+        );
         return;
     }
 
+    // ------------------------------------------------------------
+    // 1. ORGAN → CELL TYPE MAP (For Zoom/Filtering)
+    // ------------------------------------------------------------
+    const ORGAN_CELL_TYPES = {
+        LUNG: [
+            'AT1', 'AT2', 'Alveolar', 'Ciliated', 'Club', 'Goblet',
+            'Basal', 'Endothelial', 'Fibroblast', 'Macrophage',
+            'Neuroendocrine', 'Pericyte', 'Smooth Muscle', 'Immune'
+        ],
+        KIDNEY: [
+            'Podocyte', 'Proximal Tubule', 'Distal Tubule', 'Loop of Henle',
+            'Collecting Duct', 'Intercalated', 'Principal', 'Endothelial', 'Mesangial'
+        ],
+        LIVER: [
+            'Hepatocyte', 'Cholangiocyte', 'Kupffer', 'Stellate', 'LSEC',
+            'T Cell', 'B Cell', 'NK Cell', 'Erythroid'
+        ],
+        PANCREAS: [
+            'Alpha', 'Beta', 'Delta', 'PP', 'Acinar', 'Ductal', 'Stellate', 
+            'Endothelial', 'Macrophage', 'Mast', 'T cell'
+        ],
+        HYPOTHALAMUS: [
+            'Neuron', 'POMC', 'AgRP', 'GABAergic', 'Glutamatergic', 'Dopaminergic',
+            'Astrocyte', 'Oligodendrocyte', 'OPC', 'Microglia', 'Tanycyte', 'Ependymal'
+        ],
+        OLFACTORY: [
+            'Mature OSN', 'Immature OSN', 'HBC', 'GBC', 'Sustentacular', 
+            'Microvillar', 'Bowmans Gland', 'Ionocyte'
+        ],
+        CHONDROCYTE: [
+            'Chondroblast', 'Homeostatic', 'Regulatory', 'Proliferative', 
+            'PreHypertrophic', 'Hypertrophic', 'Fibrocartilage'
+        ],
+        BRAIN: ['Neuron', 'Astrocyte', 'Oligodendrocyte', 'Microglia'], // Generic fallbacks
+        HEART: ['Cardiomyocyte', 'Fibroblast', 'Endothelial'],
+        INTESTINE: ['Enterocyte', 'Goblet', 'Paneth', 'Tuft', 'Stem']
+    };
+
+    // ------------------------------------------------------------
+    // 2. CLUSTER COLOR MAP (For Consistent Styling)
+    // ------------------------------------------------------------
+    const clusterColors = {
+        // Lung
+        'Ciliated Cell': '#E11D48', 'Basal Cell': '#F59E0B', 'Club Cell': '#3B82F6', 
+        'Goblet Cell': '#10B981', 'Neuroendocrine Cell': '#8B5CF6', 
+        'Pulmonary Alveolar Type 1 Cell': '#60A5FA', 'Pulmonary Alveolar Type 2 Cell': '#2563EB',
+        'Fibroblast': '#1D4ED8', 'Endothelial Cell': '#059669', 'Immune Cell': '#1E3A8A',
+        
+        // Kidney
+        'Proximal Tubule Cell': '#3B82F6', 'Thick Ascending Limb Cell': '#60A5FA',
+        'Distal Convoluted Tubule Cell': '#93C5FD', 'Collecting Duct Principal Cell': '#BFDBFE',
+        'Podocyte': '#1E40AF',
+        
+        // Liver
+        'Hepatocyte': '#2F855A', 'Cholangiocyte': '#3182CE', 'LSEC': '#E53E3E', 
+        'Kupffer Cell': '#D69E2E', 'Hepatic Stellate Cell': '#805AD5',
+        
+        // Pancreas
+        'Alpha Cell': '#E11D48', 'Beta Cell': '#3B82F6', 'Delta Cell': '#10B981', 'PP Cell': '#F59E0B',
+        'Acinar': '#8B5CF6', 'Ductal': '#6366F1', 'Stellate': '#EC4899',
+        
+        // Olfactory
+        'Mature OSN': '#D97706', 'Immature OSN': '#FBBF24', 'Horizontal Basal Cell': '#10B981',
+        'Globose Basal Cell': '#34D399', 'Sustentacular Cell': '#3B82F6', 'Bowmans Gland Cell': '#60A5FA',
+        
+        // Chondrocyte
+        'Chondroblast': '#3B82F6', 'Homeostatic Chondrocyte': '#10B981', 
+        'Regulatory Chondrocyte': '#8B5CF6', 'Proliferative Chondrocyte': '#EF4444',
+        
+        // Hypothalamus
+        'Neuron': '#8B5CF6', 'Astrocyte': '#F59E0B', 'Oligodendrocyte': '#10B981', 
+        'Microglia': '#EF4444', 'Tanycyte': '#3B82F6'
+    };
+
+    // ------------------------------------------------------------
+    // 3. INPUT PREPARATION
+    // ------------------------------------------------------------
     if (!displayName) displayName = 'WDR31';
-    if (typeof targetGenes === 'string') targetGenes = targetGenes.split(',').filter(Boolean);
+    if (typeof targetGenes === 'string') targetGenes = targetGenes.split(',').map(g => g.trim()).filter(Boolean);
     if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName.toUpperCase()];
 
     const primaryGene = targetGenes[0];
     const isMultiGene = targetGenes.length > 1;
     const isClusterView = displayName === 'CLUSTER_VIEW';
 
-    const sourceData = Array.isArray(dataset.umap)
-        ? dataset.umap
-        : Object.values(dataset.umap);
+    const sourceData = Array.isArray(dataset.umap) ? dataset.umap : Object.values(dataset.umap);
 
-    const x = [], y = [], color = [], text = [];
+    // ------------------------------------------------------------
+    // 4. ZOOM FILTER LOGIC
+    // ------------------------------------------------------------
+    let zoomCellTypes = null;
+    if (zoomToCellType) {
+        const key = zoomToCellType.toUpperCase();
+        if (ORGAN_CELL_TYPES[key]) {
+            // If user asks to zoom to "PANCREAS", allow all pancreas cell types
+            zoomCellTypes = ORGAN_CELL_TYPES[key].map(v => v.toLowerCase());
+        } else {
+            // Specific cell type zoom (e.g. "Beta Cell")
+            zoomCellTypes = [zoomToCellType.toLowerCase()];
+        }
+    }
+
+    // ------------------------------------------------------------
+    // 5. DATA BUFFERS BUILDER
+    // ------------------------------------------------------------
+    const x = [], y = [], color = [], text = [], labelText = [];
     let maxExpr = 0;
 
+    // Helper to get expression
     const getExpr = (item, gene) => {
         if (item[gene] !== undefined) return item[gene];
         if (dataset.expression && dataset.expression[gene]) {
@@ -3183,67 +3280,65 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     };
 
     sourceData.forEach(p => {
-        const rawType = p.cell_type || p.cluster || 'Unknown';
+        const rawType = (p.cell_type || p.cluster || 'Unknown').toString();
+        
+        // Apply Zoom Filter
+        if (zoomCellTypes) {
+            const hit = zoomCellTypes.some(ct => rawType.toLowerCase().includes(ct));
+            if (!hit) return;
+        }
 
-        // ✅ FIX: partial match for zoom
-        if (
-            zoomToCellType &&
-            !rawType.toLowerCase().includes(zoomToCellType.toLowerCase())
-        ) return;
-
-        x.push(p.umap_1 || p.umap_x || p.x);
-        y.push(p.umap_2 || p.umap_y || p.y);
+        x.push(p.umap_1 ?? p.umap_x ?? p.x);
+        y.push(p.umap_2 ?? p.umap_y ?? p.y);
 
         let val = 0;
         if (!isClusterView) {
-            targetGenes.forEach(g => { val += getExpr(p, g); });
+            targetGenes.forEach(g => val += getExpr(p, g));
             if (isMultiGene) val /= targetGenes.length;
             if (val > maxExpr) maxExpr = val;
         }
 
-        color.push(isClusterView ? rawType : val);
+        // Determine Color
+        if (isClusterView) {
+            // Try Exact Match -> Partial Match -> Default
+            let c = clusterColors[rawType];
+            if (!c) {
+                const key = Object.keys(clusterColors).find(k => rawType.toLowerCase().includes(k.toLowerCase()));
+                c = key ? clusterColors[key] : '#94A3B8'; // Fallback Grey
+            }
+            color.push(c);
+            labelText.push(rawType); // Only label in cluster view
+        } else {
+            color.push(val);
+            labelText.push(""); 
+        }
 
-        text.push(
-            `<b>${rawType}</b>` +
-            (isClusterView ? '' : `<br>Expr: ${val.toFixed(2)}`)
-        );
+        text.push(`<b>${rawType}</b>${isClusterView ? '' : `<br>Expr: ${val.toFixed(2)}`}`);
     });
 
-    // === MAIN TRACE ===
+    // ------------------------------------------------------------
+    // 6. PLOTLY CONFIGURATION
+    // ------------------------------------------------------------
     const trace = {
-        x,
-        y,
-        text,
+        x, y, text,
         mode: 'markers',
         type: 'scattergl',
         hoverinfo: 'text',
         marker: {
             size: isClusterView ? 5 : 4,
-            color,
+            color: color,
             opacity: 0.85,
-            line: { width: 0.5, color: '#fff' }
+            line: { width: 0.4, color: '#ffffff' }
         }
     };
 
     if (!isClusterView) {
         trace.marker.colorscale = dataset.colorScale;
         trace.marker.cmin = 0;
-        trace.marker.cmax = maxExpr > 0 ? maxExpr : 1;
+        trace.marker.cmax = maxExpr || 1;
         trace.marker.showscale = true;
         trace.marker.colorbar = { title: 'Expression', thickness: 10 };
     }
-
-    // === LABEL TRACE (SHOW ALL CELL NAMES) ===
-    const labelTrace = {
-        x,
-        y,
-        mode: 'text',
-        text: sourceData.map(p => p.cell_type || p.cluster || ''),
-        textposition: 'top center',
-        textfont: { size: 9, color: '#4A5568' },
-        hoverinfo: 'skip',
-        showlegend: false
-    };
 
     const layout = {
         title: {
@@ -3256,23 +3351,36 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         margin: { t: 60, b: 40, l: 40, r: 40 }
     };
 
-    await Plotly.newPlot(
-        'plotly-container',
-        isClusterView ? [trace, labelTrace] : [trace],
-        layout,
-        { responsive: true, displaylogo: false }
-    );
+    await Plotly.newPlot('plotly-container', [trace], layout, { responsive: true, displaylogo: false });
 
-    // === CHAT CARD WITH GUARANTEED REFERENCE ===
-    window.addChatMessage(`
+    // ------------------------------------------------------------
+    // 7. INTERACTIVE CHAT RESPONSE
+    // ------------------------------------------------------------
+    // Build dropdown options
+    let optionsHtml = '';
+    Object.keys(DATASET_CONFIG).forEach(key => {
+        const selected = key === datasetKey ? 'selected' : '';
+        optionsHtml += `<option value="${key}" ${selected}>${DATASET_CONFIG[key].name}</option>`;
+    });
+
+    window.addChatMessage(
+        `
         <div class="ai-result-card">
             <p><strong>${isClusterView ? 'Cell Types' : primaryGene}</strong> in <strong>${dataset.name}</strong></p>
-            <p style="font-size:11px;color:#666;">📚 ${dataset.ref || 'Internal / unpublished dataset'}</p>
+            <p style="font-size:11px;color:#666; margin-bottom:10px;">📚 ${dataset.ref || 'Dataset'}</p>
+            
+            <div style="background:#f7fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+                <label style="font-size:11px; font-weight:700; color:#4a5568; display:block; margin-bottom:4px;">SWITCH TISSUE:</label>
+                <select class="cilia-select" style="width:100%; font-size:13px;" 
+                    onchange="window.CiliAI.activeDataset = this.value; window.renderUMAPPlot('${displayName}', '${targetGenes.join(',')}', '${zoomToCellType || ''}')">
+                    ${optionsHtml}
+                </select>
+            </div>
         </div>
-    `, false);
+        `,
+        false
+    );
 };
-
-
 
 // Helper: Get scRNA expression map for a gene (safe)
 function getScRNAExpression(geneSymbol) {
@@ -5976,6 +6084,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
