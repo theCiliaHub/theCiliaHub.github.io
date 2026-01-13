@@ -646,10 +646,7 @@
                 container.style.display = 'flex';
                 if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
                 if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
-                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence 
-
-[Image of Cilia Diagram]
-";
+                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence [Image of Cilia Diagram]";
                 // Ensure SVG exists (if it was cleared)
                 if (!container.querySelector('svg')) {
                     window.generateAndInjectSVG();
@@ -1648,4 +1645,5 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
