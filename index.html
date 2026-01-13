@@ -1254,11 +1254,32 @@ window.parseTsvData = function (tsvText) {
 };
 
 // ==========================================================
-// DATA LOADING LOGIC (FIXED: Removed Missing Datasets)
+// DATA LOADING LOGIC (FIXED: THROTTLED REQUESTS TO PREVENT CRASH)
 // ==========================================================
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
+
+    // Helper: Fetch URL safely. Returns valid JSON or empty data on error.
+    const fetchSafe = async (url) => {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(res.statusText);
+            return await res.json();
+        } catch (e) {
+            console.warn(`Skipping missing/failed dataset: ${url}`);
+            return { umap: [], cells: {} }; // Return empty structure to prevent crashes
+        }
+    };
+
+    // Helper: Fetch a list of URLs sequentially to avoid "ERR_HTTP2_PROTOCOL_ERROR"
+    const fetchSequence = async (urlList) => {
+        const results = [];
+        for (const url of urlList) {
+            results.push(await fetchSafe(url));
+        }
+        return results;
+    };
 
     try {
         // 1. Initialize Global Structures
@@ -1267,34 +1288,44 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         window.CiliAI.lookups = window.CiliAI.lookups || { geneMap: {} };
         window.CiliAI.cellDataCache = window.CiliAI.cellDataCache || {};
 
-        // 2. Fetch All Data (Pancreas & Olfactory removed)
+        // 2. Fetch Core Data (These are small/single, safe to fetch in parallel)
+        const [mainRes, lookupsRes, rnaResp] = await Promise.all([
+            fetchSafe(base + 'ciliAI_master_database.json'),
+            fetchSafe(base + 'ciliAI_lookups.json'),
+            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv')
+        ]);
+
+        // 3. Generate URL Lists for Multi-part Datasets
+        const lungUrls = Array.from({ length: 15 }, (_, i) => `${base}UMAP_Data/lung_downsampled_part${i + 1}.json`);
+        const liverUrls = Array.from({ length: 6 }, (_, i) => `${base}UMAP_Data/liver_part${i + 1}.json`);
+        const hypExprUrls = Array.from({ length: 6 }, (_, i) => `${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`);
+        const hypStructUrls = Array.from({ length: 2 }, (_, i) => `${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`);
+
+        // 4. Fetch Heavy Datasets Sequentially (Prevents Network Crash)
+        // We run these groups in parallel, but inside each group, files download 1-by-1.
         const [
-            mainRes, lookupsRes, rnaResp,
             kStructRes, kExpr1Res, kExpr2Res,
             lungParts, liverParts,
             hypExprParts, hypStructParts,
-            chondrocytePart
+            chondrocytePart, pancreasPart, olfactoryPart
         ] = await Promise.all([
-            // Core
-            fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
-            fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
-            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
-            // Datasets
-            fetch(base + 'kidney_structure.json').then(r => r.json()),
-            fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
-            fetch(base + 'kidney_expression_part2.json').then(r => r.json()),
-            Promise.all(Array.from({ length: 15 }, (_, i) => fetch(`${base}UMAP_Data/lung_downsampled_part${i + 1}.json`).then(r => r.json()))),
-            Promise.all(Array.from({ length: 6 }, (_, i) => fetch(`${base}UMAP_Data/liver_part${i + 1}.json`).then(r => r.json()))),
-            Promise.all(Array.from({ length: 6 }, (_, i) => fetch(`${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`).then(r => r.json()))),
-            Promise.all(Array.from({ length: 2 }, (_, i) => fetch(`${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`).then(r => r.json()))),
-            fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json())
+            fetchSafe(base + 'kidney_structure.json'),
+            fetchSafe(base + 'kidney_expression_part1.json'),
+            fetchSafe(base + 'kidney_expression_part2.json'),
+            fetchSequence(lungUrls),       // <--- Throttled
+            fetchSequence(liverUrls),      // <--- Throttled
+            fetchSequence(hypExprUrls),    // <--- Throttled
+            fetchSequence(hypStructUrls),  // <--- Throttled
+            fetchSafe(base + 'UMAP_Data/chondrocyte_part1.json'),
+            fetchSafe(base + 'UMAP_Data/pancreas_part1.json'),
+            fetchSafe(base + 'UMAP_Data/olfactory_part1.json')
         ]);
 
-        // 3. Assign Core Data
+        // 5. Assign Core Data
         window.CiliAI.masterData = mainRes.masterData || (Array.isArray(mainRes) ? mainRes : []);
         window.CiliAI.lookups = lookupsRes.lookups || lookupsRes || {};
-        
-        // 4. Populate Gene Map & Calculate Stats
+
+        // 6. Populate Maps & Stats
         const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
         const validCiliopathyDiseases = new Set();
         const uniqueCiliopathyGenes = new Set();
@@ -1303,7 +1334,6 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             if (g.Gene) {
                 const sym = g.Gene.toUpperCase();
                 window.CiliAI.lookups.geneMap[sym] = g;
-                
                 if (g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
 
                 if (primaryClasses.includes(g.ciliopathy_classification)) {
@@ -1318,7 +1348,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             }
         });
 
-        // 5. Update UI Stats
+        // Update Dashboard Stats
         const statGenes = document.getElementById('stat-genes');
         if (statGenes) statGenes.textContent = window.CiliAI.masterData.length.toLocaleString();
         
@@ -1328,7 +1358,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         const statCilioGenes = document.getElementById('stat-ciliopathy-genes');
         if (statCilioGenes) statCilioGenes.textContent = uniqueCiliopathyGenes.size.toLocaleString();
 
-        // 6. Process Datasets
+        // 7. Process Merged Datasets
         const processSplit = (parts) => {
             const res = { umap: [], cells: {} };
             parts.flat().forEach(p => {
@@ -1343,7 +1373,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             cells: Object.assign({}, ...hypExprParts)
         };
 
-        // Register Datasets (No Pancreas/Olfactory)
+        // 8. Register Datasets
         window.CiliAI.datasets = {
             lung: {
                 name: "Human Lung Organoid",
@@ -1359,7 +1389,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             },
             kidney: {
                 name: "Human Kidney",
-                umap: kStructRes.umap,
+                umap: kStructRes.umap || [],
                 expression: { ...kExpr1Res, ...kExpr2Res },
                 reference: "Stewart et al., Science (2019)"
             },
@@ -1380,15 +1410,28 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
                 umap: chondrocytePart.umap || [],
                 expression: chondrocytePart.cells || chondrocytePart,
                 reference: "Gan et al., Wire's Systems Biology (2021)"
+            },
+            pancreas: {
+                name: "Pancreas",
+                umap: pancreasPart.umap || [],
+                expression: pancreasPart.cells || {},
+                reference: "Baron et al., Cell Systems (2016)"
+            },
+            olfactory: {
+                name: "Olfactory Epithelium",
+                umap: olfactoryPart.umap || [],
+                expression: olfactoryPart.cells || {},
+                reference: "Durante et al., Nat Neuro (2020)"
             }
         };
 
-        // 7. RNA Consensus
+        // 9. RNA Consensus
         const rnaText = await rnaResp.text();
         window.rnaTissueExpressionData = window.parseTsvData ? window.parseTsvData(rnaText) : [];
 
         window.CiliAI.ready = true;
         window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
+        console.log("✅ CiliAI fully loaded.");
         return true;
 
     } catch (err) {
@@ -1556,6 +1599,7 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
 
