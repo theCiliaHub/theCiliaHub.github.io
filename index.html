@@ -1455,9 +1455,6 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         
         const mergedHypothalamusExpr = hypothalamusExprParts.reduce((acc, part) => 
             Object.assign(acc, part), {});
-            
-        const mergedPancreas = processDataset(pancreasParts, "pancreas");
-        const mergedOlfactory = processDataset(olfactoryParts, "olfactory");
         
         // Assign all datasets to CiliAI
         window.CiliAI.datasets = {
@@ -1809,6 +1806,7 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
 
