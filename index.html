@@ -500,7 +500,10 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title-group">
-                        <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
+                        <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence 
+
+[Image of Cilia Diagram]
+</span></div>
                         <div class="view-tabs">
                             <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
                             <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')">📊 Plot</button>
@@ -643,10 +646,7 @@
                 container.style.display = 'flex';
                 if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
                 if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
-                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence 
-
-[Image of Cilia Diagram]
-";
+                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
                 // Ensure SVG exists (if it was cleared)
                 if (!container.querySelector('svg')) {
                     window.generateAndInjectSVG();
@@ -1438,7 +1438,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
         document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
         
-        // Add organ counter
+        // Add organ counter (FIXED: Added Backticks for template literal)
         const existingOrganStat = document.getElementById('stat-organs');
         if (!existingOrganStat) {
              const organCounter = document.createElement('div');
