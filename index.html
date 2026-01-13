@@ -1245,6 +1245,31 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
     window.updateStatus('Syncing...', 'loading');
 
     try {
+        // --------------------------------------------------
+        // HARD GUARANTEES (CRITICAL)
+        // --------------------------------------------------
+        window.CiliAI ||= {};
+        window.CiliAI.datasets ||= {};
+        window.CiliAI.lookups ||= {};
+        window.CiliAI.cellDataCache ||= {};
+
+        // --------------------------------------------------
+        // ORGAN METADATA (MUST EXIST BEFORE USE)
+        // --------------------------------------------------
+        window.CiliAI.organMetadata = {
+            lung: { name: "Human Lung Organoid" },
+            lung_downsampled: { name: "Human Lung Tissue (Complete)" },
+            kidney: { name: "Human Kidney" },
+            liver: { name: "Human Liver" },
+            hypothalamus: { name: "Hypothalamus" },
+            chondrocyte: { name: "IVD Endplate / Chondrocyte" },
+            pancreas: { name: "Pancreas" },
+            olfactory: { name: "Olfactory Epithelium" }
+        };
+
+        // --------------------------------------------------
+        // FETCH DATA
+        // --------------------------------------------------
         const [
             mainRes, lookupsRes, rnaResp,
             kStructRes, kExpr1Res, kExpr2Res,
@@ -1280,17 +1305,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         ]);
 
         // --------------------------------------------------
-        // CORE OBJECTS
-        // --------------------------------------------------
-        window.CiliAI.masterData = mainRes.masterData || [];
-        window.CiliAI.lookups = lookupsRes.lookups || {};
-        window.CiliAI.lookups.pfamByGene ||= {};
-        window.CiliAI.lookups.goMap ||= {};
-        window.CiliAI.lookups.geneMap ||= {};
-        window.CiliAI.cellDataCache ||= {};
-
-        // --------------------------------------------------
-        // SAFE EMPTY DATASETS (FIXES YOUR ERROR)
+        // SAFE EMPTY DATASETS (NO MORE ReferenceErrors)
         // --------------------------------------------------
         const mergedPancreas = { umap: [], cells: {} };
         const mergedOlfactory = { umap: [], cells: {} };
@@ -1298,19 +1313,15 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         // --------------------------------------------------
         // LUNG (DOWN-SAMPLED)
         // --------------------------------------------------
-        const mergedLungDownsampled = { umap: [], cells: {}, cell_type_counts: {} };
+        const mergedLungDownsampled = { umap: [], cells: {} };
 
         lungParts.forEach(part => {
             part.forEach(cell => {
-                const ct = cell.cluster || cell.cell_type || 'Unknown';
                 mergedLungDownsampled.umap.push({
                     x: cell.umap_x ?? cell.x,
                     y: cell.umap_y ?? cell.y,
-                    cell_id: cell.cell_id,
-                    cell_type: ct
+                    cell_type: cell.cluster || cell.cell_type || 'Unknown'
                 });
-                mergedLungDownsampled.cell_type_counts[ct] =
-                    (mergedLungDownsampled.cell_type_counts[ct] || 0) + 1;
             });
         });
 
@@ -1322,100 +1333,79 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         // --------------------------------------------------
         // HYPOTHALAMUS
         // --------------------------------------------------
-        const mergedHypothalamusStruct = hypothalamusStructParts.reduce((acc, p) => {
-            acc.umap.push(...(p.umap || []));
-            return acc;
-        }, { umap: [] });
+        const mergedHypothalamusStruct = {
+            umap: hypothalamusStructParts.flatMap(p => p.umap || [])
+        };
 
-        const mergedHypothalamusExpr = hypothalamusExprParts.reduce((acc, p) => {
-            Object.assign(acc, p);
-            return acc;
-        }, {});
+        const mergedHypothalamusExpr = Object.assign({}, ...hypothalamusExprParts);
 
         // --------------------------------------------------
-        // DATASETS REGISTRY
+        // REGISTER DATASETS (NOW SAFE)
         // --------------------------------------------------
         window.CiliAI.datasets = {
             lung: {
                 name: window.CiliAI.organMetadata.lung.name,
                 umap: mainRes.umapData || [],
-                expression: {},
-                metadata: window.CiliAI.organMetadata.lung
+                expression: {}
             },
 
             lung_downsampled: {
                 name: window.CiliAI.organMetadata.lung_downsampled.name,
                 umap: mergedLungDownsampled.umap,
-                expression: mergedLungDownsampled.cells,
-                metadata: {
-                    ...window.CiliAI.organMetadata.lung_downsampled,
-                    cell_type_distribution: mergedLungDownsampled.cell_type_counts
-                }
+                expression: mergedLungDownsampled.cells
             },
 
             kidney: {
                 name: window.CiliAI.organMetadata.kidney.name,
                 umap: kStructRes.umap || [],
-                expression: { ...kExpr1Res, ...kExpr2Res },
-                metadata: window.CiliAI.organMetadata.kidney
+                expression: { ...kExpr1Res, ...kExpr2Res }
             },
 
             liver: {
                 name: window.CiliAI.organMetadata.liver.name,
                 umap: mergedLiver.umap || [],
-                expression: mergedLiver.cells,
-                metadata: window.CiliAI.organMetadata.liver
+                expression: mergedLiver.cells
             },
 
             hypothalamus: {
                 name: window.CiliAI.organMetadata.hypothalamus.name,
                 umap: mergedHypothalamusStruct.umap,
-                expression: mergedHypothalamusExpr,
-                metadata: window.CiliAI.organMetadata.hypothalamus
+                expression: mergedHypothalamusExpr
             },
 
             chondrocyte: {
                 name: window.CiliAI.organMetadata.chondrocyte.name,
                 umap: chondrocytePart.umap || [],
-                expression: chondrocytePart,
-                metadata: window.CiliAI.organMetadata.chondrocyte
+                expression: chondrocytePart
             },
 
             pancreas: {
                 name: window.CiliAI.organMetadata.pancreas.name,
                 umap: mergedPancreas.umap,
-                expression: mergedPancreas.cells,
-                metadata: window.CiliAI.organMetadata.pancreas
+                expression: mergedPancreas.cells
             },
 
             olfactory: {
                 name: window.CiliAI.organMetadata.olfactory.name,
                 umap: mergedOlfactory.umap,
-                expression: mergedOlfactory.cells,
-                metadata: window.CiliAI.organMetadata.olfactory
+                expression: mergedOlfactory.cells
             }
         };
 
         window.CiliAI.activeDataset = 'lung';
-
-        // --------------------------------------------------
-        // RNA TISSUE
-        // --------------------------------------------------
-        const rnaText = await rnaResp.text();
-        window.rnaTissueExpressionData = parseTsvData(rnaText);
-
         window.CiliAI.ready = true;
         window.updateStatus('CONNECTED', 'ready');
 
-        console.log("CiliAI loaded successfully");
+        console.log("✅ CiliAI fully loaded");
         return true;
 
     } catch (err) {
-        console.error("Load failed:", err);
+        console.error("❌ Load failed:", err);
         window.updateStatus('SYNC ERROR', 'error');
         return false;
     }
 };
+
     
 // Helper function to process dataset parts
 function processDataset(parts, organName) {
@@ -1625,6 +1615,7 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
 
