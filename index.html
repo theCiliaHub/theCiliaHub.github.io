@@ -6,11 +6,9 @@
     <title>CiliAI — Enhanced Gene Explorer</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
    
-    <!-- External Dependencies -->
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
    
-    <!-- CiliAI Engine - Centralized Logic -->
     <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
    
     <style>
@@ -491,7 +489,6 @@
         </div>
     </nav>
     <div class="app-container">
-        <!-- Visualization Panel -->
         <div class="center-panel">
             <div class="top-bar">
                 <div class="search-container">
@@ -503,7 +500,6 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title-group">
-                        <!-- Corrected IDs resolve console errors in engine -->
                         <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
                         <div class="view-tabs">
                             <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
@@ -543,11 +539,9 @@
                     <div id="cilia-svg"></div>
                     <div id="plotly-container"></div>
                     <div id="domain-viewer"></div>
-                    <!-- Hidden elements required by engine logic -->
                     <div id="vizActiveDescription" style="display:none"></div>
                 </div>
             </div>
-            <!-- DYNAMIC DASHBOARD -->
             <div class="landing-dashboard">
                 <div class="stat-item">
                     <div class="stat-value" id="stat-genes">...</div>
@@ -563,7 +557,6 @@
                 </div>
             </div>
         </div>
-        <!-- RIGHT PANEL -->
         <aside class="right-panel">
             <div class="chat-header">
                 <h2>CiliAI Assistant</h2>
@@ -1239,7 +1232,7 @@
             }
         };
 
-// Data Loading Logic (FIXED: All referenced datasets defined safely)
+// Data Loading Logic (FIXED: Assigned fetched data to Global State)
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
@@ -1279,7 +1272,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         ] = await Promise.all([
             fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
             fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
-            fetch(base + 'rna_tissue_consensus.tsv'),
+            fetch(base + 'rna_tissue_consensus.tsv'), // Fetch Response object
 
             fetch(base + 'kidney_structure.json').then(r => r.json()),
             fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
@@ -1303,6 +1296,16 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
             fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json())
         ]);
+
+        // --------------------------------------------------
+        // CRITICAL FIX: ASSIGN FETCHED DATA TO GLOBAL STATE
+        // --------------------------------------------------
+        window.CiliAI.lookups = lookupsRes;
+        window.CiliAI.masterData = Array.isArray(mainRes) ? mainRes : (mainRes.data || []);
+        
+        // Parse RNA data
+        const rnaText = await rnaResp.text();
+        window.CiliAI.rnaData = window.parseTsvData(rnaText);
 
         // --------------------------------------------------
         // SAFE EMPTY DATASETS (NO MORE ReferenceErrors)
@@ -1394,9 +1397,9 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
         window.CiliAI.activeDataset = 'lung';
         window.CiliAI.ready = true;
-        window.updateStatus('CONNECTED', 'ready');
+        window.updateStatus(`READY (${window.CiliAI.masterData.length} genes)`, 'ready');
 
-        console.log("✅ CiliAI fully loaded");
+        console.log("✅ CiliAI fully loaded with data");
         return true;
 
     } catch (err) {
@@ -1606,7 +1609,7 @@ window.handleUserSend = function() {
             window.generateAndInjectSVG();
             const loaded = await window.loadCiliAIData();
             if (loaded) {
-                window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
+                // Status update moved to inside loadCiliAIData for accuracy
             }
         }
         document.getElementById('chatInput').addEventListener('keydown', (e) => {
@@ -1615,10 +1618,3 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
-
-
-
-
-
-
-
