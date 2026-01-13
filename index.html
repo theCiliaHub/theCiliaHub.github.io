@@ -1254,7 +1254,7 @@ window.parseTsvData = function (tsvText) {
 };
 
 // ==========================================================
-// DATA LOADING LOGIC (FIXED STATS & REFERENCES)
+// DATA LOADING LOGIC (FIXED: Removed Missing Datasets)
 // ==========================================================
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
@@ -1267,13 +1267,13 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         window.CiliAI.lookups = window.CiliAI.lookups || { geneMap: {} };
         window.CiliAI.cellDataCache = window.CiliAI.cellDataCache || {};
 
-        // 2. Fetch All Data
+        // 2. Fetch All Data (Pancreas & Olfactory removed)
         const [
             mainRes, lookupsRes, rnaResp,
             kStructRes, kExpr1Res, kExpr2Res,
             lungParts, liverParts,
             hypExprParts, hypStructParts,
-            chondrocytePart, pancreasPart, olfactoryPart
+            chondrocytePart
         ] = await Promise.all([
             // Core
             fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
@@ -1287,16 +1287,14 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             Promise.all(Array.from({ length: 6 }, (_, i) => fetch(`${base}UMAP_Data/liver_part${i + 1}.json`).then(r => r.json()))),
             Promise.all(Array.from({ length: 6 }, (_, i) => fetch(`${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`).then(r => r.json()))),
             Promise.all(Array.from({ length: 2 }, (_, i) => fetch(`${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`).then(r => r.json()))),
-            fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json()),
-            fetch(base + 'UMAP_Data/pancreas_part1.json').then(r => r.json().catch(() => ({ umap: [], cells: {} }))),
-            fetch(base + 'UMAP_Data/olfactory_part1.json').then(r => r.json().catch(() => ({ umap: [], cells: {} })))
+            fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json())
         ]);
 
         // 3. Assign Core Data
         window.CiliAI.masterData = mainRes.masterData || (Array.isArray(mainRes) ? mainRes : []);
         window.CiliAI.lookups = lookupsRes.lookups || lookupsRes || {};
         
-        // 4. Populate Gene Map & Calculate Stats (CRITICAL FIX)
+        // 4. Populate Gene Map & Calculate Stats
         const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
         const validCiliopathyDiseases = new Set();
         const uniqueCiliopathyGenes = new Set();
@@ -1306,10 +1304,8 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
                 const sym = g.Gene.toUpperCase();
                 window.CiliAI.lookups.geneMap[sym] = g;
                 
-                // Cache scRNA if present
                 if (g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
 
-                // Stats Logic
                 if (primaryClasses.includes(g.ciliopathy_classification)) {
                     uniqueCiliopathyGenes.add(sym);
                     if (g.Ciliopathy) {
@@ -1347,7 +1343,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             cells: Object.assign({}, ...hypExprParts)
         };
 
-        // Register Datasets with References
+        // Register Datasets (No Pancreas/Olfactory)
         window.CiliAI.datasets = {
             lung: {
                 name: "Human Lung Organoid",
@@ -1384,18 +1380,6 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
                 umap: chondrocytePart.umap || [],
                 expression: chondrocytePart.cells || chondrocytePart,
                 reference: "Gan et al., Wire's Systems Biology (2021)"
-            },
-            pancreas: {
-                name: "Pancreas",
-                umap: pancreasPart.umap || [],
-                expression: pancreasPart.cells || {},
-                reference: "Baron et al., Cell Systems (2016)"
-            },
-            olfactory: {
-                name: "Olfactory Epithelium",
-                umap: olfactoryPart.umap || [],
-                expression: olfactoryPart.cells || {},
-                reference: "Durante et al., Nat Neuro (2020)"
             }
         };
 
@@ -1572,5 +1556,6 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
