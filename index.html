@@ -1256,7 +1256,7 @@ window.parseTsvData = function (tsvText) {
     });
 };
 
-// Data Loading Logic (FIXED: Preserved User Logic + Added New Tissues)
+// Data Loading Logic (FIXED: Syntax Error Resolved + Missing Tissues Added)
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
@@ -1314,7 +1314,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         // --------------------------------------------------
         // ASSIGN RAW DATA & DEFAULTS
         // --------------------------------------------------
-        window.CiliAI.masterData = mainRes.masterData || (Array.isArray(mainRes) ? mainRes : []); // Robust fallback
+        window.CiliAI.masterData = mainRes.masterData || (Array.isArray(mainRes) ? mainRes : []); 
         window.CiliAI.lookups = lookupsRes.lookups || lookupsRes || {};
         
         if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
@@ -1427,12 +1427,12 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
         document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
         
-        // Add organ counter (Backtick fix applied)
+        // Add organ counter (FIXED: Using standard concatenation for safety)
         const existingOrganStat = document.getElementById('stat-organs');
         if (!existingOrganStat) {
              const organCounter = document.createElement('div');
              organCounter.className = 'stat-item';
-             organCounter.innerHTML = `<div class="stat-value" id="stat-organs">${Object.keys(window.CiliAI.datasets).length}</div><div class="stat-label">Tissues</div>`;
+             organCounter.innerHTML = '<div class="stat-value" id="stat-organs">' + Object.keys(window.CiliAI.datasets).length + '</div><div class="stat-label">Tissues</div>';
              document.querySelector('.landing-dashboard').appendChild(organCounter);
         } else {
              existingOrganStat.textContent = Object.keys(window.CiliAI.datasets).length;
