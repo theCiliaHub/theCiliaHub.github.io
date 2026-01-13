@@ -3090,634 +3090,343 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 /**
- * Renders Interactive UMAP – Enhanced with legend, dataset switch, clickable points,
- * and full multi-gene expression averaging support.
+ * Renders Interactive UMAP – Enhanced with Transparency/Size controls, 
+ * dataset switching, and robust multi-gene expression support.
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
-    // 1. Clear previous views
+    // --- 1. ROBUST INPUT HANDLING ---
+    if (typeof targetGenes === 'string') {
+        targetGenes = targetGenes.split(',').map(s => s.trim()).filter(s => s);
+    } else if (!Array.isArray(targetGenes)) {
+        targetGenes = displayName ? [displayName] : ['WDR31'];
+    }
+    
+    // Default display name
+    if (!displayName) displayName = targetGenes[0] || 'Gene View';
+
+    // 2. Clear previous views
     if (typeof window.resetViews === 'function') window.resetViews();
 
-    // 2. Intelligent dataset selection based on query
+    // 3. Intelligent dataset selection
     let datasetKey = window.CiliAI.activeDataset || 'lung';
     
-    // Analyze the query to determine the most appropriate dataset
+    // Analyze query to find target tissue
     const analyzeQueryForDataset = () => {
         const query = (displayName + ' ' + targetGenes.join(' ')).toLowerCase();
         
-        // Check for specific organ mentions
         if (query.includes('kidney') || query.includes('renal')) return 'kidney';
         if (query.includes('liver') || query.includes('hepatic')) return 'liver';
-        if (query.includes('hypothalamus') || query.includes('brain')) return 'hypothalamus';
+        if (query.includes('hypothalamus') || query.includes('brain') || query.includes('neuron')) return 'hypothalamus';
         if (query.includes('chondrocyte') || query.includes('cartilage')) return 'chondrocyte';
         if (query.includes('pancreas') || query.includes('islet')) return 'pancreas';
-        if (query.includes('olfactory') || query.includes('smell')) return 'olfactory';
+        if (query.includes('olfactory') || query.includes('nose') || query.includes('smell')) return 'olfactory';
         
-        // Lung-specific logic
         if (query.includes('lung')) {
-            // User wants COMPLETE lung tissue (not just alveolar organoid)
-            if (query.includes('tissue') || query.includes('complete') || 
-                query.includes('whole') || query.includes('sikkema') ||
-                (!query.includes('organoid') && (query.includes('immune') || 
-                 query.includes('macrophage') || query.includes('fibroblast')))) {
+            if (query.includes('tissue') || query.includes('complete') || query.includes('sikkema') || 
+                query.includes('immune') || query.includes('macrophage')) {
                 return 'lung_downsampled';
             }
-            // User explicitly wants alveolar organoid
-            if (query.includes('organoid') || query.includes('alveolar') || 
-                query.includes('alveolus')) {
+            if (query.includes('organoid') || query.includes('alveolar')) {
                 return 'lung';
             }
         }
-        
-        // Default to current active dataset
         return datasetKey;
     };
     
-    // If displayName is not CLUSTER_VIEW and we have a query, analyze it
-    if (displayName !== 'CLUSTER_VIEW' && (displayName || targetGenes.length > 0)) {
-        const suggestedDataset = analyzeQueryForDataset();
-        if (suggestedDataset !== datasetKey && window.CiliAI.datasets[suggestedDataset]) {
-            datasetKey = suggestedDataset;
-            window.CiliAI.activeDataset = datasetKey;
+    // Switch dataset if query implies it
+    if (displayName !== 'CLUSTER_VIEW') {
+        const suggested = analyzeQueryForDataset();
+        if (window.CiliAI.datasets[suggested]) {
+            datasetKey = suggested;
+            window.CiliAI.activeDataset = suggested;
         }
     }
     
-    const dataset = window.CiliAI.datasets?.[datasetKey];
-    if (!dataset || !Array.isArray(dataset.umap)) {
-        // Fallback to lung if dataset not found
-        datasetKey = 'lung';
-        window.CiliAI.activeDataset = 'lung';
-        window.addChatMessage(`Warning: Requested dataset not available. Using Lung Organoid dataset.`, false);
-        if (!window.CiliAI.datasets?.lung) {
-            window.addChatMessage(`Error: No datasets loaded. Please wait for data to sync.`, false);
-            return;
-        }
-    }
-
-    // 3. Get dataset metadata
-    const datasetInfo = dataset.metadata || window.CiliAI.organMetadata?.[datasetKey] || {
-        name: dataset.name || 'Unknown Dataset',
-        description: 'scRNA-seq dataset',
-        cell_types: ['Unknown'],
-        reference: 'No reference available'
-    };
-
-    // 4. Normalize inputs
-    if (!displayName || displayName === 'CLUSTER_VIEW') {
-        displayName = datasetInfo.default_gene || 
-                     (datasetKey === 'lung_downsampled' ? 'FOXJ1' : 'WDR31');
-    }
+    const dataset = window.CiliAI.datasets[datasetKey];
     
-    if (typeof targetGenes === 'string') {
-        targetGenes = targetGenes.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
-    }
-    if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName.toUpperCase()];
-
-    const primaryGene = targetGenes[0];
-    const isMultiGene = targetGenes.length > 1;
-    const isClusterView = displayName === 'CLUSTER_VIEW';
-
-    // 5. Prepare data
-    const sourceData = dataset.umap;
-    if (!sourceData || sourceData.length === 0) {
-        window.addChatMessage(`No UMAP data available for ${datasetInfo.name}.`, false);
+    if (!dataset || !dataset.umap || dataset.umap.length === 0) {
+        window.addChatMessage(`⚠️ Dataset <strong>${datasetKey}</strong> is not ready or has no UMAP data.`, false);
         return;
     }
 
-    const x = [], y = [], color = [], text = [], size = [], customdata = [];
-    let maxExpr = 0;
-
-    // Get organ-specific cell type colors
-    const clusterColors = getOrganCellTypeColors(datasetKey);
-    const cellTypes = new Set();
-
-    // Helper: decode sparse array
-    const decodeSparse = (sparse, total) => {
-        const dense = new Float32Array(total).fill(0);
-        if (!sparse || !Array.isArray(sparse)) return dense;
-        for (let k = 0; k < sparse.length; k += 2) {
-            const idx = sparse[k];
-            const val = sparse[k + 1];
-            if (idx < total) dense[idx] = val;
-        }
-        return dense;
+    // 4. Metadata & Setup
+    const datasetInfo = {
+        name: dataset.name || 'Unknown Dataset',
+        description: dataset.reference || 'scRNA-seq dataset', 
+        cell_types: ['Unknown'] 
     };
 
-    // Expression handling – supports multi-gene averaging
-    let exprData = null;
-    let geneFoundCount = 0;
+    const isClusterView = displayName === 'CLUSTER_VIEW';
+    const primaryGene = targetGenes[0];
+    const isMultiGene = targetGenes.length > 1;
 
+    // 5. Prepare Data Arrays
+    const sourceData = dataset.umap;
+    const x = [], y = [], color = [], text = [], customdata = [];
+    let maxExpr = 0;
+    const clusterColors = window.getOrganCellTypeColors ? window.getOrganCellTypeColors(datasetKey) : {};
+    const cellTypesFound = new Set();
+
+    // Expression Value Helper
+    const getExpressionValue = (gene, cellId, cellType) => {
+        if (!dataset.expression) return 0;
+        let geneData = dataset.expression[gene];
+        
+        // Fallback to cache
+        if (!geneData && window.CiliAI.cellDataCache[gene]) {
+            geneData = window.CiliAI.cellDataCache[gene];
+        }
+        if (!geneData) return 0;
+
+        // Handle Sparse Arrays (Kidney) vs Objects (Lung/Liver)
+        if (Array.isArray(geneData)) return 0; // Optimization: Sparse arrays handled in batch below
+        
+        if (typeof geneData === 'object') {
+            return geneData[cellId] !== undefined ? geneData[cellId] : (geneData[cellType] || 0);
+        }
+        return 0;
+    };
+
+    // Calculate Expression (Batch)
+    let exprValues = new Float32Array(sourceData.length).fill(0);
+    
     if (!isClusterView) {
-        const perGeneExpr = [];
-
-        targetGenes.forEach(g => {
-            let rawData = dataset.expression?.[g] || window.CiliAI.cellDataCache?.[g];
-            if (!rawData && dataset.expression) {
-                // Try to find gene in expression data structure
-                Object.keys(dataset.expression).forEach(key => {
-                    if (key.toUpperCase() === g) {
-                        rawData = dataset.expression[key];
-                    }
-                });
-            }
-            
-            if (rawData) {
-                geneFoundCount++;
-                if (Array.isArray(rawData)) {
-                    perGeneExpr.push(decodeSparse(rawData, sourceData.length));
-                } else if (typeof rawData === 'object') {
-                    // Dictionary by cell type – convert to indexed array
-                    const arr = new Float32Array(sourceData.length);
-                    sourceData.forEach((p, i) => {
-                        if (p && p.cell_type) arr[i] = rawData[p.cell_type] || 0;
-                    });
-                    perGeneExpr.push(arr);
-                }
-            }
-        });
-
-        if (geneFoundCount > 0) {
-            // Average across available genes
-            exprData = new Float32Array(sourceData.length);
-            sourceData.forEach((_, i) => {
+        if (datasetKey === 'kidney' && dataset.expression) {
+             // Optimized Sparse Handling for Kidney
+             targetGenes.forEach(g => {
+                 const sparse = dataset.expression[g];
+                 if (sparse && Array.isArray(sparse)) {
+                     for (let k = 0; k < sparse.length; k += 2) {
+                         const idx = sparse[k];
+                         const val = sparse[k + 1];
+                         if (idx < exprValues.length) exprValues[idx] += val;
+                     }
+                 }
+             });
+        } else {
+            // General Object Handling
+            sourceData.forEach((p, i) => {
                 let sum = 0;
                 let count = 0;
-                perGeneExpr.forEach(arr => {
-                    if (arr[i] !== undefined) {
-                        sum += arr[i];
+                targetGenes.forEach(g => {
+                    const val = getExpressionValue(g, p.cell_id, p.cell_type || p.cluster);
+                    if (val > 0) {
+                        sum += val;
                         count++;
                     }
                 });
-                exprData[i] = count > 0 ? sum / count : 0;
+                exprValues[i] = count > 0 ? (isMultiGene ? sum / targetGenes.length : sum) : 0;
             });
         }
+        
+        // Calculate max for scaling
+        for(let i=0; i<exprValues.length; i++) if(exprValues[i] > maxExpr) maxExpr = exprValues[i];
     }
 
-    // Build plot data points
+    // 6. Build Plot Arrays
     sourceData.forEach((p, i) => {
-        if (!p) return;
-        
-        // Extract cell type - handle different data structures
-        let cellType = p.cell_type || p.cluster || 'Unknown';
-        if (typeof cellType !== 'string') cellType = 'Unknown';
-        
-        cellTypes.add(cellType);
+        const cellType = p.cell_type || p.cluster || 'Unknown';
+        cellTypesFound.add(cellType);
 
-        if (zoomToCellType && cellType.toLowerCase() !== zoomToCellType.toLowerCase()) {
-            return;
+        if (zoomToCellType && cellType.toLowerCase() !== zoomToCellType.toLowerCase()) return;
+
+        x.push(p.x || p.umap_x);
+        y.push(p.y || p.umap_y);
+
+        // Color Logic
+        if (isClusterView) {
+            let colorHex = '#94A3B8'; // Default gray
+            for (const [key, val] of Object.entries(clusterColors)) {
+                if (cellType.toLowerCase().includes(key.toLowerCase())) {
+                    colorHex = val;
+                    break;
+                }
+            }
+            color.push(colorHex);
+        } else {
+            color.push(exprValues[i]);
         }
 
-        x.push(p.x || p.umap_x || 0);
-        y.push(p.y || p.umap_y || 0);
+        // Tooltip
+        let tooltip = `<b>${cellType}</b>`;
+        if (!isClusterView) tooltip += `<br>Expr: ${exprValues[i].toFixed(2)} TPM`;
+        text.push(tooltip);
 
-        let exprVal = 0;
-        if (!isClusterView && exprData) {
-            exprVal = exprData[i] || 0;
-            if (exprVal > maxExpr) maxExpr = exprVal;
-        }
-
-        // Build hover text
-        let hoverText = `<b>${cellType}</b>`;
-        if (!isClusterView) {
-            hoverText += `<br>Expression: ${exprVal.toFixed(2)} TPM`;
-        }
-        if (p.cell_id) {
-            hoverText += `<br>ID: ${p.cell_id}`;
-        }
-        text.push(hoverText);
-
-        // Use localization from primary gene
+        // Interaction Data
         customdata.push({
             localization: window.CiliAI.lookups.geneMap?.[primaryGene]?.Localization || 'Cilium',
             cell_type: cellType,
             gene: primaryGene
         });
-
-        if (isClusterView) {
-            // Get color for this cell type
-            const colorKey = Object.keys(clusterColors).find(key => 
-                cellType.toLowerCase().includes(key.toLowerCase())
-            ) || '__default__';
-            color.push(clusterColors[colorKey] || '#94A3B8');
-            size.push(6);
-        } else {
-            color.push(exprVal);
-            size.push(exprVal > 0 ? 8 : 4);
-        }
     });
 
-    // Check if we have any data after filtering
-    if (x.length === 0) {
-        window.addChatMessage(`No cells found${zoomToCellType ? ` for cell type: ${zoomToCellType}` : ''} in ${datasetInfo.name}.`, false);
-        return;
-    }
-
-    // 6. Trace configuration
+    // 7. Plotly Configuration
     const trace = {
-        x, y, text, customdata,
-        mode: 'markers',
-        type: 'scattergl',
-        hoverinfo: 'text',
+        x: x, y: y, text: text, customdata: customdata,
+        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
-            size,
-            opacity: 0.85,
-            line: { width: 0.5, color: '#fff' }
+            size: isClusterView ? 4 : 5,
+            opacity: 0.8, // Default opacity
+            color: color,
+            ...(isClusterView ? {} : {
+                colorscale: dataset.colorScale || 'Viridis',
+                colorbar: { title: 'TPM', thickness: 10 },
+                cmin: 0, cmax: maxExpr || 1
+            })
         }
     };
 
-    if (!isClusterView) {
-        trace.marker.color = color;
-        trace.marker.cmin = 0;
-        trace.marker.cmax = maxExpr > 0 ? maxExpr : 1;
-        trace.marker.colorscale = dataset.colorScale || [
-            [0, '#e2e8f0'],
-            [0.2, '#93c5fd'],
-            [0.5, '#3b82f6'],
-            [0.8, '#1d4ed8'],
-            [1, '#1e40af']
-        ];
-        trace.marker.colorbar = {
-            title: isMultiGene ? 'Avg TPM' : 'TPM',
-            thickness: 15,
-            len: 0.6,
-            titleside: 'right'
-        };
-    } else {
-        trace.marker.color = color;
-    }
-
-    // 7. Layout configuration
-    const titleText = isClusterView 
-        ? `Cell Types: ${datasetInfo.name}`
-        : `${isMultiGene ? targetGenes.join(' + ') : primaryGene} in ${datasetInfo.name}`;
-    
     const layout = {
         title: {
-            text: `<b>${titleText}</b><br><sub>${datasetInfo.description || 'scRNA-seq'}</sub>`,
-            font: { size: 16, family: 'Inter, sans-serif' },
-            x: 0.05,
-            xref: 'paper'
+            text: `<b>${isClusterView ? 'Cell Types' : primaryGene}</b> - ${datasetInfo.name}`,
+            font: { size: 14 }
         },
-        xaxis: { 
-            visible: false, 
-            showgrid: false, 
-            zeroline: false,
-            showticklabels: false
-        },
-        yaxis: { 
-            visible: false, 
-            showgrid: false, 
-            zeroline: false,
-            showticklabels: false
-        },
+        margin: { t: 40, b: 30, l: 30, r: 30 },
+        xaxis: { visible: false }, yaxis: { visible: false },
         hovermode: 'closest',
-        margin: { t: 80, b: 40, l: 40, r: 40 },
-        plot_bgcolor: '#fff',
-        paper_bgcolor: '#fff',
-        showlegend: false,
-        annotations: [],
+        dragmode: 'pan',
         autosize: true
     };
 
-    // 8. Cell type legend for cluster view
-    if (isClusterView && cellTypes.size > 0) {
-        const legendX = 1.02;
-        let legendY = 1;
-        const legendStep = 0.05;
-        const sortedCellTypes = Array.from(cellTypes).sort();
-        
-        sortedCellTypes.forEach((ct, idx) => {
-            const col = Object.keys(clusterColors).find(key => 
-                ct.toLowerCase().includes(key.toLowerCase())
-            ) ? clusterColors[Object.keys(clusterColors).find(key => 
-                ct.toLowerCase().includes(key.toLowerCase())
-            )] : clusterColors['__default__'];
-            
-            layout.annotations.push({
-                x: legendX,
-                y: legendY - idx * legendStep,
-                xref: 'paper',
-                yref: 'paper',
-                text: `<span style="color:${col}; font-size: 10px;">●</span> <span style="font-size: 10px;">${ct}</span>`,
-                showarrow: false,
-                font: { size: 10, family: 'Inter, sans-serif' },
-                align: 'left',
-                xanchor: 'left',
-                bgcolor: 'rgba(255, 255, 255, 0.8)',
-                bordercolor: '#e2e8f0',
-                borderwidth: 1,
-                borderpad: 4
-            });
-        });
-        
-        // Adjust right margin for legend
-        layout.margin.r = 150;
-    }
+    // 8. Render Plot
+    const plotContainer = document.getElementById('plotly-container');
+    document.getElementById('cilia-svg').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+    plotContainer.style.display = 'block';
+    
+    Plotly.purge(plotContainer);
+    await Plotly.newPlot(plotContainer, [trace], layout, { responsive: true });
+    window.CiliAI.currentPlot = plotContainer;
 
-    // 9. Render the plot
-    const plotTitle = isClusterView
-        ? `Cell Types: ${datasetInfo.name}`
-        : `${isMultiGene ? 'Multi-Gene: ' + targetGenes.join(', ') : primaryGene} | ${datasetInfo.name}`;
-
-    try {
-        // Clear previous plot
-        const plotContainer = document.getElementById('plotly-container');
-        if (plotContainer) {
-            plotContainer.innerHTML = '';
-        }
-        
-        // Switch to plot view
-        document.getElementById('cilia-svg').style.display = 'none';
-        document.getElementById('domain-viewer').style.display = 'none';
-        plotContainer.style.display = 'block';
-        document.getElementById('current-viz-title').textContent = plotTitle;
-        
-        // Render with Plotly
-        await Plotly.newPlot('plotly-container', [trace], layout, {
-            responsive: true,
-            displaylogo: false,
-            displayModeBar: true,
-            modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
-            scrollZoom: true
-        });
-        
-        // Store reference to current plot
-        window.CiliAI.currentPlot = document.getElementById('plotly-container');
-        
-        // 10. Attach click handler
-        setTimeout(() => {
-            const gd = document.getElementById('plotly-container');
-            if (gd) {
-                gd.on('plotly_click', (data) => {
-                    const point = data.points?.[0];
-                    if (point) {
-                        const loc = point.customdata?.localization;
-                        const cellType = point.customdata?.cell_type;
-                        const gene = point.customdata?.gene;
-                        
-                        if (loc && typeof window.highlightCiliumLocation === 'function') {
-                            window.resetViews();
-                            window.showDiagram();
-                            window.highlightCiliumLocation(loc, gene);
-                            
-                            const cellName = point.text.split('<br>')[0].replace(/<b>|<\/b>/g, '');
-                            window.addChatMessage(
-                                `<div class="ai-result-card">
-                                    <p><i>Clicked: ${cellName}</i></p>
-                                    <p>Localization for <strong>${gene}</strong> highlighted on ciliary diagram.</p>
-                                    <p><small>Cell type: ${cellType || 'Unknown'}</small></p>
-                                </div>`, 
-                                false
-                            );
-                        }
-                    }
-                });
+    // 9. Add Click Listener
+    plotContainer.on('plotly_click', data => {
+        const pt = data.points[0];
+        if (pt && pt.customdata && pt.customdata.localization) {
+            window.showDiagram();
+            if (window.SpatialManager) {
+                window.SpatialManager.highlight(pt.customdata.localization, pt.customdata.gene);
             }
-        }, 100);
+        }
+    });
 
-    } catch (error) {
-        console.error("Plotly rendering error:", error);
-        window.addChatMessage(`<div class="ai-result-card"><p>Error rendering plot: ${error.message}</p></div>`, false);
-        return;
-    }
-
-    // 11. Create dataset selector UI
-    const createDatasetSelector = () => {
-        const availableDatasets = Object.entries(window.CiliAI.datasets || {})
-            .filter(([key, ds]) => ds.umap && ds.umap.length > 0)
-            .map(([key, ds]) => ({ key, name: ds.name }));
-        
-        if (availableDatasets.length <= 1) return '';
-        
-        let selectorHtml = `<div style="margin-top: 12px; padding: 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <div style="font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">Switch Tissue:</div>
-            <div style="display: flex; flex-wrap: wrap; gap: 6px;">`;
-        
-        availableDatasets.forEach(({ key, name }) => {
-            const isActive = key === datasetKey;
-            selectorHtml += `
-                <button onclick="window.CiliAI.activeDataset='${key}'; window.renderUMAPPlot('${displayName}', '${targetGenes.join(',')}', ${zoomToCellType ? `'${zoomToCellType}'` : 'null'})"
-                    style="padding: 4px 10px; border-radius: 6px; border: 1px solid ${isActive ? '#3b82f6' : '#cbd5e0'}; 
-                           background: ${isActive ? '#3b82f6' : 'white'}; color: ${isActive ? 'white' : '#475569'}; 
-                           font-size: 11px; font-weight: ${isActive ? '600' : '500'}; cursor: pointer; 
-                           transition: all 0.2s; white-space: nowrap;">
-                    ${name}
-                </button>
-            `;
-        });
-        
-        selectorHtml += `</div></div>`;
-        return selectorHtml;
-    };
-
-    // 12. Send chat message with dataset info
-    const datasetTypeNote = datasetKey === 'lung_downsampled' 
-        ? '<p><em>📝 <strong>Complete Lung Tissue</strong> – Contains all major lung cell types (epithelial, immune, stromal)</em></p>'
-        : datasetKey === 'lung'
-        ? '<p><em>📝 <strong>Alveolar Lung Organoid</strong> – Focused on alveolar epithelium</em></p>'
-        : '';
-
-    const cellTypeSample = datasetInfo.cell_types 
-        ? datasetInfo.cell_types.slice(0, 5).join(', ') + 
-          (datasetInfo.cell_types.length > 5 ? `... (${datasetInfo.cell_types.length} types)` : '')
-        : 'Various cell types';
-
-    window.addChatMessage(`
+    // 10. Generate UI with Controls
+    const availableDatasets = Object.keys(window.CiliAI.datasets);
+    const geneListStr = targetGenes.join(',');
+    
+    let uiHtml = `
         <div class="ai-result-card">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <div>
-                    <h4 style="margin: 0; color: #2b6cb0;">${datasetInfo.name}</h4>
-                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">
-                        ${datasetInfo.description || 'scRNA-seq dataset'}
-                    </p>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <h4 style="margin:0; color:#2b6cb0;">${datasetInfo.name}</h4>
+                <span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${x.length} cells</span>
+            </div>
+            <p style="font-size:12px; color:#64748b; margin-top:0;">${datasetInfo.description}</p>
+            
+            <div style="margin:10px 0; padding:8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; display:flex; gap:15px; align-items:center;">
+                <div style="flex:1;">
+                    <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">Opacity</label>
+                    <input type="range" min="0.1" max="1" step="0.1" value="0.8" style="width:100%;" 
+                        oninput="Plotly.restyle('plotly-container', {'marker.opacity': this.value})">
                 </div>
-                <span style="background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
-                    ${sourceData.length.toLocaleString()} cells
-                </span>
+                <div style="flex:1;">
+                    <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">Dot Size</label>
+                    <input type="range" min="1" max="20" step="1" value="${isClusterView ? 4 : 5}" style="width:100%;" 
+                        oninput="Plotly.restyle('plotly-container', {'marker.size': this.value})">
+                </div>
             </div>
-            
-            ${datasetTypeNote}
-            
-            <div style="margin-top: 12px; padding: 10px; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #0ea5e9;">
-                <div style="font-size: 11px; font-weight: 600; color: #0369a1; margin-bottom: 4px;">📚 Reference</div>
-                <div style="font-size: 11px; color: #475569;">${datasetInfo.reference || 'No reference available'}</div>
+
+            <div style="background:#fff; border-top:1px solid #eee; padding-top:10px; margin-top:10px;">
+                <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:6px; text-transform:uppercase;">Compare in other tissues:</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+    `;
+
+    availableDatasets.forEach(dsKey => {
+        const isCurrent = dsKey === datasetKey;
+        const dsName = window.CiliAI.datasets[dsKey].name.replace('Human ', '').replace('Organoid', 'Org.');
+        
+        // Dynamic style for active vs inactive buttons
+        const style = isCurrent 
+            ? "background:#e0f2fe; color:#0369a1; border:1px solid #0ea5e9; cursor:default;" 
+            : "background:white; color:#475569; border:1px solid #cbd5e0; cursor:pointer;";
+
+        uiHtml += `
+            <button onclick="${isCurrent ? '' : `window.CiliAI.activeDataset='${dsKey}'; window.renderUMAPPlot('${displayName}', '${geneListStr}')`}"
+                style="font-size:11px; padding:5px 10px; border-radius:15px; transition:all 0.2s; ${style}"
+                ${!isCurrent ? `onmouseover="this.style.borderColor='#3b82f6'; this.style.color='#3b82f6'" onmouseout="this.style.borderColor='#cbd5e0'; this.style.color='#475569'"` : ''}>
+                ${isCurrent ? '✔️' : '📍'} ${dsName}
+            </button>
+        `;
+    });
+
+    uiHtml += `
+                </div>
             </div>
-            
-            <div style="margin-top: 12px;">
-                <div style="font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">🧬 Cell Types</div>
-                <div style="font-size: 11px; color: #64748b;">${cellTypeSample}</div>
+            <div style="margin-top:10px; text-align:right;">
+                 <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${targetGenes.join('_')}')" style="font-size:11px; margin-right:10px;">⬇️ CSV</a>
+                 ${!isClusterView ? `<button class="ciliai-button" style="padding:4px 8px; font-size:11px;" onclick="window.renderUMAPPlot('CLUSTER_VIEW')">👁️ Show Clusters</button>` : ''}
             </div>
-            
-            <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                <button class="ciliai-button" style="background: #0ea5e9;"
-                    onclick="window.downloadUMAPDataAsCSV('${targetGenes.join('_') || primaryGene}')">
-                    ⬇️ Download CSV
-                </button>
-                ${isClusterView ? '' : `
-                <button class="ciliai-button" style="background: #8b5cf6;"
-                    onclick="window.renderUMAPPlot('CLUSTER_VIEW', [], ${zoomToCellType ? `'${zoomToCellType}'` : 'null'})">
-                    👁️ View Cell Types
-                </button>
-                `}
-                <button class="ciliai-button" style="background: #10b981;"
-                    onclick="window.showDiagram()">
-                    📐 View Diagram
-                </button>
-            </div>
-            
-            ${createDatasetSelector()}
         </div>
-    `, false);
+    `;
+
+    window.addChatMessage(uiHtml, false);
 };
 
-// Helper function for organ-specific cell type colors
-function getOrganCellTypeColors(organKey) {
+// =======================================================
+// Helper: Organ-Specific Colors (Must be present)
+// =======================================================
+window.getOrganCellTypeColors = function(organKey) {
     const colorSchemes = {
         // LUNG ORGANOID (Alveolar-focused)
         lung: {
-            'ciliated cell': '#E11D48',
-            'stem cell': '#3B82F6',
-            'club cell': '#10B981',
-            'goblet cell': '#8B5CF6',
-            'basal cell': '#F59E0B',
-            'neuroendocrine cell': '#EC4899',
-            'pulmonary alveolar type 1 cell': '#2563EB',
-            'pulmonary alveolar type 2 cell': '#60A5FA',
-            'lung secretory cell': '#34D399',
-            '__default__': '#94A3B8'
+            'ciliated cell': '#E11D48', 'stem cell': '#3B82F6', 'club cell': '#10B981',
+            'goblet cell': '#8B5CF6', 'basal cell': '#F59E0B', 'neuroendocrine cell': '#EC4899',
+            'pulmonary alveolar type 1 cell': '#2563EB', 'pulmonary alveolar type 2 cell': '#60A5FA',
+            'lung secretory cell': '#34D399', '__default__': '#94A3B8'
         },
-        
-        // COMPLETE LUNG TISSUE (Sikkema et al.)
+        // COMPLETE LUNG TISSUE
         lung_downsampled: {
-            // Epithelial
-            'Ciliated epithelial cell': '#E11D48',
-            'Ciliated cell': '#E11D48',
-            'AT1 cell': '#2563EB',
-            'AT2 cell': '#3B82F6',
-            'Club cell': '#10B981',
-            'Goblet cell': '#8B5CF6',
-            'Basal cell': '#F59E0B',
-            'Ionocyte': '#8B5CF6',
-            'Neuroendocrine cell': '#EC4899',
-            
-            // Immune
-            'Macrophage': '#DC2626',
-            'Monocyte': '#EF4444',
-            'Neutrophil': '#F87171',
-            'Mast cell': '#FCA5A5',
-            'T cell': '#059669',
-            'B cell': '#7C3AED',
-            'NK cell': '#10B981',
-            'Dendritic cell': '#34D399',
-            'Plasma cell': '#A78BFA',
-            
-            // Stromal
-            'Fibroblast': '#D97706',
-            'Myofibroblast': '#F59E0B',
-            'Pericyte': '#FBBF24',
-            'Smooth muscle cell': '#B45309',
-            'Endothelial cell': '#0284C7',
-            'Mesothelial cell': '#0EA5E9',
-            'Lymphatic endothelial cell': '#38BDF8',
-            'Schwann cell': '#7DD3FC',
-            
-            '__default__': '#94A3B8'
+            'Ciliated epithelial cell': '#E11D48', 'AT1 cell': '#2563EB', 'AT2 cell': '#3B82F6',
+            'Club cell': '#10B981', 'Goblet cell': '#8B5CF6', 'Basal cell': '#F59E0B',
+            'Macrophage': '#DC2626', 'Monocyte': '#EF4444', 'T cell': '#059669', 'B cell': '#7C3AED',
+            'Fibroblast': '#D97706', 'Endothelial cell': '#0284C7', '__default__': '#94A3B8'
         },
-        
         // KIDNEY
         kidney: {
-            'Proximal Tubule Cell': '#3B82F6',
-            'Thick Ascending Limb Cell': '#60A5FA',
-            'Distal Convoluted Tubule Cell': '#93C5FD',
-            'Collecting Duct Principal Cell': '#BFDBFE',
-            'Collecting Duct Intercalated Cell': '#DBEAFE',
-            'Podocyte': '#1E40AF',
-            'Fibroblast': '#1D4ED8',
-            'Endothelial Cell': '#2563EB',
-            'Immune Cell': '#1E3A8A',
-            'Cycling Cell': '#172554',
+            'Proximal Tubule Cell': '#3B82F6', 'Thick Ascending Limb Cell': '#60A5FA',
+            'Distal Convoluted Tubule Cell': '#93C5FD', 'Collecting Duct Principal Cell': '#BFDBFE',
+            'Podocyte': '#1E40AF', 'Endothelial Cell': '#2563EB', 'Immune Cell': '#1E3A8A',
             '__default__': '#94A3B8'
         },
-        
         // LIVER
         liver: {
-            'Hepatocyte': '#10B981',
-            'Cholangiocyte': '#34D399',
-            'Kupffer cell': '#DC2626',
-            'Liver sinusoidal endothelial cell': '#0284C7',
-            'Hepatic stellate cell': '#D97706',
-            'B cell': '#7C3AED',
-            'T cell': '#059669',
-            'NK cell': '#10B981',
-            'Monocyte': '#EF4444',
-            'Macrophage': '#DC2626',
-            'Dendritic cell': '#34D399',
-            'Portal fibroblast': '#F59E0B',
-            '__default__': '#94A3B8'
+            'Hepatocyte': '#10B981', 'Cholangiocyte': '#34D399', 'Kupffer cell': '#DC2626',
+            'Liver sinusoidal endothelial cell': '#0284C7', 'Hepatic stellate cell': '#D97706',
+            'T cell': '#059669', 'B cell': '#7C3AED', '__default__': '#94A3B8'
         },
-        
         // HYPOTHALAMUS
         hypothalamus: {
-            'Neuron': '#8B5CF6',
-            'Astrocyte': '#10B981',
-            'Oligodendrocyte': '#3B82F6',
-            'Microglia': '#DC2626',
-            'Endothelial cell': '#0284C7',
-            'Pericyte': '#F59E0B',
-            'Tanycyte': '#EC4899',
-            'Ependymal cell': '#8B5CF6',
+            'Neuron': '#8B5CF6', 'Astrocyte': '#10B981', 'Oligodendrocyte': '#3B82F6',
+            'Microglia': '#DC2626', 'Endothelial cell': '#0284C7', 'Tanycyte': '#EC4899',
             '__default__': '#94A3B8'
         },
-        
         // CHONDROCYTE
         chondrocyte: {
-            'Chondroblast': '#10B981',
-            'Homeostatic chondrocyte': '#34D399',
-            'Regulatory chondrocyte': '#059669',
-            'Proliferative chondrocyte': '#F59E0B',
-            'Pre-hypertrophic chondrocyte': '#D97706',
-            'Hypertrophic chondrocyte': '#B45309',
-            'Fibrocartilage cell': '#A78BFA',
-            'Immune (T/NK) cell': '#DC2626',
-            'Immune myeloid cell': '#EF4444',
+            'Chondroblast': '#10B981', 'Homeostatic chondrocyte': '#34D399',
+            'Hypertrophic chondrocyte': '#B45309', 'Immune (T/NK) cell': '#DC2626',
             '__default__': '#94A3B8'
         },
-        
         // PANCREAS
         pancreas: {
-            'Acinar cell': '#F59E0B',
-            'Ductal cell': '#D97706',
-            'Beta cell': '#DC2626',
-            'Alpha cell': '#EF4444',
-            'Delta cell': '#F87171',
-            'PP cell': '#FCA5A5',
-            'Endothelial cell': '#0284C7',
-            'Stellate cell': '#10B981',
-            'Immune cell': '#7C3AED',
-            '__default__': '#94A3B8'
+            'Acinar cell': '#F59E0B', 'Beta cell': '#DC2626', 'Alpha cell': '#EF4444',
+            'Delta cell': '#F87171', 'Ductal cell': '#D97706', '__default__': '#94A3B8'
         },
-        
-        // OLFACTORY EPITHELIUM
+        // OLFACTORY
         olfactory: {
-            'Mature OSN': '#8B5CF6',
-            'Immature OSN': '#A78BFA',
-            'Ionocyte': '#7C3AED',
-            'Horizontal Basal Cell': '#10B981',
-            'Globose Basal Cell': '#34D399',
-            'Sustentacular Cell': '#059669',
-            'Bowman\'s Gland Cell': '#0D9488',
-            'Fibroblast': '#D97706',
-            'Stromal Cell': '#F59E0B',
-            'Endothelial Cell': '#0284C7',
-            'T Cell': '#DC2626',
-            'B Cell': '#EF4444',
-            'Myeloid Cell': '#F87171',
-            'Mast Cell': '#FCA5A5',
-            '__default__': '#94A3B8'
+            'Mature OSN': '#8B5CF6', 'Immature OSN': '#A78BFA', 'Horizontal Basal Cell': '#10B981',
+            'Sustentacular Cell': '#059669', '__default__': '#94A3B8'
         }
     };
-    
     return colorSchemes[organKey] || colorSchemes.lung;
-}
+};
 
 // Helper: Get scRNA expression map for a gene (safe)
 function getScRNAExpression(geneSymbol) {
@@ -4554,12 +4263,12 @@ else if (
         qLower.includes('scrna') ||
         qLower.includes('expression')
     ) &&
-    !qLower.includes('compare') &&  // ← Critical: prevent overlap with compare intent
+    !qLower.includes('compare') &&  // Critical: prevent overlap with compare intent
     !qLower.includes(' vs ') &&
     !qLower.includes(' versus ')
 ) {
     // ---------------------------------------------------
-    // 1. Dynamic Dataset Inference & Switching
+    // 1. Dynamic Dataset Inference
     // ---------------------------------------------------
     const availableDatasets = Object.keys(window.CiliAI.datasets);
     // Sort by length desc to ensure "lung_downsampled" matches before "lung"
@@ -4570,11 +4279,12 @@ else if (
     // Check query for dataset names or aliases
     for (const dsKey of availableDatasets) {
         let isMatch = qLower.includes(dsKey);
-        
-        // Add specific aliases for better UX
+        // Aliases
         if (dsKey === 'olfactory' && (qLower.includes('nose') || qLower.includes('smell'))) isMatch = true;
-        if (dsKey === 'hypothalamus' && qLower.includes('brain')) isMatch = true;
+        if (dsKey === 'hypothalamus' && (qLower.includes('brain') || qLower.includes('neuron'))) isMatch = true;
         if (dsKey === 'chondrocyte' && (qLower.includes('cartilage') || qLower.includes('disc'))) isMatch = true;
+        if (dsKey === 'kidney' && qLower.includes('renal')) isMatch = true;
+        if (dsKey === 'liver' && qLower.includes('hepatic')) isMatch = true;
         
         if (isMatch) {
             detectedDS = dsKey;
@@ -4593,31 +4303,22 @@ else if (
     }
 
     // ---------------------------------------------------
-    // 2. Target Gene / Complex Parsing
+    // 2. Robust Target Extraction (Gene or Complex)
     // ---------------------------------------------------
-    let target = 'WDR31'; // Default
-    match = qLower.match(/(?:for|of|in)\s+(.+)/i);
-    
-    if (match) {
-        // Remove keywords and tissue names from the target string
-        let cleaner = match[1].replace(/scrna-seq|scrna|expression|umap|plot|display|in/gi, '');
-        availableDatasets.forEach(ds => {
-            cleaner = cleaner.replace(new RegExp(ds, 'gi'), '');
-        });
-        // Remove aliases
-        cleaner = cleaner.replace(/brain|nose|cartilage|organoid|tissue/gi, '');
-        
-        target = cleaner.trim();
-        if (target.length < 2) target = 'WDR31'; // Fallback
-    }
-
-    // Resolve Genes
-    let genes = window.extractMultipleGenes(target);
+    let genes = window.extractMultipleGenes(query);
+    let finalTargetTerm = null;
     let isComplex = false;
-    let finalTargetTerm = target;
 
-    if (genes.length === 0 && target) {
-        const complexName = window.extractComplexIntent(target);
+    // If no genes found via regex, check for complex names or clean parsing
+    if (genes.length === 0) {
+        // Remove command words to help complex extraction
+        let cleanQuery = qLower
+            .replace(/plot|display|show|visualize|umap|heatmap|scrna|expression/g, '')
+            .replace(/in|for|of|from/g, '')
+            .trim();
+            
+        // Check for complex intent
+        const complexName = window.extractComplexIntent(cleanQuery);
         if (complexName) {
             const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
             if (complexGenes.length > 0) {
@@ -4625,70 +4326,87 @@ else if (
                 finalTargetTerm = complexName;
                 isComplex = true;
             }
+        } 
+        // Fallback: If "Plot X" and X isn't a gene/complex, try using it as raw target
+        else if (cleanQuery.length > 2) {
+             // Try one last extraction on cleaned string
+             genes = window.extractMultipleGenes(cleanQuery);
         }
     }
 
-    const finalGenes = genes.length > 0 ? genes : ['WDR31'];
+    // Default to WDR31 if absolutely nothing found
+    const finalGenes = genes.length > 0 ? genes : ['WDR31']; 
     const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
-
+    
     // ---------------------------------------------------
-    // 3. Generalized Zoom-to-Cell-Type
+    // 3. Zoom-to-Cell-Type Parsing
     // ---------------------------------------------------
-    // Matches "zoom to [anything]" until end of string or ' in/for'
     const zoomMatch = qLower.match(/zoom to\s+([\w\s\-\(\)]+?)(?:\s+(?:in|for)|$)/i);
     const zoomToCellType = zoomMatch ? zoomMatch[1].trim() : null;
 
     // ---------------------------------------------------
-    // 4. Render UMAP
+    // 4. Render UMAP 
     // ---------------------------------------------------
     await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
 
     // ---------------------------------------------------
-    // 5. Generate Dynamic UI (Switch Chips)
+    // 5. Generate Aesthetic UI (Result Card)
     // ---------------------------------------------------
     const currentDS = window.CiliAI.activeDataset;
     const currentName = window.CiliAI.datasets[currentDS].name;
-    
-    // Create argument strings for the buttons
     const genesArg = finalGenes.join(',');
     const zoomArg = zoomToCellType || '';
 
-    // Generate chips for ALL other datasets
+    // Generate Tissue Switch Chips
     const switchButtons = availableDatasets
         .filter(ds => ds !== currentDS)
         .map(ds => {
             const shortName = window.CiliAI.datasets[ds].name.replace('Human ', '').replace('Organoid', 'Org.');
             return `
                 <button class="ciliai-button"
-                    style="font-size:10px; padding:4px 8px; background:#f0f9ff; color:#005b96; border:1px solid #b3cde0;"
+                    style="font-size:10px; padding:5px 10px; background:#ffffff; color:#475569; border:1px solid #cbd5e0; border-radius:12px; margin:2px;"
+                    onmouseover="this.style.borderColor='#3b82f6'; this.style.color='#3b82f6'"
+                    onmouseout="this.style.borderColor='#cbd5e0'; this.style.color='#475569'"
                     onclick="window.switchDatasetAndPlot('${ds}', '${geneSymbol}', '${genesArg}', '${zoomArg}')">
                     📍 ${shortName}
                 </button>
             `;
         }).join('');
 
-    // ---------------------------------------------------
-    // 6. Final HTML Output
-    // ---------------------------------------------------
+    // Aesthetic Table Layout
     htmlResult = `
-        <div class="ai-result-card">
-            <p>
-                Displaying <strong>${currentName}</strong> scRNA-seq UMAP for
-                <strong>${geneSymbol}</strong>
-                (${isComplex ? 'Complex Avg.' : 'Single Gene'}).
-            </p>
-            ${zoomToCellType ? `<p style="font-size:12px; color:#666;">Zoomed to: <em>${zoomToCellType}</em></p>` : ''}
+        <div class="ai-result-card" style="border-left: 4px solid #2b6cb0; padding:15px; font-family:'Inter',sans-serif;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px;">
+                <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Visualization Active</span>
+                <span style="font-size:10px; background:#ebf8ff; color:#2b6cb0; padding:2px 6px; border-radius:4px; font-weight:600;">UMAP</span>
+            </div>
             
-            <div style="margin-top:12px; border-top:1px solid #eee; padding-top:8px;">
-                <div style="font-size:11px; font-weight:600; color:#666; margin-bottom:6px;">Compare in other tissues:</div>
-                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <table style="width:100%; font-size:13px; border-collapse:collapse; margin-bottom:12px;">
+                <tr>
+                    <td style="color:#64748b; padding:4px 0; width:70px; vertical-align:top;">Dataset:</td>
+                    <td style="font-weight:600; color:#2d3748;">${currentName}</td>
+                </tr>
+                <tr>
+                    <td style="color:#64748b; padding:4px 0; vertical-align:top;">Target:</td>
+                    <td style="font-weight:600; color:#2b6cb0;">
+                        ${geneSymbol} 
+                        ${isComplex ? '<span style="font-weight:400; color:#666; font-size:11px;">(Complex Avg)</span>' : ''}
+                        ${finalGenes.length > 1 && !isComplex ? `<span style="font-weight:400; color:#666; font-size:11px;">(+${finalGenes.length-1} others)</span>` : ''}
+                    </td>
+                </tr>
+                ${zoomToCellType ? `<tr><td style="color:#64748b; padding:4px 0;">Zoom:</td><td>${zoomToCellType}</td></tr>` : ''}
+            </table>
+
+            <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+                <div style="font-size:10px; font-weight:700; color:#475569; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Compare in other tissues</div>
+                <div style="display:flex; flex-wrap:wrap; gap:4px;">
                     ${switchButtons}
                 </div>
             </div>
             
-            <div style="margin-top:10px; text-align:right;">
-                <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')">
-                   ⬇️ Download Data (CSV)
+            <div style="margin-top:12px; text-align:right; display:flex; justify-content:flex-end; gap:10px;">
+                <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" style="font-size:11px; text-decoration:none; color:#475569; display:flex; align-items:center;">
+                    ⬇️ CSV Data
                 </a>
             </div>
         </div>
@@ -6312,4 +6030,5 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
