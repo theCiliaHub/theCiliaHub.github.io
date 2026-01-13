@@ -1239,19 +1239,18 @@
             }
         };
 
-// Data Loading Logic (FIXED: All multi-part datasets pointed to UMAP_Data/)
 // Data Loading Logic (FIXED: Multi-part datasets pointed to UMAP_Data/)
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
     
-    try {
-        // Load all datasets in parallel
+   try {
+        // Load all datasets in parallel - ONLY EXISTING DATASETS
         const [
             mainRes, lookupsRes, rnaResp, 
             kStructRes, kExpr1Res, kExpr2Res,
             lungParts, liverParts, hypothalamusExprParts, hypothalamusStructParts,
-            chondrocytePart, pancreasParts, olfactoryParts
+            chondrocytePart
         ] = await Promise.all([
             // ROOT FILES (Confirmed working)
             fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
@@ -1281,18 +1280,8 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
                 fetch(`${base}UMAP_Data/hypothalamus_structure_part${i+1}.json`).then(r => r.json())
             )),
             
-            // CHONDROCYTE -> UMAP_Data/
-            fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json()),
-            
-            // PANCREAS (15 parts) -> UMAP_Data/
-            Promise.all(Array.from({length: 15}, (_, i) => 
-                fetch(`${base}UMAP_Data/pancreas_part${i+1}.json`).then(r => r.json())
-            )),
-            
-            // OLFACTORY (15 parts) -> UMAP_Data/
-            Promise.all(Array.from({length: 15}, (_, i) => 
-                fetch(`${base}UMAP_Data/olfactory_part${i+1}.json`).then(r => r.json())
-            ))
+            // CHONDROCYTE (1 part) -> UMAP_Data/
+            fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json())
         ]);
         
         // Process main data
@@ -1820,6 +1809,7 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
 
