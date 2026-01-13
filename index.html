@@ -1253,329 +1253,169 @@ window.parseTsvData = function (tsvText) {
     });
 };
 
-/**
- * Renders Interactive UMAP – Enhanced with legend, dataset switch, clickable points,
- * and full multi-gene expression averaging support.
- */
-window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
-    // --- 1. ROBUST INPUT HANDLING (Fixes "join is not a function" crash) ---
-    if (typeof targetGenes === 'string') {
-        targetGenes = targetGenes.split(',').map(s => s.trim()).filter(s => s);
-    } else if (!Array.isArray(targetGenes)) {
-        targetGenes = displayName ? [displayName] : ['WDR31'];
-    }
-    
-    // Default display name if missing
-    if (!displayName) displayName = targetGenes[0] || 'Gene View';
+// ==========================================================
+// DATA LOADING LOGIC (FIXED STATS & REFERENCES)
+// ==========================================================
+window.loadCiliAIData = async function(timeoutMs = 60000) {
+    const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+    window.updateStatus('Syncing...', 'loading');
 
-    // 2. Clear previous views
-    if (typeof window.resetViews === 'function') window.resetViews();
+    try {
+        // 1. Initialize Global Structures
+        window.CiliAI = window.CiliAI || {};
+        window.CiliAI.datasets = window.CiliAI.datasets || {};
+        window.CiliAI.lookups = window.CiliAI.lookups || { geneMap: {} };
+        window.CiliAI.cellDataCache = window.CiliAI.cellDataCache || {};
 
-    // 3. Intelligent dataset selection based on query
-    let datasetKey = window.CiliAI.activeDataset || 'lung';
-    
-    // Analyze the query to determine the most appropriate dataset
-    const analyzeQueryForDataset = () => {
-        const query = (displayName + ' ' + targetGenes.join(' ')).toLowerCase();
+        // 2. Fetch All Data
+        const [
+            mainRes, lookupsRes, rnaResp,
+            kStructRes, kExpr1Res, kExpr2Res,
+            lungParts, liverParts,
+            hypExprParts, hypStructParts,
+            chondrocytePart, pancreasPart, olfactoryPart
+        ] = await Promise.all([
+            // Core
+            fetch(base + 'ciliAI_master_database.json').then(r => r.json()),
+            fetch(base + 'ciliAI_lookups.json').then(r => r.json()),
+            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
+            // Datasets
+            fetch(base + 'kidney_structure.json').then(r => r.json()),
+            fetch(base + 'kidney_expression_part1.json').then(r => r.json()),
+            fetch(base + 'kidney_expression_part2.json').then(r => r.json()),
+            Promise.all(Array.from({ length: 15 }, (_, i) => fetch(`${base}UMAP_Data/lung_downsampled_part${i + 1}.json`).then(r => r.json()))),
+            Promise.all(Array.from({ length: 6 }, (_, i) => fetch(`${base}UMAP_Data/liver_part${i + 1}.json`).then(r => r.json()))),
+            Promise.all(Array.from({ length: 6 }, (_, i) => fetch(`${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`).then(r => r.json()))),
+            Promise.all(Array.from({ length: 2 }, (_, i) => fetch(`${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`).then(r => r.json()))),
+            fetch(base + 'UMAP_Data/chondrocyte_part1.json').then(r => r.json()),
+            fetch(base + 'UMAP_Data/pancreas_part1.json').then(r => r.json().catch(() => ({ umap: [], cells: {} }))),
+            fetch(base + 'UMAP_Data/olfactory_part1.json').then(r => r.json().catch(() => ({ umap: [], cells: {} })))
+        ]);
+
+        // 3. Assign Core Data
+        window.CiliAI.masterData = mainRes.masterData || (Array.isArray(mainRes) ? mainRes : []);
+        window.CiliAI.lookups = lookupsRes.lookups || lookupsRes || {};
         
-        if (query.includes('kidney') || query.includes('renal')) return 'kidney';
-        if (query.includes('liver') || query.includes('hepatic')) return 'liver';
-        if (query.includes('hypothalamus') || query.includes('brain') || query.includes('neuron')) return 'hypothalamus';
-        if (query.includes('chondrocyte') || query.includes('cartilage')) return 'chondrocyte';
-        if (query.includes('pancreas') || query.includes('islet')) return 'pancreas';
-        if (query.includes('olfactory') || query.includes('nose') || query.includes('smell')) return 'olfactory';
-        
-        if (query.includes('lung')) {
-            // Distinguish between whole tissue and organoid
-            if (query.includes('tissue') || query.includes('complete') || query.includes('sikkema') || 
-                query.includes('immune') || query.includes('macrophage')) {
-                return 'lung_downsampled';
-            }
-            if (query.includes('organoid') || query.includes('alveolar')) {
-                return 'lung';
-            }
-        }
-        return datasetKey;
-    };
-    
-    // Switch dataset if the query explicitly asks for a different one
-    if (displayName !== 'CLUSTER_VIEW') {
-        const suggested = analyzeQueryForDataset();
-        if (window.CiliAI.datasets[suggested]) {
-            datasetKey = suggested;
-            window.CiliAI.activeDataset = suggested;
-        }
-    }
-    
-    const dataset = window.CiliAI.datasets[datasetKey];
-    
-    // Safety check: Dataset exists?
-    if (!dataset || !dataset.umap || dataset.umap.length === 0) {
-        window.addChatMessage(`⚠️ Dataset <strong>${datasetKey}</strong> is not ready or has no UMAP data.`, false);
-        return;
-    }
+        // 4. Populate Gene Map & Calculate Stats (CRITICAL FIX)
+        const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+        const validCiliopathyDiseases = new Set();
+        const uniqueCiliopathyGenes = new Set();
 
-    // 4. Metadata & Setup
-    const datasetInfo = {
-        name: dataset.name || 'Unknown Dataset',
-        description: dataset.reference || 'scRNA-seq dataset', // Use reference from your loader
-        cell_types: ['Unknown'] // Placeholder, populated dynamically below
-    };
+        window.CiliAI.masterData.forEach(g => {
+            if (g.Gene) {
+                const sym = g.Gene.toUpperCase();
+                window.CiliAI.lookups.geneMap[sym] = g;
+                
+                // Cache scRNA if present
+                if (g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
 
-    const isClusterView = displayName === 'CLUSTER_VIEW';
-    const primaryGene = targetGenes[0];
-    const isMultiGene = targetGenes.length > 1;
-
-    // 5. Prepare Data Arrays
-    const sourceData = dataset.umap;
-    const x = [], y = [], color = [], text = [], customdata = [];
-    let maxExpr = 0;
-    const clusterColors = window.getOrganCellTypeColors ? window.getOrganCellTypeColors(datasetKey) : {};
-    const cellTypesFound = new Set();
-
-    // Expression Data Helper
-    // Handles both "Expression Object" (CellID -> Value) and "Sparse Array" formats
-    const getExpressionValue = (gene, cellId, cellType, index) => {
-        if (!dataset.expression) return 0;
-        
-        // A. Expression is a direct map (e.g. Hypothalamus/Liver in your loader)
-        // Check if expression data is keyed by gene symbol
-        let geneData = dataset.expression[gene];
-        
-        // Fallback: Check global cache if not in dataset object
-        if (!geneData && window.CiliAI.cellDataCache[gene]) {
-            geneData = window.CiliAI.cellDataCache[gene];
-        }
-
-        if (!geneData) return 0;
-
-        // Case 1: Sparse Array (Kidney format)
-        if (Array.isArray(geneData)) {
-            // This is slow to search every time. Usually requires decoding beforehand.
-            // For now, assume 0 if we can't efficiently map index. 
-            // *Optimization*: In a real app, decodeSparse should run once before this loop.
-            return 0; 
-        } 
-        
-        // Case 2: Object Keyed by Cell Type (Lung Organoid format)
-        if (typeof geneData === 'object' && !geneData[cellId]) {
-             return geneData[cellType] || 0;
-        }
-
-        // Case 3: Object Keyed by Cell ID (Liver/LungDownsampled format)
-        if (typeof geneData === 'object' && geneData[cellId] !== undefined) {
-            return geneData[cellId];
-        }
-
-        return 0;
-    };
-
-    // Pre-calculate expression if not cluster view
-    let exprValues = new Float32Array(sourceData.length).fill(0);
-    
-    if (!isClusterView) {
-        // Optimization: Handle specific dataset structures
-        if (datasetKey === 'kidney' && dataset.expression) {
-             // Kidney specific logic (Sparse arrays)
-             targetGenes.forEach(g => {
-                 const sparse = dataset.expression[g];
-                 if (sparse) {
-                     for (let k = 0; k < sparse.length; k += 2) {
-                         const idx = sparse[k];
-                         const val = sparse[k + 1];
-                         if (idx < exprValues.length) exprValues[idx] += val;
-                     }
-                 }
-             });
-        } else {
-            // General logic (Cell ID / Cell Type maps)
-            // Iterate ONCE through cells to look up expression
-            sourceData.forEach((p, i) => {
-                let sum = 0;
-                let count = 0;
-                targetGenes.forEach(g => {
-                    const val = getExpressionValue(g, p.cell_id, p.cell_type || p.cluster, i);
-                    if (val > 0) {
-                        sum += val;
-                        count++;
+                // Stats Logic
+                if (primaryClasses.includes(g.ciliopathy_classification)) {
+                    uniqueCiliopathyGenes.add(sym);
+                    if (g.Ciliopathy) {
+                        const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                        diseases.forEach(d => { 
+                            if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d); 
+                        });
                     }
-                });
-                exprValues[i] = count > 0 ? (isMultiGene ? sum / targetGenes.length : sum) : 0;
-            });
-        }
-        
-        maxExpr = 0;
-        for(let i=0; i<exprValues.length; i++) if(exprValues[i] > maxExpr) maxExpr = exprValues[i];
-    }
-
-    // 6. Build Plot Arrays
-    sourceData.forEach((p, i) => {
-        const cellType = p.cell_type || p.cluster || 'Unknown';
-        cellTypesFound.add(cellType);
-
-        if (zoomToCellType && cellType.toLowerCase() !== zoomToCellType.toLowerCase()) return;
-
-        x.push(p.x || p.umap_x);
-        y.push(p.y || p.umap_y);
-
-        // Color Logic
-        if (isClusterView) {
-            // Cluster coloring
-            let colorHex = '#94A3B8'; // Default
-            for (const [key, val] of Object.entries(clusterColors)) {
-                if (cellType.toLowerCase().includes(key.toLowerCase())) {
-                    colorHex = val;
-                    break;
                 }
             }
-            color.push(colorHex);
-        } else {
-            // Expression coloring
-            color.push(exprValues[i]);
-        }
-
-        // Tooltip
-        let tooltip = `<b>${cellType}</b>`;
-        if (!isClusterView) tooltip += `<br>Expr: ${exprValues[i].toFixed(2)} TPM`;
-        text.push(tooltip);
-
-        // Click Data
-        customdata.push({
-            localization: window.CiliAI.lookups.geneMap?.[primaryGene]?.Localization || 'Cilium',
-            cell_type: cellType,
-            gene: primaryGene
         });
-    });
 
-    // 7. Plotly Configuration
-    const trace = {
-        x: x, y: y, text: text, customdata: customdata,
-        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
-        marker: {
-            size: isClusterView ? 4 : 5,
-            opacity: 0.8,
-            color: color,
-            // Only add colorscale if expression view
-            ...(isClusterView ? {} : {
-                colorscale: dataset.colorScale || 'Viridis',
-                colorbar: { title: 'TPM', thickness: 10 },
-                cmin: 0, cmax: maxExpr || 1
-            })
-        }
-    };
+        // 5. Update UI Stats
+        const statGenes = document.getElementById('stat-genes');
+        if (statGenes) statGenes.textContent = window.CiliAI.masterData.length.toLocaleString();
+        
+        const statDiseases = document.getElementById('stat-ciliopathys');
+        if (statDiseases) statDiseases.textContent = validCiliopathyDiseases.size.toLocaleString();
+        
+        const statCilioGenes = document.getElementById('stat-ciliopathy-genes');
+        if (statCilioGenes) statCilioGenes.textContent = uniqueCiliopathyGenes.size.toLocaleString();
 
-    const layout = {
-        title: {
-            text: `<b>${isClusterView ? 'Cell Types' : primaryGene}</b> - ${datasetInfo.name}`,
-            font: { size: 14 }
-        },
-        margin: { t: 40, b: 30, l: 30, r: 30 },
-        xaxis: { visible: false }, yaxis: { visible: false },
-        hovermode: 'closest',
-        dragmode: 'pan'
-    };
-
-    // 8. Render
-    const plotContainer = document.getElementById('plotly-container');
-    document.getElementById('cilia-svg').style.display = 'none';
-    document.getElementById('domain-viewer').style.display = 'none';
-    plotContainer.style.display = 'block';
-    
-    // Clear & Plot
-    Plotly.purge(plotContainer);
-    await Plotly.newPlot(plotContainer, [trace], layout, { responsive: true });
-
-    // 9. Add Click Listener (Highlight Diagram)
-    plotContainer.on('plotly_click', data => {
-        const pt = data.points[0];
-        if (pt && pt.customdata && pt.customdata.localization) {
-            window.showDiagram();
-            if (window.SpatialManager) {
-                window.SpatialManager.highlight(pt.customdata.localization, pt.customdata.gene);
-            }
-        }
-    });
-
-    // 10. Generate Nice UI (Switch Buttons)
-    const availableDatasets = Object.keys(window.CiliAI.datasets);
-    const geneListStr = targetGenes.join(',');
-    
-    let uiHtml = `
-        <div class="ai-result-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <h4 style="margin:0; color:#2b6cb0;">${datasetInfo.name}</h4>
-                <span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${x.length} cells</span>
-            </div>
-            <p style="font-size:12px; color:#64748b; margin-top:0;">${datasetInfo.description}</p>
-            
-            <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; margin-top:10px;">
-                <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:6px; text-transform:uppercase;">Compare in other tissues:</div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-    `;
-
-    availableDatasets.forEach(dsKey => {
-        if (dsKey === datasetKey) return; // Skip current
-        const dsName = window.CiliAI.datasets[dsKey].name.replace('Human ', '').replace('Organoid', 'Org.');
-        uiHtml += `
-            <button onclick="window.CiliAI.activeDataset='${dsKey}'; window.renderUMAPPlot('${displayName}', '${geneListStr}')"
-                style="font-size:11px; padding:5px 10px; border:1px solid #cbd5e0; background:white; border-radius:15px; cursor:pointer; color:#475569; transition:all 0.2s;"
-                onmouseover="this.style.borderColor='#3b82f6'; this.style.color='#3b82f6'"
-                onmouseout="this.style.borderColor='#cbd5e0'; this.style.color='#475569'">
-                📍 ${dsName}
-            </button>
-        `;
-    });
-
-    uiHtml += `
-                </div>
-            </div>
-            <div style="margin-top:10px; text-align:right;">
-                 ${!isClusterView ? `<button class="ciliai-button" style="padding:4px 8px; font-size:11px;" onclick="window.renderUMAPPlot('CLUSTER_VIEW')">👁️ Show Clusters</button>` : ''}
-            </div>
-        </div>
-    `;
-
-    window.addChatMessage(uiHtml, false);
-};
-
-    
-// Helper function to process dataset parts
-function processDataset(parts, organName) {
-    const result = { umap: [], cells: {}, cell_type_counts: {} };
-    
-    parts.forEach(part => {
-        if (Array.isArray(part)) {
-            part.forEach(cell => {
-                result.umap.push({
-                    x: cell.umap_x || cell.x,
-                    y: cell.umap_y || cell.y,
-                    cell_id: cell.cell_id,
-                    cell_type: cell.cluster || cell.cell_type
-                });
-                
-                // Store expression data
-                if (cell.cell_id) {
-                    result.cells[cell.cell_id] = Object.keys(cell).reduce((acc, key) => {
-                        if (!['umap_x', 'umap_y', 'cell_id', 'cluster', 'cell_type'].includes(key)) {
-                            acc[key] = cell[key];
-                        }
-                        return acc;
-                    }, {});
-                }
-                
-                // Count cell types
-                const ct = cell.cluster || cell.cell_type;
-                result.cell_type_counts[ct] = (result.cell_type_counts[ct] || 0) + 1;
+        // 6. Process Datasets
+        const processSplit = (parts) => {
+            const res = { umap: [], cells: {} };
+            parts.flat().forEach(p => {
+                if (p.umap_x || p.x) res.umap.push(p);
+                if (p.cell_id) res.cells[p.cell_id] = p.gene_expression || p;
             });
-        } else {
-            Object.assign(result.cells, part);
-        }
-    });
+            return res;
+        };
+
+        const mergedHypothalamus = {
+            umap: hypStructParts.flatMap(p => p.umap || []),
+            cells: Object.assign({}, ...hypExprParts)
+        };
+
+        // Register Datasets with References
+        window.CiliAI.datasets = {
+            lung: {
+                name: "Human Lung Organoid",
+                umap: mainRes.umapData || [],
+                expression: {}, 
+                reference: "Miller et al., Cell Stem Cell (2020)"
+            },
+            lung_downsampled: {
+                name: "Human Lung Tissue (Complete)",
+                umap: processSplit(lungParts).umap,
+                expression: processSplit(lungParts).cells,
+                reference: "Sikkema et al., Nat Med (2023)"
+            },
+            kidney: {
+                name: "Human Kidney",
+                umap: kStructRes.umap,
+                expression: { ...kExpr1Res, ...kExpr2Res },
+                reference: "Stewart et al., Science (2019)"
+            },
+            liver: {
+                name: "Human Liver",
+                umap: processSplit(liverParts).umap,
+                expression: processSplit(liverParts).cells,
+                reference: "Aizarani et al., Nature (2019)"
+            },
+            hypothalamus: {
+                name: "Hypothalamus",
+                umap: mergedHypothalamus.umap,
+                expression: mergedHypothalamus.cells,
+                reference: "Siletti et al., Science (2023)"
+            },
+            chondrocyte: {
+                name: "IVD Endplate / Chondrocyte",
+                umap: chondrocytePart.umap || [],
+                expression: chondrocytePart.cells || chondrocytePart,
+                reference: "Gan et al., Wire's Systems Biology (2021)"
+            },
+            pancreas: {
+                name: "Pancreas",
+                umap: pancreasPart.umap || [],
+                expression: pancreasPart.cells || {},
+                reference: "Baron et al., Cell Systems (2016)"
+            },
+            olfactory: {
+                name: "Olfactory Epithelium",
+                umap: olfactoryPart.umap || [],
+                expression: olfactoryPart.cells || {},
+                reference: "Durante et al., Nat Neuro (2020)"
+            }
+        };
+
+        // 7. RNA Consensus
+        const rnaText = await rnaResp.text();
+        window.rnaTissueExpressionData = window.parseTsvData ? window.parseTsvData(rnaText) : [];
+
+        window.CiliAI.ready = true;
+        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
+        return true;
+
+    } catch (err) {
+        console.error("❌ Load failed:", err);
+        window.updateStatus('SYNC ERROR', 'error');
+        return false;
+    }
+};
     
-    return result;
-}
- // =======================================================
-// View Switching Function
+// =======================================================
+// View Switching Function (FIXED)
 // =======================================================
 window.switchView = function(viewType) {
     const diagramTab = document.getElementById('tab-diagram');
@@ -1583,24 +1423,26 @@ window.switchView = function(viewType) {
     const domainTab = document.getElementById('tab-domain');
    
     // Update tab styles
-    [diagramTab, plotTab, domainTab].forEach(tab => tab.classList.remove('active'));
+    [diagramTab, plotTab, domainTab].forEach(tab => {
+        if (tab) tab.classList.remove('active');
+    });
    
+    // Get target gene: Try search box -> Try last active gene -> Default to 'WDR31'
+    const searchVal = document.getElementById('geneSearch').value.trim();
+    const gene = searchVal || window.CiliAI.activeGeneContext || 'WDR31';
+
     if (viewType === 'diagram') {
-        diagramTab.classList.add('active');
+        if (diagramTab) diagramTab.classList.add('active');
         window.showDiagram();
-    } else if (viewType === 'plot') {
-        plotTab.classList.add('active');
-        // You might need to trigger a plot generation here
-        const gene = document.getElementById('geneSearch').value.trim();
-        if (gene) {
-            // Call your plotting function
-        }
-    } else if (viewType === 'domain') {
-        domainTab.classList.add('active');
-        const gene = document.getElementById('geneSearch').value.trim();
-        if (gene) {
-            window.showDomainViewer(gene);
-        }
+    } 
+    else if (viewType === 'plot') {
+        if (plotTab) plotTab.classList.add('active');
+        // FIX: Call the rendering function with the identified gene
+        window.renderUMAPPlot(gene, [gene]);
+    } 
+    else if (viewType === 'domain') {
+        if (domainTab) domainTab.classList.add('active');
+        window.showDomainViewer(gene);
     }
 };
  // =======================================================
@@ -1730,3 +1572,4 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
