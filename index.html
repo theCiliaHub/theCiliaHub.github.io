@@ -643,7 +643,10 @@
                 container.style.display = 'flex';
                 if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
                 if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
-                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence 
+
+[Image of Cilia Diagram]
+";
                 // Ensure SVG exists (if it was cleared)
                 if (!container.querySelector('svg')) {
                     window.generateAndInjectSVG();
@@ -1232,7 +1235,25 @@
             }
         };
 
-// Data Loading Logic (FIXED: Assigned fetched data to Global State)
+// ================================
+// TSV PARSER — REQUIRED BY ENGINE
+// ================================
+window.parseTsvData = function (tsvText) {
+    if (!tsvText || typeof tsvText !== 'string') return [];
+    const lines = tsvText.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split('\t').map(h => h.trim());
+    return lines.slice(1).map(line => {
+        const values = line.split('\t');
+        const row = {};
+        headers.forEach((h, i) => {
+            row[h] = values[i]?.trim() ?? '';
+        });
+        return row;
+    });
+};
+
+// Data Loading Logic (FIXED: Integrated missing Mapping Logic)
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
@@ -1298,26 +1319,54 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         ]);
 
         // --------------------------------------------------
-        // CRITICAL FIX: ASSIGN FETCHED DATA TO GLOBAL STATE
+        // ASSIGN RAW DATA TO GLOBAL STATE
         // --------------------------------------------------
         window.CiliAI.lookups = lookupsRes;
         window.CiliAI.masterData = Array.isArray(mainRes) ? mainRes : (mainRes.data || []);
         
-        // Parse RNA data
+        // --------------------------------------------------
+        // CRITICAL DATA MAPPING AND PROCESSING
+        // (Inserted from user's provided logic)
+        // --------------------------------------------------
+        
+        // Set default dataset
+        window.CiliAI.activeDataset = 'lung';
+        
+        // Assign RNA Tissue (Parsing logic)
         const rnaText = await rnaResp.text();
-        window.CiliAI.rnaData = window.parseTsvData(rnaText);
+        window.rnaTissueExpressionData = window.parseTsvData(rnaText);
+        
+        // Populate mapping and calculate stats
+        const primaryClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+        const validCiliopathyDiseases = new Set();
+        const uniqueCiliopathyGenes = new Set();
+        
+        // This loop populates the geneMap which is essential for lookups like IFT88, WDR31, etc.
+        window.CiliAI.masterData.forEach(g => {
+            if (g.Gene) {
+                const sym = g.Gene.toUpperCase();
+                window.CiliAI.lookups.geneMap[sym] = g;
+                if (g.expression?.scRNA) window.CiliAI.cellDataCache[sym] = g.expression.scRNA;
+                if (primaryClasses.includes(g.ciliopathy_classification)) {
+                    uniqueCiliopathyGenes.add(sym);
+                    if (g.Ciliopathy) {
+                        const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
+                        diseases.forEach(d => { 
+                            if (d && d !== 'Not specified' && d !== 'N/A') validCiliopathyDiseases.add(d); 
+                        });
+                    }
+                }
+            }
+        });
 
         // --------------------------------------------------
-        // SAFE EMPTY DATASETS (NO MORE ReferenceErrors)
+        // PROCESS DATASETS
         // --------------------------------------------------
         const mergedPancreas = { umap: [], cells: {} };
         const mergedOlfactory = { umap: [], cells: {} };
 
-        // --------------------------------------------------
-        // LUNG (DOWN-SAMPLED)
-        // --------------------------------------------------
+        // Lung Downsampled
         const mergedLungDownsampled = { umap: [], cells: {} };
-
         lungParts.forEach(part => {
             part.forEach(cell => {
                 mergedLungDownsampled.umap.push({
@@ -1328,66 +1377,52 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             });
         });
 
-        // --------------------------------------------------
-        // LIVER
-        // --------------------------------------------------
+        // Liver
         const mergedLiver = processDataset(liverParts, "liver");
 
-        // --------------------------------------------------
-        // HYPOTHALAMUS
-        // --------------------------------------------------
+        // Hypothalamus
         const mergedHypothalamusStruct = {
             umap: hypothalamusStructParts.flatMap(p => p.umap || [])
         };
-
         const mergedHypothalamusExpr = Object.assign({}, ...hypothalamusExprParts);
 
-        // --------------------------------------------------
-        // REGISTER DATASETS (NOW SAFE)
-        // --------------------------------------------------
+        // Register Datasets
         window.CiliAI.datasets = {
             lung: {
                 name: window.CiliAI.organMetadata.lung.name,
                 umap: mainRes.umapData || [],
                 expression: {}
             },
-
             lung_downsampled: {
                 name: window.CiliAI.organMetadata.lung_downsampled.name,
                 umap: mergedLungDownsampled.umap,
                 expression: mergedLungDownsampled.cells
             },
-
             kidney: {
                 name: window.CiliAI.organMetadata.kidney.name,
                 umap: kStructRes.umap || [],
                 expression: { ...kExpr1Res, ...kExpr2Res }
             },
-
             liver: {
                 name: window.CiliAI.organMetadata.liver.name,
                 umap: mergedLiver.umap || [],
                 expression: mergedLiver.cells
             },
-
             hypothalamus: {
                 name: window.CiliAI.organMetadata.hypothalamus.name,
                 umap: mergedHypothalamusStruct.umap,
                 expression: mergedHypothalamusExpr
             },
-
             chondrocyte: {
                 name: window.CiliAI.organMetadata.chondrocyte.name,
                 umap: chondrocytePart.umap || [],
                 expression: chondrocytePart
             },
-
             pancreas: {
                 name: window.CiliAI.organMetadata.pancreas.name,
                 umap: mergedPancreas.umap,
                 expression: mergedPancreas.cells
             },
-
             olfactory: {
                 name: window.CiliAI.organMetadata.olfactory.name,
                 umap: mergedOlfactory.umap,
@@ -1395,11 +1430,35 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             }
         };
 
-        window.CiliAI.activeDataset = 'lung';
+        // --------------------------------------------------
+        // UPDATE DASHBOARD UI
+        // --------------------------------------------------
+        // Update Counters with organ info
+        document.getElementById('stat-genes').textContent = window.CiliAI.masterData.length.toLocaleString();
+        document.getElementById('stat-ciliopathys').textContent = validCiliopathyDiseases.size.toLocaleString();
+        document.getElementById('stat-ciliopathy-genes').textContent = uniqueCiliopathyGenes.size.toLocaleString();
+        
+        // Add organ counter
+        const existingOrganStat = document.getElementById('stat-organs');
+        if (!existingOrganStat) {
+             const organCounter = document.createElement('div');
+             organCounter.className = 'stat-item';
+             organCounter.innerHTML = `<div class="stat-value" id="stat-organs">${Object.keys(window.CiliAI.datasets).length}</div><div class="stat-label">Tissues</div>`;
+             document.querySelector('.landing-dashboard').appendChild(organCounter);
+        } else {
+             existingOrganStat.textContent = Object.keys(window.CiliAI.datasets).length;
+        }
+        
+        // Log dataset info
+        console.log("CiliAI Datasets Loaded:");
+        Object.entries(window.CiliAI.datasets).forEach(([key, ds]) => {
+            console.log(`- ${ds.name}: ${ds.umap?.length || 0} cells, ${Object.keys(ds.expression || {}).length} genes`);
+        });
+
         window.CiliAI.ready = true;
         window.updateStatus(`READY (${window.CiliAI.masterData.length} genes)`, 'ready');
 
-        console.log("✅ CiliAI fully loaded with data");
+        console.log("✅ CiliAI fully loaded with data and maps");
         return true;
 
     } catch (err) {
@@ -1541,23 +1600,6 @@ window.downloadJournalSVG = function() {
     }
 };
    
-// ================================
-// TSV PARSER — REQUIRED BY ENGINE
-// ================================
-window.parseTsvData = function (tsvText) {
-    if (!tsvText || typeof tsvText !== 'string') return [];
-    const lines = tsvText.trim().split(/\r?\n/);
-    if (lines.length < 2) return [];
-    const headers = lines[0].split('\t').map(h => h.trim());
-    return lines.slice(1).map(line => {
-        const values = line.split('\t');
-        const row = {};
-        headers.forEach((h, i) => {
-            row[h] = values[i]?.trim() ?? '';
-        });
-        return row;
-    });
-};
 window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
             const query = input.value.trim();
