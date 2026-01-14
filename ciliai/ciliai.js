@@ -3090,7 +3090,7 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 //**
- * Renders Interactive UMAP – Fixed coordinate extraction to prevent "Axis Scaling" errors.
+ */ Renders Interactive UMAP – Fixed coordinate extraction to prevent "Axis Scaling" errors.
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Robust Input Handling
@@ -6000,6 +6000,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
