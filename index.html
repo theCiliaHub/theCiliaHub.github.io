@@ -1262,25 +1262,20 @@ window.loadCiliAIData = async function() {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
 
-    // 1. Define Throttled Fetcher (Fixes "fetchWithThrottle is not a function")
+    // Internal Throttler
     const fetchWithThrottle = async (urls, limit = 3) => {
         const results = [];
         const queue = [...urls];
-        
         const worker = async () => {
             while (queue.length > 0) {
                 const url = queue.shift();
                 try {
                     const res = await fetch(url);
                     if (!res.ok) throw new Error(res.status);
-                    const data = await res.json();
-                    results.push(data);
-                } catch (e) {
-                    console.warn(`Skipped: ${url}`);
-                }
+                    results.push(await res.json());
+                } catch (e) { console.warn(`Skipped: ${url}`); }
             }
         };
-
         await Promise.all(Array.from({ length: limit }, worker));
         return results;
     };
@@ -1288,99 +1283,94 @@ window.loadCiliAIData = async function() {
     const fetchSafe = async (url) => {
         try {
             const res = await fetch(url);
-            return res.ok ? await res.json() : null;
+            if (!res.ok) throw new Error(res.status);
+            return await res.json();
         } catch (e) { return null; }
     };
 
     try {
+        // 1. Setup Globals
         window.CiliAI = window.CiliAI || {};
         window.CiliAI.datasets = window.CiliAI.datasets || {};
         window.CiliAI.lookups = window.CiliAI.lookups || { geneMap: {} };
         window.CiliAI.cellDataCache = window.CiliAI.cellDataCache || {};
 
-        // 2. Define ALL File URLs
+        // 2. Define URLs
         const lungUrls = Array.from({ length: 15 }, (_, i) => `${base}UMAP_Data/lung_downsampled_part${i + 1}.json`);
         const liverUrls = Array.from({ length: 6 }, (_, i) => `${base}UMAP_Data/liver_part${i + 1}.json`);
         const hypExprUrls = Array.from({ length: 6 }, (_, i) => `${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`);
         const hypStructUrls = Array.from({ length: 2 }, (_, i) => `${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`);
 
-        // 3. Fetch Data (Parallel Blocks)
+        // 3. Fetch Data
         const [
-            mainRes, 
-            lookupsRes,
+            mainRes, lookupsRes,
             kStruct, kExpr1, kExpr2,
-            lungParts,
-            liverParts,
-            hypExprParts,
-            hypStructParts,
-            chondroPart
+            lungParts, liverParts,
+            hypExpr, hypStruct,
+            chondro
         ] = await Promise.all([
             fetchSafe(base + 'ciliAI_master_database.json'),
             fetchSafe(base + 'ciliAI_lookups.json'),
             fetchSafe(base + 'kidney_structure.json'),
             fetchSafe(base + 'kidney_expression_part1.json'),
             fetchSafe(base + 'kidney_expression_part2.json'),
-            fetchWithThrottle(lungUrls, 3),        // Throttled
-            fetchWithThrottle(liverUrls, 3),       // Throttled
-            fetchWithThrottle(hypExprUrls, 3),     // Throttled
-            fetchWithThrottle(hypStructUrls, 2),   // Throttled
+            fetchWithThrottle(lungUrls, 3),       
+            fetchWithThrottle(liverUrls, 3),      
+            fetchWithThrottle(hypExprUrls, 3),    
+            fetchWithThrottle(hypStructUrls, 2),  
             fetchSafe(base + 'UMAP_Data/chondrocyte_part1.json')
         ]);
 
-        // 4. Process Cell-Centric Data (Lung, Liver, Chondrocyte)
-        const mergeCellCentric = (parts) => {
+        // 4. Robust Processing Helper (The Fix)
+        const processParts = (parts) => {
             const res = { umap: [], cells: {} };
-            const flat = Array.isArray(parts) ? parts.flat() : [parts];
-            flat.forEach(p => {
-                if (!p) return;
-                const items = Array.isArray(p) ? p : (p.umap || [p]);
-                items.forEach(item => {
-                    // Normalize coords
-                    const px = item.umap_x ?? item.x ?? item.UMAP_1 ?? item.umap?.x;
-                    const py = item.umap_y ?? item.y ?? item.UMAP_2 ?? item.umap?.y;
-                    
-                    if (px !== undefined && py !== undefined) {
-                        // Ensure we create a clean point object
-                        res.umap.push({
-                            x: px, y: py,
-                            cell_id: item.cell_id,
-                            cell_type: item.cluster || item.cell_type || 'Unknown'
-                        });
-                    }
-                    // Normalize expression
-                    if (item.cell_id) {
-                        res.cells[item.cell_id] = item.expression || item.gene_expression || item;
-                    }
-                });
+            const list = Array.isArray(parts) ? parts : [parts];
+            // Deep flatten to handle arrays of arrays
+            const flatList = list.flat(2).filter(p => p);
+
+            flatList.forEach(p => {
+                // Check if 'p' is a wrapper object with a 'umap' array
+                if (p.umap && Array.isArray(p.umap)) {
+                    p.umap.forEach(item => extractPoint(item, res));
+                    if (p.cells) Object.assign(res.cells, p.cells);
+                } 
+                // Otherwise, 'p' is likely the cell object itself
+                else {
+                    extractPoint(p, res);
+                }
             });
             return res;
         };
 
-        const mergedLung = mergeCellCentric(lungParts);
-        const mergedLiver = mergeCellCentric(liverParts);
-        const mergedChondro = mergeCellCentric(chondroPart);
+        const extractPoint = (p, res) => {
+            // Coordinate Normalization: Check nested umap.x, flat x, or UMAP_1
+            let px = p.x ?? p.umap_x ?? p.UMAP_1 ?? (p.umap?.x);
+            let py = p.y ?? p.umap_y ?? p.UMAP_2 ?? (p.umap?.y);
+            let pid = p.cell_id ?? p.id;
 
-        // 5. Process Hypothalamus (Gene-Centric Expression + Array Structure)
-        // Hypothalamus structure parts are arrays of {id, x, y, type}
-        // Expression parts are objects { "GENE": { cells: [], expression: [] } }
-        const hypUmap = [];
-        hypStructParts.flat().forEach(part => {
-             const items = Array.isArray(part) ? part : (part.umap || []);
-             items.forEach(p => {
-                 if (p.x !== undefined && p.y !== undefined) {
-                     hypUmap.push({
-                         x: p.x, y: p.y,
-                         cell_id: p.id, // ID is index in expression arrays
-                         cell_type: p.type || 'Unknown'
-                     });
-                 }
-             });
-        });
-        
-        const hypExpr = {};
-        hypExprParts.flat().forEach(part => {
-            if (part) Object.assign(hypExpr, part);
-        });
+            if (px !== undefined && py !== undefined) {
+                res.umap.push({
+                    x: parseFloat(px), 
+                    y: parseFloat(py),
+                    cell_id: pid,
+                    cell_type: p.cluster || p.cell_type || p.type || 'Unknown'
+                });
+            }
+            if (pid) {
+                // Extract expression (prioritize explicit object, else use self)
+                res.cells[pid] = p.expression || p.gene_expression || p;
+            }
+        };
+
+        // 5. Process Datasets
+        const mergedLung = processParts(lungParts);
+        const mergedLiver = processParts(liverParts);
+        const mergedChondro = processParts(chondro);
+
+        // Hypothalamus Special Merge
+        const hypUmap = processParts(hypStruct).umap; 
+        const hypCells = {};
+        hypExpr.flat().forEach(part => { if(part) Object.assign(hypCells, part); });
 
         // 6. Register Datasets
         window.CiliAI.datasets = {
@@ -1388,14 +1378,14 @@ window.loadCiliAIData = async function() {
                 name: "Human Lung Organoid", 
                 umap: mainRes?.umapData || [], 
                 expression: {}, 
-                reference: "Miller et al., Cell Stem Cell (2020)",
+                reference: "Miller et al. (2020)",
                 icon: "🫁"
             },
             lung_downsampled: { 
                 name: "Human Lung Tissue (Complete)", 
                 umap: mergedLung.umap, 
                 expression: mergedLung.cells, 
-                reference: "Sikkema et al., Nat Med (2023)",
+                reference: "Sikkema et al. (2023)",
                 icon: "🫁",
                 colorScale: 'Reds'
             },
@@ -1403,7 +1393,7 @@ window.loadCiliAIData = async function() {
                 name: "Human Kidney", 
                 umap: kStruct?.umap || [], 
                 expression: {...(kExpr1 || {}), ...(kExpr2 || {})}, 
-                reference: "Stewart et al., Science (2019)",
+                reference: "Stewart et al. (2019)",
                 icon: "🫘",
                 colorScale: 'Blues'
             },
@@ -1411,57 +1401,52 @@ window.loadCiliAIData = async function() {
                 name: "Human Liver", 
                 umap: mergedLiver.umap, 
                 expression: mergedLiver.cells, 
-                reference: "Aizarani et al., Nature (2019)",
+                reference: "Aizarani et al. (2019)",
                 icon: "🍺", 
                 colorScale: 'Greens'
             },
             hypothalamus: { 
                 name: "Hypothalamus", 
                 umap: hypUmap, 
-                expression: hypExpr, 
-                reference: "Siletti et al., Science (2023)",
+                expression: hypCells, 
+                reference: "Siletti et al. (2023)",
                 icon: "🧠",
                 colorScale: 'Purples'
             },
             chondrocyte: { 
-                name: "IVD Endplate / Chondrocyte", 
+                name: "Chondrocyte", 
                 umap: mergedChondro.umap, 
                 expression: mergedChondro.cells, 
-                reference: "Gan et al., Wire's Systems Biology (2021)",
+                reference: "Gan et al. (2021)",
                 icon: "🦴",
-                colorScale: 'Teal' // Custom logic in render handles this
+                colorScale: 'Teal'
             }
         };
 
-        // 7. Core Metadata
+        // 7. Metadata
         window.CiliAI.masterData = mainRes?.masterData || [];
         window.CiliAI.lookups = lookupsRes?.lookups || { geneMap: {} };
+        const stats = { genes: window.CiliAI.masterData.length };
         
-        // Stats
-        const stats = { genes: window.CiliAI.masterData.length, dis: new Set(), cilio: new Set() };
         window.CiliAI.masterData.forEach(g => {
             if (g.Gene) {
                 const s = g.Gene.toUpperCase();
                 window.CiliAI.lookups.geneMap[s] = g;
                 if(g.expression?.scRNA) window.CiliAI.cellDataCache[s] = g.expression.scRNA;
-                if (['Primary Ciliopathies', 'Motile Ciliopathies'].includes(g.ciliopathy_classification)) {
-                    stats.cilio.add(s);
-                    if(g.Ciliopathy) (Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy]).forEach(d => stats.dis.add(d));
-                }
             }
         });
 
         // UI Updates
-        document.getElementById('stat-genes').textContent = stats.genes.toLocaleString();
-        document.getElementById('stat-ciliopathys').textContent = stats.dis.size.toLocaleString();
-        document.getElementById('stat-ciliopathy-genes').textContent = stats.cilio.size.toLocaleString();
+        const elG = document.getElementById('stat-genes');
+        if(elG) elG.textContent = stats.genes.toLocaleString();
 
         window.CiliAI.ready = true;
         window.updateStatus(`Ready (${stats.genes} genes)`, 'ready');
+        console.log("✅ CiliAI fully loaded.");
         return true;
 
-    } catch (err) {
-        console.error("Load failed:", err);
+    } catch (e) {
+        console.error("Load failed:", e);
         window.updateStatus('ERROR', 'error');
         return false;
     }
@@ -1863,18 +1848,30 @@ window.handleUserSend = function() {
             }
         };
        
-        async function init() {
-            window.updateStatus('Loading databases...', 'loading');
+// 9. INIT & STARTUP
+    window.initCiliAI = async function() {
+        window.updateStatus('Loading databases...', 'loading');
+        if (window.generateAndInjectSVG) {
             window.generateAndInjectSVG();
-            const loaded = await window.loadCiliAIData();
-            if (loaded) {
-                // Status update moved to inside loadCiliAIData for accuracy
-            }
         }
-        document.getElementById('chatInput').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') window.handleUserSend();
-        });
-        init();
-    </script>
+        const loaded = await window.loadCiliAIData();
+        if (loaded) {
+            window.addChatMessage("👋 CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
+            window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
+        } else {
+            window.updateStatus('Load failed', 'error');
+            window.addChatMessage("⚠️ Failed to load data. Please refresh the page.", false);
+        }
+    };
+
+    document.getElementById('chatInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') window.handleUserSend();
+    });
+
+    // Start App
+    window.initCiliAI();
+
+</script>
+</body>
 </html>
 
