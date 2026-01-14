@@ -1235,9 +1235,19 @@
             }
         };
 
-// ================================
-// TSV PARSER — REQUIRED BY ENGINE
-// ================================
+The error TypeError: items.forEach is not a function is happening because the Liver and Chondrocyte datasets have a structure where each cell object contains a umap property that is a coordinate object ({x: 1, y: 2}), not an array of points.
+
+The previous logic const items = Array.isArray(p) ? p : (p.umap || [p]); mistakenly treated p.umap (the coordinate object) as the list of items to iterate over, causing the crash.
+
+I have rewritten the loadCiliAIData function with a robust processParts helper that correctly distinguishes between "Dataset Containers" (which have an array of points) and "Single Cells" (which might have nested coordinate objects).
+
+Here is the Fixed Code (copy and paste this into your script tag):
+
+JavaScript
+
+/* ============ DATA LOADING & PROCESSING ENGINE ============ */
+
+// 1. TSV Parser (Kept Original)
 window.parseTsvData = function (tsvText) {
     if (!tsvText || typeof tsvText !== 'string') return [];
     const lines = tsvText.trim().split(/\r?\n/);
@@ -1253,14 +1263,12 @@ window.parseTsvData = function (tsvText) {
     });
 };
 
-// ==========================================================
-// DATA LOADING LOGIC (Specific File List from User)
-// ==========================================================
+// 2. Data Loading Logic (Fixed "items.forEach" Crash)
 window.loadCiliAIData = async function(timeoutMs = 60000) {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
 
-    // Helper: Safely fetch
+    // Safe Fetch Helper
     const fetchSafe = async (url) => {
         try {
             const res = await fetch(url);
@@ -1268,11 +1276,11 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             return await res.json();
         } catch (e) {
             console.warn(`Skipped: ${url}`);
-            return null; // distinct from empty array to identify failure
+            return null; // Return null to indicate missing file
         }
     };
     
-    // Helper: Sequential fetch for heavy parts to prevent network errors
+    // Sequence Fetcher
     const fetchSeq = async (urls) => {
         const res = [];
         for (const u of urls) {
@@ -1282,30 +1290,83 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         return res;
     };
 
+    // --- CRITICAL FIX: Robust Data Processor ---
+    const processParts = (parts) => {
+        const res = { umap: [], cells: {} };
+        const list = Array.isArray(parts) ? parts : [parts];
+        
+        // Deep flatten to handle arrays of arrays of cells
+        const flatList = list.flat(2).filter(p => p); // Remove nulls
+
+        flatList.forEach(p => {
+            // CASE A: It's a single cell (Has cell_id)
+            // Note: We check this FIRST to avoid mistaking p.umap (coords object) for a dataset list
+            if (p.cell_id) {
+                addCellToRes(p, res);
+                return;
+            }
+
+            // CASE B: It's a dataset wrapper { umap: [...] }
+            if (p.umap && Array.isArray(p.umap)) {
+                p.umap.forEach(item => addCellToRes(item, res));
+                if (p.cells) Object.assign(res.cells, p.cells);
+                return;
+            }
+
+            // CASE C: It's just a raw point without ID (unlikely but safe to handle)
+            if (p.x !== undefined || p.umap_x !== undefined) {
+                addCellToRes(p, res);
+            }
+        });
+        return res;
+    };
+
+    // Extraction Helper
+    const addCellToRes = (p, res) => {
+        // 1. Extract Coordinates (Handle all variations)
+        let px, py;
+        if (p.x !== undefined) { px = p.x; py = p.y; }
+        else if (p.umap_x !== undefined) { px = p.umap_x; py = p.umap_y; }
+        else if (p.umap && p.umap.x !== undefined) { px = p.umap.x; py = p.umap.y; } // Liver format
+        else if (p.UMAP_1 !== undefined) { px = p.UMAP_1; py = p.UMAP_2; }
+
+        if (px !== undefined && py !== undefined) {
+            res.umap.push({
+                x: px, y: py,
+                cell_id: p.cell_id,
+                cell_type: p.cluster || p.cell_type || 'Unknown'
+            });
+        }
+
+        // 2. Extract Expression
+        if (p.cell_id) {
+            // Prioritize explicit expression object, fallback to spread object
+            res.cells[p.cell_id] = p.expression || p.gene_expression || p;
+        }
+    };
+
     try {
         window.CiliAI = window.CiliAI || {};
         window.CiliAI.datasets = window.CiliAI.datasets || {};
         window.CiliAI.lookups = window.CiliAI.lookups || { geneMap: {} };
         window.CiliAI.cellDataCache = window.CiliAI.cellDataCache || {};
 
-        // 1. Fetch Core Data
+        // --- Fetch Execution ---
         const [mainRes, lookupsRes, rnaResp] = await Promise.all([
             fetchSafe(base + 'ciliAI_master_database.json'),
             fetchSafe(base + 'ciliAI_lookups.json'),
             fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv')
         ]);
 
-        // 2. Define URLs based on your list
         const lungUrls = Array.from({ length: 15 }, (_, i) => `${base}UMAP_Data/lung_downsampled_part${i + 1}.json`);
         const liverUrls = Array.from({ length: 6 }, (_, i) => `${base}UMAP_Data/liver_part${i + 1}.json`);
         const hypExprUrls = Array.from({ length: 6 }, (_, i) => `${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`);
         const hypStructUrls = Array.from({ length: 2 }, (_, i) => `${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`);
 
-        // 3. Fetch Datasets
         const [
             kStruct, kExpr1, kExpr2,
             lungParts, liverParts,
-            hypExprParts, hypStructParts,
+            hypExpr, hypStruct,
             chondroPart
         ] = await Promise.all([
             fetchSafe(base + 'kidney_structure.json'),
@@ -1318,49 +1379,17 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             fetchSafe(base + 'UMAP_Data/chondrocyte_part1.json')
         ]);
 
-        // 4. Process Cell-Centric Datasets (Lung Downsampled, Liver, Chondrocyte)
-        // These are arrays of objects: [{cell_id, umap_x, expression:{...}}, ...]
-        const mergeCellCentric = (parts) => {
-            const res = { umap: [], cells: {} };
-            const flat = Array.isArray(parts) ? parts.flat() : [parts];
-            
-            flat.forEach(p => {
-                if (!p) return;
-                // Handle wrapped {umap: [...]} or direct [...]
-                const items = Array.isArray(p) ? p : (p.umap || [p]);
-                items.forEach(item => {
-                    // Store coordinates
-                    if (item.umap_x || item.x || item.UMAP_1 || (item.umap && item.umap.x)) {
-                        res.umap.push(item);
-                    }
-                    // Store expression (keyed by cell_id)
-                    if (item.cell_id) {
-                        res.cells[item.cell_id] = item.expression || item.gene_expression || item;
-                    }
-                });
-            });
-            return res;
-        };
+        // --- Process Data ---
+        const mergedLung = processParts(lungParts);
+        const mergedLiver = processParts(liverParts);
+        const mergedChondro = processParts(chondroPart);
 
-        const mergedLung = mergeCellCentric(lungParts);
-        const mergedLiver = mergeCellCentric(liverParts);
-        const mergedChondro = mergeCellCentric(chondroPart);
+        // Hypothalamus (Special Merge: Struct array + Expr object parts)
+        const hypUmap = processParts(hypStruct).umap;
+        const hypCells = {};
+        hypExpr.forEach(part => { if(part) Object.assign(hypCells, part); });
 
-        // 5. Process Gene-Centric Datasets (Hypothalamus)
-        // Structure: Arrays of coordinates
-        // Expression: Objects like {"GENE": {cells:[], expression:[]}}
-        const hypUmap = [];
-        hypStructParts.flat().forEach(part => {
-             const items = Array.isArray(part) ? part : (part.umap || []);
-             items.forEach(p => hypUmap.push(p));
-        });
-        
-        const hypExpr = {};
-        hypExprParts.flat().forEach(part => {
-            if (part) Object.assign(hypExpr, part);
-        });
-
-        // 6. Register Datasets
+        // --- Register Datasets ---
         window.CiliAI.datasets = {
             lung: { 
                 name: "Human Lung Organoid", 
@@ -1389,7 +1418,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             hypothalamus: { 
                 name: "Hypothalamus", 
                 umap: hypUmap, 
-                expression: hypExpr, 
+                expression: hypCells, 
                 reference: "Siletti et al. (2023)" 
             },
             chondrocyte: { 
@@ -1400,36 +1429,37 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
             }
         };
 
-        // 7. Core Metadata & Stats
+        // --- Core Metadata & Stats ---
         window.CiliAI.masterData = mainRes?.masterData || [];
         window.CiliAI.lookups = lookupsRes?.lookups || {};
-        
+        window.CiliAI.lookups.geneMap = window.CiliAI.lookups.geneMap || {};
+
         const stats = { genes: window.CiliAI.masterData.length, dis: new Set(), cilio: new Set() };
+        
         window.CiliAI.masterData.forEach(g => {
             if (g.Gene) {
                 const s = g.Gene.toUpperCase();
                 window.CiliAI.lookups.geneMap[s] = g;
-                if(g.expression?.scRNA) window.CiliAI.cellDataCache[s] = g.expression.scRNA;
+                
+                if (g.expression?.scRNA) window.CiliAI.cellDataCache[s] = g.expression.scRNA;
+
                 if (['Primary Ciliopathies', 'Motile Ciliopathies'].includes(g.ciliopathy_classification)) {
                     stats.cilio.add(s);
                     if(g.Ciliopathy) (Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy]).forEach(d => stats.dis.add(d));
                 }
             }
         });
-        
-        // Update Dashboard
+
+        // Update Dashboard Stats
         const elGenes = document.getElementById('stat-genes');
         if(elGenes) elGenes.textContent = stats.genes.toLocaleString();
-        
         const elDis = document.getElementById('stat-ciliopathys');
         if(elDis) elDis.textContent = stats.dis.size.toLocaleString();
-        
         const elCilio = document.getElementById('stat-ciliopathy-genes');
         if(elCilio) elCilio.textContent = stats.cilio.size.toLocaleString();
 
-        // 8. RNA Consensus
         const rnaText = await rnaResp.text();
-        window.rnaTissueExpressionData = window.parseTsvData ? window.parseTsvData(rnaText) : [];
+        window.rnaTissueExpressionData = window.parseTsvData(rnaText);
 
         window.CiliAI.ready = true;
         window.updateStatus(`Ready (${stats.genes} genes)`, 'ready');
@@ -1600,6 +1630,7 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
 
 
 
