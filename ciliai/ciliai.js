@@ -5,37 +5,24 @@
 /* ==============================================================
  * CiliAI – Global State (MUST BE FIRST)
  * ============================================================== */
+// 1. GLOBAL STATE (With All Datasets Pre-Initialized)
 window.CiliAI = {
-    activeDataset: 'lung',
-    datasets: {
-        lung: { 
-            name: 'Human Lung Organoid', 
-            umap: null, 
-            colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] 
+        activeDataset: 'lung',
+        datasets: {
+             lung: { name: 'Human Lung Organoid', umap: [], icon: "🫁", colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] },
+             lung_downsampled: { name: 'Human Lung Tissue (Complete)', umap: [], colorScale: 'Reds', icon: "🫁" },
+             kidney: { name: 'Human Kidney', umap: [], expression: null, colorScale: 'Blues', icon: "🫘" },
+             liver: { name: 'Human Liver', umap: [], colorScale: 'Greens', icon: "🍺" },
+             hypothalamus: { name: 'Hypothalamus', umap: [], expression: {}, colorScale: 'Purples', icon: "🧠" },
+             chondrocyte: { name: 'Chondrocyte', umap: [], colorScale: 'Teal', icon: "🦴" }
         },
-        kidney: { 
-            name: 'Human Kidney', 
-            umap: null, 
-            expression: null, 
-            colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']] 
-        }
-    },
-    data: { umap: [] },
-    masterData: [],
-    ready: false,
-    lookups: {
-        geneMap: {},
-        umapByGene: {},
-        goMap: {},
-        pfamByGene: {}
-    },
-    cellDataCache: {},
-    lastQueryContext: { type: null, data: [], term: null },
-    CiliAI_UMAP: null,
-    currentPlot: null,
-    zoomStateByGene: {},
-    activeGeneContext: null
-};
+        masterData: [],
+        lookups: { geneMap: {}, cellDataCache: {}, byCiliopathy: {} },
+        ready: false,
+        currentPlot: null,
+        zoomStateByGene: {}
+    };
+
 
 // 1. GLOBAL STATE & UTILITIES
 // ==========================================================
@@ -3091,10 +3078,7 @@ window.terminologyQueries = {
 // ==========================================================
 /**
  * Renders Interactive UMAP – Enhanced with Universal Data Access
- */
-/**
- * Renders Interactive UMAP – Enhanced with Universal Data Access
- * FIXED VERSION: Better coordinate extraction and expression handling
+ * FIXED: Includes Expression Statistics & Robust Coordinate Handling
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Input Handling
@@ -3266,7 +3250,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
             px = p.UMAP_1; py = p.UMAP_2;
         } else {
             // Skip if no coordinates found
-            console.warn('No coordinates for cell:', p);
             return;
         }
         
@@ -3275,7 +3258,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         py = parseFloat(py);
         
         if (isNaN(px) || isNaN(py)) {
-            console.warn('Invalid coordinates for cell:', p);
             return;
         }
 
@@ -3448,8 +3430,13 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         return;
     }
 
-    // 5. UI Updates
+    // 5. UI Updates (Icons, Buttons, Stats)
     let tissueButtons = '';
+    const getIcon = (k) => ({
+        lung: '🫁', lung_downsampled: '🫁', kidney: '🫘', 
+        liver: '🍺', hypothalamus: '🧠', chondrocyte: '🦴'
+    }[k] || '📍');
+
     Object.keys(window.CiliAI.datasets).forEach(k => {
         if (k === datasetKey) return;
         const datasetInfo = window.CiliAI.datasets[k];
@@ -3473,24 +3460,27 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
                 margin:2px;
                 color:${k === window.CiliAI.activeDataset ? '#1e40af' : '#666'};
             ">
-                📍 ${shortName}
+                ${getIcon(k)} ${shortName}
             </button>`;
     });
 
-    // Calculate expression statistics
+    // --- CRITICAL RESTORATION: Expression Stats ---
     let exprStats = '';
     if (!isCluster) {
-        const exprCells = expr.filter(v => v > 0).length;
+        // Filter out zero expression values to calculate stats only for expressing cells
+        const exprValues = Array.from(expr).filter(v => v > 0);
+        const exprCells = exprValues.length;
         const totalCells = expr.length;
         const exprPercentage = totalCells > 0 ? (exprCells / totalCells * 100).toFixed(1) : '0.0';
+        const avgExpr = exprCells > 0 ? (exprValues.reduce((a, b) => a + b, 0) / exprCells).toFixed(2) : '0.00';
         
         exprStats = `
             <div style="margin-top:8px; padding:8px; background:#f0f9ff; border-radius:6px; border-left:3px solid #3b82f6;">
                 <div style="font-size:10px; font-weight:700; color:#1e40af; margin-bottom:2px;">EXPRESSION STATS</div>
                 <div style="font-size:11px; color:#666;">
-                    Expressed in ${exprCells}/${totalCells} cells (${exprPercentage}%)<br>
-                    Max expression: ${maxExpr.toFixed(2)}<br>
-                    Average: ${(expr.reduce((a, b) => a + b, 0) / totalCells).toFixed(2)}
+                    Expressed in ${exprCells.toLocaleString()}/${totalCells.toLocaleString()} cells (${exprPercentage}%)<br>
+                    Max expression: ${maxExpr.toFixed(2)} TPM<br>
+                    Avg in expressing cells: ${avgExpr} TPM
                 </div>
             </div>`;
     }
@@ -5085,21 +5075,6 @@ if (htmlResult === null) {
     }
 };
 
-// Re-define initCiliAI (must be after all other code)
-window.initCiliAI = async function() {
-    window.updateStatus('Loading databases...', 'loading');
-    window.generateAndInjectSVG();
-
-    const loaded = await window.loadCiliAIData();
-    if (loaded) {
-        window.addChatMessage("CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
-        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes loaded)`, 'ready');
-    } else {
-        window.updateStatus('Load failed', 'error');
-    }
-};
-
-
 window.fetchVariantData = async function(geneSymbol) {
     try {
         const response = await fetch(`https://mygene.info/v3/query?q=${geneSymbol}&fields=clinvar,gnomad`);
@@ -6170,87 +6145,11 @@ window.downloadCurrentVisualization = function() {
     }
 };
 
-window.updateStatus = function(text, state = 'normal') {
-    const statusEl = document.getElementById('dataStatus');
-    if (statusEl) {
-        statusEl.textContent = text;
-        statusEl.className = `status-badge status ${state}`;
-    }
-};
 
-// Full data loading (updated with kidney split)
-window.loadCiliAIData = async function(timeoutMs = 60000) {
-    const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-    const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-    const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
-    const kidneyStructUrl = baseUrl + 'kidney_structure.json';
-    const kidneyExpr1Url = baseUrl + 'kidney_expression_part1.json';
-    const kidneyExpr2Url = baseUrl + 'kidney_expression_part2.json';
-
-    try {
-        const [mainRes, lookupsRes, kStructRes, kExpr1Res, kExpr2Res] = await Promise.all([
-            fetch(mainDbUrl), fetch(lookupsUrl), fetch(kidneyStructUrl),
-            fetch(kidneyExpr1Url), fetch(kidneyExpr2Url)
-        ]);
-        if (!mainRes.ok || !lookupsRes.ok) throw new Error('Failed to load core data');
-        const mainData = await mainRes.json();
-        const lookupData = await lookupsRes.json();
-
-        window.CiliAI.masterData = mainData.masterData || [];
-        window.CiliAI.lookups = lookupData.lookups || {};
-        if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
-        if (!window.CiliAI.lookups.goMap) window.CiliAI.lookups.goMap = {};
-
-        window.CiliAI_UMAP = mainData.umapData || [];
-        window.CiliAI.data.umap = mainData.umapData || [];
-        window.CiliAI.datasets.lung.umap = mainData.umapData;
-
-        if (kStructRes.ok && kExpr1Res.ok && kExpr2Res.ok) {
-            const kStruct = await kStructRes.json();
-            const kExpr1 = await kExpr1Res.json();
-            const kExpr2 = await kExpr2Res.json();
-            const fullExpression = { ...kExpr1, ...kExpr2 };
-            window.CiliAI.datasets.kidney = {
-                name: "Human Kidney",
-                umap: kStruct.umap,
-                expression: fullExpression,
-                metadata: kStruct.metadata,
-                colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']]
-            };
-        }
-
-        // Build lookups
-        window.CiliAI.lookups.umapByGene = {};
-        window.CiliAI.lookups.geneMap = {};
-        window.CiliAI.cellDataCache = {};
-        if (Array.isArray(window.CiliAI_UMAP)) {
-            window.CiliAI_UMAP.forEach(point => {
-                if (point.Gene) window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
-            });
-        }
-        mainData.masterData.forEach(gene => {
-            if (gene.Gene) {
-                const symbol = gene.Gene.toUpperCase();
-                window.CiliAI.lookups.geneMap[symbol] = gene;
-                if (gene.expression?.scRNA) {
-                    window.CiliAI.cellDataCache[symbol] = gene.expression.scRNA;
-                }
-            }
-        });
-
-        window.CiliAI.ready = true;
-        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes loaded)`, 'ready');
-        return true;
-    } catch (err) {
-        console.error("Failed to load CiliAI databases:", err);
-        window.updateStatus('Load failed', 'error');
-        window.CiliAI.ready = false;
-        return false;
-    }
-};
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
