@@ -3089,6 +3089,9 @@ window.terminologyQueries = {
 // ==========================================================
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
+/**
+ * Renders Interactive UMAP – Enhanced with Universal Data Access
+ */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Input Handling
     if (typeof targetGenes === 'string') targetGenes = targetGenes.split(',').map(s => s.trim()).filter(s => s);
@@ -3102,7 +3105,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     // Explicit Mentions
     const map = { 
         'kidney': 'kidney', 'liver': 'liver', 'brain': 'hypothalamus', 'hypothalamus': 'hypothalamus',
-        'cartilage': 'chondrocyte', 'chondrocyte': 'chondrocyte', 'chondro': 'chondrocyte'
+        'cartilage': 'chondrocyte', 'chondrocyte': 'chondrocyte'
     };
     for (const k in map) if (query.includes(k)) datasetKey = map[k];
     
@@ -3129,7 +3132,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 
     if (!isCluster) {
         // === Gene-Centric Sparse Datasets (Kidney & Hypothalamus) ===
-        // Structure: { "GENE": { cells: [index...], expression: [val...] } } OR { "GENE": [idx, val, idx, val...] }
         if (datasetKey === 'kidney' || datasetKey === 'hypothalamus') {
             targetGenes.forEach(g => {
                 const gData = dataset.expression?.[g];
@@ -3178,10 +3180,18 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     // Process Points
     const colors = window.getOrganCellTypeColors ? window.getOrganCellTypeColors(datasetKey) : {};
     
+    // Status Helper
+    const inferCiliaInfo = (ct) => {
+        const lower = (ct || '').toLowerCase();
+        if (lower.includes('ciliated')) return { status: "Ciliated", type: "Motile" };
+        if (lower.includes('neuron') || lower.includes('fibroblast') || lower.includes('chondrocyte')) return { status: "Ciliated", type: "Primary" };
+        return { status: "Non-ciliated", type: "None" };
+    };
+    
     dataset.umap.forEach((p, i) => {
         // Robust Coordinate Extraction
-        let px = p.x ?? p.umap_x ?? (p.umap ? p.umap.x : undefined);
-        let py = p.y ?? p.umap_y ?? (p.umap ? p.umap.y : undefined);
+        let px = p.x ?? p.umap_x ?? (p.umap ? p.umap.x : undefined) ?? p.UMAP_1;
+        let py = p.y ?? p.umap_y ?? (p.umap ? p.umap.y : undefined) ?? p.UMAP_2;
         
         if (px === undefined || py === undefined) return;
 
@@ -3199,7 +3209,8 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
             color.push(expr[i]);
         }
         
-        text.push(`<b>${ct}</b><br>${!isCluster ? `Expr: ${expr[i].toFixed(2)}` : ''}`);
+        const info = inferCiliaInfo(ct);
+        text.push(`<b style="font-size:14px;color:black;">${ct}</b><br><span style="color:#555;">${info.status}</span>${!isCluster ? `<br>Expr: ${expr[i].toFixed(2)}` : ''}`);
         customdata.push({ localization: 'Cilium', gene: gene });
     });
 
@@ -3243,7 +3254,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     window.addChatMessage(`
         <div class="ai-result-card">
             <h4 style="margin:0; color:#2b6cb0;">${dataset.name}</h4>
-            <p style="font-size:11px; color:#666;">Ref: ${dataset.reference}</p>
+            <p style="font-size:11px; color:#666;">Ref: ${dataset.reference || 'Unknown'}</p>
             <div style="background:#f8f9fa; padding:8px; margin:8px 0; border-radius:6px;">
                 <div style="font-size:10px; font-weight:700; color:#666; margin-bottom:4px;">SWITCH TISSUE:</div>
                 <div style="display:flex; flex-wrap:wrap;">${btns}</div>
@@ -5919,6 +5930,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
