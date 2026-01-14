@@ -1255,43 +1255,41 @@ window.parseTsvData = function (tsvText) {
     });
 };
 
-// 2. Data Loading Logic (Fixed "items.forEach" Crash)
-window.loadCiliAIData = async function(timeoutMs = 60000) {
+// ==========================================================
+// DATA LOADING LOGIC (COMPLETE & THROTTLED)
+// ==========================================================
+window.loadCiliAIData = async function() {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing...', 'loading');
 
-    // Safe Fetch Helper with better error handling
+    // 1. Define Throttled Fetcher (Fixes "fetchWithThrottle is not a function")
+    const fetchWithThrottle = async (urls, limit = 3) => {
+        const results = [];
+        const queue = [...urls];
+        
+        const worker = async () => {
+            while (queue.length > 0) {
+                const url = queue.shift();
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error(res.status);
+                    const data = await res.json();
+                    results.push(data);
+                } catch (e) {
+                    console.warn(`Skipped: ${url}`);
+                }
+            }
+        };
+
+        await Promise.all(Array.from({ length: limit }, worker));
+        return results;
+    };
+
     const fetchSafe = async (url) => {
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 20000);
-            
-            const res = await fetch(url, { 
-                signal: controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                    'Cache-Control': 'no-cache'
-                }
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-            }
-            
-            // Parse JSON but handle potential syntax errors
-            const text = await res.text();
-            try {
-                return JSON.parse(text);
-            } catch (parseError) {
-                console.warn(`Failed to parse JSON from ${url}:`, parseError.message);
-                return null;
-            }
-        } catch (e) {
-            console.warn(`Skipped: ${url}`, e.message);
-            return null;
-        }
+            const res = await fetch(url);
+            return res.ok ? await res.json() : null;
+        } catch (e) { return null; }
     };
 
     try {
@@ -1300,194 +1298,171 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
         window.CiliAI.lookups = window.CiliAI.lookups || { geneMap: {} };
         window.CiliAI.cellDataCache = window.CiliAI.cellDataCache || {};
 
-        // --- Fetch Core Data First ---
-        const [mainRes, lookupsRes, rnaResp] = await Promise.all([
+        // 2. Define ALL File URLs
+        const lungUrls = Array.from({ length: 15 }, (_, i) => `${base}UMAP_Data/lung_downsampled_part${i + 1}.json`);
+        const liverUrls = Array.from({ length: 6 }, (_, i) => `${base}UMAP_Data/liver_part${i + 1}.json`);
+        const hypExprUrls = Array.from({ length: 6 }, (_, i) => `${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`);
+        const hypStructUrls = Array.from({ length: 2 }, (_, i) => `${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`);
+
+        // 3. Fetch Data (Parallel Blocks)
+        const [
+            mainRes, 
+            lookupsRes,
+            kStruct, kExpr1, kExpr2,
+            lungParts,
+            liverParts,
+            hypExprParts,
+            hypStructParts,
+            chondroPart
+        ] = await Promise.all([
             fetchSafe(base + 'ciliAI_master_database.json'),
             fetchSafe(base + 'ciliAI_lookups.json'),
-            fetch(base + 'rna_tissue_consensus.tsv').then(r => r.ok ? r.text() : '').catch(() => '')
-        ]);
-
-        // --- Prepare URLs for Throttled Fetching ---
-        const lungUrls = Array.from({ length: 15 }, (_, i) => 
-            `${base}UMAP_Data/lung_downsampled_part${i + 1}.json`);
-        
-        const liverUrls = Array.from({ length: 6 }, (_, i) => 
-            `${base}UMAP_Data/liver_part${i + 1}.json`);
-        
-        const hypExprUrls = Array.from({ length: 6 }, (_, i) => 
-            `${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`);
-        
-        const hypStructUrls = Array.from({ length: 2 }, (_, i) => 
-            `${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`);
-
-        // --- Fetch Large Datasets with Throttling ---
-        console.log('Fetching datasets...');
-        const [lungParts, liverParts, hypExprParts, hypStructParts] = await Promise.all([
-            window.fetchWithThrottle(lungUrls, 3),
-            window.fetchWithThrottle(liverUrls, 3),
-            window.fetchWithThrottle(hypExprUrls, 2),
-            window.fetchWithThrottle(hypStructUrls, 2)
-        ]);
-
-        // --- Fetch Individual Datasets ---
-        console.log('Fetching individual datasets...');
-        const [kStruct, kExpr1, kExpr2, chondroPart] = await Promise.all([
             fetchSafe(base + 'kidney_structure.json'),
             fetchSafe(base + 'kidney_expression_part1.json'),
             fetchSafe(base + 'kidney_expression_part2.json'),
+            fetchWithThrottle(lungUrls, 3),        // Throttled
+            fetchWithThrottle(liverUrls, 3),       // Throttled
+            fetchWithThrottle(hypExprUrls, 3),     // Throttled
+            fetchWithThrottle(hypStructUrls, 2),   // Throttled
             fetchSafe(base + 'UMAP_Data/chondrocyte_part1.json')
         ]);
 
-        // --- Normalize and Merge All Datasets ---
-        console.log('Normalizing data...');
-        
-        // 1. Lung Data (Multiple Parts)
-        let mergedLung = { umap: [], cells: {} };
-        lungParts.forEach(part => {
-            const normalized = window.normalizeCellData(part);
-            mergedLung.umap.push(...normalized.umap);
-            Object.assign(mergedLung.cells, normalized.cells);
-        });
-        
-        // 2. Liver Data (Multiple Parts)
-        let mergedLiver = { umap: [], cells: {} };
-        liverParts.forEach(part => {
-            const normalized = window.normalizeCellData(part);
-            mergedLiver.umap.push(...normalized.umap);
-            Object.assign(mergedLiver.cells, normalized.cells);
-        });
-        
-        // 3. Hypothalamus Data (Special handling: Structure + Expression)
-        let mergedHypUmap = [];
-        let mergedHypCells = {};
-        
-        // Process structure parts
-        hypStructParts.forEach(part => {
-            const normalized = window.normalizeCellData(part);
-            mergedHypUmap.push(...normalized.umap);
-        });
-        
-        // Process expression parts
-        hypExprParts.forEach(part => {
-            const normalized = window.normalizeCellData(part);
-            Object.assign(mergedHypCells, normalized.cells);
-        });
-        
-        // Match up structure with expression (if possible)
-        mergedHypUmap.forEach(point => {
-            if (!mergedHypCells[point.cell_id]) {
-                mergedHypCells[point.cell_id] = { cell_id: point.cell_id };
-            }
-        });
-        
-        // 4. Individual datasets
-        const mergedKidney = window.normalizeCellData(kStruct);
-        const mergedChondro = window.normalizeCellData(chondroPart);
-        
-        // Add expression data to kidney
-        const kidneyExpr1 = window.normalizeCellData(kExpr1);
-        const kidneyExpr2 = window.normalizeCellData(kExpr2);
-        Object.assign(mergedKidney.cells, kidneyExpr1.cells, kidneyExpr2.cells);
+        // 4. Process Cell-Centric Data (Lung, Liver, Chondrocyte)
+        const mergeCellCentric = (parts) => {
+            const res = { umap: [], cells: {} };
+            const flat = Array.isArray(parts) ? parts.flat() : [parts];
+            flat.forEach(p => {
+                if (!p) return;
+                const items = Array.isArray(p) ? p : (p.umap || [p]);
+                items.forEach(item => {
+                    // Normalize coords
+                    const px = item.umap_x ?? item.x ?? item.UMAP_1 ?? item.umap?.x;
+                    const py = item.umap_y ?? item.y ?? item.UMAP_2 ?? item.umap?.y;
+                    
+                    if (px !== undefined && py !== undefined) {
+                        // Ensure we create a clean point object
+                        res.umap.push({
+                            x: px, y: py,
+                            cell_id: item.cell_id,
+                            cell_type: item.cluster || item.cell_type || 'Unknown'
+                        });
+                    }
+                    // Normalize expression
+                    if (item.cell_id) {
+                        res.cells[item.cell_id] = item.expression || item.gene_expression || item;
+                    }
+                });
+            });
+            return res;
+        };
 
-        // --- Register Datasets with Normalized Data ---
+        const mergedLung = mergeCellCentric(lungParts);
+        const mergedLiver = mergeCellCentric(liverParts);
+        const mergedChondro = mergeCellCentric(chondroPart);
+
+        // 5. Process Hypothalamus (Gene-Centric Expression + Array Structure)
+        // Hypothalamus structure parts are arrays of {id, x, y, type}
+        // Expression parts are objects { "GENE": { cells: [], expression: [] } }
+        const hypUmap = [];
+        hypStructParts.flat().forEach(part => {
+             const items = Array.isArray(part) ? part : (part.umap || []);
+             items.forEach(p => {
+                 if (p.x !== undefined && p.y !== undefined) {
+                     hypUmap.push({
+                         x: p.x, y: p.y,
+                         cell_id: p.id, // ID is index in expression arrays
+                         cell_type: p.type || 'Unknown'
+                     });
+                 }
+             });
+        });
+        
+        const hypExpr = {};
+        hypExprParts.flat().forEach(part => {
+            if (part) Object.assign(hypExpr, part);
+        });
+
+        // 6. Register Datasets
         window.CiliAI.datasets = {
+            lung: { 
+                name: "Human Lung Organoid", 
+                umap: mainRes?.umapData || [], 
+                expression: {}, 
+                reference: "Miller et al., Cell Stem Cell (2020)",
+                icon: "🫁"
+            },
             lung_downsampled: { 
                 name: "Human Lung Tissue (Complete)", 
                 umap: mergedLung.umap, 
                 expression: mergedLung.cells, 
-                reference: "Sikkema et al. (2023)",
-                cell_count: mergedLung.umap.length
+                reference: "Sikkema et al., Nat Med (2023)",
+                icon: "🫁",
+                colorScale: 'Reds'
+            },
+            kidney: { 
+                name: "Human Kidney", 
+                umap: kStruct?.umap || [], 
+                expression: {...(kExpr1 || {}), ...(kExpr2 || {})}, 
+                reference: "Stewart et al., Science (2019)",
+                icon: "🫘",
+                colorScale: 'Blues'
             },
             liver: { 
                 name: "Human Liver", 
                 umap: mergedLiver.umap, 
                 expression: mergedLiver.cells, 
-                reference: "Aizarani et al. (2019)",
-                cell_count: mergedLiver.umap.length
+                reference: "Aizarani et al., Nature (2019)",
+                icon: "🍺", 
+                colorScale: 'Greens'
             },
             hypothalamus: { 
                 name: "Hypothalamus", 
-                umap: mergedHypUmap, 
-                expression: mergedHypCells, 
-                reference: "Siletti et al. (2023)",
-                cell_count: mergedHypUmap.length
-            },
-            kidney: { 
-                name: "Human Kidney", 
-                umap: mergedKidney.umap, 
-                expression: mergedKidney.cells, 
-                reference: "Stewart et al. (2019)",
-                cell_count: mergedKidney.umap.length
+                umap: hypUmap, 
+                expression: hypExpr, 
+                reference: "Siletti et al., Science (2023)",
+                icon: "🧠",
+                colorScale: 'Purples'
             },
             chondrocyte: { 
-                name: "Chondrocyte", 
+                name: "IVD Endplate / Chondrocyte", 
                 umap: mergedChondro.umap, 
                 expression: mergedChondro.cells, 
-                reference: "Gan et al. (2021)",
-                cell_count: mergedChondro.umap.length
+                reference: "Gan et al., Wire's Systems Biology (2021)",
+                icon: "🦴",
+                colorScale: 'Teal' // Custom logic in render handles this
             }
         };
 
-        // --- Initialize with Default Dataset ---
-        window.CiliAI.activeDataset = 'lung_downsampled';
-        window.CiliAI.data = {
-            umap: window.CiliAI.datasets[window.CiliAI.activeDataset]?.umap || []
-        };
-
-        // --- Core Metadata & Stats ---
+        // 7. Core Metadata
         window.CiliAI.masterData = mainRes?.masterData || [];
-        window.CiliAI.lookups = lookupsRes?.lookups || {};
-        window.CiliAI.lookups.geneMap = window.CiliAI.lookups.geneMap || {};
-
-        const stats = { genes: window.CiliAI.masterData.length, dis: new Set(), cilio: new Set() };
+        window.CiliAI.lookups = lookupsRes?.lookups || { geneMap: {} };
         
+        // Stats
+        const stats = { genes: window.CiliAI.masterData.length, dis: new Set(), cilio: new Set() };
         window.CiliAI.masterData.forEach(g => {
             if (g.Gene) {
                 const s = g.Gene.toUpperCase();
                 window.CiliAI.lookups.geneMap[s] = g;
-                
-                if (g.expression?.scRNA) {
-                    window.CiliAI.cellDataCache[s] = g.expression.scRNA;
-                }
-
+                if(g.expression?.scRNA) window.CiliAI.cellDataCache[s] = g.expression.scRNA;
                 if (['Primary Ciliopathies', 'Motile Ciliopathies'].includes(g.ciliopathy_classification)) {
                     stats.cilio.add(s);
-                    if(g.Ciliopathy) {
-                        const diseases = Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy];
-                        diseases.forEach(d => d && d.trim() && stats.dis.add(d.trim()));
-                    }
+                    if(g.Ciliopathy) (Array.isArray(g.Ciliopathy) ? g.Ciliopathy : [g.Ciliopathy]).forEach(d => stats.dis.add(d));
                 }
             }
         });
 
-        // Update Dashboard Stats
-        const elGenes = document.getElementById('stat-genes');
-        if(elGenes) elGenes.textContent = stats.genes.toLocaleString();
-        const elDis = document.getElementById('stat-ciliopathys');
-        if(elDis) elDis.textContent = stats.dis.size.toLocaleString();
-        const elCilio = document.getElementById('stat-ciliopathy-genes');
-        if(elCilio) elCilio.textContent = stats.cilio.size.toLocaleString();
-
-        if (rnaResp) {
-            window.rnaTissueExpressionData = window.parseTsvData(rnaResp);
-        }
+        // UI Updates
+        document.getElementById('stat-genes').textContent = stats.genes.toLocaleString();
+        document.getElementById('stat-ciliopathys').textContent = stats.dis.size.toLocaleString();
+        document.getElementById('stat-ciliopathy-genes').textContent = stats.cilio.size.toLocaleString();
 
         window.CiliAI.ready = true;
-        
-        // Log dataset statistics
-        console.log('Data loaded successfully. Datasets:');
-        Object.keys(window.CiliAI.datasets).forEach(key => {
-            const dataset = window.CiliAI.datasets[key];
-            console.log(`  ${key}: ${dataset.name} - ${dataset.umap.length} cells`);
-        });
-        
         window.updateStatus(`Ready (${stats.genes} genes)`, 'ready');
-        
         return true;
 
     } catch (err) {
         console.error("Load failed:", err);
-        window.updateStatus('ERROR: ' + err.message, 'error');
+        window.updateStatus('ERROR', 'error');
         return false;
     }
 };
@@ -1902,3 +1877,4 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
+
