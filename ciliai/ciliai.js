@@ -3090,8 +3090,7 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 /**
- * Renders Interactive UMAP – Enhanced with Ciliation Status, 
- * dynamic dataset switching, and robust multi-gene expression.
+ * Renders Interactive UMAP – Fixed coordinate extraction to prevent "Axis Scaling" errors.
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Robust Input Handling
@@ -3108,14 +3107,12 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     let datasetKey = window.CiliAI.activeDataset || 'lung';
     const query = (displayName + ' ' + targetGenes.join(' ')).toLowerCase();
 
-    // Map common terms to dataset keys
+    // Check for explicit dataset mentions (Removed Pancreas/Olfactory)
     const dsMap = {
         'kidney': 'kidney', 'renal': 'kidney',
         'liver': 'liver', 'hepatic': 'liver',
-        'hypothalamus': 'hypothalamus', 'brain': 'hypothalamus', 'neuron': 'hypothalamus',
-        'chondrocyte': 'chondrocyte', 'cartilage': 'chondrocyte',
-        'pancreas': 'pancreas', 'islet': 'pancreas',
-        'olfactory': 'olfactory', 'nose': 'olfactory'
+        'hypothalamus': 'hypothalamus', 'brain': 'hypothalamus',
+        'chondrocyte': 'chondrocyte', 'cartilage': 'chondrocyte'
     };
 
     for (const [key, val] of Object.entries(dsMap)) {
@@ -3125,7 +3122,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         }
     }
 
-    // Special Lung Logic
     if (query.includes('lung')) {
         if (query.includes('tissue') || query.includes('complete') || query.includes('sikkema')) {
             datasetKey = 'lung_downsampled';
@@ -3134,14 +3130,14 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         }
     }
     
-    // Check if the selected dataset actually exists (loaded)
+    // Switch active dataset if different
     if (displayName !== 'CLUSTER_VIEW' && window.CiliAI.datasets[datasetKey]) {
         window.CiliAI.activeDataset = datasetKey;
     }
 
     const dataset = window.CiliAI.datasets[datasetKey];
-    if (!dataset || !dataset.umap || dataset.umap.length === 0) {
-        window.addChatMessage(`⚠️ Dataset <strong>${datasetKey}</strong> is not ready or unavailable.`, false);
+    if (!dataset || !dataset.umap) {
+        window.addChatMessage("⚠️ Dataset unavailable.", false);
         return;
     }
 
@@ -3151,54 +3147,22 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     const isClusterView = displayName === 'CLUSTER_VIEW';
     const primaryGene = targetGenes[0];
     const isMultiGene = targetGenes.length > 1;
-    
-    // Get colors if available
     const clusterColors = window.getOrganCellTypeColors ? window.getOrganCellTypeColors(datasetKey) : {};
 
-    // --- Enhanced Ciliation Status Logic ---
+    // Helper: Infer Ciliation Status
     const inferCiliaInfo = (cellType) => {
         if (!cellType) return { status: "Unknown", type: "Unknown" };
         const lower = cellType.toLowerCase();
         let status = "Non-ciliated";
         let type = "None";
 
-        // Motile Cilia
         if (lower.includes('ciliated') || lower.includes('sperm') || lower.includes('ependymal')) {
-            status = "Ciliated";
-            type = "Motile Cilia (9+2)";
-        } 
-        // Primary Cilia (Broad coverage for atlases)
-        else if (
-            lower.includes('tubule') || lower.includes('neuron') || lower.includes('fibroblast') || 
-            lower.includes('endothelial') || lower.includes('podocyte') || lower.includes('stem') || 
-            lower.includes('basal') || lower.includes('club') || lower.includes('chondrocyte') ||
-            lower.includes('astrocyte') || lower.includes('stellate') || lower.includes('cholangiocyte') ||
-            lower.includes('tanycyte') || lower.includes('progenitor') || lower.includes('mesenchymal')
-        ) {
-            status = "Ciliated";
-            type = "Primary Cilia (9+0)";
-        } 
-        // Specialized Sensory
-        else if (lower.includes('photoreceptor') || lower.includes('osn') || lower.includes('olfactory')) {
-            status = "Ciliated";
-            type = "Sensory Cilia (Modified)";
+            status = "Ciliated"; type = "Motile Cilia";
+        } else if (lower.includes('tubule') || lower.includes('neuron') || lower.includes('fibroblast') || 
+                   lower.includes('endothelial') || lower.includes('podocyte') || lower.includes('stem') || 
+                   lower.includes('basal') || lower.includes('club')) {
+            status = "Ciliated (Likely)"; type = "Primary Cilia";
         }
-        // Explicitly Non-Ciliated
-        else if (
-            lower.includes('immune') || lower.includes('blood') || lower.includes('macrophage') || 
-            lower.includes('t cell') || lower.includes('b cell') || lower.includes('nk cell') ||
-            lower.includes('monocyte') || lower.includes('neutrophil') || lower.includes('microglia') ||
-            lower.includes('kupffer') || lower.includes('erythrocyte')
-        ) {
-            status = "Non-ciliated";
-            type = "None";
-        }
-        // Hepatocytes are generally considered non-ciliated in healthy adult tissue
-        else if (lower.includes('hepatocyte')) {
-            status = "Non-ciliated";
-            type = "None (Adult)";
-        }
-
         return { status, type };
     };
 
@@ -3207,22 +3171,18 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     let maxExpr = 0;
 
     if (!isClusterView) {
-        // Universal Data Access
         sourceData.forEach((p, i) => {
             let sum = 0;
             let count = 0;
             targetGenes.forEach(g => {
                 let val = 0;
-                // 1. Check Cell-Major (Hypothalamus/Liver/LungDownsampled)
+                // Universal Access: Check Cell-Major then Gene-Major then Cache
                 if (dataset.expression && p.cell_id && dataset.expression[p.cell_id]) {
                     val = dataset.expression[p.cell_id][g] || 0;
-                }
-                // 2. Check Gene-Major Map (Lung Org)
-                else if (dataset.expression?.[g] && !Array.isArray(dataset.expression[g])) {
+                } else if (dataset.expression?.[g] && !Array.isArray(dataset.expression[g])) {
+                    // Object Map (Lung Org style)
                     val = dataset.expression[g][p.cell_type] || 0;
-                } 
-                // 3. Check Cache
-                else if (window.CiliAI.cellDataCache[g]) {
+                } else if (window.CiliAI.cellDataCache[g]) {
                     const cache = window.CiliAI.cellDataCache[g];
                     val = cache[p.cell_type] || cache[p.cell_id] || 0;
                 }
@@ -3231,8 +3191,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
             exprValues[i] = count > 0 ? (isMultiGene ? sum / targetGenes.length : sum) : 0;
             if (exprValues[i] > maxExpr) maxExpr = exprValues[i];
         });
-
-        // Kidney Optimization (Sparse Array overlay)
+        // Kidney Optimization (Sparse Array) - applied after to overlay if needed
         if (datasetKey === 'kidney' && dataset.expression) {
              targetGenes.forEach(g => {
                  const sparse = dataset.expression[g];
@@ -3241,7 +3200,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
                          const idx = sparse[k];
                          const val = sparse[k + 1];
                          if (idx < exprValues.length) {
-                             exprValues[idx] += val;
+                             exprValues[idx] += val; 
                              if(exprValues[idx] > maxExpr) maxExpr = exprValues[idx];
                          }
                      }
@@ -3250,13 +3209,14 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         }
     }
 
-    // Build Plot Arrays
+    // Build Arrays
     sourceData.forEach((p, i) => {
-        // Coordinate safeguards
+        // --- CRITICAL FIX: Robust Coordinate Extraction ---
+        // Checks all possible key variations to prevent "undefined" pushing
         let px = p.x ?? p.umap_x ?? p.UMAP_1 ?? p.tSNE_1 ?? undefined;
         let py = p.y ?? p.umap_y ?? p.UMAP_2 ?? p.tSNE_2 ?? undefined;
 
-        if (px === undefined || py === undefined) return;
+        if (px === undefined || py === undefined) return; // Skip invalid points
 
         const cellType = p.cell_type || p.cluster || 'Unknown';
         if (zoomToCellType && cellType.toLowerCase() !== zoomToCellType.toLowerCase()) return;
@@ -3275,12 +3235,12 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
             color.push(exprValues[i]);
         }
 
-        // Enhanced Tooltip (Bold Black Name + Status)
+        // Tooltip
         const ciliaInfo = inferCiliaInfo(cellType);
         const exprText = !isClusterView ? `<br>Expr: ${exprValues[i].toFixed(2)} TPM` : '';
         text.push(
             `<b style="color:black; font-size:14px; font-family:Arial;">${cellType}</b><br>` +
-            `<span style="font-size:11px; color:#555;">Ciliation: <b>${ciliaInfo.status}</b></span><br>` +
+            `<span style="font-size:11px; color:#555;">Status: ${ciliaInfo.status}</span><br>` +
             `<span style="font-size:11px; color:#555;">Type: ${ciliaInfo.type}</span>` +
             exprText
         );
@@ -3321,14 +3281,13 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     await Plotly.newPlot(plotContainer, [trace], layout, { responsive: true });
     window.CiliAI.currentPlot = plotContainer;
 
-    // 5. Generate UI (Dynamic Switcher)
-    // Automatically find all available datasets that are NOT the current one
+    // 5. Generate UI
     const allDatasets = Object.keys(window.CiliAI.datasets);
     const geneStr = targetGenes.join(',');
     
     let buttonsHtml = '';
     allDatasets.forEach(dsKey => {
-        if (dsKey === datasetKey) return; // Skip current
+        if (dsKey === datasetKey) return; 
         const dsName = window.CiliAI.datasets[dsKey].name.replace('Human ', '').replace('Organoid', 'Org.');
         buttonsHtml += `
             <button onclick="window.CiliAI.activeDataset='${dsKey}'; window.renderUMAPPlot('${displayName}', '${geneStr}')"
@@ -6041,6 +6000,7 @@ window.loadCiliAIData = async function(timeoutMs = 60000) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
