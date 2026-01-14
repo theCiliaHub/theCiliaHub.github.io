@@ -1235,15 +1235,7 @@
             }
         };
 
-The error TypeError: items.forEach is not a function is happening because the Liver and Chondrocyte datasets have a structure where each cell object contains a umap property that is a coordinate object ({x: 1, y: 2}), not an array of points.
 
-The previous logic const items = Array.isArray(p) ? p : (p.umap || [p]); mistakenly treated p.umap (the coordinate object) as the list of items to iterate over, causing the crash.
-
-I have rewritten the loadCiliAIData function with a robust processParts helper that correctly distinguishes between "Dataset Containers" (which have an array of points) and "Single Cells" (which might have nested coordinate objects).
-
-Here is the Fixed Code (copy and paste this into your script tag):
-
-JavaScript
 
 /* ============ DATA LOADING & PROCESSING ENGINE ============ */
 
@@ -1630,10 +1622,4 @@ window.handleUserSend = function() {
         init();
     </script>
 </html>
-
-
-
-
-
-
 
