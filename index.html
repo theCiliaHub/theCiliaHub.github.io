@@ -1476,13 +1476,57 @@ window.switchView = function(viewType) {
     else if (viewType === 'plot') {
         if (plotTab) plotTab.classList.add('active');
         // FIX: Call the rendering function with the identified gene
-        window.renderUMAPPlot(gene, [gene]);
+        if(window.renderUMAPPlot) window.renderUMAPPlot(gene, [gene]);
     } 
     else if (viewType === 'domain') {
         if (domainTab) domainTab.classList.add('active');
-        window.showDomainViewer(gene);
+        if(window.showDomainViewer) window.showDomainViewer(gene);
     }
 };
+
+// ============ ENHANCED DATA NORMALIZATION ENGINE ============
+window.normalizeCellData = function(rawData) {
+    if (!rawData) return { umap: [], cells: {} };
+   
+    // CASE 1: Direct array of cells (Chondrocyte format)
+    if (Array.isArray(rawData)) {
+        // Check if it's the specific Hypothalamus structure array
+        if (rawData.length > 0 && rawData[0].id !== undefined && rawData[0].x !== undefined) {
+             return processStructureArrayFormat(rawData);
+        }
+        // Check if it's the Liver format (nested umap object)
+        if (rawData.length > 0 && rawData[0].umap && rawData[0].expression) {
+             return processLiverFormat(rawData);
+        }
+        // Check if it's Lung format (flat coordinates)
+        if (rawData.length > 0 && (rawData[0].umap_x !== undefined || rawData[0].UMAP_1 !== undefined)) {
+             return processFlatCoordinateFormat(rawData);
+        }
+        return processArrayFormat(rawData);
+    }
+   
+    // CASE 2: Object with gene keys mapping to expression arrays (Hypothalamus expression format)
+    if (typeof rawData === 'object' && !Array.isArray(rawData) && !rawData.cell_id && !rawData.umap) {
+        // Check if this is the hypothalamus expression format: { GENE: { cells: [], expression: [] } }
+        const firstKey = Object.keys(rawData)[0];
+        if (firstKey && rawData[firstKey] && 
+            (rawData[firstKey].cells !== undefined || rawData[firstKey].expression !== undefined)) {
+            return processHypothalamusExpressionFormat(rawData);
+        }
+        // Could also be expression-only object for other datasets
+        return processExpressionObjectFormat(rawData);
+    }
+   
+    // CASE 3: Object wrapper with umap array (Kidney format)
+    if (rawData.umap && Array.isArray(rawData.umap)) {
+        return processObjectWrapperFormat(rawData);
+    }
+   
+    console.warn('Unknown data format:', rawData);
+    return { umap: [], cells: {} };
+};
+
+    
  // =======================================================
 // Zoom Controls
 // =======================================================
@@ -1874,4 +1918,5 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
