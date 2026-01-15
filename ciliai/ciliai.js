@@ -3299,8 +3299,8 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
             <div style="margin-top:8px;">${tissueButtons}</div>
         </div>
     `, false);
+    
 };
-
 
 // =======================================================
 // Helper: Organ-Specific Colors (Must be present)
@@ -5912,6 +5912,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
