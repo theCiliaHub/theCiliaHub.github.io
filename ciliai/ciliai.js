@@ -3077,15 +3077,21 @@ window.terminologyQueries = {
 // ==========================================================
 /**
  * Renders Interactive UMAP – Enhanced with legend, dataset switch, clickable points,
- * sliders, and support for all tissue types.
+ * and full multi-gene expression averaging support.
+ * RESTORED: Original Lung/Kidney Logic
+ * ADDED: Other Tissues, Sliders, Multi-Dataset Switching
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Clear previous views
     if (typeof window.resetViews === 'function') window.resetViews();
 
     // 2. Active dataset
-    let datasetKey = window.CiliAI.activeDataset || 'lung_downsampled';
-    let dataset = window.CiliAI.datasets?.[datasetKey];
+    const datasetKey = window.CiliAI.activeDataset || 'lung';
+    const dataset = window.CiliAI.datasets?.[datasetKey];
+    if (!dataset || !Array.isArray(dataset.umap)) {
+        window.addChatMessage(`Warning: ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
+        return;
+    }
 
     // 3. Normalize inputs
     if (!displayName) displayName = 'WDR31';
@@ -3094,47 +3100,9 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     }
     if (!targetGenes || targetGenes.length === 0) targetGenes = [displayName.toUpperCase()];
 
-    const primaryGene = targetGenes[0].toUpperCase();
+    const primaryGene = targetGenes[0];                    
     const isMultiGene = targetGenes.length > 1;
     const isClusterView = displayName === 'CLUSTER_VIEW';
-
-    // --- AUTO-SWITCH LOGIC START ---
-    if (!isClusterView && dataset) {
-        const checkGene = (ds, g) => {
-            if (!ds || !ds.expression) return false;
-            // Case A: Gene-centric (e.g. Kidney/Hypothalamus often store by Gene Key)
-            if (ds.expression[g] !== undefined) return true;
-            // Case B: Cell-centric (check sample cell)
-            const cellKeys = Object.keys(ds.expression);
-            if (cellKeys.length > 0) {
-                const firstCell = ds.expression[cellKeys[0]];
-                if (firstCell && (firstCell[g] !== undefined)) return true;
-            }
-            return false;
-        };
-
-        if (!checkGene(dataset, primaryGene)) {
-            const allKeys = Object.keys(window.CiliAI.datasets);
-            for (const key of allKeys) {
-                if (key === datasetKey) continue;
-                const candidateDs = window.CiliAI.datasets[key];
-                if (checkGene(candidateDs, primaryGene)) {
-                    console.log(`[CiliAI] Auto-switching from ${datasetKey} to ${key} for ${primaryGene}`);
-                    datasetKey = key;
-                    window.CiliAI.activeDataset = key;
-                    dataset = candidateDs;
-                    window.addChatMessage(`ℹ️ <strong>${primaryGene}</strong> not found in current tissue. Auto-switched to <strong>${dataset.name}</strong>.`, false);
-                    break;
-                }
-            }
-        }
-    }
-    // --- AUTO-SWITCH LOGIC END ---
-
-    if (!dataset || !Array.isArray(dataset.umap) || dataset.umap.length === 0) {
-        window.addChatMessage(`Warning: ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
-        return;
-    }
 
     // 4. Prepare data
     const sourceData = dataset.umap;
@@ -3144,48 +3112,57 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     // Unique cell types for legend
     const cellTypes = new Set();
     
-    // --- COLORS: Preserved Lung/Kidney + Added Others ---
+    // --- EXPANDED CLUSTER COLORS (Lung/Kidney Preserved) ---
     const clusterColors = {
-        // Lung & Kidney (Original)
-        'Proximal Tubule Cell': '#3B82F6', 'Thick Ascending Limb Cell': '#60A5FA',
-        'Distal Convoluted Tubule Cell': '#93C5FD', 'Collecting Duct Principal Cell': '#BFDBFE',
-        'Collecting Duct Intercalated Cell': '#DBEAFE', 'Podocyte': '#1E40AF',
-        'Fibroblast': '#1D4ED8', 'Endothelial Cell': '#2563EB', 'Immune Cell': '#1E3A8A',
-        'Cycling Cell': '#172554', 'Ciliated Cell': '#E11D48',
-        'stem cell': '#E11D48', 'club cell': '#3B82F6', 'goblet cell': '#10B981',
-        'basal cell': '#F59E0B', 'neuroendocrine cell': '#8B5CF6',
-        'pulmonary alveolar type 1 cell': '#60A5FA', 'pulmonary alveolar type 2 cell': '#2563EB',
-        'lung secretory cell': '#34D399', 'Ciliated epithelial cell': '#E11D48',
-        'AT1 cell': '#60A5FA', 'AT2 cell': '#2563EB', 'Club cell': '#3B82F6',
-        'Goblet cell': '#10B981', 'Basal cell': '#F59E0B', 'Macrophage': '#DC2626',
-        'Monocyte': '#EF4444', 'T cell': '#059669', 'B cell': '#7C3AED', 'Endothelial cell': '#0284C7',
+        // --- Lung & Kidney (Original - DO NOT CHANGE) ---
+        'Proximal Tubule Cell': '#3B82F6',
+        'Thick Ascending Limb Cell': '#60A5FA',
+        'Distal Convoluted Tubule Cell': '#93C5FD',
+        'Collecting Duct Principal Cell': '#BFDBFE',
+        'Collecting Duct Intercalated Cell': '#DBEAFE',
+        'Podocyte': '#1E40AF',
+        'Fibroblast': '#1D4ED8',
+        'Endothelial Cell': '#2563EB',
+        'Immune Cell': '#1E3A8A',
+        'Cycling Cell': '#172554',
+        'Ciliated Cell': '#E11D48',
+        'stem cell': '#E11D48',
+        'club cell': '#3B82F6',
+        'goblet cell': '#10B981',
+        'basal cell': '#F59E0B',
+        'neuroendocrine cell': '#8B5CF6',
+        'pulmonary alveolar type 1 cell': '#60A5FA',
+        'pulmonary alveolar type 2 cell': '#2563EB',
+        'lung secretory cell': '#34D399',
         
+        // --- ADDED: Other Tissues ---
+        // Lung Tissue (Complete)
+        'Ciliated epithelial cell': '#E11D48', 'AT1 cell': '#60A5FA', 'AT2 cell': '#2563EB', 
+        'Club cell': '#3B82F6', 'Goblet cell': '#10B981', 'Basal cell': '#F59E0B', 
+        'Macrophage': '#DC2626', 'Monocyte': '#EF4444', 'T cell': '#059669', 'B cell': '#7C3AED', 
+        'Endothelial cell': '#0284C7',
+
         // Liver
         'Hepatocyte': '#10B981', 'Cholangiocyte': '#34D399', 'Kupffer cell': '#DC2626',
         'Liver sinusoidal endothelial cell': '#0284C7', 'Hepatic stellate cell': '#D97706',
         'NK cell': '#9F7AEA',
-        
+
         // Hypothalamus
         'Neuron': '#8B5CF6', 'Astrocyte': '#10B981', 'Oligodendrocyte': '#3B82F6',
         'Microglia': '#DC2626', 'Tanycyte': '#EC4899', 'Ependymal cell': '#E11D48',
         'Mural cell': '#D97706',
-        
+
         // Chondrocyte
         'Chondroblast': '#10B981', 'Homeostatic chondrocyte': '#34D399',
         'Hypertrophic chondrocyte': '#B45309', 'Prefibrotic chondrocyte': '#D97706',
         'Reparative chondrocyte': '#3B82F6',
-        
-        // Pancreas & Olfactory
-        'Acinar cell': '#F59E0B', 'Beta cell': '#DC2626', 'Alpha cell': '#EF4444',
-        'Delta cell': '#F87171', 'Ductal cell': '#D97706', 'Stellate cell': '#10B981',
+
+        // Olfactory
         'Mature OSN': '#8B5CF6', 'Immature OSN': '#A78BFA', 'Horizontal Basal Cell': '#10B981',
-        'Sustentacular Cell': '#059669', 'Bowman Gland': '#D97706', 'Microvillar Cell': '#EC4899',
-        
-        // Default
-        'Unknown': '#94A3B8'
+        'Sustentacular Cell': '#059669', 'Bowman Gland': '#D97706', 'Microvillar Cell': '#EC4899'
     };
 
-    // Helper: decode sparse array
+    // Helper: decode sparse array (Original)
     const decodeSparse = (sparse, total) => {
         const dense = new Float32Array(total).fill(0);
         if (!sparse) return dense;
@@ -3197,8 +3174,8 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         return dense;
     };
 
-    // Expression handling – now supports multi-gene averaging
-    let exprData = null;  
+    // Expression handling
+    let exprData = null; 
     let geneFoundCount = 0;
 
     if (!isClusterView) {
@@ -3207,29 +3184,43 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         targetGenes.forEach(g => {
             let rawData = dataset.expression?.[g] || window.CiliAI.cellDataCache?.[g];
             
-            // Try fetching from cell-centric structure if gene-centric failed (for Liver/Lung)
+            // Fallback: If no gene key, check if dataset is cell-centric (e.g. Liver/Chondrocyte)
             if (!rawData && dataset.expression && typeof dataset.expression === 'object' && !Array.isArray(dataset.expression)) {
-                 // We don't iterate all cells here for performance, assumes data handled below or cached
+                // Mock a rawData object to force the logic below to use cell lookups
+                rawData = { __cell_lookup_mode__: true }; 
             }
 
             if (rawData) {
                 geneFoundCount++;
                 if (Array.isArray(rawData)) {
-                    // Kidney format (Sparse Array)
+                    // Kidney / Sparse Array Logic (Original)
                     perGeneExpr.push(decodeSparse(rawData, sourceData.length));
-                } else if (rawData.cells && rawData.expression) {
-                    // Hypothalamus format (Object with cells/expression arrays)
+                } 
+                // --- ADDED: Hypothalamus Logic (structure: {cells:[], expression:[]}) ---
+                else if (rawData.cells && rawData.expression) {
                     const arr = new Float32Array(sourceData.length).fill(0);
                     for(let k=0; k<rawData.cells.length; k++) {
                         const idx = rawData.cells[k];
                         if(idx < arr.length) arr[idx] = rawData.expression[k];
                     }
                     perGeneExpr.push(arr);
-                } else if (typeof rawData === 'object') {
-                    // Standard dictionary
+                } 
+                // --- END ADDED ---
+                else if (typeof rawData === 'object') {
+                    // Dictionary or Cell-Centric Lookup (Original Logic Extended)
                     const arr = new Float32Array(sourceData.length);
                     sourceData.forEach((p, i) => {
-                        if (p && p.cell_type) arr[i] = rawData[p.cell_type] || 0;
+                        // Original Lung Organoid Logic: rawData is { "CellType": value }
+                        if (rawData[p.cell_type] !== undefined) {
+                            arr[i] = rawData[p.cell_type];
+                        }
+                        // Added: Cell-Centric Lookup (Liver/Chondrocyte)
+                        else if (rawData.__cell_lookup_mode__) {
+                            const cellId = p.cell_id || p.id;
+                            if (dataset.expression[cellId] && dataset.expression[cellId][g] !== undefined) {
+                                arr[i] = dataset.expression[cellId][g];
+                            }
+                        }
                     });
                     perGeneExpr.push(arr);
                 }
@@ -3237,6 +3228,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         });
 
         if (geneFoundCount > 0) {
+            // Average across available genes
             exprData = new Float32Array(sourceData.length);
             sourceData.forEach((_, i) => {
                 let sum = 0;
@@ -3252,46 +3244,15 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         }
     }
 
-    // Helper for Cilia Status
-    const inferCiliaInfo = (cellType) => {
-        const lower = (cellType || '').toLowerCase();
-        // 1. Definite Motile Cilia
-        if (lower.includes('multiciliated') || lower.includes('sperm') || lower.includes('ependymal')) {
-            return { status: "Ciliated", type: "Motile" };
-        }
-        // 2. Definite Primary Cilia
-        if (lower.includes('neuron') || lower.includes('astrocyte') || 
-            lower.includes('fibroblast') || lower.includes('chondrocyte') ||
-            lower.includes('stellate') || lower.includes('endothelial') ||
-            lower.includes('podocyte') || lower.includes('tubule') ||
-            lower.includes('duct') || lower.includes('stem') || 
-            lower.includes('progenitor') || lower.includes('osn') || 
-            lower.includes('cholangiocyte') || lower.includes('tanycyte')) {
-            return { status: "Ciliated", type: "Primary" };
-        }
-        // 3. Generic "Ciliated" check
-        if (lower.includes('ciliated')) {
-            return { status: "Ciliated", type: "Motile/Primary" };
-        }
-        // 4. Likely Non-ciliated
-        if (lower.includes('macrophage') || lower.includes('monocyte') || 
-            lower.includes('t cell') || lower.includes('b cell') || 
-            lower.includes('nk cell') || lower.includes('blood') ||
-            lower.includes('microglia') || lower.includes('neutrophil')) {
-            return { status: "Non-ciliated", type: "None" };
-        }
-        return { status: "Unknown Status", type: "Unknown" };
-    };
-
     // Build plot data points
     sourceData.forEach((p, i) => {
         if (!p) return;
-        const cellType = p.cell_type || p.cluster || 'Unknown';
+        const cellType = p.cell_type || p.cluster || p.type || 'Unknown';
         cellTypes.add(cellType);
 
         if (zoomToCellType && cellType !== zoomToCellType) return;
 
-        // Coordinate normalization
+        // Coordinate normalization (Handle all formats)
         let px = p.x ?? p.umap_x ?? p.UMAP_1;
         let py = p.y ?? p.umap_y ?? p.UMAP_2;
         if (px === undefined || py === undefined) return;
@@ -3300,33 +3261,23 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         y.push(parseFloat(py));
 
         let exprVal = 0;
-        if (!isClusterView) {
-            if (exprData) {
-                exprVal = exprData[i];
-            } else {
-                // Fallback for cell-centric data (Liver/Lung flat files)
-                const g = targetGenes[0];
-                if (p[g] !== undefined) exprVal = p[g];
-                else if (dataset.expression && dataset.expression[p.cell_id] && dataset.expression[p.cell_id][g] !== undefined) {
-                    exprVal = dataset.expression[p.cell_id][g];
-                }
-            }
+        if (!isClusterView && exprData) {
+            exprVal = exprData[i];
             if (exprVal > maxExpr) maxExpr = exprVal;
         }
 
-        const info = inferCiliaInfo(cellType);
-        text.push(`<b>${cellType}</b><br>Status: ${info.status}<br>${isClusterView ? '' : `Expression: ${exprVal.toFixed(2)} TPM`}`);
+        text.push(`<b>${cellType}</b><br>${isClusterView ? '' : `Expression: ${exprVal.toFixed(2)} TPM`}`);
 
+        // Use localization from primary gene
         customdata.push({
             localization: window.CiliAI.lookups.geneMap[primaryGene]?.Localization || 'Cilium',
             gene: primaryGene
         });
 
         if (isClusterView) {
-            // Fuzzy match for color
             let matchColor = '#94A3B8';
-            for (const key in clusterColors) {
-                if (cellType.toLowerCase().includes(key.toLowerCase())) {
+            for(const key in clusterColors) {
+                if(cellType.toLowerCase().includes(key.toLowerCase())) {
                     matchColor = clusterColors[key];
                     break;
                 }
@@ -3374,7 +3325,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     // Layout
     const layout = {
         title: {
-            text: `<b>${isClusterView ? 'Cell Types' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</b><br><sub>${dataset.name}</sub>`,
+            text: `<b>${isClusterView ? 'Cell Types' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</b><br><sub>${dataset.name}</sub> `,
             font: { size: 16 }
         },
         xaxis: { visible: false, showgrid: false, zeroline: false },
@@ -3394,15 +3345,19 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         const legendStep = 0.06;
         Array.from(cellTypes).sort().forEach((ct, idx) => {
             let col = '#666';
-            for (const key in clusterColors) {
-                if (ct.toLowerCase().includes(key.toLowerCase())) { col = clusterColors[key]; break; }
+            for(const key in clusterColors) {
+                if(ct.toLowerCase().includes(key.toLowerCase())) { col = clusterColors[key]; break; }
             }
             layout.annotations.push({
-                x: legendX, y: legendY - idx * legendStep,
-                xref: 'paper', yref: 'paper',
+                x: legendX,
+                y: legendY - idx * legendStep,
+                xref: 'paper',
+                yref: 'paper',
                 text: `<span style="color:${col}">●</span> ${ct}`,
-                showarrow: false, font: { size: 11 },
-                align: 'left', xanchor: 'left'
+                showarrow: false,
+                font: { size: 11 },
+                align: 'left',
+                xanchor: 'left'
             });
         });
     }
@@ -3415,8 +3370,8 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     });
 
     const plotDiv = document.getElementById('plotly-container');
-    document.getElementById('cilia-svg').style.display = 'none';
-    document.getElementById('domain-viewer').style.display = 'none';
+    if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
+    if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
     plotDiv.style.display = 'block';
     
     window.CiliAI.currentPlot = plotDiv;
@@ -3450,7 +3405,9 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     window.addChatMessage(`
         <div class="ai-result-card">
             <p><strong>${isClusterView ? 'Cell Type View' : (isMultiGene ? targetGenes.join(' + ') : primaryGene)}</strong> in <strong>${dataset.name}</strong></p>
-            ${isClusterView ? '<p>Colored by cell type (legend on right)</p>' : `<p>Max Expr: <strong>${maxExpr.toFixed(2)} TPM</strong></p>`}
+            ${isClusterView 
+                ? '<p>Colored by cell type (legend on right)</p>' 
+                : `<p>Colored by ${isMultiGene ? 'average ' : ''}expression level</p>`}
             
             <div style="margin-top:12px; border-top:1px solid #eee; padding-top:8px;">
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
@@ -3472,6 +3429,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         </div>
     `, false);
 };
+
 
 // =======================================================
 // Helper: Organ-Specific Colors (Updated with new types)
@@ -6089,6 +6047,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
