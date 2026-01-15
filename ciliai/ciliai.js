@@ -3076,8 +3076,8 @@ window.terminologyQueries = {
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
 /**
- * Renders Interactive UMAP – Enhanced with Auto-Dataset Switching
- * FIXED: Variable reference error ('gene' -> 'geneSymbol')
+ * Renders Interactive UMAP – Enhanced with Auto-Dataset Switching & Safety Checks
+ * FIXED: Syntax errors and Plotly axis scaling crashes
  */
 window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCellType = null) {
     // 1. Input Handling & Normalization
@@ -3085,7 +3085,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     else if (!Array.isArray(targetGenes)) targetGenes = [displayName || 'WDR31'];
     if (!displayName) displayName = targetGenes[0];
 
-    const geneSymbol = targetGenes[0].toUpperCase(); // <--- Defined here as 'geneSymbol'
+    const geneSymbol = targetGenes[0].toUpperCase();
     const isCluster = displayName === 'CLUSTER_VIEW';
 
     // 2. Resolve Active Dataset
@@ -3096,7 +3096,9 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     if (!isCluster && dataset) {
         const checkGene = (ds, g) => {
             if (!ds || !ds.expression) return false;
+            // Case A: Gene-centric (Kidney/Hypothalamus)
             if (ds.expression[g] !== undefined) return true;
+            // Case B: Cell-centric (Lung/Liver) - check sample
             const cellKeys = Object.keys(ds.expression);
             if (cellKeys.length > 0) {
                 const firstCell = ds.expression[cellKeys[0]];
@@ -3136,6 +3138,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     if (!isCluster) {
         targetGenes.forEach(g => {
             const gUpper = g.toUpperCase();
+            // Data Extraction Strategy
             if (datasetKey === 'hypothalamus' && dataset.expression?.[gUpper]) {
                 const gData = dataset.expression[gUpper];
                 if (gData.cells && gData.expression) {
@@ -3155,10 +3158,11 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
                      if(idx < expr.length) expr[idx] += arr[k+1];
                  }
             } else {
+                // Default / Cell-centric
                 dataset.umap.forEach((p, i) => {
                     let exprVal = 0;
                     const cellId = p.cell_id || p.id;
-                    if (cellId && dataset.expression?.[cellId]?.[gUpper] !== undefined) {
+                    if (dataset.expression?.[cellId]?.[gUpper] !== undefined) {
                         exprVal = dataset.expression[cellId][gUpper];
                     } else if (p[gUpper] !== undefined) {
                         exprVal = p[gUpper];
@@ -3173,19 +3177,17 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
                 });
             }
         });
+        
+        // Safety recalculation of maxExpr
+        maxExpr = 0;
+        for(let i=0; i<expr.length; i++) { if(expr[i] > maxExpr) maxExpr = expr[i]; }
+        
         if (maxExpr === 0) window.addChatMessage(`⚠️ Gene <strong>${targetGenes[0]}</strong> not detected in ${dataset.name}. (Max TPM: 0)`, false);
     }
 
     // 4. Construct Traces
     const colors = window.getOrganCellTypeColors ? window.getOrganCellTypeColors(datasetKey) : {};
-    const inferCiliaInfo = (cellType) => {
-        const lower = (cellType || '').toLowerCase();
-        if (lower.includes('ciliated') || lower.includes('multiciliated')) return { status: "Ciliated", type: "Motile/Primary" };
-        if (lower.includes('neuron') || lower.includes('fibroblast')) return { status: "Ciliated", type: "Primary" };
-        return { status: "Non-ciliated", type: "None" };
-    };
     
-    let filteredCount = 0;
     dataset.umap.forEach((p, i) => {
         let px = p.x ?? p.umap_x ?? p.UMAP_1 ?? (p.umap?.x);
         let py = p.y ?? p.umap_y ?? p.UMAP_2 ?? (p.umap?.y);
@@ -3193,10 +3195,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         if (isNaN(px) || isNaN(py)) return;
 
         const cellType = p.cell_type || p.cluster || p.type || 'Unknown';
-        if (zoomToCellType && !cellType.toLowerCase().includes(zoomToCellType.toLowerCase())) {
-            filteredCount++;
-            return;
-        }
+        if (zoomToCellType && !cellType.toLowerCase().includes(zoomToCellType.toLowerCase())) return;
 
         x.push(px);
         y.push(py);
@@ -3214,7 +3213,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
             color.push(expr[i]);
         }
         
-        const info = inferCiliaInfo(cellType);
         const exprValue = !isCluster ? expr[i].toFixed(2) : 'N/A';
         const cellId = p.cell_id || `cell_${i}`;
         
@@ -3224,20 +3222,23 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
             ${!isCluster ? `<span style="color:#059669;font-weight:bold;">Expr: ${exprValue}</span>` : ''}
         `);
         
-        // --- FIXED: Uses 'geneSymbol' instead of 'gene' ---
         customdata.push({ 
-            localization: info.type === 'None' ? 'Cell Body' : 'Cilium', 
+            localization: 'Cilium', 
             gene: geneSymbol, 
             cell_type: cellType 
         });
     });
 
-    if (x.length === 0) return;
+    // --- CRITICAL FIX: PREVENT PLOTLY CRASH ON EMPTY DATA ---
+    if (x.length === 0) {
+        window.addChatMessage(`⚠️ Error: No valid UMAP coordinates found for <strong>${dataset.name}</strong>.`, false);
+        return;
+    }
 
     // 5. Render Plot
     const plotDiv = document.getElementById('plotly-container');
-    document.getElementById('cilia-svg').style.display = 'none';
-    document.getElementById('domain-viewer').style.display = 'none';
+    if (document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
+    if (document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
     plotDiv.style.display = 'block';
     
     const plotData = [{
@@ -3299,6 +3300,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         </div>
     `, false);
 };
+
 
 // =======================================================
 // Helper: Organ-Specific Colors (Must be present)
@@ -5910,6 +5912,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
