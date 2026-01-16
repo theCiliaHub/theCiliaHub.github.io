@@ -936,7 +936,7 @@
                             text.style.fontSize = '12px';
                         });
                         
-                        const geneName = geneMap[partId];
+                         geneName = geneMap[partId];
                         if (geneName) {
                             labels.querySelectorAll('text').forEach(text => {
                                 if (text.textContent.includes(geneName)) {
@@ -954,7 +954,7 @@
             container.onclick = (e) => {
                 if(e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
                     SpatialManager.resetZoom();
-                    const labels = container.querySelector('.cilia-labels');
+                     labels = container.querySelector('.cilia-labels');
                     if (labels) {
                         labels.style.opacity = '0';
                         labels.querySelectorAll('text').forEach(text => {
@@ -971,16 +971,16 @@
         };
         // 4. Helper Functions
         window.addChatMessage = function(html, isUser = false) {
-            const messages = document.getElementById('messages');
+             messages = document.getElementById('messages');
             if (!messages) return;
-            const msg = document.createElement('div');
+             msg = document.createElement('div');
             msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
             msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
             messages.appendChild(msg);
             messages.scrollTop = messages.scrollHeight;
         };
         window.updateStatus = function(text, state = 'normal') {
-            const statusEl = document.getElementById('dataStatus');
+             statusEl = document.getElementById('dataStatus');
             if (statusEl) {
                 statusEl.textContent = text;
                 statusEl.className = `status-badge status ${state}`;
@@ -991,21 +991,21 @@
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('domain-viewer').style.display = 'none';
             
-            const plotContainer = document.getElementById('plotly-container');
+             plotContainer = document.getElementById('plotly-container');
             plotContainer.style.display = 'block';
             document.getElementById('current-viz-title').textContent = title;
             
             // Clear previous plot to prevent artifacts
             plotContainer.innerHTML = '';
             
-            const vizCard = document.querySelector('.viz-card');
-            const vizHeader = document.querySelector('.viz-header');
+             vizCard = document.querySelector('.viz-card');
+             vizHeader = document.querySelector('.viz-header');
             
             // Calculate height safely
-            const availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
-            const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
+             availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
+             availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
             
-            const layout = {
+             layout = {
                 ...plotData.layout,
                 autosize: true,
                 width: availableWidth,
@@ -1033,7 +1033,7 @@
                 
                 // Add click listener safely
                 gd.on('plotly_click', e => {
-                    const loc = e.points?.[0]?.customdata?.localization;
+                     loc = e.points?.[0]?.customdata?.localization;
                     if (!loc) return;
                     window.showDiagram();
                     if(window.SpatialManager) {
@@ -1044,7 +1044,7 @@
             
             // Resize Listener: Only resize if the container is actually visible
             window.addEventListener('resize', () => {
-                const container = document.getElementById('plotly-container');
+                 container = document.getElementById('plotly-container');
                 if (window.CiliAI.currentPlot && container && container.offsetParent !== null) {
                     setTimeout(() => { Plotly.Plots.resize(window.CiliAI.currentPlot); }, 50);
                 }
@@ -1061,23 +1061,23 @@
         window.showDomainViewer = function(gene) {
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('plotly-container').style.display = 'none';
-            const domainContainer = document.getElementById('domain-viewer');
+             domainContainer = document.getElementById('domain-viewer');
             domainContainer.style.display = 'flex';
             domainContainer.innerHTML = '';
             document.getElementById('current-viz-title').textContent = `Pfam Domains: ${gene}`;
             // Safety check for lookup data
-            const pfamLookup = window.CiliAI.lookups.pfamByGene || {};
-            const pfam = pfamLookup[gene.toUpperCase()] || [];
+             pfamLookup = window.CiliAI.lookups.pfamByGene || {};
+             pfam = pfamLookup[gene.toUpperCase()] || [];
             
             if (!pfam.length) {
                 // Check for raw text descriptions as fallback
-                const geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
+                 geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
                 if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
-                    const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
-                    const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
+                     desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
+                     parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
                     
                     if (parts.length > 0) {
-                        const domains = parts.map((part, i) => ({
+                         domains = parts.map((part, i) => ({
                             id: `DOM_${i+1}`,
                             name: part.trim(),
                             start: (i * 200) + 50,
@@ -1424,34 +1424,36 @@ window.loadCiliAIData = async function() {
         window.CiliAI.masterData = mainRes?.masterData || [];
         window.CiliAI.lookups = lookupsRes?.lookups || { geneMap: {} };
         // --- Stats Calculation (Fixed: Excludes Secondary Diseases) ---
-            const stats = { genes: window.CiliAI.masterData.length };
-            const diseases = new Set();
-            let ciliopathyGeneCount = 0;
+            // --- Stats Calculation ---
+const stats = { genes: window.CiliAI.masterData.length };
+const uniqueDiseasesLower = new Set(); // Use Set for unique lowercase names
+let ciliopathyGeneCount = 0;
 
-            window.CiliAI.masterData.forEach(g => {
-                // 1. Check if it has ciliopathy data
-                let hasCiliopathy = false;
-                if (g.Ciliopathy && g.Ciliopathy !== 'N/A' && g.Ciliopathy !== 'Not specified') hasCiliopathy = true;
-                if (g.Ciliopathies && g.Ciliopathies.length > 0) hasCiliopathy = true;
+window.CiliAI.masterData.forEach(g => {
+    // 1. Classification Check (Exclude Secondary)
+    const classification = (g.ciliopathy_classification || '').toString();
+    const isSecondary = classification.toLowerCase().includes('secondary');
 
-                // 2. Check Classification (Exclude Secondary)
-                // Note: Ensure the property name matches your JSON (ciliopathy_classification vs Ciliopathy_Classification)
-                const classification = g.ciliopathy_classification || g.Ciliopathy_Classification || '';
-                const isSecondary = classification === 'Secondary Diseases';
+    // 2. Data Check
+    const raw = g.Ciliopathy || g.Ciliopathies;
+    let hasData = false;
+    let list = [];
+    if (Array.isArray(raw) && raw.length > 0) { list = raw; hasData = true; }
+    else if (typeof raw === 'string' && raw !== 'N/A' && raw !== 'Not specified') { list = [raw]; hasData = true; }
 
-                if (hasCiliopathy && !isSecondary) {
-                    ciliopathyGeneCount++;
-                    
-                    // Collect Unique Diseases
-                    const raw = g.Ciliopathy || g.Ciliopathies;
-                    const list = Array.isArray(raw) ? raw : [raw];
-                    list.forEach(d => {
-                        if (d && d !== 'N/A' && d !== 'Not specified') {
-                            diseases.add(d.trim());
-                        }
-                    });
+    if (hasData && !isSecondary) {
+        ciliopathyGeneCount++;
+        list.forEach(d => {
+            if (d && typeof d === 'string') {
+                const clean = d.trim();
+                // 3. Normalize to lowercase to deduplicate "Joubert Syndrome" vs "joubert syndrome"
+                if (clean.length > 2 && clean !== 'Not specified') {
+                    uniqueDiseasesLower.add(clean.toLowerCase());
                 }
-            });
+            }
+        });
+    }
+});
 
             // Update DOM
             const elG = document.getElementById('stat-genes');
@@ -1891,6 +1893,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
