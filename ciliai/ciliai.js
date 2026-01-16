@@ -2350,83 +2350,213 @@ window.openTab = function(evt, tabName) {
 window.displayFullGeneInfo = async function(geneSymbol) {
     injectCiliAIStyles();
     
-    const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
+    const gm = window.CiliAI?.lookups?.geneMap;
     if (!gm || !gm[geneSymbol]) {
         return `<div class="ai-result-card">No data found for gene <strong>${geneSymbol}</strong></div>`;
     }
+
     const g = gm[geneSymbol];
-    const safeVal = (v) => (v && v !== 'N/A' && v !== '0') ? v : '<span style="color:#ccc">—</span>';
+    const safeVal = (v) => (v && v !== 'N/A' && v !== '0' && v !== null && v !== undefined) 
+        ? v 
+        : '<span style="color:#ccc">—</span>';
+
+    // ── Existing scRNA (cell-type) expression ──
     const scRNA = g.expression?.scRNA || {};
 
-    // Calculate Confidence Score for Badge
+    // ── NEW: Bulk tissue expression from ciliai_master_expression.json ──
+    const tissueExpr   = g.expression?.tissue   || {};           // { "Lung_Primary": 11.51, "Kidney": 2.47, ... }
+    const exprCategory = g.expression?.category || '—';          // "Pan-ciliary (Ubiquitous)", "Idio-ciliary (Tissue-Specific)", etc.
+    const nTissues     = g.expression?.n_tissues || 0;           // number of tissues with detectable expression
+
+    // Confidence badge
     let score = 0;
-    if (g.screens) score += g.screens.length; 
+    if (g.screens) score += g.screens.length;
     if (g.Ciliopathies && g.Ciliopathies.length > 0) score += 2;
-    if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') score += 1; 
+    if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') score += 1;
 
     let badge = '';
-    if (score >= 4) badge = `<span class="cilia-badge badge-gold">🥇 High Confidence</span>`;
+    if      (score >= 4) badge = `<span class="cilia-badge badge-gold">🥇 High Confidence</span>`;
     else if (score >= 2) badge = `<span class="cilia-badge badge-silver">🥈 Verified</span>`;
-    else badge = `<span class="cilia-badge badge-bronze">🥉 Candidate</span>`;
+    else                 badge = `<span class="cilia-badge badge-bronze">🥉 Candidate</span>`;
 
-    // --- BUILD HTML ---
-    let html = `<div class="ai-result-card" style="font-family: 'Inter', sans-serif;">`;
-    
-    // 1. Header
-    html += `<div style="display:flex; align-items:center; margin-bottom:10px;">
-                <h2 id="current-gene-name" style="margin:0; color:#2b6cb0;">${geneSymbol}</h2>
-                ${badge}
-             </div>`;
+    // ────────────────────────────────────────────────────────────────
+    // BUILD MAIN HTML
+    // ────────────────────────────────────────────────────────────────
+    let html = `<div class="ai-result-card" style="font-family: 'Inter', sans-serif; padding:20px;">`;
 
-    // 2. Navigation Tabs
+    // Header
     html += `
-        <div class="cilia-tabs">
+        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+            <h2 id="current-gene-name" style="margin:0; color:#2b6cb0; font-size:1.9rem;">
+                ${geneSymbol}
+            </h2>
+            ${badge}
+        </div>`;
+
+    // Tabs
+    html += `
+        <div class="cilia-tabs" style="margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:4px;">
             <button class="cilia-tab-btn active" onclick="window.openTab(event, 'overview')">Overview</button>
-            <button class="cilia-tab-btn" onclick="window.openTab(event, 'expression')">Expression</button>
-            <button class="cilia-tab-btn" onclick="window.openTab(event, 'screens')">Screens</button>
-            <button class="cilia-tab-btn" onclick="window.openTab(event, 'evolution')">Evolution</button>
+            <button class="cilia-tab-btn"         onclick="window.openTab(event, 'expression')">Expression</button>
+            <button class="cilia-tab-btn"         onclick="window.openTab(event, 'screens')">Screens</button>
+            <button class="cilia-tab-btn"         onclick="window.openTab(event, 'evolution')">Evolution</button>
+        </div>`;
+
+    // ────────────────────── OVERVIEW TAB ──────────────────────
+    html += `
+        <div id="tab-overview" class="cilia-tab-content active">
+            <p><strong>Description:</strong> ${g['Gene.Description'] || 'No description available.'}</p>
+            <p><strong>Localization:</strong> ${g.Localization || 'Not annotated'}</p>
+            
+            <div style="background:#f8fafc; padding:14px; border-radius:8px; margin:16px 0; border:1px solid #e2e8f0; font-size:0.95em;">
+                <p style="margin:6px 0;"><strong>Mouse Ortholog:</strong> ${safeVal(g.Ortholog_Mouse)}</p>
+                <p style="margin:6px 0;"><strong>LoF Phenotype (cilia length):</strong> ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</p>
+                <p style="margin:6px 0;"><strong>OMIM:</strong> ${safeVal(g.OMIM?.ID)}</p>
+            </div>
+            
+            ${g.complex_components ? renderComplexTable(g.complex_components) : '<p style="color:#64748b;">No known protein complex membership.</p>'}
+        </div>`;
+
+    // ────────────────────── EXPRESSION TAB (now with bulk + scRNA) ──────────────────────
+    html += `
+        <div id="tab-expression" class="cilia-tab-content">
+            <div style="margin-bottom:20px;">
+                <button class="ciliai-button" onclick="window.renderUMAPPlot('${geneSymbol}')">
+                    🔄 Refresh UMAP Plot
+                </button>
+            </div>`;
+
+    // Bulk tissue expression (from new JSON)
+    if (Object.keys(tissueExpr).length > 0) {
+        // Filter out non-tissue keys
+        const realTissues = Object.fromEntries(
+            Object.entries(tissueExpr).filter(([k]) => 
+                !['n_tissues_expressed', 'Category'].includes(k)
+            )
+        );
+
+        if (Object.keys(realTissues).length > 0) {
+            html += `
+                <div class="section-header" style="margin-bottom:12px;">Bulk Tissue RNA-seq Expression</div>
+                
+                <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
+                    <div style="background:#f0f9ff; padding:10px 16px; border-radius:8px; border:1px solid #bae6fd; font-size:0.95em; font-weight:500;">
+                        Category: ${exprCategory}
+                    </div>
+                    <div style="background:#f0fdf4; padding:10px 16px; border-radius:8px; border:1px solid #86efac; font-size:0.95em; font-weight:500;">
+                        Expressed in ${nTissues} tissue${nTissues === 1 ? '' : 's'}
+                    </div>
+                </div>
+
+                ${renderTissueExpressionTable(realTissues)}
+            `;
+        } else {
+            html += '<p style="color:#64748b; font-style:italic;">No bulk tissue expression values available.</p>';
+        }
+    } else {
+        html += '<p style="color:#64748b; font-style:italic; margin:16px 0;">No bulk tissue-level expression data available for this gene.</p>';
+    }
+
+    // scRNA section (lung organoid)
+    html += `
+        <div class="section-header" style="margin:28px 0 12px; padding-top:16px; border-top:1px solid #e2e8f0;">
+            Single-cell RNA-seq (Lung Organoid)
         </div>
+        ${Object.keys(scRNA).length > 0 
+            ? renderScRNATable(scRNA) 
+            : '<p style="color:#64748b;">No single-cell expression data available in the lung organoid dataset.</p>'}
     `;
 
-    // 3. Tab Contents
-    
-    // -- OVERVIEW --
-    html += `<div id="tab-overview" class="cilia-tab-content active">
-                <p><strong>Description:</strong> ${g['Gene.Description'] || 'No description available'}</p>
-                <p><strong>Localization:</strong> ${g.Localization || 'Unknown'}</p>
-                <div style="background:#f7fafc; padding:10px; border-radius:8px; margin:10px 0; font-size: 0.95em; border: 1px solid #edf2f7;">
-                    <p style="margin:3px 0;"><strong>Mouse Ortholog:</strong> ${safeVal(g.Ortholog_Mouse)}</p>
-                    <p style="margin:3px 0;"><strong>Phenotype (LoF):</strong> ${safeVal(g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'])}</p>
-                    <p style="margin:3px 0;"><strong>OMIM:</strong> ${safeVal(g.OMIM?.ID)}</p>
-                </div>
-                ${g.complex_components ? renderComplexTable(g.complex_components) : ''}
-             </div>`;
+    html += `</div>`;
 
-    // -- EXPRESSION --
-    html += `<div id="tab-expression" class="cilia-tab-content">
-                <div style="margin-bottom: 10px;">
-                    <button class="ciliai-button" onclick="window.renderUMAPPlot('${geneSymbol}')">🔄 Refresh UMAP Plot</button>
-                </div>
-                ${Object.keys(scRNA).length > 0 ? renderScRNATable(scRNA) : '<p>No scRNA data.</p>'}
-             </div>`;
+    // ────────────────────── SCREENS TAB ──────────────────────
+    html += `
+        <div id="tab-screens" class="cilia-tab-content">
+            ${renderCiliaEffectsTable(g)}
+            ${Array.isArray(g.screens) && g.screens.length > 0 
+                ? renderScreensTable(g.screens) 
+                : '<p style="color:#64748b;">No functional screen data available.</p>'}
+        </div>`;
 
-    // -- SCREENS --
-    html += `<div id="tab-screens" class="cilia-tab-content">
-                ${renderCiliaEffectsTable(g)}
-                ${Array.isArray(g.screens) && g.screens.length > 0 ? renderScreensTable(g.screens) : '<p>No screen data available.</p>'}
-             </div>`;
+    // ────────────────────── EVOLUTION TAB ──────────────────────
+    html += `
+        <div id="tab-evolution" class="cilia-tab-content">
+            ${g.phylogeny 
+                ? renderPhyloTable(g.phylogeny) 
+                : '<p style="color:#64748b;">No phylogenetic / evolutionary data available.</p>'}
+            <div style="margin-top:20px;">
+                <button class="ciliai-button" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">
+                    View Phylogeny Heatmap
+                </button>
+            </div>
+        </div>`;
 
-    // -- EVOLUTION --
-    html += `<div id="tab-evolution" class="cilia-tab-content">
-                ${g.phylogeny ? renderPhyloTable(g.phylogeny) : '<p>No phylogeny data.</p>'}
-                <div style="margin-top:10px;">
-                    <button class="ciliai-button" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">View Phylogeny Heatmap</button>
-                </div>
-             </div>`;
+    html += `</div>`; // close .ai-result-card
 
-    html += `</div>`; 
     return html;
 };
+
+// Tissue-level expression table (sorted descending TPM)
+function renderTissueExpressionTable(tissueData) {
+    const sorted = Object.entries(tissueData)
+        .sort(([,a], [,b]) => b - a); // highest TPM first
+
+    let html = `
+        <table class="fancy-table" style="width:100%; margin-top:8px;">
+            <thead>
+                <tr>
+                    <th>Tissue / Dataset</th>
+                    <th style="text-align:right; width:120px;">TPM</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    sorted.forEach(([tissue, tpm]) => {
+        // Clean display name
+        let display = tissue
+            .replace(/_/g, ' ')
+            .replace('Primary', 'Primary cilia')
+            .replace('Motile',   'Motile cilia')
+            .replace('Lung Primary', 'Lung (primary)')
+            .replace('Lung Motile',  'Lung (motile)');
+
+        const isHigh = tpm >= 10;
+        html += `
+            <tr>
+                <td style="font-weight:${isHigh ? '600' : 'normal'};">${display}</td>
+                <td style="text-align:right; font-weight:${isHigh ? '600' : 'normal'}; color:${isHigh ? '#1e40af' : '#4b5563'};">
+                    ${tpm.toFixed(2)}
+                </td>
+            </tr>`;
+    });
+
+    html += `
+            </tbody>
+        </table>
+        <div style="margin-top:8px; font-size:11px; color:#64748b; font-style:italic;">
+            Source: CiliAI integrated tissue RNA-seq (2024–2025)
+        </div>`;
+
+    return html;
+}
+window.getPanCiliaryGenes = function() {
+    return Object.entries(window.CiliAI.lookups.geneMap)
+        .filter(([,g]) => g.expression?.category?.includes('Pan-ciliary'))
+        .map(([gene]) => gene)
+        .sort();
+};
+
+window.getTissueSpecificGenes = function(tissue) {
+    const key = tissue.toLowerCase();
+    return Object.entries(window.CiliAI.lookups.geneMap)
+        .filter(([,g]) => {
+            const tpm = g.expression?.tissue?.[Object.keys(g.expression.tissue).find(k => k.toLowerCase().includes(key))];
+            return tpm > 0 && g.expression?.n_tissues === 1;
+        })
+        .map(([gene]) => gene)
+        .sort();
+};
+
 
 function renderComplexTable(components) {
     let html = `<div class="section-header">Protein Complexes</div>
@@ -3704,6 +3834,144 @@ window.handleAIQuery = async function (query) {
                 }
             }
         }
+
+// === NEW INTENT BLOCK: Tissue Expression Category & Pan-ciliary / Tissue-Specific Lists ===
+// Place this after the "where is … expressed?" or localization block
+else if (
+    htmlResult === null &&
+    (
+        qLower.includes('pan-ciliary') ||
+        qLower.includes('pan ciliary') ||
+        qLower.includes('ubiquitous') ||
+        qLower.includes('pan-ubiquitous') ||
+        qLower.includes('idio-ciliary') ||
+        qLower.includes('tissue-specific') ||
+        qLower.includes('specific to') && (qLower.includes('lung') || qLower.includes('kidney') || qLower.includes('liver') || qLower.includes('skeleton') || qLower.includes('pancreas') || qLower.includes('olfactory') || qLower.includes('hypothalamus')) ||
+        qLower.includes('category of') ||
+        (qLower.includes('expressed') && qLower.includes('category')) ||
+        qLower.includes('expressed in how many tissues') ||
+        (qLower.includes('list') && (qLower.includes('pan') || qLower.includes('ubiquit') || qLower.includes('specific') || qLower.includes('idio')))
+    )
+) {
+    // ── 1. Single-gene category questions ──
+    const genes = window.extractMultipleGenes(query);
+    if (genes.length > 0) {
+        const geneSymbol = genes[0].toUpperCase();
+        const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+
+        if (!geneData || !geneData.expression?.tissue) {
+            htmlResult = `<div class="ai-result-card">
+                <p>No tissue expression data available for <strong>${geneSymbol}</strong>.</p>
+            </div>`;
+        } else {
+            const category = geneData.expression.category || 'Unknown';
+            const nTissues = geneData.expression.n_tissues || 0;
+            const isPan = category.toLowerCase().includes('pan-ciliary') || category.toLowerCase().includes('ubiquitous');
+            const isIdio = category.toLowerCase().includes('idio-ciliary') || category.toLowerCase().includes('tissue-specific');
+
+            let verdict = '';
+            if (isPan) {
+                verdict = `<span style="color:#059669; font-weight:600;">Yes — Pan-ciliary (Ubiquitous)</span>`;
+            } else if (isIdio) {
+                verdict = `<span style="color:#dc2626; font-weight:600;">Yes — Idio-ciliary (Tissue-Specific)</span>`;
+            } else {
+                verdict = `<span style="color:#7c3aed; font-weight:600;">Multi-tissue / Intermediate</span>`;
+            }
+
+            htmlResult = `<div class="ai-result-card">
+                <h4>Tissue Expression Category: ${geneSymbol}</h4>
+                <p style="font-size:17px; margin:16px 0;">
+                    ${verdict}<br>
+                    <span style="font-size:14px; color:#4b5563;">
+                        Category: <strong>${category}</strong><br>
+                        Detected in <strong>${nTissues}</strong> tissue${nTissues === 1 ? '' : 's'}
+                    </span>
+                </p>
+                <p style="font-size:13px; color:#64748b;">
+                    Data source: bulk RNA-seq across major human tissues (CiliAI 2025 integration)
+                </p>
+            </div>`;
+        }
+        window.addChatMessage(htmlResult, false);
+        return;
+    }
+
+    // ── 2. List requests ──
+    const isPanList = qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') ||
+                      qLower.includes('ubiquitous') || qLower.includes('ubiquitously expressed');
+    const isIdioList = qLower.includes('idio-ciliary') || qLower.includes('tissue-specific') ||
+                       qLower.includes('specific to') || qLower.includes('only in');
+
+    if (isPanList || isIdioList || qLower.includes('list') || qLower.includes('show all')) {
+        let filteredGenes = [];
+
+        Object.entries(window.CiliAI.lookups.geneMap).forEach(([gene, data]) => {
+            if (!data.expression?.category) return;
+            const cat = data.expression.category.toLowerCase();
+            const n = data.expression.n_tissues || 0;
+
+            if (isPanList && (cat.includes('pan-ciliary') || cat.includes('ubiquitous'))) {
+                filteredGenes.push(gene);
+            }
+            else if (isIdioList && (cat.includes('idio-ciliary') || cat.includes('tissue-specific'))) {
+                filteredGenes.push(gene);
+            }
+            // Specific tissue filter (e.g. "genes specific to lung")
+            else if (qLower.includes('lung') && n === 1 && data.expression.tissue?.Lung_Primary > 0 || data.expression.tissue?.Lung_Motile > 0) {
+                filteredGenes.push(gene);
+            }
+            else if (qLower.includes('kidney') && n === 1 && data.expression.tissue?.Kidney > 0) {
+                filteredGenes.push(gene);
+            }
+            else if (qLower.includes('liver') && n === 1 && data.expression.tissue?.Liver > 0) {
+                filteredGenes.push(gene);
+            }
+            else if (qLower.includes('skeleton') && n === 1 && data.expression.tissue?.Skeleton > 0) {
+                filteredGenes.push(gene);
+            }
+            // ... can extend to other tissues
+        });
+
+        filteredGenes.sort();
+
+        if (filteredGenes.length === 0) {
+            htmlResult = `<div class="ai-result-card">
+                <p>No genes match the requested criteria in the current dataset.</p>
+            </div>`;
+        } else {
+            const term = isPanList ? 'Pan-ciliary (Ubiquitous)' :
+                         isIdioList ? 'Idio-ciliary (Tissue-Specific)' :
+                         qLower.includes('lung') ? 'Lung-specific' :
+                         qLower.includes('kidney') ? 'Kidney-specific' : 'Matching';
+
+            const preview = filteredGenes.length > 12 ?
+                filteredGenes.slice(0,12).join(', ') + ` … and ${filteredGenes.length-12} more` :
+                filteredGenes.join(', ');
+
+            htmlResult = `<div class="ai-result-card">
+                <h4>${term} Genes</h4>
+                <p>Found <strong>${filteredGenes.length}</strong> genes.</p>
+                <p style="font-size:13.5px; line-height:1.5; margin:12px 0;">
+                    ${preview}
+                </p>
+                <p style="font-size:12px; color:#64748b;">
+                    Want to see the full list or view them in the panel? Type <strong>yes</strong> or <strong>show list</strong>.
+                </p>
+            </div>`;
+
+            // Prepare follow-up context
+            lastQueryContext = {
+                type: 'list_followup',
+                data: filteredGenes.map(g => ({ gene: g })),
+                term: `${term} Genes (${filteredGenes.length})`
+            };
+        }
+
+        window.addChatMessage(htmlResult, false);
+        return;
+    }
+}
+        
         // === 3. FULLY FIXED CILIOPATHY CLASSIFICATION, OVERLAP & ORTHOLOG HANDLER ===
         const classificationMap = getDiseaseClassificationMap();
         // Extended keyword mapping (includes common variations)
@@ -6007,6 +6275,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
