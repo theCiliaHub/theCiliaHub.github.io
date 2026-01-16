@@ -1425,51 +1425,54 @@ window.loadCiliAIData = async function() {
         window.CiliAI.lookups = lookupsRes?.lookups || { geneMap: {} };
         // --- Stats Calculation (Fixed: Excludes Secondary Diseases) ---
             // --- Stats Calculation ---
-const stats = { genes: window.CiliAI.masterData.length };
-const uniqueDiseasesLower = new Set(); // Use Set for unique lowercase names
-let ciliopathyGeneCount = 0;
+// --- Stats Calculation (Fixed: Excludes Secondary Diseases & Reference Error) ---
+            const stats = { genes: window.CiliAI.masterData.length };
+            const uniqueDiseasesLower = new Set(); // Stores unique lowercase disease names
+            let ciliopathyGeneCount = 0;
 
-window.CiliAI.masterData.forEach(g => {
-    // 1. Classification Check (Exclude Secondary)
-    const classification = (g.ciliopathy_classification || '').toString();
-    const isSecondary = classification.toLowerCase().includes('secondary');
+            window.CiliAI.masterData.forEach(g => {
+                // 1. Classification Check (Exclude Secondary)
+                const classification = (g.ciliopathy_classification || '').toString();
+                const isSecondary = classification.toLowerCase().includes('secondary');
 
-    // 2. Data Check
-    const raw = g.Ciliopathy || g.Ciliopathies;
-    let hasData = false;
-    let list = [];
-    if (Array.isArray(raw) && raw.length > 0) { list = raw; hasData = true; }
-    else if (typeof raw === 'string' && raw !== 'N/A' && raw !== 'Not specified') { list = [raw]; hasData = true; }
+                // 2. Data Check
+                const raw = g.Ciliopathy || g.Ciliopathies;
+                let hasData = false;
+                let list = [];
 
-    if (hasData && !isSecondary) {
-        ciliopathyGeneCount++;
-        list.forEach(d => {
-            if (d && typeof d === 'string') {
-                const clean = d.trim();
-                // 3. Normalize to lowercase to deduplicate "Joubert Syndrome" vs "joubert syndrome"
-                if (clean.length > 2 && clean !== 'Not specified') {
-                    uniqueDiseasesLower.add(clean.toLowerCase());
+                if (Array.isArray(raw) && raw.length > 0) { list = raw; hasData = true; }
+                else if (typeof raw === 'string' && raw !== 'N/A' && raw !== 'Not specified') { list = [raw]; hasData = true; }
+
+                if (hasData && !isSecondary) {
+                    ciliopathyGeneCount++;
+                    list.forEach(d => {
+                        if (d && typeof d === 'string') {
+                            const clean = d.trim();
+                            // 3. Normalize to lowercase to deduplicate (e.g., "Joubert" vs "joubert")
+                            if (clean.length > 2 && clean !== 'Not specified') {
+                                uniqueDiseasesLower.add(clean.toLowerCase());
+                            }
+                        }
+                    });
                 }
-            }
-        });
-    }
-});
+            });
 
-            // Update DOM
+            // Update DOM with formatted numbers
             const elG = document.getElementById('stat-genes');
             if(elG) elG.textContent = stats.genes.toLocaleString();
 
             const elD = document.getElementById('stat-ciliopathys');
-            if(elD) elD.textContent = diseases.size.toLocaleString();
+            // FIX: Use uniqueDiseasesLower.size here
+            if(elD) elD.textContent = uniqueDiseasesLower.size.toLocaleString(); 
 
             const elCG = document.getElementById('stat-ciliopathy-genes');
             if(elCG) elCG.textContent = ciliopathyGeneCount.toLocaleString();
-        
-        window.CiliAI.ready = true;
-        window.updateStatus(`Ready (${stats.genes} genes)`, 'ready');
-        console.log("✅ CiliAI fully loaded.");
-        return true;
 
+            window.CiliAI.ready = true;
+            window.updateStatus(`Ready (${stats.genes} genes)`, 'ready');
+            console.log("✅ CiliAI fully loaded.");
+            return true;
+       
     } catch (e) {
         console.error("Load failed:", e);
         window.updateStatus('ERROR', 'error');
@@ -1893,6 +1896,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
