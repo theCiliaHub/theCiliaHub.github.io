@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — Enhanced Gene Explorer</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png">
-   
+    
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-   
+    
     <script src="https://theciliahub.github.io/ciliai/ciliai.js"></script>
-   
+    
     <style>
         :root {
             /* Synchronized Palette from plots.html */
@@ -24,14 +24,14 @@
             --highlight-gold: #f6e05e;
             --bg: #f8fafc;
             --card: #ffffff;
-           
+            
             /* Anatomical Palette markers */
             --color-pcm1: #5b21b6; /* Professional Deep Violet - PCM1 (Basal Body) */
             --color-tmem17: #475569; /* Slate Blue - TMEM17 (Transition Zone) */
             --color-arl13b: #0891b2; /* Muted Cyan - ARL13B (Membrane) */
             --color-tubulin: #2563eb; /* Royal Blue - Beta2-tubulin (Axoneme) */
         }
-       
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html {
             height: 100%;
@@ -270,7 +270,7 @@
             overflow: hidden;
         }
         #cilia-svg { display: flex; align-items: center; justify-content: center; }
-       
+        
         /* RIGHT PANEL: CHAT */
         .right-panel {
             display: flex;
@@ -441,7 +441,7 @@
             stroke-width: 2.5;
             filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8));
         }
-       
+        
         /* DASHBOARD */
         .landing-dashboard {
             display: grid;
@@ -459,14 +459,14 @@
         .detail-tab.active { border-bottom: 2px solid var(--primary-blue); opacity: 1; color: var(--primary-blue); }
         .detail-content { display: none; padding: 10px 0; }
         .detail-content.active { display: block; }
-       
+        
         .expr-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 5px; }
         .expr-table td { padding: 6px 0; border-bottom: 1px solid #f5f5f5; color: #4b5563; }
         .expr-table td:last-child { text-align: right; font-weight: 700; color: var(--primary-blue); }
         /* LABELS */
         .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
         .labels-visible .cilia-labels text { opacity: 1; }
-       
+        
         .ai-result-card { background: white; border: 1px solid var(--border-light); border-radius: 12px; padding: 16px; margin-top: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     </style>
 </head>
@@ -610,7 +610,7 @@
             lastQueryContext: { type: null, data: [], term: null },
             CiliAI_UMAP: null,
             currentPlot: null,
-           
+            
             // Zoom persistence state
             zoomStateByGene: {}, // { GENE: localization }
             activeGeneContext: null
@@ -646,13 +646,16 @@
                 container.style.display = 'flex';
                 if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
                 if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
-                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence [Image of Cilia Diagram]";
+                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence 
+
+[Image of Cilia Diagram]
+";
                 // Ensure SVG exists (if it was cleared)
                 if (!container.querySelector('svg')) {
                     window.generateAndInjectSVG();
                 }
                 const normalized = locTerm.toLowerCase().trim();
-               
+                
                 // Map broad terms like "cilia" to specific SVG parts if needed
                 let targetId = this.locMap[normalized];
                 if (!targetId && normalized.includes('cilia')) targetId = 'axoneme'; // Fallback for general "cilia" queries
@@ -785,7 +788,7 @@
                 document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
             }
         };
-       
+        
         // =======================================================
         // PUBLIC BRIDGE — Legacy compatibility
         // =======================================================
@@ -796,7 +799,10 @@
         // 3. SVG GENERATION FUNCTION (UPDATED WITH NEW DEFS)
         window.generateAndInjectSVG = function() {
             const container = document.getElementById('cilia-svg');
-            document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence [Image of Cilia Diagram]";
+            document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence 
+
+[Image of Cilia Diagram]
+";
             container.innerHTML = `
                 <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
                     <defs>
@@ -808,19 +814,19 @@
                             <stop offset="0%" style="stop-color:#E2E8F0;" />
                             <stop offset="100%" style="stop-color:#CBD5E1;" />
                         </radialGradient>
-                       
+                        
                         <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" style="stop-color:#5b21b6;" /> <stop offset="100%" style="stop-color:#4c1d95;" />
                         </linearGradient>
-                       
+                        
                         <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" style="stop-color:#475569;" /> <stop offset="100%" style="stop-color:#334155;" />
                         </linearGradient>
-                       
+                        
                         <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" style="stop-color:#0891b2;" /> <stop offset="100%" style="stop-color:#0e7490;" />
                         </linearGradient>
-                       
+                        
                         <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" style="stop-color:#2563eb;" /> <stop offset="100%" style="stop-color:#1d4ed8;" />
                         </linearGradient>
@@ -835,69 +841,69 @@
                             <feComposite in="SourceGraphic" in2="heatmap" operator="atop" />
                         </filter>
                     </defs>
-                   
+                    
                     <g id="viewport-group" transform="translate(0, 0)">
                         <path id="cell-body" class="cilia-part" tabindex="0"
                               fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
                               d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
-                       
+                        
                         <circle id="nucleus" class="cilia-part" tabindex="0"
                                 fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
                                 cx="140" cy="290" r="35"/>
-                       
+                        
                         <rect id="basal-body" class="cilia-part" tabindex="0"
                               fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
                               x="130" y="165" width="20" height="15" rx="2"/>
-                       
+                        
                         <path id="transition-zone" class="cilia-part" tabindex="0"
                               fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
                               d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
-                       
+                        
                         <path id="ciliary-membrane" class="cilia-part" tabindex="0"
                               fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
                               d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
-                       
+                        
                         <path id="axoneme" class="cilia-part" tabindex="0"
                               fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
                               d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
-                       
+                        
                         <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
                             <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">
                                 PCM1
                                 <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>
                             </text>
-                           
+                            
                             <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">
                                 TMEM17
                                 <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="0.5s"/>
                             </text>
-                           
+                            
                             <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">
                                 ARL13B
                                 <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1s"/>
                             </text>
-                           
+                            
                             <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">
                                 β2-tubulin
                                 <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1.5s"/>
                             </text>
                         </g>
-                       
+                        
                         <circle cx="140" cy="172.5" r="3" fill="#5b21b6" opacity="0.6" style="pointer-events: none;">
                             <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/>
                             <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
                         </circle>
-                       
+                        
                         <circle cx="140" cy="157.5" r="3" fill="#475569" opacity="0.6" style="pointer-events: none;">
                             <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.3s"/>
                             <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.3s"/>
                         </circle>
-                       
+                        
                         <circle cx="140" cy="90" r="3" fill="#0891b2" opacity="0.6" style="pointer-events: none;">
                             <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.6s"/>
                             <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.6s"/>
                         </circle>
-                       
+                        
                         <circle cx="140" cy="42.5" r="3" fill="#2563eb" opacity="0.6" style="pointer-events: none;">
                             <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.9s"/>
                             <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.9s"/>
@@ -905,24 +911,24 @@
                     </g>
                 </svg>
             `;
-           
+            
             container.onmouseenter = () => {
                 const labels = container.querySelector('.cilia-labels');
                 if (labels) labels.style.opacity = '1';
             };
-           
+            
             container.onmouseleave = () => {
                 const labels = container.querySelector('.cilia-labels');
                 if (labels) labels.style.opacity = '0';
             };
-           
+            
             const ciliaParts = container.querySelectorAll('.cilia-part');
             ciliaParts.forEach(part => {
                 part.addEventListener('click', (e) => {
                     e.stopPropagation();
                     document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
                     part.classList.add('active-highlight');
-                   
+                    
                     const labels = container.querySelector('.cilia-labels');
                     if (labels) {
                         labels.style.opacity = '1';
@@ -933,12 +939,12 @@
                             'ciliary-membrane': 'ARL13B',
                             'axoneme': 'β2-tubulin'
                         };
-                       
+                        
                         labels.querySelectorAll('text').forEach(text => {
                             text.style.fontWeight = '700';
                             text.style.fontSize = '12px';
                         });
-                       
+                        
                         const geneName = geneMap[partId];
                         if (geneName) {
                             labels.querySelectorAll('text').forEach(text => {
@@ -953,7 +959,7 @@
                     SpatialManager.zoomTo(part);
                 });
             });
-           
+            
             container.onclick = (e) => {
                 if(e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
                     SpatialManager.resetZoom();
@@ -993,21 +999,21 @@
             // SAFEGUARD: Clear potential overlapping containers first
             document.getElementById('cilia-svg').style.display = 'none';
             document.getElementById('domain-viewer').style.display = 'none';
-           
+            
             const plotContainer = document.getElementById('plotly-container');
             plotContainer.style.display = 'block';
             document.getElementById('current-viz-title').textContent = title;
-           
+            
             // Clear previous plot to prevent artifacts
             plotContainer.innerHTML = '';
-           
+            
             const vizCard = document.querySelector('.viz-card');
             const vizHeader = document.querySelector('.viz-header');
-           
+            
             // Calculate height safely
             const availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
             const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
-           
+            
             const layout = {
                 ...plotData.layout,
                 autosize: true,
@@ -1025,7 +1031,7 @@
                     bgcolor: 'rgba(255, 255, 255, 0.8)', bordercolor: '#e1e8ed', borderwidth: 1, font: { size: 10 }
                 }
             };
-           
+            
             // FIX: Use Promise to ensure plot is ready before attaching listeners or resizing
             Plotly.newPlot('plotly-container', plotData.data, layout, {
                 responsive: true, displayModeBar: true, displaylogo: false,
@@ -1033,7 +1039,7 @@
                 scrollZoom: false
             }).then(gd => {
                 window.CiliAI.currentPlot = gd;
-               
+                
                 // Add click listener safely
                 gd.on('plotly_click', e => {
                     const loc = e.points?.[0]?.customdata?.localization;
@@ -1044,7 +1050,7 @@
                     }
                 });
             });
-           
+            
             // Resize Listener: Only resize if the container is actually visible
             window.addEventListener('resize', () => {
                 const container = document.getElementById('plotly-container');
@@ -1071,14 +1077,14 @@
             // Safety check for lookup data
             const pfamLookup = window.CiliAI.lookups.pfamByGene || {};
             const pfam = pfamLookup[gene.toUpperCase()] || [];
-           
+            
             if (!pfam.length) {
                 // Check for raw text descriptions as fallback
                 const geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
                 if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
                     const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
                     const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
-                   
+                    
                     if (parts.length > 0) {
                         const domains = parts.map((part, i) => ({
                             id: `DOM_${i+1}`,
@@ -1091,7 +1097,7 @@
                         return;
                     }
                 }
-               
+                
                 domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
                 return;
             }
@@ -1099,7 +1105,7 @@
             const seqLength = Math.max(...pfam.map(d => d.end), 1000);
             const svgWidth = 1000; // Internal coordinate width
             const scale = (val) => (val / seqLength) * (svgWidth - 100) + 50; // Map seq pos to SVG x
-           
+            
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('viewBox', `0 0 ${svgWidth} 200`);
             svg.setAttribute('width', '100%');
@@ -1132,12 +1138,12 @@
             // --- 4. Draw Domains & Labels ---
             pfam.forEach((domain, index) => {
                 const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-               
+                
                 // Calculate Positions
                 const xStart = scale(domain.start);
                 const xEnd = scale(domain.end);
                 const width = Math.max(xEnd - xStart, 10); // Min width 10px
-               
+                
                 // Domain Rectangle
                 const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                 rect.setAttribute('x', xStart);
@@ -1150,7 +1156,7 @@
                 rect.setAttribute('stroke-width', '1');
                 rect.setAttribute('opacity', '0.9');
                 rect.classList.add('domain-rect');
-               
+                
                 // Tooltip
                 const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
@@ -1160,7 +1166,7 @@
                 // Even index = Top High, Odd index = Top Low (or bottom)
                 // Here we alternate two rows ABOVE the protein to avoid clutter
                 const labelY = (index % 2 === 0) ? 40 : 65;
-               
+                
                 // Connector Line (from label to domain)
                 const conn = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 conn.setAttribute('x1', xStart + width / 2);
@@ -1179,10 +1185,10 @@
                 text.setAttribute('font-weight', '600');
                 text.setAttribute('fill', '#2c3e50');
                 text.textContent = domain.name || domain.id;
-               
+                
                 // Prevent text from going off-screen
                 // (Simple clamp logic could be added here if needed, but centering usually works)
-               
+                
                 group.appendChild(text);
                 svg.appendChild(group);
             });
@@ -1314,10 +1320,10 @@ window.loadCiliAIData = async function() {
             fetchSafe(base + 'kidney_structure.json'),
             fetchSafe(base + 'kidney_expression_part1.json'),
             fetchSafe(base + 'kidney_expression_part2.json'),
-            fetchWithThrottle(lungUrls, 3),       
-            fetchWithThrottle(liverUrls, 3),      
-            fetchWithThrottle(hypExprUrls, 3),    
-            fetchWithThrottle(hypStructUrls, 2),  
+            fetchWithThrottle(lungUrls, 3),        
+            fetchWithThrottle(liverUrls, 3),       
+            fetchWithThrottle(hypExprUrls, 3),     
+            fetchWithThrottle(hypStructUrls, 2),   
             fetchSafe(base + 'UMAP_Data/chondrocyte_part1.json')
         ]);
 
@@ -1436,9 +1442,35 @@ window.loadCiliAIData = async function() {
             }
         });
 
+        // --- NEW: Calculate Ciliopathy Stats ---
+        const diseases = new Set();
+        let ciliopathyGeneCount = 0;
+
+        window.CiliAI.masterData.forEach(g => {
+            // Count genes with associated Ciliopathies
+            if (g.Ciliopathy || (g.Ciliopathies && g.Ciliopathies.length > 0)) {
+                ciliopathyGeneCount++;
+                
+                // Collect Unique Diseases
+                const raw = g.Ciliopathy || g.Ciliopathies;
+                const list = Array.isArray(raw) ? raw : [raw];
+                list.forEach(d => {
+                    if (d && d !== 'N/A' && d !== 'Not specified') {
+                        diseases.add(d.trim());
+                    }
+                });
+            }
+        });
+
         // UI Updates
         const elG = document.getElementById('stat-genes');
         if(elG) elG.textContent = stats.genes.toLocaleString();
+
+        const elD = document.getElementById('stat-ciliopathys');
+        if(elD) elD.textContent = diseases.size.toLocaleString();
+
+        const elCG = document.getElementById('stat-ciliopathy-genes');
+        if(elCG) elCG.textContent = ciliopathyGeneCount.toLocaleString();
 
         window.CiliAI.ready = true;
         window.updateStatus(`Ready (${stats.genes} genes)`, 'ready');
@@ -1483,50 +1515,6 @@ window.switchView = function(viewType) {
         if(window.showDomainViewer) window.showDomainViewer(gene);
     }
 };
-
-// ============ ENHANCED DATA NORMALIZATION ENGINE ============
-window.normalizeCellData = function(rawData) {
-    if (!rawData) return { umap: [], cells: {} };
-   
-    // CASE 1: Direct array of cells (Chondrocyte format)
-    if (Array.isArray(rawData)) {
-        // Check if it's the specific Hypothalamus structure array
-        if (rawData.length > 0 && rawData[0].id !== undefined && rawData[0].x !== undefined) {
-             return processStructureArrayFormat(rawData);
-        }
-        // Check if it's the Liver format (nested umap object)
-        if (rawData.length > 0 && rawData[0].umap && rawData[0].expression) {
-             return processLiverFormat(rawData);
-        }
-        // Check if it's Lung format (flat coordinates)
-        if (rawData.length > 0 && (rawData[0].umap_x !== undefined || rawData[0].UMAP_1 !== undefined)) {
-             return processFlatCoordinateFormat(rawData);
-        }
-        return processArrayFormat(rawData);
-    }
-   
-    // CASE 2: Object with gene keys mapping to expression arrays (Hypothalamus expression format)
-    if (typeof rawData === 'object' && !Array.isArray(rawData) && !rawData.cell_id && !rawData.umap) {
-        // Check if this is the hypothalamus expression format: { GENE: { cells: [], expression: [] } }
-        const firstKey = Object.keys(rawData)[0];
-        if (firstKey && rawData[firstKey] && 
-            (rawData[firstKey].cells !== undefined || rawData[firstKey].expression !== undefined)) {
-            return processHypothalamusExpressionFormat(rawData);
-        }
-        // Could also be expression-only object for other datasets
-        return processExpressionObjectFormat(rawData);
-    }
-   
-    // CASE 3: Object wrapper with umap array (Kidney format)
-    if (rawData.umap && Array.isArray(rawData.umap)) {
-        return processObjectWrapperFormat(rawData);
-    }
-   
-    console.warn('Unknown data format:', rawData);
-    return { umap: [], cells: {} };
-};
-
-    
  // =======================================================
 // Zoom Controls
 // =======================================================
@@ -1581,12 +1569,21 @@ window.toggleFullscreen = function() {
 // ============ ENHANCED DATA NORMALIZATION ENGINE ============
 window.normalizeCellData = function(rawData) {
     if (!rawData) return { umap: [], cells: {} };
-    
+   
     // CASE 1: Direct array of cells (Chondrocyte format)
     if (Array.isArray(rawData)) {
+        if (rawData.length > 0 && rawData[0].id !== undefined && rawData[0].x !== undefined) {
+             return processStructureArrayFormat(rawData);
+        }
+        if (rawData.length > 0 && rawData[0].umap && rawData[0].expression) {
+             return processLiverFormat(rawData);
+        }
+        if (rawData.length > 0 && (rawData[0].umap_x !== undefined || rawData[0].UMAP_1 !== undefined)) {
+             return processFlatCoordinateFormat(rawData);
+        }
         return processArrayFormat(rawData);
     }
-    
+   
     // CASE 2: Object with gene keys mapping to expression arrays (Hypothalamus expression format)
     if (typeof rawData === 'object' && !Array.isArray(rawData) && !rawData.cell_id && !rawData.umap) {
         // Check if this is the hypothalamus expression format: { GENE: { cells: [], expression: [] } }
@@ -1598,27 +1595,12 @@ window.normalizeCellData = function(rawData) {
         // Could also be expression-only object for other datasets
         return processExpressionObjectFormat(rawData);
     }
-    
+   
     // CASE 3: Object wrapper with umap array (Kidney format)
     if (rawData.umap && Array.isArray(rawData.umap)) {
         return processObjectWrapperFormat(rawData);
     }
-    
-    // CASE 4: Structure array (Hypothalamus structure format)
-    if (Array.isArray(rawData) && rawData.length > 0 && rawData[0].id !== undefined && rawData[0].x !== undefined) {
-        return processStructureArrayFormat(rawData);
-    }
-    
-    // CASE 5: Liver format - array of objects with nested umap and expression
-    if (Array.isArray(rawData) && rawData.length > 0 && rawData[0].umap && rawData[0].expression) {
-        return processLiverFormat(rawData);
-    }
-    
-    // CASE 6: Lung format - array with flat coordinate fields
-    if (Array.isArray(rawData) && rawData.length > 0 && (rawData[0].umap_x !== undefined || rawData[0].UMAP_1 !== undefined)) {
-        return processFlatCoordinateFormat(rawData);
-    }
-    
+   
     console.warn('Unknown data format:', rawData);
     return { umap: [], cells: {} };
 };
@@ -1626,7 +1608,7 @@ window.normalizeCellData = function(rawData) {
 // Process Chondrocyte format: array of cells with gene expression as properties
 function processArrayFormat(dataArray) {
     const result = { umap: [], cells: {} };
-    
+   
     dataArray.forEach(cell => {
         const point = extractCellPoint(cell);
         if (point) {
@@ -1636,31 +1618,31 @@ function processArrayFormat(dataArray) {
             }
         }
     });
-    
+   
     return result;
 }
 
 // Process Hypothalamus expression format: { GENE: { cells: [], expression: [] } }
 function processHypothalamusExpressionFormat(exprData) {
     const result = { umap: [], cells: {} };
-    
+   
     // This format doesn't contain UMAP coordinates, only expression
     // We'll create cell entries from the first gene's data
     const firstGene = Object.keys(exprData)[0];
     if (!firstGene || !exprData[firstGene].cells) {
         return result;
     }
-    
+   
     const cellIds = exprData[firstGene].cells;
     const expressions = exprData[firstGene].expression || [];
-    
+   
     // Create empty cell objects with IDs
     cellIds.forEach((cellId, index) => {
         if (!result.cells[cellId]) {
             result.cells[cellId] = { cell_id: cellId.toString() };
         }
     });
-    
+   
     // Add expression for each gene
     Object.keys(exprData).forEach(gene => {
         const geneData = exprData[gene];
@@ -1673,14 +1655,14 @@ function processHypothalamusExpressionFormat(exprData) {
             });
         }
     });
-    
+   
     return result;
 }
 
 // Process structure array format: [{id, x, y, type}, ...]
 function processStructureArrayFormat(structArray) {
     const result = { umap: [], cells: {} };
-    
+   
     structArray.forEach(item => {
         const point = {
             x: item.x,
@@ -1691,14 +1673,14 @@ function processStructureArrayFormat(structArray) {
         result.umap.push(point);
         result.cells[point.cell_id] = { cell_id: point.cell_id };
     });
-    
+   
     return result;
 }
 
 // Process Liver format: array with nested umap {x, y} and nested expression
 function processLiverFormat(liverArray) {
     const result = { umap: [], cells: {} };
-    
+   
     liverArray.forEach(cell => {
         const point = {
             x: cell.umap?.x || 0,
@@ -1707,26 +1689,26 @@ function processLiverFormat(liverArray) {
             cell_type: cell.cell_type || cell.cluster || 'Unknown',
             ciliary_status: cell.ciliary_status
         };
-        
+       
         result.umap.push(point);
-        
+       
         // Extract expression data
         const cellExpr = {};
         if (cell.expression && typeof cell.expression === 'object') {
             Object.assign(cellExpr, cell.expression);
         }
         cellExpr.cell_id = point.cell_id;
-        
+       
         result.cells[point.cell_id] = cellExpr;
     });
-    
+   
     return result;
 }
 
 // Process flat coordinate format (Lung): array with umap_x, umap_y
 function processFlatCoordinateFormat(dataArray) {
     const result = { umap: [], cells: {} };
-    
+   
     dataArray.forEach(cell => {
         const point = extractCellPoint(cell);
         if (point) {
@@ -1736,7 +1718,7 @@ function processFlatCoordinateFormat(dataArray) {
             }
         }
     });
-    
+   
     return result;
 }
 
@@ -1744,7 +1726,7 @@ function processFlatCoordinateFormat(dataArray) {
 function extractCellPoint(cell) {
     // Try all possible coordinate formats
     let x, y;
-    
+   
     if (cell.x !== undefined && cell.y !== undefined) {
         x = cell.x;
         y = cell.y;
@@ -1760,10 +1742,10 @@ function extractCellPoint(cell) {
     } else {
         return null; // No valid coordinates
     }
-    
+   
     const cellId = cell.cell_id || cell.id || `cell_${Math.random().toString(36).substr(2, 9)}`;
     const cellType = cell.cluster || cell.cell_type || cell.type || cell.cellType || 'Unknown';
-    
+   
     return {
         x: parseFloat(x),
         y: parseFloat(y),
@@ -1782,20 +1764,20 @@ function extractGeneExpressionFromCell(cell, cellId) {
         'cell_id', 'id', 'cluster', 'cell_type', 'type', 'cellType',
         'ciliary_score', 'ciliary_status', 'expression'
     ];
-    
+   
     Object.keys(cell).forEach(key => {
         if (!excludedKeys.includes(key) && typeof cell[key] === 'number') {
             expression[key] = cell[key];
         }
     });
-    
+   
     return expression;
 }
 
 // Process object wrapper format
 function processObjectWrapperFormat(wrapper) {
     const result = { umap: [], cells: {} };
-    
+   
     if (wrapper.umap && Array.isArray(wrapper.umap)) {
         wrapper.umap.forEach(cell => {
             const point = extractCellPoint(cell);
@@ -1807,25 +1789,25 @@ function processObjectWrapperFormat(wrapper) {
             }
         });
     }
-    
+   
     if (wrapper.cells && typeof wrapper.cells === 'object') {
         Object.assign(result.cells, wrapper.cells);
     }
-    
+   
     return result;
 }
 
 // Process expression object format
 function processExpressionObjectFormat(exprObj) {
     const result = { umap: [], cells: {} };
-    
+   
     Object.keys(exprObj).forEach(cellId => {
         const cellData = exprObj[cellId];
         if (cellData && typeof cellData === 'object') {
             result.cells[cellId] = { ...cellData, cell_id: cellId };
         }
     });
-    
+   
     return result;
 }
 
@@ -1891,7 +1873,7 @@ window.handleUserSend = function() {
                 });
             }
         };
-       
+        
 // 9. INIT & STARTUP
     window.initCiliAI = async function() {
         window.updateStatus('Loading databases...', 'loading');
@@ -1918,5 +1900,3 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
-
-
