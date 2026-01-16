@@ -1423,46 +1423,46 @@ window.loadCiliAIData = async function() {
         // 7. Metadata
         window.CiliAI.masterData = mainRes?.masterData || [];
         window.CiliAI.lookups = lookupsRes?.lookups || { geneMap: {} };
-        const stats = { genes: window.CiliAI.masterData.length };
+        // --- Stats Calculation (Fixed: Excludes Secondary Diseases) ---
+            const stats = { genes: window.CiliAI.masterData.length };
+            const diseases = new Set();
+            let ciliopathyGeneCount = 0;
+
+            window.CiliAI.masterData.forEach(g => {
+                // 1. Check if it has ciliopathy data
+                let hasCiliopathy = false;
+                if (g.Ciliopathy && g.Ciliopathy !== 'N/A' && g.Ciliopathy !== 'Not specified') hasCiliopathy = true;
+                if (g.Ciliopathies && g.Ciliopathies.length > 0) hasCiliopathy = true;
+
+                // 2. Check Classification (Exclude Secondary)
+                // Note: Ensure the property name matches your JSON (ciliopathy_classification vs Ciliopathy_Classification)
+                const classification = g.ciliopathy_classification || g.Ciliopathy_Classification || '';
+                const isSecondary = classification === 'Secondary Diseases';
+
+                if (hasCiliopathy && !isSecondary) {
+                    ciliopathyGeneCount++;
+                    
+                    // Collect Unique Diseases
+                    const raw = g.Ciliopathy || g.Ciliopathies;
+                    const list = Array.isArray(raw) ? raw : [raw];
+                    list.forEach(d => {
+                        if (d && d !== 'N/A' && d !== 'Not specified') {
+                            diseases.add(d.trim());
+                        }
+                    });
+                }
+            });
+
+            // Update DOM
+            const elG = document.getElementById('stat-genes');
+            if(elG) elG.textContent = stats.genes.toLocaleString();
+
+            const elD = document.getElementById('stat-ciliopathys');
+            if(elD) elD.textContent = diseases.size.toLocaleString();
+
+            const elCG = document.getElementById('stat-ciliopathy-genes');
+            if(elCG) elCG.textContent = ciliopathyGeneCount.toLocaleString();
         
-        window.CiliAI.masterData.forEach(g => {
-            if (g.Gene) {
-                const s = g.Gene.toUpperCase();
-                window.CiliAI.lookups.geneMap[s] = g;
-                if(g.expression?.scRNA) window.CiliAI.cellDataCache[s] = g.expression.scRNA;
-            }
-        });
-
-        // --- NEW: Calculate Ciliopathy Stats ---
-        const diseases = new Set();
-        let ciliopathyGeneCount = 0;
-
-        window.CiliAI.masterData.forEach(g => {
-            // Count genes with associated Ciliopathies
-            if (g.Ciliopathy || (g.Ciliopathies && g.Ciliopathies.length > 0)) {
-                ciliopathyGeneCount++;
-                
-                // Collect Unique Diseases
-                const raw = g.Ciliopathy || g.Ciliopathies;
-                const list = Array.isArray(raw) ? raw : [raw];
-                list.forEach(d => {
-                    if (d && d !== 'N/A' && d !== 'Not specified') {
-                        diseases.add(d.trim());
-                    }
-                });
-            }
-        });
-
-        // UI Updates
-        const elG = document.getElementById('stat-genes');
-        if(elG) elG.textContent = stats.genes.toLocaleString();
-
-        const elD = document.getElementById('stat-ciliopathys');
-        if(elD) elD.textContent = diseases.size.toLocaleString();
-
-        const elCG = document.getElementById('stat-ciliopathy-genes');
-        if(elCG) elCG.textContent = ciliopathyGeneCount.toLocaleString();
-
         window.CiliAI.ready = true;
         window.updateStatus(`Ready (${stats.genes} genes)`, 'ready');
         console.log("✅ CiliAI fully loaded.");
@@ -1891,5 +1891,6 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
