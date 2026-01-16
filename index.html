@@ -559,24 +559,153 @@
         </div>
         <aside class="right-panel">
             <div class="chat-header">
-                <h2>CiliAI Assistant</h2>
-                <p>Interactive biological logic mapping</p>
-            </div>
-            <div class="messages-area" id="messages">
-                <div class="ciliai-message assistant">
-                    <div class="message-wrapper">
-                        <div class="ciliai-message-content">
-                            👋 Welcome to CiliAI. I can help you visualize gene expression and map localizations. Try asking:
-                            <div class="suggested-chips">
-                                <span class="gene-badge" onclick="window.handleAIQuery('What is IFT88?')">IFT88 Details</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Please list the genes for Joubert Syndrome')">Joubert Syndrome</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Where is PCM1?')">PCM1 Mapping</span>
-                                <span class="gene-badge" onclick="window.handleAIQuery('Plot FOXJ1')">FOXJ1 Expression</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+              <h2>CiliAI Assistant</h2>
+<p>Interactive biological logic mapping</p>
+</div>
+
+<div class="messages-area" id="messages">
+  <div class="ciliai-message assistant">
+    <div class="message-wrapper">
+      <div class="ciliai-message-content">
+
+        👋 <strong>Welcome to CiliAI</strong><br><br>
+
+        Ask me about <strong>ciliary genes</strong>, <strong>expression categories</strong>,
+        <strong>ciliopathies</strong>, <strong>localization</strong>,
+        <strong>evolution</strong>, or <strong>functional screens</strong>.<br><br>
+
+        <strong>Quick things you can try:</strong>
+
+        <!-- ================= Gene & Expression ================= -->
+        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+          Gene & Expression
+        </div>
+
+        <div class="suggested-chips" style="margin-bottom:20px;">
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('IFT88 details')">
+            IFT88 Details
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Plot FOXJ1 expression')">
+            FOXJ1 Expression
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Is IFT88 pan-ciliary?')">
+            Is IFT88 pan-ciliary?
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Show pan-ciliary genes')">
+            Pan-ciliary genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Genes specific to lung')">
+            Lung-specific genes
+          </span>
+        </div>
+
+        <!-- ================= Ciliopathies ================= -->
+        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+          Ciliopathies & Diseases
+        </div>
+
+        <div class="suggested-chips" style="margin-bottom:20px;">
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('List genes for Joubert syndrome')">
+            Joubert syndrome genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Genes in Primary Ciliary Dyskinesia')">
+            PCD genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Bardet-Biedl syndrome genes')">
+            Bardet–Biedl genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('How many unique ciliopathy genes are there?')">
+            Total ciliopathy genes
+          </span>
+        </div>
+
+        <!-- ================= Localization ================= -->
+        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+          Localization & Structure
+        </div>
+
+        <div class="suggested-chips">
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Where is PCM1 localized?')">
+            PCM1 localization
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Where is CEP290 localized?')">
+            CEP290 location
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Multi-gene view: IFT88, BBS4, TMEM67')">
+            Multi-gene overlay
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Transition zone genes')">
+            Transition zone genes
+          </span>
+        </div>
+
+        <!-- ================= Expression Logic Hint ================= -->
+        <div style="margin-top:24px; font-size:13px; color:#64748b; line-height:1.5;">
+          💡 <strong>Expression logic you can ask about:</strong><br>
+          • Is <em>[gene]</em> pan-ciliary (ubiquitous)?<br>
+          • Show tissue-specific genes (lung, kidney, brain, skeleton)<br>
+          • List all pan-ciliary (ubiquitously expressed) genes
+        </div>
+
+        <!-- ================= Evolution & Screens ================= -->
+        <div style="margin:20px 0 12px; font-weight:500; color:#4b5563;">
+          Evolution, Screens & Orthologs
+        </div>
+
+        <div class="suggested-chips" style="margin-bottom:20px;">
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Evolution of BBS1')">
+            BBS1 evolution
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Loss-of-function phenotype of IFT88')">
+            IFT88 screen
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Mouse ortholog of ARL13B')">
+            ARL13B mouse ortholog
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Protein domains of CEP290')">
+            CEP290 domains
+          </span>
+        </div>
+
+        <div style="margin-top:20px; font-size:13px; color:#6b7280;">
+          Just type a question — or click any chip above to begin.
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
             <div class="input-area">
                 <div class="chat-input-group">
                     <input type="text" id="chatInput" class="chat-input" placeholder="Ask about a gene, structure, or disease...">
@@ -1884,4 +2013,5 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
