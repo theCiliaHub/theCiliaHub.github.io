@@ -3975,30 +3975,41 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-// === NEW INTENT BLOCK: Tissue Expression Category & Pan-ciliary / Tissue-Specific Lists ===
-// Place this after the "where is … expressed?" or localization block
+// === FIXED INTENT BLOCK: Tissue Expression Category & Pan-ciliary / Idio-ciliary Lists ===
+// Place this AFTER the "where is … expressed?" block and BEFORE other list/classification handlers
 else if (
     htmlResult === null &&
     (
+        // Core category keywords
         qLower.includes('pan-ciliary') ||
-        qLower.includes('pan ciliary') ||
+        qLower.includes('pan ciliary') ||           // ← fixes your failing query
+        qLower.includes('pan-ciliary') ||           // hyphenated
         qLower.includes('ubiquitous') ||
         qLower.includes('pan-ubiquitous') ||
         qLower.includes('idio-ciliary') ||
+        qLower.includes('idio ciliary') ||
         qLower.includes('tissue-specific') ||
-        qLower.includes('specific to') && (qLower.includes('lung') || qLower.includes('kidney') || qLower.includes('liver') || qLower.includes('skeleton') || qLower.includes('pancreas') || qLower.includes('olfactory') || qLower.includes('hypothalamus')) ||
-        qLower.includes('category of') ||
-        (qLower.includes('expressed') && qLower.includes('category')) ||
+        qLower.includes('tissue specific') ||
+        qLower.includes('idio-specific') ||
+        // Contextual triggers
+        (qLower.includes('display') || qLower.includes('show') || qLower.includes('list')) &&
+        (qLower.includes('pan') || qLower.includes('ubiquit') || qLower.includes('idio') || qLower.includes('specific') || qLower.includes('category')) ||
         qLower.includes('expressed in how many tissues') ||
-        (qLower.includes('list') && (qLower.includes('pan') || qLower.includes('ubiquit') || qLower.includes('specific') || qLower.includes('idio')))
+        qLower.includes('category of') ||
+        (qLower.includes('specific to') && 
+         (qLower.includes('lung') || qLower.includes('kidney') || qLower.includes('liver') || 
+          qLower.includes('brain') || qLower.includes('olfactory') || qLower.includes('pancreas') || 
+          qLower.includes('skeleton') || qLower.includes('hypothalamus')))
     )
 ) {
-    // ── 1. Single-gene category questions ──
+    console.log(`[CiliAI] Detected category/list intent for query: "${query}"`);
+
+    // ── 1. Single-gene category questions (keep this – it's useful) ──
     const genes = window.extractMultipleGenes(query);
     if (genes.length > 0) {
         const geneSymbol = genes[0].toUpperCase();
         const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
-
+        
         if (!geneData || !geneData.expression?.tissue) {
             htmlResult = `<div class="ai-result-card">
                 <p>No tissue expression data available for <strong>${geneSymbol}</strong>.</p>
@@ -4006,16 +4017,15 @@ else if (
         } else {
             const category = geneData.expression.category || 'Unknown';
             const nTissues = geneData.expression.n_tissues || 0;
-            const isPan = category.toLowerCase().includes('pan-ciliary') || category.toLowerCase().includes('ubiquitous');
-            const isIdio = category.toLowerCase().includes('idio-ciliary') || category.toLowerCase().includes('tissue-specific');
-
+            
+            const catLower = category.toLowerCase();
             let verdict = '';
-            if (isPan) {
+            if (catLower.includes('pan-ciliary') || catLower.includes('ubiquitous')) {
                 verdict = `<span style="color:#059669; font-weight:600;">Yes — Pan-ciliary (Ubiquitous)</span>`;
-            } else if (isIdio) {
+            } else if (catLower.includes('idio-ciliary') || catLower.includes('tissue-specific')) {
                 verdict = `<span style="color:#dc2626; font-weight:600;">Yes — Idio-ciliary (Tissue-Specific)</span>`;
             } else {
-                verdict = `<span style="color:#7c3aed; font-weight:600;">Multi-tissue / Intermediate</span>`;
+                verdict = `<span style="color:#7c3aed; font-weight:600;">Multi-tissue / Intermediate / Low-Rare</span>`;
             }
 
             htmlResult = `<div class="ai-result-card">
@@ -4032,84 +4042,27 @@ else if (
                 </p>
             </div>`;
         }
+        
         window.addChatMessage(htmlResult, false);
         return;
     }
 
-    // ── 2. List requests ──
-    const isPanList = qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') ||
-                      qLower.includes('ubiquitous') || qLower.includes('ubiquitously expressed');
-    const isIdioList = qLower.includes('idio-ciliary') || qLower.includes('tissue-specific') ||
-                       qLower.includes('specific to') || qLower.includes('only in');
-
-    if (isPanList || isIdioList || qLower.includes('list') || qLower.includes('show all')) {
-        let filteredGenes = [];
-
-        Object.entries(window.CiliAI.lookups.geneMap).forEach(([gene, data]) => {
-            if (!data.expression?.category) return;
-            const cat = data.expression.category.toLowerCase();
-            const n = data.expression.n_tissues || 0;
-
-            if (isPanList && (cat.includes('pan-ciliary') || cat.includes('ubiquitous'))) {
-                filteredGenes.push(gene);
-            }
-            else if (isIdioList && (cat.includes('idio-ciliary') || cat.includes('tissue-specific'))) {
-                filteredGenes.push(gene);
-            }
-            // Specific tissue filter (e.g. "genes specific to lung")
-            else if (qLower.includes('lung') && n === 1 && data.expression.tissue?.Lung_Primary > 0 || data.expression.tissue?.Lung_Motile > 0) {
-                filteredGenes.push(gene);
-            }
-            else if (qLower.includes('kidney') && n === 1 && data.expression.tissue?.Kidney > 0) {
-                filteredGenes.push(gene);
-            }
-            else if (qLower.includes('liver') && n === 1 && data.expression.tissue?.Liver > 0) {
-                filteredGenes.push(gene);
-            }
-            else if (qLower.includes('skeleton') && n === 1 && data.expression.tissue?.Skeleton > 0) {
-                filteredGenes.push(gene);
-            }
-            // ... can extend to other tissues
-        });
-
-        filteredGenes.sort();
-
-        if (filteredGenes.length === 0) {
-            htmlResult = `<div class="ai-result-card">
-                <p>No genes match the requested criteria in the current dataset.</p>
-            </div>`;
-        } else {
-            const term = isPanList ? 'Pan-ciliary (Ubiquitous)' :
-                         isIdioList ? 'Idio-ciliary (Tissue-Specific)' :
-                         qLower.includes('lung') ? 'Lung-specific' :
-                         qLower.includes('kidney') ? 'Kidney-specific' : 'Matching';
-
-            const preview = filteredGenes.length > 12 ?
-                filteredGenes.slice(0,12).join(', ') + ` … and ${filteredGenes.length-12} more` :
-                filteredGenes.join(', ');
-
-            htmlResult = `<div class="ai-result-card">
-                <h4>${term} Genes</h4>
-                <p>Found <strong>${filteredGenes.length}</strong> genes.</p>
-                <p style="font-size:13.5px; line-height:1.5; margin:12px 0;">
-                    ${preview}
-                </p>
-                <p style="font-size:12px; color:#64748b;">
-                    Want to see the full list or view them in the panel? Type <strong>yes</strong> or <strong>show list</strong>.
-                </p>
-            </div>`;
-
-            // Prepare follow-up context
-            lastQueryContext = {
-                type: 'list_followup',
-                data: filteredGenes.map(g => ({ gene: g })),
-                term: `${term} Genes (${filteredGenes.length})`
-            };
-        }
-
-        window.addChatMessage(htmlResult, false);
+    // ── 2. Category LIST requests → delegate to the fixed handler ──
+    console.log("[CiliAI] Routing list request to handleExpressionCategoryQuery");
+    const result = window.handleExpressionCategoryQuery(query);
+    
+    if (result) {
+        window.addChatMessage(result, false);
         return;
     }
+
+    // Fallback if handler returns nothing (should rarely happen)
+    htmlResult = `<div class="ai-result-card">
+        <p>No matching category or list found for this query.</p>
+        <p>Try: "pan-ciliary genes", "idio-specific lung genes", "ubiquitous ciliary genes"</p>
+    </div>`;
+    window.addChatMessage(htmlResult, false);
+    return;
 }
         
         // === 3. FULLY FIXED CILIOPATHY CLASSIFICATION, OVERLAP & ORTHOLOG HANDLER ===
@@ -6415,6 +6368,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
