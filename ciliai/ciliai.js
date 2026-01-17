@@ -2397,7 +2397,7 @@ window.handleExpressionCategoryQuery = function(query) {
         const cat = String(data.Category).trim().toLowerCase();
         
         // STRICT CHECK: "multi-tissue" will NOT equal "pan-ciliary (ubiquitous)"
-        if (cat === targetCategory) {
+        if (cat === targetCategory.toLowerCase()) {
             
             if (targetCategory.includes('idio') && targetTissue) {
                 // For Idio-specific, ensure it's high in the requested tissue
@@ -6404,6 +6404,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
