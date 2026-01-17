@@ -2380,10 +2380,7 @@ window.openTab = function(evt, tabName) {
 
 
 // ==============================================================
-// 1. STRICT QUERY HANDLER (Fixes 2259 vs 1060 count)
-// ==============================================================
-// ==============================================================
-// 1. STRICT QUERY HANDLER – Fixed category filtering (2259 → ~1060)
+// 1. STRICT QUERY HANDLER – Ultra-resilient normalization
 // ==============================================================
 window.handleExpressionCategoryQuery = function(query) {
     const qLower = query.toLowerCase().trim();
@@ -2393,27 +2390,40 @@ window.handleExpressionCategoryQuery = function(query) {
         return `<div class="ai-result-card"><p>Expression Atlas data not loaded.</p></div>`;
     }
 
+    // ── Normalize function for categories (handles most DB inconsistencies) ──
+    const normalizeCategory = (str) => {
+        if (!str) return '';
+        return String(str)
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ')           // collapse spaces
+            .replace(/[\(\[]/g, '(')        // normalize parens
+            .replace(/[\)\]]/g, ')')
+            .replace(/\s*\(\s*/g, ' (')     // standardize spacing around parens
+            .replace(/\s*\)\s*/g, ') ');
+    };
+
     let results = [];
     let title = '';
-    let categoryTarget = null;
+    let targetNormalized = '';
 
     // ── Intent detection ───────────────────────────────────────────────
     if (qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') || qLower.includes('ubiquitous')) {
-        categoryTarget = 'Pan-ciliary (Ubiquitous)';
+        targetNormalized = normalizeCategory('Pan-ciliary (Ubiquitous)');
         title = 'Pan-ciliary (Ubiquitous) Genes';
     } 
     else if (qLower.includes('idio-ciliary') || qLower.includes('idio ciliary') || 
              qLower.includes('tissue specific') || qLower.includes('tissue-specific') || 
              qLower.includes('idio specific')) {
-        categoryTarget = 'Idio-ciliary (Tissue-Specific)';
+        targetNormalized = normalizeCategory('Idio-ciliary (Tissue-Specific)');
         title = 'Idio-ciliary (Tissue-Specific) Genes';
     }
 
-    if (!categoryTarget) return null; // Not a recognized category query
+    if (!targetNormalized) return null;
 
-    // ── Tissue detection for Idio-ciliary ──────────────────────────────
+    // ── Tissue for Idio (unchanged from before) ────────────────────────
     let targetTissues = null;
-    if (categoryTarget === 'Idio-ciliary (Tissue-Specific)') {
+    if (targetNormalized.includes('tissue-specific')) {
         if (qLower.includes('lung'))           targetTissues = ['Lung_Primary', 'Lung_Motile'];
         else if (qLower.includes('kidney'))     targetTissues = ['Kidney'];
         else if (qLower.includes('liver'))      targetTissues = ['Liver'];
@@ -2422,40 +2432,31 @@ window.handleExpressionCategoryQuery = function(query) {
         else if (qLower.includes('pancreas'))   targetTissues = ['Pancreas'];
         else if (qLower.includes('skeleton') || qLower.includes('bone')) targetTissues = ['Skeleton'];
 
-        if (targetTissues) {
-            title += ` (${targetTissues[0].replace('_', ' ')})`;
-        }
+        if (targetTissues) title += ` (${targetTissues[0].replace('_', ' ')})`;
     }
 
-    // ── Strict filtering with normalization ────────────────────────────
+    // ── Filter with normalized comparison ──────────────────────────────
     Object.entries(atlas).forEach(([gene, data]) => {
         if (!data?.Category) return;
 
-        const catNormalized = String(data.Category)
-            .trim()
-            .replace(/\s+/g, ' ');  // normalize internal spaces
+        const catNorm = normalizeCategory(data.Category);
 
-        if (catNormalized === categoryTarget) {
-            if (categoryTarget === 'Pan-ciliary (Ubiquitous)') {
+        if (catNorm === targetNormalized) {
+            if (targetNormalized.includes('ubiquitous')) {
                 const n = Number(data.n_tissues_expressed) || 0;
                 results.push({
                     gene,
                     description: `Expressed in ${n}/8 tissues`
                 });
-            } 
-            else if (categoryTarget === 'Idio-ciliary (Tissue-Specific)') {
+            } else if (targetNormalized.includes('tissue-specific')) {
                 if (targetTissues) {
-                    // Find dominant tissue (highest expression)
                     let maxVal = -1;
                     let maxTissue = '';
-                    const allTissues = ['Hypothalamus','Kidney','Liver','Lung_Primary','Lung_Motile','Olfactory','Pancreas','Skeleton'];
+                    const tissues = ['Hypothalamus','Kidney','Liver','Lung_Primary','Lung_Motile','Olfactory','Pancreas','Skeleton'];
 
-                    allTissues.forEach(t => {
+                    tissues.forEach(t => {
                         const val = Number(data[t]) || 0;
-                        if (val > maxVal) {
-                            maxVal = val;
-                            maxTissue = t;
-                        }
+                        if (val > maxVal) { maxVal = val; maxTissue = t; }
                     });
 
                     if (maxVal > 1.0 && targetTissues.some(t => maxTissue.includes(t))) {
@@ -2465,11 +2466,7 @@ window.handleExpressionCategoryQuery = function(query) {
                         });
                     }
                 } else {
-                    // No specific tissue requested → include all Idio-ciliary
-                    results.push({
-                        gene,
-                        description: 'Tissue-Specific'
-                    });
+                    results.push({ gene, description: 'Tissue-Specific' });
                 }
             }
         }
@@ -2477,7 +2474,7 @@ window.handleExpressionCategoryQuery = function(query) {
 
     results.sort((a, b) => a.gene.localeCompare(b.gene));
 
-    console.log(`[CiliAI Category Query] ${title}: ${results.length} genes`);
+    console.log(`[CiliAI] ${title}: ${results.length} genes (normalized match)`);
 
     window.CiliAI.lastQueryContext = {
         type: 'list_followup',
@@ -2489,17 +2486,20 @@ window.handleExpressionCategoryQuery = function(query) {
 };
 
 // ==============================================================
-// 2. HELPER FUNCTIONS – Aligned with the fixed query logic
+// 2. HELPERS – Use same normalization
 // ==============================================================
 window.getPanCiliaryGenes = function() {
     const atlas = window.CiliAI?.expressionAtlas;
     if (!atlas) return [];
 
+    const target = 'Pan-ciliary (Ubiquitous)'.toLowerCase().trim(); // base
+
     return Object.entries(atlas)
-        .filter(([, data]) => 
-            data?.Category && 
-            String(data.Category).trim() === 'Pan-ciliary (Ubiquitous)'
-        )
+        .filter(([, data]) => {
+            if (!data?.Category) return false;
+            const norm = String(data.Category).trim().toLowerCase().replace(/\s+/g, ' ');
+            return norm === target || norm.includes('pan-ciliary') && norm.includes('ubiquitous');
+        })
         .map(([gene]) => gene)
         .sort();
 };
@@ -6415,6 +6415,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
