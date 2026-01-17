@@ -2350,12 +2350,12 @@ window.openTab = function(evt, tabName) {
 // 2. MAIN GENE DISPLAY FUNCTION
 // ==============================================================
 // ==============================================================
-// 1. ROBUST QUERY HANDLER (Fixes 2259 vs 1060 count)
+// 1. ROBUST QUERY HANDLER (FULL LIST SAFE)
 // ==============================================================
 window.handleExpressionCategoryQuery = function(query) {
     const qLower = query.toLowerCase();
     const atlas = window.CiliAI.expressionAtlas;
-    
+
     if (!atlas || Object.keys(atlas).length === 0) {
         return `<div class="ai-result-card"><p>Expression Atlas data not loaded.</p></div>`;
     }
@@ -2364,15 +2364,24 @@ window.handleExpressionCategoryQuery = function(query) {
     let targetTissue = null;
     let title = '';
 
+    // ------------------------------------------------------------
     // A. Detect Intent
-    if (qLower.includes('pan-ciliary') || qLower.includes('ubiquitous') || qLower.includes('pan ciliary')) {
-        targetCategory = 'pan-ciliary (ubiquitous)'; // normalized target
+    // ------------------------------------------------------------
+    if (
+        qLower.includes('pan-ciliary') ||
+        qLower.includes('pan ciliary') ||
+        qLower.includes('ubiquitous')
+    ) {
+        targetCategory = 'pan-ciliary (ubiquitous)';
         title = 'Pan-ciliary (Ubiquitous) Genes';
     } 
-    else if (qLower.includes('idio-specific') || qLower.includes('idio specific') || qLower.includes('tissue specific')) {
+    else if (
+        qLower.includes('idio-specific') ||
+        qLower.includes('idio specific') ||
+        qLower.includes('tissue specific')
+    ) {
         targetCategory = 'idio-ciliary (tissue-specific)';
-        
-        // Detect Tissue context
+
         if (qLower.includes('lung')) targetTissue = ['Lung_Primary', 'Lung_Motile'];
         else if (qLower.includes('kidney')) targetTissue = ['Kidney'];
         else if (qLower.includes('liver')) targetTissue = ['Liver'];
@@ -2380,64 +2389,93 @@ window.handleExpressionCategoryQuery = function(query) {
         else if (qLower.includes('olfactory') || qLower.includes('nose')) targetTissue = ['Olfactory'];
         else if (qLower.includes('pancreas')) targetTissue = ['Pancreas'];
         else if (qLower.includes('skeleton') || qLower.includes('bone')) targetTissue = ['Skeleton'];
-        
-        title = targetTissue ? `Idio-ciliary Genes (${targetTissue[0].split('_')[0]} Specific)` : 'Idio-ciliary (Tissue-Specific) Genes';
+
+        title = targetTissue
+            ? `Idio-ciliary Genes (${targetTissue[0].split('_')[0]} Specific)`
+            : 'Idio-ciliary (Tissue-Specific) Genes';
     }
 
     if (!targetCategory) return null;
 
-    // B. Filter Data (Strict & Normalized)
+    // ------------------------------------------------------------
+    // B. Filter Atlas (STRICT + SAFE)
+    // ------------------------------------------------------------
     let results = [];
-    console.log(`[CiliAI Debug] Filtering for category: "${targetCategory}"`);
 
     Object.entries(atlas).forEach(([gene, data]) => {
         if (!data.Category) return;
 
-        // Normalize data category for safe comparison
         const cat = String(data.Category).trim().toLowerCase();
-        
-        // STRICT CHECK: "multi-tissue" will NOT equal "pan-ciliary (ubiquitous)"
-        if (cat === targetCategory.toLowerCase()) {
-            
-            if (targetCategory.includes('idio') && targetTissue) {
-                // For Idio-specific, ensure it's high in the requested tissue
-                const tissues = ['Hypothalamus', 'Kidney', 'Liver', 'Lung_Primary', 'Lung_Motile', 'Olfactory', 'Pancreas', 'Skeleton'];
-                let maxVal = -1;
-                let maxT = '';
-                tissues.forEach(t => {
-                    if ((data[t] || 0) > maxVal) { maxVal = data[t]; maxT = t; }
-                });
-                
-                // Must match target tissue AND have expression > 1.0
-                if (targetTissue.some(t => maxT.includes(t)) && maxVal > 1.0) {
-                     results.push({ 
-                         gene: gene, 
-                         description: `${maxT.replace('_', ' ')}: ${maxVal.toFixed(1)} TPM` 
-                     });
+        if (cat !== targetCategory.toLowerCase()) return;
+
+        // ---- IDIO LOGIC ----
+        if (targetCategory.includes('idio') && targetTissue) {
+            const tissues = [
+                'Hypothalamus',
+                'Kidney',
+                'Liver',
+                'Lung_Primary',
+                'Lung_Motile',
+                'Olfactory',
+                'Pancreas',
+                'Skeleton'
+            ];
+
+            let maxVal = -1;
+            let maxT = null;
+
+            tissues.forEach(t => {
+                const val = Number(data[t]) || 0;
+                if (val > maxVal) {
+                    maxVal = val;
+                    maxT = t;
                 }
-            } else {
-                // Pan-ciliary or generic Idio request
-                results.push({ 
-                    gene: gene, 
-                    description: `Expressed in ${data.n_tissues_expressed}/8 tissues` 
+            });
+
+            if (
+                maxT &&
+                targetTissue.some(t => maxT.includes(t)) &&
+                maxVal > 1.0
+            ) {
+                results.push({
+                    gene,
+                    description: `${maxT.replace('_', ' ')}: ${maxVal.toFixed(2)} TPM`
                 });
             }
+        } 
+        // ---- PAN-CILIARY ----
+        else {
+            results.push({
+                gene,
+                description: `Expressed in ${data.n_tissues_expressed}/8 tissues`
+            });
         }
     });
-    
-    // Sort Results alphabetically
-    results.sort((a,b) => a.gene.localeCompare(b.gene));
 
-    console.log(`[CiliAI Debug] Found ${results.length} matches.`);
+    // Alphabetical
+    results.sort((a, b) => a.gene.localeCompare(b.gene));
 
-    // C. Save Context & Return
+    console.log(`[CiliAI Debug] ${title}: ${results.length} genes`);
+
+    // ------------------------------------------------------------
+    // C. Persist FULL LIST (NO TRUNCATION)
+    // ------------------------------------------------------------
     window.CiliAI.lastQueryContext = {
-        type: 'list_followup',
-        data: results,
-        term: title
+        type: 'expression_list',
+        title,
+        results,
+        allowFullRender: true
     };
 
-    return `I found <strong>${results.length}</strong> ${title}. Do you want to view the list?`;
+    return `
+        <div class="ai-result-card">
+            <strong>${results.length}</strong> ${title} found.<br>
+            Would you like to <strong>view the full list</strong>?
+            <div style="margin-top:6px;font-size:0.9em;color:#6b7280;">
+                Type <code>yes</code> or <code>show list</code>
+            </div>
+        </div>
+    `;
 };
 
 // ==============================================================
@@ -6404,6 +6442,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
