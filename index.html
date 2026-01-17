@@ -1517,34 +1517,34 @@ window.loadCiliAIData = async function() {
         window.CiliAI.lookups = lookupsRes?.lookups || { geneMap: {} };
 
         // ──────────────────────── NEW: Integrate expression data ────────────────────────
-        if (expressionData && typeof expressionData === 'object') {
-            // Attach expression directly to each gene in geneMap
-            Object.entries(expressionData).forEach(([gene, exprObj]) => {
-                const upperGene = gene.toUpperCase();
-                if (window.CiliAI.lookups.geneMap[upperGene]) {
-                    window.CiliAI.lookups.geneMap[upperGene].expression = {
-                        ...(window.CiliAI.lookups.geneMap[upperGene].expression || {}),
-                        tissue: exprObj,                               // main tissue-level data
-                        n_tissues: exprObj.n_tissues_expressed || 0,
-                        category: exprObj.Category || 'Unknown'
-                    };
-                } else {
-                    // Optional: create stub entry if gene not yet in master
-                    window.CiliAI.lookups.geneMap[upperGene] = {
-                        Gene: upperGene,
-                        expression: {
-                            tissue: exprObj,
-                            n_tissues: exprObj.n_tissues_expressed || 0,
-                            category: exprObj.Category || 'Unknown'
-                        }
-                    };
-                }
-            });
+       if (expressionData && typeof expressionData === 'object') {
 
-            console.log(`Loaded expression data for ${Object.keys(expressionData).length} genes`);
+    // ✅ REGISTER ATLAS (THIS WAS MISSING)
+    window.CiliAI.expressionAtlas = expressionData;
+
+    Object.entries(expressionData).forEach(([gene, exprObj]) => {
+        const upperGene = gene.toUpperCase();
+        if (window.CiliAI.lookups.geneMap[upperGene]) {
+            window.CiliAI.lookups.geneMap[upperGene].expression = {
+                ...(window.CiliAI.lookups.geneMap[upperGene].expression || {}),
+                tissue: exprObj,
+                n_tissues: exprObj.n_tissues_expressed || 0,
+                category: exprObj.Category || 'Unknown'
+            };
         } else {
-            console.warn("Expression data not loaded or invalid format");
+            window.CiliAI.lookups.geneMap[upperGene] = {
+                Gene: upperGene,
+                expression: {
+                    tissue: exprObj,
+                    n_tissues: exprObj.n_tissues_expressed || 0,
+                    category: exprObj.Category || 'Unknown'
+                }
+            };
         }
+    });
+
+    console.log(`Loaded expression data for ${Object.keys(expressionData).length} genes`);
+}
 
         // 7. Stats calculation (unchanged)
         const stats = { genes: window.CiliAI.masterData.length };
@@ -2013,5 +2013,6 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
