@@ -2381,93 +2381,101 @@ window.openTab = function(evt, tabName) {
 // ==============================================================
 // 1. STRICT QUERY HANDLER (Fixes 2259 vs 1060 count)
 // ==============================================================
+// ==============================================================
+// 1. STRICT QUERY HANDLER (Fixes 2259 vs 1060 count)
+// ==============================================================
 window.handleExpressionCategoryQuery = function(query) {
-    const qLower = query.toLowerCase();
-    const atlas = window.CiliAI.expressionAtlas;
-    
+    const qLower = query.toLowerCase().trim();
+    const atlas = window.CiliAI?.expressionAtlas;
+
     if (!atlas || Object.keys(atlas).length === 0) {
         return `<div class="ai-result-card"><p>Expression Atlas data not loaded.</p></div>`;
     }
 
-    let isPanRequest = false;
-    let isIdioRequest = false;
-    let targetTissue = null;
-    let title = '';
-
-    // A. Detect Intent
-    if (qLower.includes('pan-ciliary') || qLower.includes('ubiquitous') || qLower.includes('pan ciliary')) {
-        isPanRequest = true;
-        title = 'Pan-ciliary (Ubiquitous) Genes';
-    } 
-    else if (qLower.includes('idio-specific') || qLower.includes('idio specific') || qLower.includes('tissue specific')) {
-        isIdioRequest = true;
-        title = 'Idio-ciliary (Tissue-Specific) Genes';
-        
-        // Detect Tissue context
-        if (qLower.includes('lung')) targetTissue = ['Lung_Primary', 'Lung_Motile'];
-        else if (qLower.includes('kidney')) targetTissue = ['Kidney'];
-        else if (qLower.includes('liver')) targetTissue = ['Liver'];
-        else if (qLower.includes('brain') || qLower.includes('hypothalamus')) targetTissue = ['Hypothalamus'];
-        else if (qLower.includes('olfactory') || qLower.includes('nose')) targetTissue = ['Olfactory'];
-        else if (qLower.includes('pancreas')) targetTissue = ['Pancreas'];
-        else if (qLower.includes('skeleton') || qLower.includes('bone')) targetTissue = ['Skeleton'];
-        
-        if (targetTissue) title += ` (${targetTissue[0].split('_')[0]})`;
-    }
-
-    if (!isPanRequest && !isIdioRequest) return null;
-
-    // B. Filter Data (Hardcoded Strict Checks)
     let results = [];
-    
-    // Debug specific problematic gene
-    if (atlas['ABCA13']) {
-        console.log(`[CiliAI Debug] ABCA13 Category in DB: "${atlas['ABCA13'].Category}"`);
+    let title = '';
+    let categoryTarget = null;
+
+    // Normalize category detection (forgiving to user input)
+    if (qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') || qLower.includes('ubiquitous')) {
+        categoryTarget = 'Pan-ciliary (Ubiquitous)';
+        title = 'Pan-ciliary (Ubiquitous) Genes';
+    } else if (qLower.includes('idio-ciliary') || qLower.includes('idio ciliary') || 
+               qLower.includes('tissue specific') || qLower.includes('tissue-specific') || 
+               qLower.includes('idio specific')) {
+        categoryTarget = 'Idio-ciliary (Tissue-Specific)';
+        title = 'Idio-ciliary (Tissue-Specific) Genes';
     }
 
-    Object.entries(atlas).forEach(([gene, data]) => {
-        const cat = data.Category; // Raw category string
-        
-        if (isPanRequest) {
-            // STRICT FILTER: Only accept exact string match
-            if (cat === 'Pan-ciliary (Ubiquitous)') {
-                results.push({ 
-                    gene: gene, 
-                    description: `Expressed in ${data.n_tissues_expressed}/8 tissues` 
-                });
-            }
-        } 
-        else if (isIdioRequest) {
-            // STRICT FILTER: Only accept exact string match
-            if (cat === 'Idio-ciliary (Tissue-Specific)') {
-                
-                if (targetTissue) {
-                    // Check if max expression is in target tissue
-                    let maxVal = 0;
-                    let maxT = '';
-                    const tissues = ['Hypothalamus', 'Kidney', 'Liver', 'Lung_Primary', 'Lung_Motile', 'Olfactory', 'Pancreas', 'Skeleton'];
-                    
-                    tissues.forEach(t => {
-                        if ((data[t] || 0) > maxVal) { maxVal = data[t]; maxT = t; }
-                    });
+    if (!categoryTarget) return null; // Not a category query
 
-                    // Match logic: Max tissue is target AND value > 1.0
-                    if (targetTissue.some(t => maxT.includes(t)) && maxVal > 1.0) {
-                         results.push({ gene: gene, description: `${maxT.replace('_', ' ')}: ${maxVal.toFixed(1)} TPM` });
+    // Tissue detection for Idio-ciliary
+    let targetTissues = null;
+    if (categoryTarget === 'Idio-ciliary (Tissue-Specific)') {
+        if (qLower.includes('lung'))           targetTissues = ['Lung_Primary', 'Lung_Motile'];
+        else if (qLower.includes('kidney'))     targetTissues = ['Kidney'];
+        else if (qLower.includes('liver'))      targetTissues = ['Liver'];
+        else if (qLower.includes('brain') || qLower.includes('hypothalamus')) targetTissues = ['Hypothalamus'];
+        else if (qLower.includes('olfactory') || qLower.includes('nose')) targetTissues = ['Olfactory'];
+        else if (qLower.includes('pancreas'))   targetTissues = ['Pancreas'];
+        else if (qLower.includes('skeleton') || qLower.includes('bone')) targetTissues = ['Skeleton'];
+        
+        if (targetTissues) {
+            title += ` (${targetTissues[0].replace('_', ' ')})`;
+        }
+    }
+
+    // Strict filtering with normalization
+    Object.entries(atlas).forEach(([gene, data]) => {
+        if (!data?.Category) return;
+
+        const normalizedCat = String(data.Category).trim().toLowerCase().replace(/\s+/g, ' ');
+
+        // Exact match after normalization
+        if (normalizedCat === categoryTarget.toLowerCase()) {
+            if (categoryTarget === 'Pan-ciliary (Ubiquitous)') {
+                const n = data.n_tissues_expressed || 0;
+                results.push({
+                    gene,
+                    description: `Expressed in ${n}/8 tissues`
+                });
+            } 
+            else if (categoryTarget === 'Idio-ciliary (Tissue-Specific)') {
+                if (targetTissues) {
+                    // Find the tissue with highest expression
+                    let maxVal = 0;
+                    let maxTissue = '';
+                    ['Hypothalamus', 'Kidney', 'Liver', 'Lung_Primary', 'Lung_Motile', 'Olfactory', 'Pancreas', 'Skeleton']
+                        .forEach(t => {
+                            const val = Number(data[t]) || 0;
+                            if (val > maxVal) {
+                                maxVal = val;
+                                maxTissue = t;
+                            }
+                        });
+
+                    // Check if dominant tissue matches target AND expression is meaningful
+                    if (targetTissues.some(t => maxTissue.includes(t)) && maxVal > 1.0) {
+                        results.push({
+                            gene,
+                            description: `${maxTissue.replace('_', ' ')}: ${maxVal.toFixed(1)} TPM`
+                        });
                     }
                 } else {
-                    // No tissue specified, list all Idio genes
-                    results.push({ gene: gene, description: `Tissue-Specific` });
+                    // No tissue specified → include all Idio-ciliary genes
+                    results.push({
+                        gene,
+                        description: 'Tissue-Specific'
+                    });
                 }
             }
         }
     });
-    
-    results.sort((a,b) => a.gene.localeCompare(b.gene));
 
-    console.log(`[CiliAI Results] ${title}: ${results.length} genes found.`);
+    results.sort((a, b) => a.gene.localeCompare(b.gene));
 
-    // C. Save Context
+    console.log(`[CiliAI] ${title}: ${results.length} genes found`);
+
     window.CiliAI.lastQueryContext = {
         type: 'list_followup',
         data: results,
@@ -2478,86 +2486,91 @@ window.handleExpressionCategoryQuery = function(query) {
 };
 
 // ==============================================================
-// 2. SEARCH HELPERS (Pan-ciliary / Idio-specific)
+// 2. HELPER FUNCTIONS (Consistent with query handler)
 // ==============================================================
 window.getPanCiliaryGenes = function() {
-    if (!window.CiliAI.expressionAtlas) return [];
-    return Object.entries(window.CiliAI.expressionAtlas)
-        .filter(([, data]) => data.Category === 'Pan-ciliary (Ubiquitous)')
-        .map(([gene]) => gene)
-        .sort();
-};
-
-window.getTissueSpecificGenes = function(tissueKeyword) {
-    if (!window.CiliAI.expressionAtlas) return [];
-    const key = tissueKeyword.toLowerCase();
-    
-    // Map user keywords to atlas columns
-    let columnKey = '';
-    if (key.includes('lung')) columnKey = 'Lung_Primary'; 
-    else if (key.includes('kidney')) columnKey = 'Kidney';
-    else if (key.includes('liver')) columnKey = 'Liver';
-    else if (key.includes('brain')) columnKey = 'Hypothalamus';
-    else if (key.includes('nose')) columnKey = 'Olfactory';
-    else if (key.includes('pancreas')) columnKey = 'Pancreas';
-    else if (key.includes('skeleton') || key.includes('bone')) columnKey = 'Skeleton';
-    
+    if (!window.CiliAI?.expressionAtlas) return [];
     return Object.entries(window.CiliAI.expressionAtlas)
         .filter(([, data]) => {
-            if (data.Category !== 'Idio-ciliary (Tissue-Specific)') return false;
-            // Check if this tissue is the dominant one (expression > 1.0)
-            if (columnKey && (data[columnKey] || 0) > 1.0) return true;
-            return false; 
+            return data?.Category && 
+                   String(data.Category).trim() === 'Pan-ciliary (Ubiquitous)';
         })
         .map(([gene]) => gene)
         .sort();
 };
 
+window.getTissueSpecificGenes = function(tissueKeyword) {
+    if (!window.CiliAI?.expressionAtlas) return [];
+    const key = tissueKeyword.toLowerCase();
+
+    let targetColumns = [];
+    if (key.includes('lung'))           targetColumns = ['Lung_Primary', 'Lung_Motile'];
+    else if (key.includes('kidney'))     targetColumns = ['Kidney'];
+    else if (key.includes('liver'))      targetColumns = ['Liver'];
+    else if (key.includes('brain') || key.includes('hypothalamus')) targetColumns = ['Hypothalamus'];
+    else if (key.includes('olfactory') || key.includes('nose')) targetColumns = ['Olfactory'];
+    else if (key.includes('pancreas'))   targetColumns = ['Pancreas'];
+    else if (key.includes('skeleton') || key.includes('bone')) targetColumns = ['Skeleton'];
+
+    if (!targetColumns.length) return [];
+
+    return Object.entries(window.CiliAI.expressionAtlas)
+        .filter(([, data]) => {
+            if (!data?.Category || data.Category.trim() !== 'Idio-ciliary (Tissue-Specific)') return false;
+            return targetColumns.some(col => Number(data[col]) > 1.0);
+        })
+        .map(([gene]) => gene)
+        .sort();
+};
+
+
+    
 // ==============================================================
 // 4. MAIN GENE DISPLAY (Fixed Safety)
 // ==============================================================
 window.displayFullGeneInfo = async function(geneSymbol) {
-    if(typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
-    
+    if (typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
+
     const gm = window.CiliAI?.lookups?.geneMap;
     if (!gm || !gm[geneSymbol]) {
         return `<div class="ai-result-card">No data found for gene <strong>${geneSymbol}</strong></div>`;
     }
 
     const g = gm[geneSymbol];
-    const safeVal = (v) => (v && v !== 'N/A' && v !== '0' && v !== null && v !== undefined) ? v : '<span style="color:#ccc">—</span>';
+    const safeVal = (v) => (v && v !== 'N/A' && v !== '0' && v !== null && v !== undefined) 
+        ? v 
+        : '<span style="color:#ccc">—</span>';
 
     const scRNA = g.expression?.scRNA || {};
-    
-    // SAFE COPY: Prevent delete from modifying global state
+
+    // Safe copy to avoid mutating global data
     let tissueExpr = {};
     let exprCategory = '—';
     let nTissues = 0;
-
-    if (g.expression && g.expression.tissue) {
-        tissueExpr = { ...g.expression.tissue }; 
+    if (g.expression?.tissue) {
+        tissueExpr = { ...g.expression.tissue };
         exprCategory = g.expression.category || tissueExpr.Category || 'Unknown';
         nTissues = g.expression.n_tissues || tissueExpr.n_tissues_expressed || 0;
-        
-        // Clean up display object
+
         delete tissueExpr.n_tissues_expressed;
         delete tissueExpr.Category;
     }
 
-    let score = 0;
-    if (g.screens) score += g.screens.length;
-    if (g.Ciliopathies && g.Ciliopathies.length > 0) score += 2;
-    if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') score += 1;
-    let badge = score >= 4 ? '🥇 High Confidence' : score >= 2 ? '🥈 Verified' : '🥉 Candidate';
+    const score = (g.screens?.length || 0) + 
+                  (g.Ciliopathies?.length > 0 ? 2 : 0) + 
+                  (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A' ? 1 : 0);
+
+    const badgeClass = score >= 4 ? 'gold' : score >= 2 ? 'silver' : 'bronze';
+    const badgeText = score >= 4 ? '🥇 High Confidence' : score >= 2 ? '🥈 Verified' : '🥉 Candidate';
 
     let html = `<div class="ai-result-card" style="font-family: 'Inter', sans-serif; padding:20px;">`;
-    
+
     html += `
         <div style="display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
             <h2 id="current-gene-name" style="margin:0; color:#2b6cb0; font-size:1.9rem;">${geneSymbol}</h2>
-            <span class="cilia-badge badge-${score >= 4 ? 'gold' : score >= 2 ? 'silver' : 'bronze'}">${badge}</span>
+            <span class="cilia-badge badge-${badgeClass}">${badgeText}</span>
         </div>`;
-
+    
     html += `
         <div class="cilia-tabs" style="margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:4px;">
             <button class="cilia-tab-btn active" onclick="window.openTab(event, 'overview')">Overview</button>
@@ -6393,6 +6406,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
