@@ -2379,7 +2379,7 @@ window.openTab = function(evt, tabName) {
 
 
 // ==============================================================
-// 1. ROBUST QUERY HANDLER (Fixes 2259 vs 1060 count)
+// 1. STRICT QUERY HANDLER (Fixes 2259 vs 1060 count)
 // ==============================================================
 window.handleExpressionCategoryQuery = function(query) {
     const qLower = query.toLowerCase();
@@ -2389,17 +2389,19 @@ window.handleExpressionCategoryQuery = function(query) {
         return `<div class="ai-result-card"><p>Expression Atlas data not loaded.</p></div>`;
     }
 
-    let targetCategory = '';
+    let isPanRequest = false;
+    let isIdioRequest = false;
     let targetTissue = null;
     let title = '';
 
     // A. Detect Intent
     if (qLower.includes('pan-ciliary') || qLower.includes('ubiquitous') || qLower.includes('pan ciliary')) {
-        targetCategory = 'pan-ciliary (ubiquitous)'; // normalized target
+        isPanRequest = true;
         title = 'Pan-ciliary (Ubiquitous) Genes';
     } 
     else if (qLower.includes('idio-specific') || qLower.includes('idio specific') || qLower.includes('tissue specific')) {
-        targetCategory = 'idio-ciliary (tissue-specific)';
+        isIdioRequest = true;
+        title = 'Idio-ciliary (Tissue-Specific) Genes';
         
         // Detect Tissue context
         if (qLower.includes('lung')) targetTissue = ['Lung_Primary', 'Lung_Motile'];
@@ -2410,56 +2412,62 @@ window.handleExpressionCategoryQuery = function(query) {
         else if (qLower.includes('pancreas')) targetTissue = ['Pancreas'];
         else if (qLower.includes('skeleton') || qLower.includes('bone')) targetTissue = ['Skeleton'];
         
-        title = targetTissue ? `Idio-ciliary Genes (${targetTissue[0].split('_')[0]} Specific)` : 'Idio-ciliary (Tissue-Specific) Genes';
+        if (targetTissue) title += ` (${targetTissue[0].split('_')[0]})`;
     }
 
-    if (!targetCategory) return null;
+    if (!isPanRequest && !isIdioRequest) return null;
 
-    // B. Filter Data (Strict & Normalized)
+    // B. Filter Data (Hardcoded Strict Checks)
     let results = [];
-    console.log(`[CiliAI Debug] Filtering for category: "${targetCategory}"`);
+    
+    // Debug specific problematic gene
+    if (atlas['ABCA13']) {
+        console.log(`[CiliAI Debug] ABCA13 Category in DB: "${atlas['ABCA13'].Category}"`);
+    }
 
     Object.entries(atlas).forEach(([gene, data]) => {
-        if (!data.Category) return;
-
-        // Normalize data category for safe comparison
-        const cat = String(data.Category).trim().toLowerCase();
+        const cat = data.Category; // Raw category string
         
-        // STRICT CHECK: "multi-tissue" will NOT equal "pan-ciliary (ubiquitous)"
-        if (cat === targetCategory) {
-            
-            if (targetCategory.includes('idio') && targetTissue) {
-                // For Idio-specific, ensure it's high in the requested tissue
-                const tissues = ['Hypothalamus', 'Kidney', 'Liver', 'Lung_Primary', 'Lung_Motile', 'Olfactory', 'Pancreas', 'Skeleton'];
-                let maxVal = -1;
-                let maxT = '';
-                tissues.forEach(t => {
-                    if ((data[t] || 0) > maxVal) { maxVal = data[t]; maxT = t; }
-                });
-                
-                // Must match target tissue AND have expression > 1.0
-                if (targetTissue.some(t => maxT.includes(t)) && maxVal > 1.0) {
-                     results.push({ 
-                         gene: gene, 
-                         description: `${maxT.replace('_', ' ')}: ${maxVal.toFixed(1)} TPM` 
-                     });
-                }
-            } else {
-                // Pan-ciliary or generic Idio request
+        if (isPanRequest) {
+            // STRICT FILTER: Only accept exact string match
+            if (cat === 'Pan-ciliary (Ubiquitous)') {
                 results.push({ 
                     gene: gene, 
                     description: `Expressed in ${data.n_tissues_expressed}/8 tissues` 
                 });
             }
+        } 
+        else if (isIdioRequest) {
+            // STRICT FILTER: Only accept exact string match
+            if (cat === 'Idio-ciliary (Tissue-Specific)') {
+                
+                if (targetTissue) {
+                    // Check if max expression is in target tissue
+                    let maxVal = 0;
+                    let maxT = '';
+                    const tissues = ['Hypothalamus', 'Kidney', 'Liver', 'Lung_Primary', 'Lung_Motile', 'Olfactory', 'Pancreas', 'Skeleton'];
+                    
+                    tissues.forEach(t => {
+                        if ((data[t] || 0) > maxVal) { maxVal = data[t]; maxT = t; }
+                    });
+
+                    // Match logic: Max tissue is target AND value > 1.0
+                    if (targetTissue.some(t => maxT.includes(t)) && maxVal > 1.0) {
+                         results.push({ gene: gene, description: `${maxT.replace('_', ' ')}: ${maxVal.toFixed(1)} TPM` });
+                    }
+                } else {
+                    // No tissue specified, list all Idio genes
+                    results.push({ gene: gene, description: `Tissue-Specific` });
+                }
+            }
         }
     });
     
-    // Sort Results alphabetically
     results.sort((a,b) => a.gene.localeCompare(b.gene));
 
-    console.log(`[CiliAI Debug] Found ${results.length} matches.`);
+    console.log(`[CiliAI Results] ${title}: ${results.length} genes found.`);
 
-    // C. Save Context & Return
+    // C. Save Context
     window.CiliAI.lastQueryContext = {
         type: 'list_followup',
         data: results,
@@ -2470,15 +2478,12 @@ window.handleExpressionCategoryQuery = function(query) {
 };
 
 // ==============================================================
-// 2. SEARCH HELPERS (Updated to use normalized check)
+// 2. SEARCH HELPERS (Pan-ciliary / Idio-specific)
 // ==============================================================
 window.getPanCiliaryGenes = function() {
     if (!window.CiliAI.expressionAtlas) return [];
     return Object.entries(window.CiliAI.expressionAtlas)
-        .filter(([, data]) => {
-            const cat = String(data.Category || '').trim().toLowerCase();
-            return cat === 'pan-ciliary (ubiquitous)';
-        })
+        .filter(([, data]) => data.Category === 'Pan-ciliary (Ubiquitous)')
         .map(([gene]) => gene)
         .sort();
 };
@@ -2487,6 +2492,7 @@ window.getTissueSpecificGenes = function(tissueKeyword) {
     if (!window.CiliAI.expressionAtlas) return [];
     const key = tissueKeyword.toLowerCase();
     
+    // Map user keywords to atlas columns
     let columnKey = '';
     if (key.includes('lung')) columnKey = 'Lung_Primary'; 
     else if (key.includes('kidney')) columnKey = 'Kidney';
@@ -2498,9 +2504,8 @@ window.getTissueSpecificGenes = function(tissueKeyword) {
     
     return Object.entries(window.CiliAI.expressionAtlas)
         .filter(([, data]) => {
-            const cat = String(data.Category || '').trim().toLowerCase();
-            if (cat !== 'idio-ciliary (tissue-specific)') return false;
-            // Check dominant tissue
+            if (data.Category !== 'Idio-ciliary (Tissue-Specific)') return false;
+            // Check if this tissue is the dominant one (expression > 1.0)
             if (columnKey && (data[columnKey] || 0) > 1.0) return true;
             return false; 
         })
@@ -6388,6 +6393,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
