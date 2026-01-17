@@ -22,6 +22,37 @@ if (!window.CiliAI) {
     };
 }
 
+// ==============================================================
+// EXPRESSION RESULT RENDERER (NO TRUNCATION)
+// ==============================================================
+window.renderExpressionResults = function(context) {
+    if (!context || !Array.isArray(context.results)) {
+        return `<div class="ai-result-card">No results available.</div>`;
+    }
+
+    const rows = context.results.map(r => `
+        <div class="gene-row">
+            <strong>${r.gene}</strong>
+            <span class="gene-desc">${r.description}</span>
+        </div>
+    `).join('');
+
+    return `
+        <div class="ai-result-card">
+            <h4>${context.title || 'Gene List'}</h4>
+            <div class="gene-panel" style="
+                max-height: 420px;
+                overflow-y: auto;
+                margin-top: 8px;
+                padding-right: 6px;
+            ">
+                ${rows}
+            </div>
+        </div>
+    `;
+};
+
+
 
 // 1. GLOBAL STATE & UTILITIES
 // ==========================================================
@@ -6442,6 +6473,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
