@@ -2396,10 +2396,10 @@ window.handleExpressionCategoryQuery = function(query) {
         return String(str)
             .trim()
             .toLowerCase()
-            .replace(/\s+/g, ' ')           // collapse spaces
-            .replace(/[\(\[]/g, '(')        // normalize parens
+            .replace(/\s+/g, ' ')            // collapse spaces
+            .replace(/[\(\[]/g, '(')         // normalize parens
             .replace(/[\)\]]/g, ')')
-            .replace(/\s*\(\s*/g, ' (')     // standardize spacing around parens
+            .replace(/\s*\(\s*/g, ' (')      // standardize spacing around parens
             .replace(/\s*\)\s*/g, ') ');
     };
 
@@ -2408,15 +2408,18 @@ window.handleExpressionCategoryQuery = function(query) {
     let targetNormalized = '';
 
     // ── Intent detection ───────────────────────────────────────────────
+    // Pan-ciliary = All/Most ciliated cells
     if (qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') || qLower.includes('ubiquitous')) {
         targetNormalized = normalizeCategory('Pan-ciliary (Ubiquitous)');
-        title = 'Pan-ciliary (Ubiquitous) Genes';
+        title = 'Pan-ciliary Genes (Ubiquitous in Ciliated Cells)';
     } 
+    // Idio-ciliary = Limited ciliated cell expression (Tissue Specific)
+    // Multiple tissues = Expressed in a few ciliated cells (subset of Idio/Pan boundary)
     else if (qLower.includes('idio-ciliary') || qLower.includes('idio ciliary') || 
              qLower.includes('tissue specific') || qLower.includes('tissue-specific') || 
-             qLower.includes('idio specific')) {
+             qLower.includes('idio specific') || qLower.includes('multiple tissue')) {
         targetNormalized = normalizeCategory('Idio-ciliary (Tissue-Specific)');
-        title = 'Idio-ciliary (Tissue-Specific) Genes';
+        title = 'Idio-ciliary Genes (Tissue-Specific Ciliated Cells)';
     }
 
     if (!targetNormalized) return null;
@@ -2432,7 +2435,7 @@ window.handleExpressionCategoryQuery = function(query) {
         else if (qLower.includes('pancreas'))   targetTissues = ['Pancreas'];
         else if (qLower.includes('skeleton') || qLower.includes('bone')) targetTissues = ['Skeleton'];
 
-        if (targetTissues) title += ` (${targetTissues[0].replace('_', ' ')})`;
+        if (targetTissues) title = `Idio-ciliary Genes in ${targetTissues[0].replace('_', ' ')} (Ciliated Cells)`;
     }
 
     // ── Filter with normalized comparison ──────────────────────────────
@@ -2446,7 +2449,7 @@ window.handleExpressionCategoryQuery = function(query) {
                 const n = Number(data.n_tissues_expressed) || 0;
                 results.push({
                     gene,
-                    description: `Expressed in ${n}/8 tissues`
+                    description: `Expressed in ciliated cells of ${n}/8 tissues`
                 });
             } else if (targetNormalized.includes('tissue-specific')) {
                 if (targetTissues) {
@@ -2462,11 +2465,16 @@ window.handleExpressionCategoryQuery = function(query) {
                     if (maxVal > 1.0 && targetTissues.some(t => maxTissue.includes(t))) {
                         results.push({
                             gene,
-                            description: `${maxTissue.replace('_', ' ')}: ${maxVal.toFixed(1)} TPM`
+                            description: `${maxTissue.replace('_', ' ')} (Ciliated): ${maxVal.toFixed(1)} TPM`
                         });
                     }
                 } else {
-                    results.push({ gene, description: 'Tissue-Specific' });
+                    // General Idio/Multiple search
+                    const n = Number(data.n_tissues_expressed) || 0;
+                    results.push({ 
+                        gene, 
+                        description: `Limited expression (ciliated cells in ${n} tissues)` 
+                    });
                 }
             }
         }
@@ -2482,7 +2490,7 @@ window.handleExpressionCategoryQuery = function(query) {
         term: title
     };
 
-    return `I found <strong>${results.length}</strong> ${title}. Do you want to view the list?`;
+    return `I found <strong>${results.length}</strong> genes matching <em>${title}</em>. Do you want to view the list?`;
 };
 
 // ==============================================================
@@ -2498,7 +2506,7 @@ window.getPanCiliaryGenes = function() {
         .filter(([, data]) => {
             if (!data?.Category) return false;
             const norm = String(data.Category).trim().toLowerCase().replace(/\s+/g, ' ');
-            return norm === target || norm.includes('pan-ciliary') && norm.includes('ubiquitous');
+            return norm === target || (norm.includes('pan-ciliary') && norm.includes('ubiquitous'));
         })
         .map(([gene]) => gene)
         .sort();
@@ -2531,9 +2539,7 @@ window.getTissueSpecificGenes = function(tissueKeyword) {
         .map(([gene]) => gene)
         .sort();
 };
-
-
-    
+ 
 // ==============================================================
 // 4. MAIN GENE DISPLAY (Fixed Safety)
 // ==============================================================
@@ -2606,14 +2612,22 @@ window.displayFullGeneInfo = async function(geneSymbol) {
             </div>`;
 
     if (Object.keys(tissueExpr).length > 0) {
+        // Refine the category display based on definitions
+        let displayCategory = exprCategory;
+        if (exprCategory.includes('Pan-ciliary')) displayCategory = 'Pan-ciliary (Ubiquitous in Ciliated Cells)';
+        if (exprCategory.includes('Idio-ciliary')) displayCategory = 'Idio-ciliary (Tissue-Specific)';
+
         html += `
             <div class="section-header" style="margin-bottom:12px;">Bulk Tissue RNA-seq</div>
+            <p style="font-size:0.9em; color:#64748b; margin-bottom:12px;">
+                <em>Note: Tissues listed below represent expression levels specifically in <strong>ciliated cell populations</strong> within that tissue.</em>
+            </p>
             <div style="display:flex; gap:10px; margin-bottom:12px;">
                  <span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:4px; border:1px solid #bae6fd;">
-                    Category: <strong>${exprCategory}</strong>
+                    Category: <strong>${displayCategory}</strong>
                  </span>
                  <span style="font-size:11px; background:#f0fdf4; color:#15803d; padding:4px 8px; border-radius:4px; border:1px solid #bbf7d0;">
-                    Expressed in <strong>${nTissues}</strong> tissues
+                    Expressed in <strong>${nTissues}</strong> ciliated tissues
                  </span>
             </div>
             ${window.renderTissueExpressionTable(tissueExpr)}
@@ -2665,7 +2679,7 @@ window.renderTissueExpressionTable = function(tissueData) {
         <table class="fancy-table" style="width:100%; margin-top:8px; font-size:12px;">
             <thead>
                 <tr>
-                    <th style="background:#f1f5f9; color:#475569;">Tissue / Dataset</th>
+                    <th style="background:#f1f5f9; color:#475569;">Tissue (Ciliated Cells)</th>
                     <th style="text-align:right; width:80px; background:#f1f5f9; color:#475569;">TPM</th>
                     <th style="width:100px; background:#f1f5f9;"></th>
                 </tr>
@@ -6368,6 +6382,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
