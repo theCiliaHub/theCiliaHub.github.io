@@ -921,11 +921,136 @@ function addChatMessage(html, isUser = false) {
     }
 
 
-    /**
-     * (MODIFIED) Downloads the dynamic table as a CSV.
-     * The columns are now built automatically from the keys in the geneList objects.
-     */
-    function downloadTableAsCSV(title, geneList) {
+/* ==============================================================
+ * NEW FEATURE: FULL DATABASE VIEW & DOWNLOAD
+ * ============================================================== */
+
+/**
+ * Renders the comprehensive "Ciliary Gene Database" table with sorting and actions.
+ */
+window.renderFullDatabase = function() {
+    const container = document.getElementById('cilia-svg'); 
+    if (!container) return;
+    
+    // Switch to table view mode
+    const wrapper = container.closest('.interactive-cilium');
+    if (wrapper) wrapper.classList.add('table-view-active');
+
+    const genes = window.CiliAI.masterData || [];
+    const count = genes.length;
+
+    if (count === 0) {
+        container.innerHTML = `<div class="ciliai-table-container"><h3>Ciliary Gene Database</h3><p style="padding:20px;">Database loading...</p></div>`;
+        return;
+    }
+
+    // Generate Table HTML
+    const tableHTML = `
+        <div class="ciliai-table-container">
+            <div style="padding: 15px 10px; border-bottom: 1px solid #e2e8f0; background: white;">
+                <h3 style="margin:0; color: #2b6cb0;">Ciliary Gene Database</h3>
+                <p style="margin:5px 0 0 0; color: #64748b; font-size: 13px;">
+                    Comprehensive catalog of <strong>${count.toLocaleString()}</strong> genes, localization, and disease associations.
+                </p>
+                <div style="margin-top: 10px;">
+                    <button class="ciliai-button" onclick="window.downloadFullDatabaseCSV()">📥 Download Database</button>
+                    <button class="ciliai-button" style="background:#718096;" onclick="window.generateAndInjectSVG()">Back to Diagram</button>
+                </div>
+            </div>
+            
+            <div class="ciliai-table-scroll-wrapper">
+                <table class="ciliai-data-table sortable" id="full-gene-table">
+                    <thead>
+                        <tr>
+                            <th onclick="window.sortTable('full-gene-table', 0)" style="cursor:pointer">Gene ↕</th>
+                            <th onclick="window.sortTable('full-gene-table', 1)" style="cursor:pointer">Description ↕</th>
+                            <th onclick="window.sortTable('full-gene-table', 2)" style="cursor:pointer">Localization ↕</th>
+                            <th onclick="window.sortTable('full-gene-table', 3)" style="cursor:pointer">Ciliopathy ↕</th>
+                            <th onclick="window.sortTable('full-gene-table', 4)" style="cursor:pointer">Mouse Ortholog ↕</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${genes.map(g => {
+                            const sym = g.Gene;
+                            const desc = g['Gene.Description'] || '-';
+                            const loc = g.Localization || '-';
+                            // Handle array or string for diseases
+                            const disease = Array.isArray(g.Ciliopathies) 
+                                ? g.Ciliopathies.join('; ') 
+                                : (g.Ciliopathies || g.Ciliopathy || '-');
+                            const mouse = g.Ortholog_Mouse || '-';
+                            
+                            // Truncate long descriptions for display
+                            const shortDesc = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+
+                            return `<tr>
+                                <td><strong style="color:#2b6cb0;">${sym}</strong></td>
+                                <td title="${desc.replace(/"/g, '&quot;')}">${shortDesc}</td>
+                                <td>${loc}</td>
+                                <td>${disease}</td>
+                                <td>${mouse}</td>
+                                <td>
+                                    <span style="cursor:pointer; font-size:16px; margin-right:10px;" title="View Details" onclick="window.handleAIQuery('Tell me about ${sym}')">👁️</span>
+                                    <span style="cursor:pointer; font-size:16px;" title="View Plot" onclick="window.handleAIQuery('Plot ${sym}')">📊</span>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = tableHTML;
+    
+    // Ensure table styles are injected
+    if (typeof window.injectTableCSS === 'function') window.injectTableCSS();
+};
+
+/**
+ * Downloads the entire database as a clean CSV file.
+ */
+window.downloadFullDatabaseCSV = function() {
+    const genes = window.CiliAI.masterData || [];
+    if (genes.length === 0) {
+        alert("Database is empty or not loaded.");
+        return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    // CSV Header
+    csvContent += "Gene,Description,Localization,Ciliopathy,Mouse_Ortholog\r\n";
+
+    genes.forEach(g => {
+        // Handle fields safely to prevent CSV breakage
+        const safe = (val) => `"${(val || '').toString().replace(/"/g, '""')}"`;
+        
+        const row = [
+            safe(g.Gene),
+            safe(g['Gene.Description']),
+            safe(g.Localization),
+            safe(Array.isArray(g.Ciliopathies) ? g.Ciliopathies.join('; ') : (g.Ciliopathies || g.Ciliopathy)),
+            safe(g.Ortholog_Mouse)
+        ];
+        csvContent += row.join(",") + "\r\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Ciliary_Gene_Database_Full.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+
+/**
+* (MODIFIED) Downloads the dynamic table as a CSV.
+* The columns are now built automatically from the keys in the geneList objects.
+*/
+function downloadTableAsCSV(title, geneList) {
         if (!geneList || geneList.length === 0) return;
         
         const keys = Object.keys(geneList[0]);
@@ -1001,11 +1126,12 @@ function addChatMessage(html, isUser = false) {
         }
 
         .ciliai-table-scroll-wrapper { 
-            flex: 1; 
-            overflow-y: auto; 
-            border-top: 1px solid #c8d6e5; 
-            border-bottom: 1px solid #c8d6e5; 
-            margin: 0 0 10px 0; 
+    flex: 1; 
+    overflow-y: auto; 
+    min-height: 0;  /* <--- ADD THIS LINE TO FIX SCROLLING */
+    border-top: 1px solid #c8d6e5; 
+    border-bottom: 1px solid #c8d6e5; 
+    margin: 0 0 10px 0; 
         }
 
         .ciliai-data-table { 
@@ -3885,38 +4011,72 @@ window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
     if (!query) return;
+
     const qLower = query.toLowerCase().trim();
-    // === INSERT THIS BLOCK ===
-    // Priority Check: Expression Categories (Pan-ciliary / Idio-specific)
-    if (qLower.includes('pan-ciliary') || qLower.includes('idio-specific') || qLower.includes('ubiquitous') || qLower.includes('tissue specific')) {
+
+    // ============================================================
+    // 1. [INSERT HERE] DATABASE & FULL LIST TRIGGER
+    // ============================================================
+    // This catches "show database", "show all genes", "full list", etc.
+    if (qLower.includes('database') || 
+       (qLower.includes('all') && qLower.includes('genes') && (qLower.includes('list') || qLower.includes('show') || qLower.includes('table'))) ||
+       qLower.includes('full list')) {
+        
+        if (typeof window.renderFullDatabase === 'function') {
+            window.renderFullDatabase();
+            window.addChatMessage("Displaying the comprehensive <strong>Ciliary Gene Database</strong> in the main panel.", false);
+        } else {
+            window.addChatMessage("The database viewer is not loaded yet.", false);
+        }
+        return; // STOP here
+    }
+
+    // ============================================================
+    // 2. PRIORITY: EXPRESSION CATEGORY / LISTS
+    // ============================================================
+    // Handles "Pan-ciliary", "Idio-ciliary", "Ubiquitous", "How many..."
+    if (qLower.includes('pan-ciliary') || 
+        qLower.includes('idio-specific') || 
+        qLower.includes('ubiquitous') || 
+        qLower.includes('tissue specific') || 
+        qLower.includes('idio ciliary') || 
+        qLower.includes('category')) {
+        
         const result = window.handleExpressionCategoryQuery(query);
         if (result) {
             window.addChatMessage(result, false);
-            return; // STOP here so we don't search for genes named "Pan"
+            return;
         }
     }
-    // === 1. HIGHEST PRIORITY: Cell-type specific questions (your existing fix) ===
-    if (qLower.includes('cilia-restricted') ||
-        qLower.includes('cilia restricted') ||
-        qLower.includes('ciliary-restricted') ||
-        qLower.includes('specific to') ||
-        (qLower.includes('express') && qLower.includes('cell')) ||
-        qLower.includes('active in') ||
+
+    // ============================================================
+    // 3. PRIORITY: CELL-TYPE SPECIFIC QUESTIONS
+    // ============================================================
+    // Handles "cilia-restricted", "active in basal cell", etc.
+    if (qLower.includes('cilia-restricted') || 
+        qLower.includes('specific to') || 
+        (qLower.includes('active in') && qLower.includes('cell')) ||
         (qLower.includes('tpm') && qLower.includes('cell'))) {
+        
         const result = window.handleCellTypeQuestion(query);
         if (result) {
             window.addChatMessage(result, false);
             return;
         }
+    } 
+    // ============================================================
+    // 4. FALLBACK: GENERAL GENE SEARCH
+    // ============================================================
+    // If no specific command found, look for gene symbols
+    const genes = window.extractMultipleGenes(query);
+    if (genes.length > 0) {
+        // Assume first gene for details
+        const html = await window.displayFullGeneInfo(genes[0]);
+        window.addChatMessage(html, false);
+    } else {
+        // No intent and no gene found
+        window.addChatMessage("I'm not sure which gene or category you are referring to. Try asking 'Show full database', 'Show Pan-ciliary genes', or 'What is IFT88?'.", false);
     }
-    if (window.log) window.log(`Routing query: ${query}`);
-    try {
-        if (!window.CiliAI || !window.CiliAI.ready) {
-            window.addChatMessage("Data is still loading, please wait...", false);
-            return;
-        }
-        let htmlResult = null;
-        let match;
         // === 2. GENERALIZED: "Where is [GENE] expressed?" for ANY ciliary gene ===
         if (qLower.includes('where is') && qLower.includes('expressed')) {
             const genes = extractMultipleGenes(query);
@@ -6382,6 +6542,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
