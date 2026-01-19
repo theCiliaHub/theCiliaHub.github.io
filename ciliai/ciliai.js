@@ -1,6 +1,9 @@
 /* ==============================================================
  * CiliAI – Unified Logic Engine (v7.2.1 – Fixed Initialization)
  * ============================================================== */
+/* ==============================================================
+ * CiliAI – Unified Logic Engine (v7.2.2 – Batch Query Fix)
+ * ============================================================== */
 
 // 1. GLOBAL STATE & SAFE INITIALIZATION
 // ==========================================================
@@ -54,7 +57,7 @@ window.CiliAI.utils = {
 window.extractMultipleGenes = window.extractMultipleGenes || function(q) { return []; };
 window.getTPMInCellType = window.getTPMInCellType || function() { return 0; };
 
-console.log("CiliAI v7.2.1 – Utils & State Initialized");
+console.log("CiliAI v7.2.2 – Utils & State Initialized (Batch Fix Applied)");
 
 // Define logger to prevent ReferenceErrors
 if (typeof window.log !== "function") {
@@ -5000,7 +5003,7 @@ const intentHandlers = [
     // Batch Query
     {
         priority: 55,
-        matcher: (qLower) => query.includes(',') && window.CiliAI.utils.extractGenes(query).length > 1,
+        matcher: (qLower) => qLower.includes(',') && window.CiliAI.utils.extractGenes(qLower).length > 1,
         handler: async (query) => {
             return window.handleBatchQuery ? window.handleBatchQuery(query) : null;
         }
@@ -5319,7 +5322,6 @@ window.handleAIQuery = async function (query) {
         window.addChatMessage(`An internal error occurred: ${e.message}`, false);
     }
 };
-
 
 window.fetchVariantData = async function(geneSymbol) {
     try {
@@ -6394,6 +6396,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
