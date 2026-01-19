@@ -1,14 +1,11 @@
 /* ==============================================================
- * CiliAI – Unified Logic Engine (v7.2.1 – Fixed Initialization)
- * ============================================================== */
-/* ==============================================================
- * CiliAI – Unified Logic Engine (v7.2.2 – Batch Query Fix)
+ * CiliAI – Unified Logic Engine (v7.2.3 – State & Legacy Fixes)
  * ============================================================== */
 
 // 1. GLOBAL STATE & SAFE INITIALIZATION
 // ==========================================================
 
-// Ensure window.CiliAI exists; if it exists, extend it, do not overwrite if not necessary.
+// Ensure window.CiliAI exists; if it exists, extend it.
 window.CiliAI = window.CiliAI || {};
 
 // Initialize Datasets if missing
@@ -23,15 +20,21 @@ if (!window.CiliAI.datasets) {
     };
 }
 
-// Initialize Global State Properties if missing
+// Initialize Global State Properties
 if (!window.CiliAI.activeDataset) window.CiliAI.activeDataset = 'lung';
 if (!window.CiliAI.masterData) window.CiliAI.masterData = [];
 if (!window.CiliAI.lookups) window.CiliAI.lookups = { geneMap: {}, cellDataCache: {}, byCiliopathy: {} };
 if (window.CiliAI.ready === undefined) window.CiliAI.ready = false;
-if (!window.CiliAI.zoomStateByGene) window.CiliAI.zoomStateByGene = {};
+
+// CRITICAL FIX: Initialize Legacy Globals for SpatialManager/Zoom
+// The 'Cannot set properties of undefined' error happens because legacy code expects window.zoomStateByGene
+window.zoomStateByGene = window.zoomStateByGene || {}; 
+window.CiliAI.zoomStateByGene = window.zoomStateByGene; // Sync with namespace
+
+// CRITICAL FIX: Initialize Query Context for "Yes" follow-ups
+window.lastQueryContext = window.lastQueryContext || { type: null, data: [], term: null };
 
 // ── UTILITIES (MUST BE DEFINED ALWAYS) ──
-// We define this unconditionally to ensure 'handleAIQuery' never finds it undefined.
 window.CiliAI.utils = {
     normalizeQuery: (query) => (query || '').toLowerCase().trim(),
     extractGenes: (query) => {
@@ -57,7 +60,7 @@ window.CiliAI.utils = {
 window.extractMultipleGenes = window.extractMultipleGenes || function(q) { return []; };
 window.getTPMInCellType = window.getTPMInCellType || function() { return 0; };
 
-console.log("CiliAI v7.2.2 – Utils & State Initialized (Batch Fix Applied)");
+console.log("CiliAI v7.2.3 – Legacy Globals & State Initialized");
 
 // Define logger to prevent ReferenceErrors
 if (typeof window.log !== "function") {
@@ -4319,11 +4322,13 @@ const intentHandlers = [
         handler: async (query) => {
             if (window.lastQueryContext.data && window.lastQueryContext.data.length > 0) {
                 window.showDataInLeftPanel(window.lastQueryContext.term || 'Gene List', window.lastQueryContext.data);
+                const displayedTerm = window.lastQueryContext.term || 'List';
+                const displayedCount = window.lastQueryContext.data.length;
                 window.lastQueryContext = { type: null, data: [], term: null };
-                return `Displaying <strong>${window.lastQueryContext.term}</strong> (${window.lastQueryContext.data.length} genes) in the main panel.`;
+                return `Displaying <strong>${displayedTerm}</strong> (${displayedCount} genes) in the main panel.`;
             } else {
                 window.lastQueryContext = { type: null, data: [], term: null };
-                return `No genes to display for <strong>${window.lastQueryContext.term}</strong>.`;
+                return `No gene list is currently active to display. Try searching for a category first (e.g., 'Pan-ciliary genes').`;
             }
         }
     },
@@ -6396,6 +6401,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
