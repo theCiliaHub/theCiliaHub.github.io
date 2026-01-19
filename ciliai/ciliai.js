@@ -1,53 +1,65 @@
 /* ==============================================================
- * CiliAI – Unified Logic Engine (v7.1 – Safe Initialization)
+ * CiliAI – Unified Logic Engine (v7.2.1 – Fixed Initialization)
  * ============================================================== */
 
-// Ensure window.CiliAI exists but don't override if already defined
-if (!window.CiliAI) {
-    window.CiliAI = {
-        activeDataset: 'lung',
-        datasets: {
-            lung: { name: 'Human Lung Organoid', umap: [], icon: "🫁", colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] },
-            lung_downsampled: { name: 'Human Lung Tissue (Complete)', umap: [], colorScale: 'Reds', icon: "🫁" },
-            kidney: { name: 'Human Kidney', umap: [], expression: null, colorScale: 'Blues', icon: "🫘" },
-            liver: { name: 'Human Liver', umap: [], colorScale: 'Greens', icon: "🍺" },
-            hypothalamus: { name: 'Hypothalamus', umap: [], expression: {}, colorScale: 'Purples', icon: "🧠" },
-            chondrocyte: { name: 'Chondrocyte', umap: [], colorScale: 'Teal', icon: "🦴" }
-        },
-        masterData: [],
-        lookups: { geneMap: {}, cellDataCache: {}, byCiliopathy: {} },
-        ready: false,
-        currentPlot: null,
-        zoomStateByGene: {},
-        activeGeneContext: null
+// 1. GLOBAL STATE & SAFE INITIALIZATION
+// ==========================================================
+
+// Ensure window.CiliAI exists; if it exists, extend it, do not overwrite if not necessary.
+window.CiliAI = window.CiliAI || {};
+
+// Initialize Datasets if missing
+if (!window.CiliAI.datasets) {
+    window.CiliAI.datasets = {
+        lung: { name: 'Human Lung Organoid', umap: [], icon: "🫁", colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] },
+        lung_downsampled: { name: 'Human Lung Tissue (Complete)', umap: [], colorScale: 'Reds', icon: "🫁" },
+        kidney: { name: 'Human Kidney', umap: [], expression: null, colorScale: 'Blues', icon: "🫘" },
+        liver: { name: 'Human Liver', umap: [], colorScale: 'Greens', icon: "🍺" },
+        hypothalamus: { name: 'Hypothalamus', umap: [], expression: {}, colorScale: 'Purples', icon: "🧠" },
+        chondrocyte: { name: 'Chondrocyte', umap: [], colorScale: 'Teal', icon: "🦴" }
     };
 }
 
+// Initialize Global State Properties if missing
+if (!window.CiliAI.activeDataset) window.CiliAI.activeDataset = 'lung';
+if (!window.CiliAI.masterData) window.CiliAI.masterData = [];
+if (!window.CiliAI.lookups) window.CiliAI.lookups = { geneMap: {}, cellDataCache: {}, byCiliopathy: {} };
+if (window.CiliAI.ready === undefined) window.CiliAI.ready = false;
+if (!window.CiliAI.zoomStateByGene) window.CiliAI.zoomStateByGene = {};
 
-// 1. GLOBAL STATE & UTILITIES
-// ==========================================================
-// 5. Ensure these are exposed globally
-window.extractMultipleGenes = extractMultipleGenes;
-window.getTPMInCellType = getTPMInCellType;
+// ── UTILITIES (MUST BE DEFINED ALWAYS) ──
+// We define this unconditionally to ensure 'handleAIQuery' never finds it undefined.
+window.CiliAI.utils = {
+    normalizeQuery: (query) => (query || '').toLowerCase().trim(),
+    extractGenes: (query) => {
+        if (!query) return [];
+        return window.extractMultipleGenes ? window.extractMultipleGenes(query) : [];
+    },
+    getExpressedCellTypes: (exprMap) => {
+        if (!exprMap) return [];
+        return window.getExpressedCellTypes ? window.getExpressedCellTypes(exprMap) : [];
+    },
+    normalizeTerm: (term) => {
+        if (!term) return '';
+        return window.normalizeTerm ? window.normalizeTerm(term) : term.toLowerCase().replace(/[^a-z0-9]/g, '');
+    },
+    ensureArray: (value) => {
+        if (Array.isArray(value)) return value;
+        if (value === null || value === undefined) return [];
+        return [value];
+    }
+};
 
+// Expose legacy globals just in case
+window.extractMultipleGenes = window.extractMultipleGenes || function(q) { return []; };
+window.getTPMInCellType = window.getTPMInCellType || function() { return 0; };
 
-// 6. Auto-run the fixed router
-console.log("CiliAI v7.2 – Cell-Type Questions FIXED & Fully Supported");
+console.log("CiliAI v7.2.1 – Utils & State Initialized");
 
-
-// Define logger first to prevent ReferenceErrors
+// Define logger to prevent ReferenceErrors
 if (typeof window.log !== "function") {
     window.log = function (msg) { console.log(`CiliAI LOG: ${msg}`); };
 }
-
-// Put this EARLY in ciliai.js — ideally right after if (!window.CiliAI) { … }
-window.CiliAI.utils = {
-    normalizeQuery: (query) => query.toLowerCase().trim(),
-    extractGenes: (query) => window.extractMultipleGenes ? window.extractMultipleGenes(query) : [],
-    getExpressedCellTypes: (exprMap) => window.getExpressedCellTypes ? window.getExpressedCellTypes(exprMap) : [],
-    normalizeTerm: (term) => window.normalizeTerm ? window.normalizeTerm(term) : term.toLowerCase().replace(/[^a-z0-9]/g, ''),
-    ensureArray: (value) => window.ensureArray ? window.ensureArray(value) : (Array.isArray(value) ? value : value ? [value] : []),
-};
 
 // Chat Handler
 if (typeof window.addChatMessage !== "function") {
@@ -3785,12 +3797,9 @@ window.handleCellTypeQuestion = function(query) {
 };
 
 
-// ==============================================================
-// MODULAR INTENT SYSTEM (Replaces old handleAIQuery)
-// ==============================================================
+// 2. INTENT HANDLERS
+// ==========================================================
 
-
-// 2. Intent Handlers Array (Each intent as a modular object)
 const intentHandlers = [
     // Highest Priority: Cell-type specific questions
     {
@@ -3885,7 +3894,7 @@ const intentHandlers = [
                         <p style="font-size:13.5px; line-height:1.5; margin:12px 0;">${preview}</p>
                         <p style="font-size:12px; color:#64748b;">Want to see the full list or view them in the panel? Type <strong>yes</strong> or <strong>show list</strong>.</p>
                     </div>`;
-                    window.lastQueryContext = {  // Note: Use window. for global
+                    window.lastQueryContext = { 
                         type: 'list_followup',
                         data: filteredGenes.map(g => ({ gene: g })),
                         term: `${term} Genes (${filteredGenes.length})`
@@ -4241,6 +4250,7 @@ const intentHandlers = [
             };
             let set1 = null, set2 = null;
             let name1 = '', name2 = '';
+            const classificationMap = getDiseaseClassificationMap();
             const foundClasses = Object.keys(classificationKeywords).filter(k => qLower.includes(k));
             if (foundClasses.length >= 2) {
                 name1 = classificationKeywords[foundClasses[0]];
@@ -4326,7 +4336,6 @@ const intentHandlers = [
             const match = match1 || match2;
             if (!match) return null;
             const geneSymbol = (match1 ? match1[1] : match2[2]).toUpperCase();
-            const organism = (match1 ? match1[2] : match2[1]);
             const genes = window.CiliAI.utils.extractGenes(query);
             if (genes.length === 0) return `<div class="ai-result-card"><p>Please specify a gene (e.g., "ortholog of ARL13B").</p></div>`;
             const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
@@ -4736,7 +4745,7 @@ const intentHandlers = [
                 genes.slice(0, 6).forEach(g => {
                     const geneData = window.CiliAI.lookups.geneMap[g];
                     const domainCount = geneData?.PFAM_IDs ? geneData.PFAM_IDs.split(/[,;]/).filter(Boolean).length
-                                    : geneData?.Domain_Descriptions ? geneData.Domain_Descriptions.split(/[,;]/).filter(Boolean).length : 0;
+                                                           : geneData?.Domain_Descriptions ? geneData.Domain_Descriptions.split(/[,;]/).filter(Boolean).length : 0;
                     responseHtml += `<li><strong>${g}</strong>: ${domainCount} domain${domainCount !== 1 ? 's' : ''}</li>`;
                 });
                 if (genes.length > 6) responseHtml += `<li><em>...and ${genes.length - 6} more</em></li>`;
@@ -4908,7 +4917,7 @@ const intentHandlers = [
                 responseHtml += `
                     <p><strong>Expression Comparison</strong> across <strong>${validGenes.length}</strong> genes in <strong>${dsName}</strong>:</p>
                     <p>Colored by <strong>average expression</strong> of the gene set.<br>
-                       Click points to see localization of individual cells.</p>
+                        Click points to see localization of individual cells.</p>
                     <ul style="margin:10px 0; padding-left:20px; font-size:13.5px;">
                         ${validGenes.map((g, i) => {
                             const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5', '#9f7aea'];
@@ -5272,8 +5281,19 @@ window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow || !query) return;
 
+    // Fail-safe: Ensure utils exist (fixes "Cannot read properties of undefined")
+    if (!window.CiliAI.utils) {
+        console.warn("CiliAI.utils was missing. Re-initializing.");
+        window.CiliAI.utils = {
+            normalizeQuery: (q) => (q || '').toLowerCase().trim(),
+            extractGenes: (q) => window.extractMultipleGenes ? window.extractMultipleGenes(q) : [],
+            normalizeTerm: (t) => t ? t.toLowerCase().replace(/[^a-z0-9]/g, '') : '',
+            ensureArray: (v) => Array.isArray(v) ? v : (v ? [v] : [])
+        };
+    }
+
     // Defensive normalization
-    const qLower = (window.CiliAI?.utils?.normalizeQuery?.(query)) || query.toLowerCase().trim();
+    const qLower = window.CiliAI.utils.normalizeQuery(query);
 
     if (window.log) window.log(`Routing query: ${query}`);
 
@@ -6374,5 +6394,6 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
