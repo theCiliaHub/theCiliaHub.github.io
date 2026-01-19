@@ -576,7 +576,6 @@
 
         <strong>Quick things you can try:</strong>
 
-        <!-- ================= Gene & Expression ================= -->
         <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Gene & Expression
         </div>
@@ -584,12 +583,12 @@
         <div class="suggested-chips" style="margin-bottom:20px;">
           <span class="gene-badge"
                 onclick="window.handleAIQuery('IFT88 details')">
-            IFT88 Details
+            IFT88 Data Details
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Plot FOXJ1 expression')">
-            FOXJ1 Expression
+                onclick="window.handleAIQuery('Plot ARL13B expression')">
+            Display ARL13B scRNA-seq expression
           </span>
 
           <span class="gene-badge"
@@ -599,7 +598,7 @@
 
           <span class="gene-badge"
                 onclick="window.handleAIQuery('Show pan-ciliary genes')">
-            Pan-ciliary genes
+            Show pan-ciliary genes
           </span>
 
           <span class="gene-badge"
@@ -608,7 +607,6 @@
           </span>
         </div>
 
-        <!-- ================= Ciliopathies ================= -->
         <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Ciliopathies & Diseases
         </div>
@@ -616,17 +614,17 @@
         <div class="suggested-chips" style="margin-bottom:20px;">
           <span class="gene-badge"
                 onclick="window.handleAIQuery('List genes for Joubert syndrome')">
-            Joubert syndrome genes
+            Display Joubert syndrome genes
           </span>
 
           <span class="gene-badge"
                 onclick="window.handleAIQuery('Genes in Primary Ciliary Dyskinesia')">
-            PCD genes
+            List Primary Ciliary Dyskinesia genes
           </span>
 
           <span class="gene-badge"
                 onclick="window.handleAIQuery('Bardet-Biedl syndrome genes')">
-            Bardet–Biedl genes
+            Display Bardet–Biedl genes
           </span>
 
           <span class="gene-badge"
@@ -635,7 +633,6 @@
           </span>
         </div>
 
-        <!-- ================= Localization ================= -->
         <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Localization & Structure
         </div>
@@ -648,20 +645,57 @@
 
           <span class="gene-badge"
                 onclick="window.handleAIQuery('Where is CEP290 localized?')">
-            CEP290 location
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.handleAIQuery('Multi-gene view: IFT88, BBS4, TMEM67')">
-            Multi-gene overlay
+            Where is CEP290 localized?
           </span>
 
           <span class="gene-badge"
                 onclick="window.handleAIQuery('Transition zone genes')">
-            Transition zone genes
+            Display transition zone genes
           </span>
         </div>
 
+        <div style="margin-top:24px; font-size:13px; color:#64748b; line-height:1.5;">
+          💡 <strong>Expression logic you can ask about:</strong><br>
+          • Is <em>[gene]</em> pan-ciliary (ubiquitous)?<br>
+          • Show tissue-specific genes (lung, kidney, brain, skeleton)<br>
+          • List all pan-ciliary (ubiquitously expressed) genes
+        </div>
+
+        <div style="margin:20px 0 12px; font-weight:500; color:#4b5563;">
+          Evolution, Screens & Orthologs
+        </div>
+
+        <div class="suggested-chips" style="margin-bottom:20px;">
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Evolution of BBS1')">
+            Display BBS1 evolution
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Loss-of-function phenotype of IFT88')">
+            IFT88 screen data
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Mouse ortholog of ARL13B')">
+            Show ARL13B mouse ortholog
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Protein domains of WDR31')">
+            Display WDR31 domains
+          </span>
+        </div>
+
+        <div style="margin-top:20px; font-size:13px; color:#6b7280;">
+          Just type a question — or click any chip above to begin.
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+            
         <!-- ================= Expression Logic Hint ================= -->
         <div style="margin-top:24px; font-size:13px; color:#64748b; line-height:1.5;">
           💡 <strong>Expression logic you can ask about:</strong><br>
@@ -2013,6 +2047,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
