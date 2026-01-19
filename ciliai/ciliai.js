@@ -4172,7 +4172,7 @@ const intentHandlers = [
 
     // Genes in a classification (FIXED: Supports individual syndromes like Joubert)
     {
-        priority: 83,
+       priority: 83,
         matcher: (qLower) => {
             // Broad Classifications
             const hasBroadClass = Object.keys({
@@ -4182,7 +4182,7 @@ const intentHandlers = [
                 'atypical ciliopathies': 1, 'atypical': 1
             }).some(kw => qLower.includes(kw));
 
-            // Specific Syndromes (Fixed to catch 'joubert syndrome genes' here)
+            // Specific Syndromes
             const hasSyndrome = qLower.includes('joubert') || qLower.includes('bbs') || qLower.includes('meckel') || qLower.includes('mks') || qLower.includes('pcd') || qLower.includes('nphp') || qLower.includes('senior');
 
             return (hasBroadClass || hasSyndrome) && qLower.includes('genes');
@@ -4210,7 +4210,6 @@ const intentHandlers = [
             for (const [kw, full] of Object.entries(classificationKeywords)) {
                 if (qLower.includes(kw)) {
                     targetName = full;
-                    // Gather all genes for this classification
                     const diseases = classificationMap[full] || [];
                     let allGenes = new Set();
                     diseases.forEach(disease => {
@@ -4249,16 +4248,10 @@ const intentHandlers = [
                     gene: g,
                     description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Ciliary protein'
                 }));
-                window.lastQueryContext = {
-                    type: 'list_followup',
-                    data: geneObjects,
-                    term: `Genes in ${targetName}`
-                };
-                return `<div class="ai-result-card">
-                    <h4>Genes Associated with ${targetName}</h4>
-                    <p>Found <strong>${geneList.length}</strong> unique genes.</p>
-                    <p>Would you like to <strong>view the full list</strong>?</p>
-                </div>`;
+                
+                // --- FIXED: Use formatListResult to return table immediately ---
+                return window.formatListResult(`Genes Associated with ${targetName}`, geneObjects, `Found ${geneList.length} unique genes.`);
+                
             } else if (targetName) {
                 return `<div class="ai-result-card"><p>No genes found for <strong>${targetName}</strong> in the current database.</p></div>`;
             }
@@ -4266,7 +4259,6 @@ const intentHandlers = [
             return null;
         }
     },
-
     // Shared genes between classifications or diseases
     {
         priority: 82,
@@ -6430,6 +6422,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
