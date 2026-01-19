@@ -4170,25 +4170,28 @@ const intentHandlers = [
         }
     },
 
-    // Genes in a classification
+    // Genes in a classification (FIXED: Supports individual syndromes like Joubert)
     {
         priority: 83,
         matcher: (qLower) => {
-            const classificationKeywords = Object.keys({
-                'primary ciliopathies': 'Primary Ciliopathies',
-                'primary': 'Primary Ciliopathies',
-                'motile ciliopathies': 'Motile Ciliopathies',
-                'motile': 'Motile Ciliopathies',
-                'secondary diseases': 'Secondary Diseases',
-                'secondary': 'Secondary Diseases',
-                'atypical ciliopathies': 'Atypical Ciliopathies',
-                'atypical': 'Atypical Ciliopathies'
-            }).find(kw => qLower.includes(kw)) && qLower.includes('genes');
-            return classificationKeywords;
+            // Broad Classifications
+            const hasBroadClass = Object.keys({
+                'primary ciliopathies': 1, 'primary': 1,
+                'motile ciliopathies': 1, 'motile': 1,
+                'secondary diseases': 1, 'secondary': 1,
+                'atypical ciliopathies': 1, 'atypical': 1
+            }).some(kw => qLower.includes(kw));
+
+            // Specific Syndromes (Fixed to catch 'joubert syndrome genes' here)
+            const hasSyndrome = qLower.includes('joubert') || qLower.includes('bbs') || qLower.includes('meckel') || qLower.includes('mks') || qLower.includes('pcd') || qLower.includes('nphp') || qLower.includes('senior');
+
+            return (hasBroadClass || hasSyndrome) && qLower.includes('genes');
         },
         handler: async (query) => {
             const qLower = window.CiliAI.utils.normalizeQuery(query);
             const classificationMap = getDiseaseClassificationMap();
+
+            // Broad Categories
             const classificationKeywords = {
                 'primary ciliopathies': 'Primary Ciliopathies',
                 'primary': 'Primary Ciliopathies',
@@ -4199,41 +4202,67 @@ const intentHandlers = [
                 'atypical ciliopathies': 'Atypical Ciliopathies',
                 'atypical': 'Atypical Ciliopathies'
             };
-            let matchedClassification = null;
+
+            let targetName = null;
+            let geneList = [];
+
+            // Check for Broad Classification first
             for (const [kw, full] of Object.entries(classificationKeywords)) {
                 if (qLower.includes(kw)) {
-                    matchedClassification = full;
+                    targetName = full;
+                    // Gather all genes for this classification
+                    const diseases = classificationMap[full] || [];
+                    let allGenes = new Set();
+                    diseases.forEach(disease => {
+                        const normKey = window.CiliAI.utils.normalizeTerm(disease);
+                        const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                        genes.forEach(g => allGenes.add(g));
+                    });
+                    geneList = Array.from(allGenes);
                     break;
                 }
             }
-            if (qLower.includes('genes') && matchedClassification) {
-                const diseases = classificationMap[matchedClassification];
-                let allGenes = new Set();
-                diseases.forEach(disease => {
-                    const normKey = window.CiliAI.utils.normalizeTerm(disease);
-                    const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
-                    genes.forEach(g => allGenes.add(g));
-                });
-                const geneList = Array.from(allGenes);
-                if (geneList.length === 0) {
-                    return `<div class="ai-result-card"><p>No genes found for <strong>${matchedClassification}</strong>.</p></div>`;
-                } else {
-                    const geneObjects = geneList.map(g => ({
-                        gene: g,
-                        description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Ciliary protein'
-                    }));
-                    window.lastQueryContext = {
-                        type: 'list_followup',
-                        data: geneObjects,
-                        term: `Genes in ${matchedClassification}`
-                    };
-                    return `<div class="ai-result-card">
-                        <h4>Genes Associated with ${matchedClassification}</h4>
-                        <p>Found <strong>${geneList.length}</strong> unique genes across all related diseases.</p>
-                        <p>Would you like to <strong>view the full list</strong>?</p>
-                    </div>`;
+
+            // If not broad, check specific syndromes
+            if (!targetName) {
+                const syndromeMap = {
+                    'joubert': 'Joubert Syndrome',
+                    'bbs': 'Bardet–Biedl Syndrome',
+                    'meckel': 'Meckel–Gruber Syndrome',
+                    'mks': 'Meckel–Gruber Syndrome',
+                    'nphp': 'Nephronophthisis',
+                    'senior': 'Senior-Løken Syndrome',
+                    'pcd': 'Primary Ciliary Dyskinesia'
+                };
+                for (const [key, full] of Object.entries(syndromeMap)) {
+                    if (qLower.includes(key)) {
+                        targetName = full;
+                        const normKey = window.CiliAI.utils.normalizeTerm(full);
+                        geneList = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                        break;
+                    }
                 }
             }
+
+            if (targetName && geneList.length > 0) {
+                const geneObjects = geneList.map(g => ({
+                    gene: g,
+                    description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Ciliary protein'
+                }));
+                window.lastQueryContext = {
+                    type: 'list_followup',
+                    data: geneObjects,
+                    term: `Genes in ${targetName}`
+                };
+                return `<div class="ai-result-card">
+                    <h4>Genes Associated with ${targetName}</h4>
+                    <p>Found <strong>${geneList.length}</strong> unique genes.</p>
+                    <p>Would you like to <strong>view the full list</strong>?</p>
+                </div>`;
+            } else if (targetName) {
+                return `<div class="ai-result-card"><p>No genes found for <strong>${targetName}</strong> in the current database.</p></div>`;
+            }
+
             return null;
         }
     },
@@ -4712,7 +4741,7 @@ const intentHandlers = [
         }
     },
 
-    // Domain Architecture
+    // Domain Architecture (Replaced CEP290 with WDR31 in suggestions)
     {
         priority: 60,
         matcher: (qLower) => {
@@ -6401,6 +6430,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
