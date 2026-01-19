@@ -1,6 +1,7 @@
 /* ==============================================================
  * CiliAI – Unified Logic Engine (v7.1 – Safe Initialization)
  * ============================================================== */
+
 // Ensure window.CiliAI exists but don't override if already defined
 if (!window.CiliAI) {
     window.CiliAI = {
@@ -39,6 +40,14 @@ if (typeof window.log !== "function") {
     window.log = function (msg) { console.log(`CiliAI LOG: ${msg}`); };
 }
 
+// Put this EARLY in ciliai.js — ideally right after if (!window.CiliAI) { … }
+window.CiliAI.utils = {
+    normalizeQuery: (query) => query.toLowerCase().trim(),
+    extractGenes: (query) => window.extractMultipleGenes ? window.extractMultipleGenes(query) : [],
+    getExpressedCellTypes: (exprMap) => window.getExpressedCellTypes ? window.getExpressedCellTypes(exprMap) : [],
+    normalizeTerm: (term) => window.normalizeTerm ? window.normalizeTerm(term) : term.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    ensureArray: (value) => window.ensureArray ? window.ensureArray(value) : (Array.isArray(value) ? value : value ? [value] : []),
+};
 
 // Chat Handler
 if (typeof window.addChatMessage !== "function") {
@@ -3780,15 +3789,6 @@ window.handleCellTypeQuestion = function(query) {
 // MODULAR INTENT SYSTEM (Replaces old handleAIQuery)
 // ==============================================================
 
-// 1. Shared Utilities (Common functions used across handlers)
-window.CiliAI.utils = {
-    normalizeQuery: (query) => query.toLowerCase().trim(),
-    extractGenes: (query) => window.extractMultipleGenes ? window.extractMultipleGenes(query) : [],  // Fallback if missing
-    getExpressedCellTypes: (exprMap) => window.getExpressedCellTypes ? window.getExpressedCellTypes(exprMap) : [],
-    normalizeTerm: (term) => window.normalizeTerm ? window.normalizeTerm(term) : term.toLowerCase().replace(/[^a-z0-9]/g, ''),
-    ensureArray: (value) => window.ensureArray ? window.ensureArray(value) : (Array.isArray(value) ? value : value ? [value] : []),
-    // Add more as needed (e.g., getTPMInCellType, extractCellTypeQuestion, etc.)
-};
 
 // 2. Intent Handlers Array (Each intent as a modular object)
 const intentHandlers = [
@@ -5271,24 +5271,29 @@ intentHandlers.sort((a, b) => b.priority - a.priority);
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow || !query) return;
-    const qLower = window.CiliAI.utils.normalizeQuery(query);
+
+    // Defensive normalization
+    const qLower = (window.CiliAI?.utils?.normalizeQuery?.(query)) || query.toLowerCase().trim();
+
     if (window.log) window.log(`Routing query: ${query}`);
+
     try {
         if (!window.CiliAI || !window.CiliAI.ready) {
             window.addChatMessage("Data is still loading, please wait...", false);
             return;
         }
+
         let htmlResult = null;
+
         for (const intent of intentHandlers) {
             if (intent.matcher(qLower)) {
                 htmlResult = await intent.handler(query);
                 if (htmlResult) {
                     window.addChatMessage(htmlResult, false);
-                    return;  // Stop after first successful handler
+                    return;
                 }
             }
         }
-        // If no handler matched, fallback to default (already in fallback handler)
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
         window.addChatMessage(`An internal error occurred: ${e.message}`, false);
@@ -6369,4 +6374,5 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
