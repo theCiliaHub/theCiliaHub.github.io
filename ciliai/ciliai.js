@@ -2715,6 +2715,7 @@ function renderMiniComplexList(data) {
  */
 function getGenesByLocalization(term) {
     if (!term) return [];
+    if (normTerm === 'tz') normTerm = 'transition zone';
     let normTerm = term.toLowerCase().trim();
     
     const L = window.CiliAI.lookups;
@@ -4619,6 +4620,50 @@ const intentHandlers = [
         }
     },
 
+{
+    priority: 68,
+    matcher: (qLower) => {
+        const loc = window.extractLocalizationIntent?.(qLower);
+        return !!loc && /genes?\b/.test(qLower);
+    },
+    handler: async (query) => {
+        const qLower = window.CiliAI.utils.normalizeQuery(query);
+        const localization = window.extractLocalizationIntent(qLower);
+
+        if (!localization) return null;
+
+        const geneList = window.getGenesByLocalization(localization);
+
+        if (!geneList.length) {
+            return `<div class="ai-result-card">
+                <p>No genes annotated to the <strong>${localization}</strong> were found.</p>
+            </div>`;
+        }
+
+        // Set follow-up context
+        window.lastQueryContext = {
+            type: 'list_followup',
+            term: `Genes localized to ${localization}`,
+            data: geneList
+        };
+
+        // ✅ Immediately show list (NOT ask)
+        return `<div class="ai-result-card">
+            <h4>📍 Transition Zone Genes</h4>
+            <p>Found <strong>${geneList.length}</strong> genes localized to the <strong>${localization}</strong>:</p>
+
+            <div class="gene-badge-container">
+                ${geneList.map(g =>
+                    `<span class="gene-badge" onclick="handleGeneSearch('${g.gene}', false)">
+                        ${g.gene}
+                    </span>`
+                ).join('')}
+            </div>
+        </div>`;
+    }
+},
+
+    
     // List Genes (by localization, compartment, module)
     {
         priority: 66,
@@ -4716,22 +4761,26 @@ const intentHandlers = [
     },
 
     // Ortholog Queries (Alternative Patterns)
-    {
-        priority: 61,
-        matcher: (qLower) => {
-            const match1 = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i);
-            const match2 = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i);
-            return match1 || match2;
-        },
-        handler: async (query) => {
-            const qLower = window.CiliAI.utils.normalizeQuery(query);
-            const match1 = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i);
-            const match2 = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i);
-            const match = match1 || match2;
-            if (!match) return null;
-            return window.handleOrthologQuery ? window.handleOrthologQuery((match1 ? match1[1] : match2[2]).toUpperCase(), (match1 ? match1[2] : match2[1])) : null;
-        }
+   {
+    priority: 61,
+    matcher: (qLower) => {
+        const match1 = qLower.match(/…/i);
+        const match2 = qLower.match(/…/i);
+        return !!(match1 || match2);           // ← boolean return, no problem
     },
+    handler: async (query) => {                // ← this is a real async function
+        const qLower = window.CiliAI.utils?.normalizeQuery?.(query) || query.toLowerCase().trim();
+        const match1 = qLower.match(/…/i);
+        const match2 = qLower.match(/…/i);
+        const match = match1 || match2;
+        if (!match) return null;               // ← legal return inside function
+
+        const geneSymbol = (match1 ? match1[1] : match2[2]).toUpperCase();
+        const organism  = (match1 ? match1[2] : match2[1]);
+
+        return window.handleOrthologQuery?.(geneSymbol, organism) ?? null;
+    }
+},
 
     // Domain Architecture (Replaced CEP290 with WDR31 in suggestions)
     {
@@ -6311,40 +6360,66 @@ window.showPlot = function(plotData, title = "Gene Expression UMAP") {
     window.removeEventListener('resize', resizeHandler);
     window.addEventListener('resize', resizeHandler);
 };
-window.showDomainViewer = function(gene) {
+window.showDomainViewer = function (gene) {
+    if (!window.CiliAI || !window.CiliAI.lookups) return;
+
+    gene = gene.toUpperCase();
+
+    // ✅ Ensure lookup caches exist
+    if (!window.CiliAI.lookups.pfamByGene) {
+        window.CiliAI.lookups.pfamByGene = {};
+    }
+
+    const domainContainer = document.getElementById('domain-viewer');
+    const titleEl = document.getElementById('current-viz-title');
+
+    // UI switching
     document.getElementById('cilia-svg').style.display = 'none';
     document.getElementById('plotly-container').style.display = 'none';
-    const domainContainer = document.getElementById('domain-viewer');
     domainContainer.style.display = 'flex';
     domainContainer.innerHTML = '';
-    document.getElementById('current-viz-title').textContent = `Pfam Domains: ${gene}`;
-    const pfamLookup = window.CiliAI.lookups.pfamByGene || {};
-    let pfam = pfamLookup[gene.toUpperCase()] || [];
+    titleEl.textContent = `Pfam Domains: ${gene}`;
+
+    // --- Resolve Pfam domains ---
+    let pfam = window.CiliAI.lookups.pfamByGene[gene] || [];
+
     if (!pfam.length) {
-        const geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
+        const geneData = window.CiliAI.lookups.geneMap?.[gene];
+
         if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
             const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
-            const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
-            if (parts.length > 0) {
-                const domains = parts.map((part, i) => ({
-                    id: `DOM_${i+1}`,
-                    name: part.trim(),
+            const parts = desc.split(/[;,]/).map(s => s.trim()).filter(Boolean);
+
+            if (parts.length) {
+                pfam = parts.map((part, i) => ({
+                    id: `DOM_${i + 1}`,
+                    name: part,
                     start: (i * 200) + 50,
                     end: (i * 200) + 150
                 }));
-                window.CiliAI.lookups.pfamByGene[gene.toUpperCase()] = domains;
-                window.showDomainViewer(gene);
-                return;
+
+                // ✅ cache once
+                window.CiliAI.lookups.pfamByGene[gene] = pfam;
             }
         }
-        domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
+    }
+
+    // --- No domains case ---
+    if (!pfam.length) {
+        domainContainer.innerHTML = `
+            <div style="padding:20px; text-align:center; color:#666;">
+                No Pfam domain data available for <strong>${gene}</strong>.
+            </div>`;
         return;
     }
+
+    // --- Render SVG ---
     const seqLength = Math.max(...pfam.map(d => d.end), 1000);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 150`);
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '100%');
+
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', '50');
     line.setAttribute('y1', '75');
@@ -6354,9 +6429,11 @@ window.showDomainViewer = function(gene) {
     line.setAttribute('stroke-width', '4');
     line.setAttribute('stroke-linecap', 'round');
     svg.appendChild(line);
+
     pfam.forEach((domain, index) => {
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         const width = domain.end - domain.start + 1;
+
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', domain.start + 50);
         rect.setAttribute('y', '55');
@@ -6366,11 +6443,11 @@ window.showDomainViewer = function(gene) {
         rect.setAttribute('fill', `hsl(${index * 50 + 200}, 80%, 60%)`);
         rect.setAttribute('stroke', '#fff');
         rect.setAttribute('stroke-width', '2');
-        rect.classList.add('domain-rect');
+
         const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
+        title.textContent = `${domain.name} (${domain.start}-${domain.end})`;
         rect.appendChild(title);
-        group.appendChild(rect);
+
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', domain.start + 50 + width / 2);
         text.setAttribute('y', '45');
@@ -6378,12 +6455,16 @@ window.showDomainViewer = function(gene) {
         text.setAttribute('font-size', '12');
         text.setAttribute('font-weight', 'bold');
         text.setAttribute('fill', '#333');
-        text.textContent = domain.name || domain.id;
+        text.textContent = domain.name;
+
+        group.appendChild(rect);
         group.appendChild(text);
         svg.appendChild(group);
     });
+
     domainContainer.appendChild(svg);
 };
+
 
 window.downloadCurrentVisualization = function() {
     if (window.CiliAI?.currentPlot) {
@@ -6422,6 +6503,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
