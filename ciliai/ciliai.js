@@ -3775,408 +3775,470 @@ window.handleCellTypeQuestion = function(query) {
     return html;
 };
 
-window.handleAIQuery = async function (query) {
-    const chatWindow = document.getElementById('messages');
-    if (!chatWindow) return;
-    if (!query) return;
-    const qLower = query.toLowerCase().trim();
-    // === 1. HIGHEST PRIORITY: Cell-type specific questions (your existing fix) ===
-    if (qLower.includes('cilia-restricted') ||
-        qLower.includes('cilia restricted') ||
-        qLower.includes('ciliary-restricted') ||
-        qLower.includes('specific to') ||
-        (qLower.includes('express') && qLower.includes('cell')) ||
-        qLower.includes('active in') ||
-        (qLower.includes('tpm') && qLower.includes('cell'))) {
-        const result = window.handleCellTypeQuestion(query);
-        if (result) {
-            window.addChatMessage(result, false);
-            return;
+
+// ==============================================================
+// MODULAR INTENT SYSTEM (Replaces old handleAIQuery)
+// ==============================================================
+
+// 1. Shared Utilities (Common functions used across handlers)
+window.CiliAI.utils = {
+    normalizeQuery: (query) => query.toLowerCase().trim(),
+    extractGenes: (query) => window.extractMultipleGenes ? window.extractMultipleGenes(query) : [],  // Fallback if missing
+    getExpressedCellTypes: (exprMap) => window.getExpressedCellTypes ? window.getExpressedCellTypes(exprMap) : [],
+    normalizeTerm: (term) => window.normalizeTerm ? window.normalizeTerm(term) : term.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    ensureArray: (value) => window.ensureArray ? window.ensureArray(value) : (Array.isArray(value) ? value : value ? [value] : []),
+    // Add more as needed (e.g., getTPMInCellType, extractCellTypeQuestion, etc.)
+};
+
+// 2. Intent Handlers Array (Each intent as a modular object)
+const intentHandlers = [
+    // Highest Priority: Cell-type specific questions
+    {
+        priority: 100,
+        matcher: (qLower) => qLower.includes('cilia-restricted') || qLower.includes('cilia restricted') || qLower.includes('ciliary-restricted') || qLower.includes('specific to') || (qLower.includes('express') && qLower.includes('cell')) || qLower.includes('active in') || (qLower.includes('tpm') && qLower.includes('cell')),
+        handler: async (query) => {
+            return window.handleCellTypeQuestion ? window.handleCellTypeQuestion(query) : null;
         }
-    }
-    if (window.log) window.log(`Routing query: ${query}`);
-    try {
-        if (!window.CiliAI || !window.CiliAI.ready) {
-            window.addChatMessage("Data is still loading, please wait...", false);
-            return;
-        }
-        let htmlResult = null;
-        let match;
-        // === 2. GENERALIZED: "Where is [GENE] expressed?" for ANY ciliary gene ===
-        if (qLower.includes('where is') && qLower.includes('expressed')) {
-            const genes = extractMultipleGenes(query);
+    },
+
+    // Pan-ciliary / Tissue Expression Category & Lists
+    {
+        priority: 95,
+        matcher: (qLower) => qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') || qLower.includes('ubiquitous') || qLower.includes('pan-ubiquitous') || qLower.includes('idio-ciliary') || qLower.includes('tissue-specific') || (qLower.includes('specific to') && (qLower.includes('lung') || qLower.includes('kidney') || qLower.includes('liver') || qLower.includes('skeleton') || qLower.includes('pancreas') || qLower.includes('olfactory') || qLower.includes('hypothalamus'))) || qLower.includes('category of') || (qLower.includes('expressed') && qLower.includes('category')) || qLower.includes('expressed in how many tissues') || (qLower.includes('list') && (qLower.includes('pan') || qLower.includes('ubiquit') || qLower.includes('specific') || qLower.includes('idio'))),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            let htmlResult = null;
+            const genes = window.CiliAI.utils.extractGenes(query);
             if (genes.length > 0) {
-                const geneSymbol = genes[0];
-                const gene = window.CiliAI.lookups.geneMap[geneSymbol];
-                if (!gene) {
-                    htmlResult = `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in database.</p></div>`;
+                const geneSymbol = genes[0].toUpperCase();
+                const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+                if (!geneData || !geneData.expression?.tissue) {
+                    htmlResult = `<div class="ai-result-card">
+                        <p>No tissue expression data available for <strong>${geneSymbol}</strong>.</p>
+                    </div>`;
                 } else {
-                    const loc = gene.Localization || 'Not specified';
-                    let expressionInfo = '';
-                    let scrnaSummary = '';
-                    if (gene.expression?.scRNA) {
-                        const expressed = getExpressedCellTypes(gene.expression.scRNA);
-                        if (expressed.length > 0) {
-                            scrnaSummary = `<p><strong>scRNA-seq (lung):</strong> Expressed in: <strong>${expressed.join(', ')}</strong></p>`;
-                        }
-                    }
-                    // Detect motile cilia genes
-                    const isMotile = loc.toLowerCase().includes('axoneme') ||
-                                     loc.toLowerCase().includes('dynein') ||
-                                     loc.toLowerCase().includes('radial spoke') ||
-                                     geneSymbol.startsWith('DNAH') ||
-                                     geneSymbol.startsWith('DNAI') ||
-                                     geneSymbol.includes('DNAAF') ||
-                                     (gene.Ciliopathies && gene.Ciliopathies.includes('Primary Ciliary Dyskinesia'));
-                    const isMulticiliatedMarker = geneSymbol === 'FOXJ1' || loc.toLowerCase().includes('multiciliated');
-                    if (isMotile) {
-                        expressionInfo = `
-                            <p><strong>${geneSymbol}</strong> is expressed in <strong>cells with motile cilia</strong>:</p>
-                            <ul>
-                                <li>Multiciliated respiratory epithelium (lungs, trachea, bronchi)</li>
-                                <li>Fallopian tube epithelium</li>
-                                <li>Testicular sperm flagella</li>
-                            </ul>
-                            <p><strong>Localization:</strong> ${loc}</p>
-                            <p>Defects often cause <strong>Primary Ciliary Dyskinesia (PCD)</strong>.</p>
-                        `;
-                    } else if (isMulticiliatedMarker) {
-                        expressionInfo = `
-                            <p><strong>${geneSymbol}</strong> is a master regulator of <strong>multiciliogenesis</strong>.</p>
-                            <p>Specifically expressed in <strong>multiciliated cells</strong> (e.g., airway epithelium).</p>
-                            ${scrnaSummary}
-                        `;
+                    const category = geneData.expression.category || 'Unknown';
+                    const nTissues = geneData.expression.n_tissues || 0;
+                    const isPan = category.toLowerCase().includes('pan-ciliary') || category.toLowerCase().includes('ubiquitous');
+                    const isIdio = category.toLowerCase().includes('idio-ciliary') || category.toLowerCase().includes('tissue-specific');
+                    let verdict = '';
+                    if (isPan) {
+                        verdict = `<span style="color:#059669; font-weight:600;">Yes — Pan-ciliary (Ubiquitous)</span>`;
+                    } else if (isIdio) {
+                        verdict = `<span style="color:#dc2626; font-weight:600;">Yes — Idio-ciliary (Tissue-Specific)</span>`;
                     } else {
-                        expressionInfo = `
-                            <p><strong>${geneSymbol}</strong> is expressed in cells with <strong>primary cilia</strong> (most vertebrate cell types).</p>
-                            <p>Enriched in:</p>
-                            <ul>
-                                <li>Kidney tubules and collecting ducts</li>
-                                <li>Brain (neurons, cerebellum)</li>
-                                <li>Retina (photoreceptors)</li>
-                                <li>Liver, pancreas, and other organs</li>
-                            </ul>
-                            <p><strong>Localization:</strong> ${loc}</p>
-                            ${scrnaSummary}
-                        `;
+                        verdict = `<span style="color:#7c3aed; font-weight:600;">Multi-tissue / Intermediate</span>`;
                     }
-                    htmlResult = `
-                        <div class="ai-result-card">
-                            <h4>Expression of ${geneSymbol}</h4>
-                            ${expressionInfo}
-                        </div>
-                    `;
+                    htmlResult = `<div class="ai-result-card">
+                        <h4>Tissue Expression Category: ${geneSymbol}</h4>
+                        <p style="font-size:17px; margin:16px 0;">
+                            ${verdict}<br>
+                            <span style="font-size:14px; color:#4b5563;">
+                                Category: <strong>${category}</strong><br>
+                                Detected in <strong>${nTissues}</strong> tissue${nTissues === 1 ? '' : 's'}
+                            </span>
+                        </p>
+                        <p style="font-size:13px; color:#64748b;">
+                            Data source: bulk RNA-seq across major human tissues (CiliAI 2025 integration)
+                        </p>
+                    </div>`;
                 }
-                if (htmlResult) {
-                    window.addChatMessage(htmlResult, false);
-                    return;
+                return htmlResult;
+            }
+            // List requests
+            const isPanList = qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') ||
+                              qLower.includes('ubiquitous') || qLower.includes('ubiquitously expressed');
+            const isIdioList = qLower.includes('idio-ciliary') || qLower.includes('tissue-specific') ||
+                               qLower.includes('specific to') || qLower.includes('only in');
+            if (isPanList || isIdioList || qLower.includes('list') || qLower.includes('show all')) {
+                let filteredGenes = [];
+                Object.entries(window.CiliAI.lookups.geneMap).forEach(([gene, data]) => {
+                    if (!data.expression?.category) return;
+                    const cat = data.expression.category.toLowerCase();
+                    const n = data.expression.n_tissues || 0;
+                    if (isPanList && (cat.includes('pan-ciliary') || cat.includes('ubiquitous'))) {
+                        filteredGenes.push(gene);
+                    } else if (isIdioList && (cat.includes('idio-ciliary') || cat.includes('tissue-specific'))) {
+                        filteredGenes.push(gene);
+                    } else if (qLower.includes('lung') && n === 1 && (data.expression.tissue?.Lung_Primary > 0 || data.expression.tissue?.Lung_Motile > 0)) {
+                        filteredGenes.push(gene);
+                    } else if (qLower.includes('kidney') && n === 1 && data.expression.tissue?.Kidney > 0) {
+                        filteredGenes.push(gene);
+                    } else if (qLower.includes('liver') && n === 1 && data.expression.tissue?.Liver > 0) {
+                        filteredGenes.push(gene);
+                    } else if (qLower.includes('skeleton') && n === 1 && data.expression.tissue?.Skeleton > 0) {
+                        filteredGenes.push(gene);
+                    }
+                });
+                filteredGenes.sort();
+                if (filteredGenes.length === 0) {
+                    htmlResult = `<div class="ai-result-card"><p>No genes match the requested criteria in the current dataset.</p></div>`;
+                } else {
+                    const term = isPanList ? 'Pan-ciliary (Ubiquitous)' :
+                                 isIdioList ? 'Idio-ciliary (Tissue-Specific)' :
+                                 qLower.includes('lung') ? 'Lung-specific' :
+                                 qLower.includes('kidney') ? 'Kidney-specific' : 'Matching';
+                    const preview = filteredGenes.length > 12 ? filteredGenes.slice(0,12).join(', ') + ` … and ${filteredGenes.length-12} more` : filteredGenes.join(', ');
+                    htmlResult = `<div class="ai-result-card">
+                        <h4>${term} Genes</h4>
+                        <p>Found <strong>${filteredGenes.length}</strong> genes.</p>
+                        <p style="font-size:13.5px; line-height:1.5; margin:12px 0;">${preview}</p>
+                        <p style="font-size:12px; color:#64748b;">Want to see the full list or view them in the panel? Type <strong>yes</strong> or <strong>show list</strong>.</p>
+                    </div>`;
+                    window.lastQueryContext = {  // Note: Use window. for global
+                        type: 'list_followup',
+                        data: filteredGenes.map(g => ({ gene: g })),
+                        term: `${term} Genes (${filteredGenes.length})`
+                    };
+                }
+                return htmlResult;
+            }
+            return null;
+        }
+    },
+
+    // "Where is [GENE] expressed?" for ANY ciliary gene
+    {
+        priority: 90,
+        matcher: (qLower) => qLower.includes('where is') && qLower.includes('expressed'),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return null;
+            const geneSymbol = genes[0];
+            const gene = window.CiliAI.lookups.geneMap[geneSymbol];
+            if (!gene) {
+                return `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in database.</p></div>`;
+            }
+            const loc = gene.Localization || 'Not specified';
+            let expressionInfo = '';
+            let scrnaSummary = '';
+            if (gene.expression?.scRNA) {
+                const expressed = window.CiliAI.utils.getExpressedCellTypes(gene.expression.scRNA);
+                if (expressed.length > 0) {
+                    scrnaSummary = `<p><strong>scRNA-seq (lung):</strong> Expressed in: <strong>${expressed.join(', ')}</strong></p>`;
                 }
             }
-        }
-
-// === NEW INTENT BLOCK: Tissue Expression Category & Pan-ciliary / Tissue-Specific Lists ===
-// Place this after the "where is … expressed?" or localization block
-else if (
-    htmlResult === null &&
-    (
-        qLower.includes('pan-ciliary') ||
-        qLower.includes('pan ciliary') ||
-        qLower.includes('ubiquitous') ||
-        qLower.includes('pan-ubiquitous') ||
-        qLower.includes('idio-ciliary') ||
-        qLower.includes('tissue-specific') ||
-        qLower.includes('specific to') && (qLower.includes('lung') || qLower.includes('kidney') || qLower.includes('liver') || qLower.includes('skeleton') || qLower.includes('pancreas') || qLower.includes('olfactory') || qLower.includes('hypothalamus')) ||
-        qLower.includes('category of') ||
-        (qLower.includes('expressed') && qLower.includes('category')) ||
-        qLower.includes('expressed in how many tissues') ||
-        (qLower.includes('list') && (qLower.includes('pan') || qLower.includes('ubiquit') || qLower.includes('specific') || qLower.includes('idio')))
-    )
-) {
-    // ── 1. Single-gene category questions ──
-    const genes = window.extractMultipleGenes(query);
-    if (genes.length > 0) {
-        const geneSymbol = genes[0].toUpperCase();
-        const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
-
-        if (!geneData || !geneData.expression?.tissue) {
-            htmlResult = `<div class="ai-result-card">
-                <p>No tissue expression data available for <strong>${geneSymbol}</strong>.</p>
-            </div>`;
-        } else {
-            const category = geneData.expression.category || 'Unknown';
-            const nTissues = geneData.expression.n_tissues || 0;
-            const isPan = category.toLowerCase().includes('pan-ciliary') || category.toLowerCase().includes('ubiquitous');
-            const isIdio = category.toLowerCase().includes('idio-ciliary') || category.toLowerCase().includes('tissue-specific');
-
-            let verdict = '';
-            if (isPan) {
-                verdict = `<span style="color:#059669; font-weight:600;">Yes — Pan-ciliary (Ubiquitous)</span>`;
-            } else if (isIdio) {
-                verdict = `<span style="color:#dc2626; font-weight:600;">Yes — Idio-ciliary (Tissue-Specific)</span>`;
+            const isMotile = loc.toLowerCase().includes('axoneme') ||
+                             loc.toLowerCase().includes('dynein') ||
+                             loc.toLowerCase().includes('radial spoke') ||
+                             geneSymbol.startsWith('DNAH') ||
+                             geneSymbol.startsWith('DNAI') ||
+                             geneSymbol.includes('DNAAF') ||
+                             (gene.Ciliopathies && gene.Ciliopathies.includes('Primary Ciliary Dyskinesia'));
+            const isMulticiliatedMarker = geneSymbol === 'FOXJ1' || loc.toLowerCase().includes('multiciliated');
+            if (isMotile) {
+                expressionInfo = `
+                    <p><strong>${geneSymbol}</strong> is expressed in <strong>cells with motile cilia</strong>:</p>
+                    <ul>
+                        <li>Multiciliated respiratory epithelium (lungs, trachea, bronchi)</li>
+                        <li>Fallopian tube epithelium</li>
+                        <li>Testicular sperm flagella</li>
+                    </ul>
+                    <p><strong>Localization:</strong> ${loc}</p>
+                    <p>Defects often cause <strong>Primary Ciliary Dyskinesia (PCD)</strong>.</p>
+                `;
+            } else if (isMulticiliatedMarker) {
+                expressionInfo = `
+                    <p><strong>${geneSymbol}</strong> is a master regulator of <strong>multiciliogenesis</strong>.</p>
+                    <p>Specifically expressed in <strong>multiciliated cells</strong> (e.g., airway epithelium).</p>
+                    ${scrnaSummary}
+                `;
             } else {
-                verdict = `<span style="color:#7c3aed; font-weight:600;">Multi-tissue / Intermediate</span>`;
+                expressionInfo = `
+                    <p><strong>${geneSymbol}</strong> is expressed in cells with <strong>primary cilia</strong> (most vertebrate cell types).</p>
+                    <p>Enriched in:</p>
+                    <ul>
+                        <li>Kidney tubules and collecting ducts</li>
+                        <li>Brain (neurons, cerebellum)</li>
+                        <li>Retina (photoreceptors)</li>
+                        <li>Liver, pancreas, and other organs</li>
+                    </ul>
+                    <p><strong>Localization:</strong> ${loc}</p>
+                    ${scrnaSummary}
+                `;
             }
-
-            htmlResult = `<div class="ai-result-card">
-                <h4>Tissue Expression Category: ${geneSymbol}</h4>
-                <p style="font-size:17px; margin:16px 0;">
-                    ${verdict}<br>
-                    <span style="font-size:14px; color:#4b5563;">
-                        Category: <strong>${category}</strong><br>
-                        Detected in <strong>${nTissues}</strong> tissue${nTissues === 1 ? '' : 's'}
-                    </span>
-                </p>
-                <p style="font-size:13px; color:#64748b;">
-                    Data source: bulk RNA-seq across major human tissues (CiliAI 2025 integration)
-                </p>
-            </div>`;
+            return `
+                <div class="ai-result-card">
+                    <h4>Expression of ${geneSymbol}</h4>
+                    ${expressionInfo}
+                </div>
+            `;
         }
-        window.addChatMessage(htmlResult, false);
-        return;
-    }
+    },
 
-    // ── 2. List requests ──
-    const isPanList = qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') ||
-                      qLower.includes('ubiquitous') || qLower.includes('ubiquitously expressed');
-    const isIdioList = qLower.includes('idio-ciliary') || qLower.includes('tissue-specific') ||
-                       qLower.includes('specific to') || qLower.includes('only in');
-
-    if (isPanList || isIdioList || qLower.includes('list') || qLower.includes('show all')) {
-        let filteredGenes = [];
-
-        Object.entries(window.CiliAI.lookups.geneMap).forEach(([gene, data]) => {
-            if (!data.expression?.category) return;
-            const cat = data.expression.category.toLowerCase();
-            const n = data.expression.n_tissues || 0;
-
-            if (isPanList && (cat.includes('pan-ciliary') || cat.includes('ubiquitous'))) {
-                filteredGenes.push(gene);
-            }
-            else if (isIdioList && (cat.includes('idio-ciliary') || cat.includes('tissue-specific'))) {
-                filteredGenes.push(gene);
-            }
-            // Specific tissue filter (e.g. "genes specific to lung")
-            else if (qLower.includes('lung') && n === 1 && data.expression.tissue?.Lung_Primary > 0 || data.expression.tissue?.Lung_Motile > 0) {
-                filteredGenes.push(gene);
-            }
-            else if (qLower.includes('kidney') && n === 1 && data.expression.tissue?.Kidney > 0) {
-                filteredGenes.push(gene);
-            }
-            else if (qLower.includes('liver') && n === 1 && data.expression.tissue?.Liver > 0) {
-                filteredGenes.push(gene);
-            }
-            else if (qLower.includes('skeleton') && n === 1 && data.expression.tissue?.Skeleton > 0) {
-                filteredGenes.push(gene);
-            }
-            // ... can extend to other tissues
-        });
-
-        filteredGenes.sort();
-
-        if (filteredGenes.length === 0) {
-            htmlResult = `<div class="ai-result-card">
-                <p>No genes match the requested criteria in the current dataset.</p>
-            </div>`;
-        } else {
-            const term = isPanList ? 'Pan-ciliary (Ubiquitous)' :
-                         isIdioList ? 'Idio-ciliary (Tissue-Specific)' :
-                         qLower.includes('lung') ? 'Lung-specific' :
-                         qLower.includes('kidney') ? 'Kidney-specific' : 'Matching';
-
-            const preview = filteredGenes.length > 12 ?
-                filteredGenes.slice(0,12).join(', ') + ` … and ${filteredGenes.length-12} more` :
-                filteredGenes.join(', ');
-
-            htmlResult = `<div class="ai-result-card">
-                <h4>${term} Genes</h4>
-                <p>Found <strong>${filteredGenes.length}</strong> genes.</p>
-                <p style="font-size:13.5px; line-height:1.5; margin:12px 0;">
-                    ${preview}
-                </p>
-                <p style="font-size:12px; color:#64748b;">
-                    Want to see the full list or view them in the panel? Type <strong>yes</strong> or <strong>show list</strong>.
-                </p>
-            </div>`;
-
-            // Prepare follow-up context
-            lastQueryContext = {
-                type: 'list_followup',
-                data: filteredGenes.map(g => ({ gene: g })),
-                term: `${term} Genes (${filteredGenes.length})`
+    // Ciliopathy classification, overlap, orthologs (combined for efficiency)
+    {
+        priority: 85,
+        matcher: (qLower) => {
+            const classificationKeywords = {
+                'primary ciliopathies': 'Primary Ciliopathies',
+                'primary': 'Primary Ciliopathies',
+                'motile ciliopathies': 'Motile Ciliopathies',
+                'motile': 'Motile Ciliopathies',
+                'secondary diseases': 'Secondary Diseases',
+                'secondary': 'Secondary Diseases',
+                'atypical ciliopathies': 'Atypical Ciliopathies',
+                'atypical': 'Atypical Ciliopathies'
             };
-        }
-
-        window.addChatMessage(htmlResult, false);
-        return;
-    }
-}
-        
-        // === 3. FULLY FIXED CILIOPATHY CLASSIFICATION, OVERLAP & ORTHOLOG HANDLER ===
-        const classificationMap = getDiseaseClassificationMap();
-        // Extended keyword mapping (includes common variations)
-        const classificationKeywords = {
-            'primary ciliopathies': 'Primary Ciliopathies',
-            'primary': 'Primary Ciliopathies',
-            'motile ciliopathies': 'Motile Ciliopathies',
-            'motile': 'Motile Ciliopathies',
-            'secondary diseases': 'Secondary Diseases',
-            'secondary': 'Secondary Diseases',
-            'atypical ciliopathies': 'Atypical Ciliopathies',
-            'atypical': 'Atypical Ciliopathies'
-        };
-        let matchedClassification = null;
-        for (const [kw, full] of Object.entries(classificationKeywords)) {
-            if (qLower.includes(kw)) {
-                matchedClassification = full;
-                break;
+            const organismKeywords = {
+                'mouse': 'Mouse',
+                'drosophila': 'Drosophila',
+                'fly': 'Drosophila',
+                'c. elegans': 'C_elegans',
+                'worm': 'C_elegans',
+                'zebrafish': 'Zebrafish',
+                'fish': 'Zebrafish',
+                'xenopus': 'Xenopus',
+                'frog': 'Xenopus'
+            };
+            const requestedOrganism = Object.keys(organismKeywords).find(kw => qLower.includes(kw));
+            const matchedClassification = Object.keys(classificationKeywords).find(kw => qLower.includes(kw));
+            const hasCiliopathyGroup = qLower.includes('senior løken') || qLower.includes('bardet biedl') || qLower.includes('meckel gruber') || qLower.includes('joubert') || qLower.includes('primary ciliopathy') || qLower.includes('motile ciliopathy') || qLower.includes('atypical ciliopathy') || qLower.includes('all ciliopathy') || qLower.includes('ciliopathies') || qLower.includes('ciliopathy genes');
+            return requestedOrganism && hasCiliopathyGroup;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const classificationMap = getDiseaseClassificationMap();
+            const classificationKeywords = {
+                'primary ciliopathies': 'Primary Ciliopathies',
+                'primary': 'Primary Ciliopathies',
+                'motile ciliopathies': 'Motile Ciliopathies',
+                'motile': 'Motile Ciliopathies',
+                'secondary diseases': 'Secondary Diseases',
+                'secondary': 'Secondary Diseases',
+                'atypical ciliopathies': 'Atypical Ciliopathies',
+                'atypical': 'Atypical Ciliopathies'
+            };
+            let matchedClassification = null;
+            for (const [kw, full] of Object.entries(classificationKeywords)) {
+                if (qLower.includes(kw)) {
+                    matchedClassification = full;
+                    break;
+                }
             }
-        }
-        // === MODEL ORGANISM ORTHOLOGS/HOMOLOGS FOR CILIOPATHY GROUPS ===
-        const organismKeywords = {
-            'mouse': 'Mouse',
-            'drosophila': 'Drosophila',
-            'fly': 'Drosophila',
-            'c. elegans': 'C_elegans',
-            'worm': 'C_elegans',
-            'zebrafish': 'Zebrafish',
-            'fish': 'Zebrafish',
-            'xenopus': 'Xenopus',
-            'frog': 'Xenopus'
-        };
-        let requestedOrganism = null;
-        for (const [keyword, field] of Object.entries(organismKeywords)) {
-            if (qLower.includes(keyword)) {
-                requestedOrganism = field;
-                break;
+            const organismKeywords = {
+                'mouse': 'Mouse',
+                'drosophila': 'Drosophila',
+                'fly': 'Drosophila',
+                'c. elegans': 'C_elegans',
+                'worm': 'C_elegans',
+                'zebrafish': 'Zebrafish',
+                'fish': 'Zebrafish',
+                'xenopus': 'Xenopus',
+                'frog': 'Xenopus'
+            };
+            let requestedOrganism = null;
+            for (const [keyword, field] of Object.entries(organismKeywords)) {
+                if (qLower.includes(keyword)) {
+                    requestedOrganism = field;
+                    break;
+                }
             }
-        }
-        // Only run if a model organism is mentioned AND a ciliopathy group is mentioned
-        if (requestedOrganism &&
-            (qLower.includes('senior løken') ||
-             qLower.includes('bardet biedl') ||
-             qLower.includes('meckel gruber') ||
-             qLower.includes('joubert') ||
-             qLower.includes('primary ciliopathy') ||
-             qLower.includes('motile ciliopathy') ||
-             qLower.includes('atypical ciliopathy') ||
-             qLower.includes('all ciliopathy') ||
-             qLower.includes('ciliopathies') ||
-             qLower.includes('ciliopathy genes'))) {
-            let targetGenes = new Set();
-            // Collect human genes
-            if (qLower.includes('all ciliopathy') || qLower.includes('ciliopathies')) {
-                ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'].forEach(className => {
+            if (requestedOrganism && (qLower.includes('senior løken') || qLower.includes('bardet biedl') || qLower.includes('meckel gruber') || qLower.includes('joubert') || qLower.includes('primary ciliopathy') || qLower.includes('motile ciliopathy') || qLower.includes('atypical ciliopathy') || qLower.includes('all ciliopathy') || qLower.includes('ciliopathies') || qLower.includes('ciliopathy genes'))) {
+                let targetGenes = new Set();
+                // Collect human genes
+                if (qLower.includes('all ciliopathy') || qLower.includes('ciliopathies')) {
+                    ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'].forEach(className => {
+                        window.CiliAI.masterData.forEach(gene => {
+                            if (gene.ciliopathy_classification === className) {
+                                targetGenes.add(gene.Gene);
+                            }
+                        });
+                    });
+                } else if (qLower.includes('primary ciliopathy')) {
                     window.CiliAI.masterData.forEach(gene => {
-                        if (gene.ciliopathy_classification === className) {
+                        if (gene.ciliopathy_classification === 'Primary Ciliopathies') {
                             targetGenes.add(gene.Gene);
                         }
                     });
-                });
-            } else if (qLower.includes('primary ciliopathy')) {
-                window.CiliAI.masterData.forEach(gene => {
-                    if (gene.ciliopathy_classification === 'Primary Ciliopathies') {
-                        targetGenes.add(gene.Gene);
-                    }
-                });
-            } else if (qLower.includes('motile ciliopathy')) {
-                window.CiliAI.masterData.forEach(gene => {
-                    if (gene.ciliopathy_classification === 'Motile Ciliopathies') {
-                        targetGenes.add(gene.Gene);
-                    }
-                });
-            } else if (qLower.includes('atypical ciliopathy')) {
-                window.CiliAI.masterData.forEach(gene => {
-                    if (gene.ciliopathy_classification === 'Atypical Ciliopathies') {
-                        targetGenes.add(gene.Gene);
-                    }
-                });
-            } else if (qLower.includes('joubert')) {
-                window.CiliAI.masterData.forEach(gene => {
-                    if (gene.Ciliopathy && normalizeTerm(gene.Ciliopathy).includes('joubert')) {
-                        targetGenes.add(gene.Gene);
-                    }
-                });
-            }
-            if (targetGenes.size === 0) {
-                window.addChatMessage(`<div class="ai-result-card"><p>No genes found for the requested group.</p></div>`, false);
-                return;
-            }
-            const mappings = [];
-            targetGenes.forEach(humanGene => {
-                const geneData = window.CiliAI.lookups.geneMap[humanGene];
-                if (geneData) {
-                    const orthoField = `Ortholog_${requestedOrganism}`;
-                    const ortholog = geneData[orthoField];
-                    if (ortholog && ortholog !== 'null' && ortholog.trim()) {
-                        mappings.push({ human: humanGene, ortholog: ortholog.trim() });
-                    }
+                } else if (qLower.includes('motile ciliopathy')) {
+                    window.CiliAI.masterData.forEach(gene => {
+                        if (gene.ciliopathy_classification === 'Motile Ciliopathies') {
+                            targetGenes.add(gene.Gene);
+                        }
+                    });
+                } else if (qLower.includes('atypical ciliopathy')) {
+                    window.CiliAI.masterData.forEach(gene => {
+                        if (gene.ciliopathy_classification === 'Atypical Ciliopathies') {
+                            targetGenes.add(gene.Gene);
+                        }
+                    });
+                } else if (qLower.includes('joubert')) {
+                    window.CiliAI.masterData.forEach(gene => {
+                        if (gene.Ciliopathy && window.CiliAI.utils.normalizeTerm(gene.Ciliopathy).includes('joubert')) {
+                            targetGenes.add(gene.Gene);
+                        }
+                    });
                 }
-            });
-            if (mappings.length === 0) {
-                const orgName = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
-                window.addChatMessage(`<div class="ai-result-card"><p>No ${orgName} orthologs found.</p></div>`, false);
-                return;
-            }
-            mappings.sort((a, b) => a.human.localeCompare(b.human));
-            const listHtml = mappings.map(m => `<li><strong>${m.human}</strong> → <em>${m.ortholog}</em></li>`).join('');
-            const groupName = qLower.includes('all') ? 'All Ciliopathies' :
-                              qLower.includes('joubert') ? 'Joubert Syndrome' :
-                              qLower.includes('primary') ? 'Primary Ciliopathies' :
-                              qLower.includes('motile') ? 'Motile Ciliopathies' :
-                              qLower.includes('atypical') ? 'Atypical Ciliopathies' : 'Group';
-            const orgDisplay = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
-            window.addChatMessage(`<div class="ai-result-card">
-                <h4>${orgDisplay} Orthologs: ${groupName}</h4>
-                <p><strong>${mappings.length}</strong> mappings:</p>
-                <ul style="columns: 2;">${listHtml}</ul>
-            </div>`, false);
-            return; // Critical: stop further processing
-        }
-        // === A. List diseases in classification ===
-        if (matchedClassification && !qLower.includes('genes')) {
-            const diseases = classificationMap[matchedClassification];
-            htmlResult = `<div class="ai-result-card">
-                <h4>${matchedClassification} (${diseases.length} diseases)</h4>
-                <ul style="columns: 2; font-size: 13px; line-height: 1.5;">
-                    ${diseases.map(d => `<li>${d}</li>`).join('')}
-                </ul>
-            </div>`;
-            window.addChatMessage(htmlResult, false);
-            return;
-        }
-        // === B. Genes in a classification (Primary, Secondary, etc.) ===
-        if (qLower.includes('genes') && matchedClassification) {
-            const diseases = classificationMap[matchedClassification];
-            let allGenes = new Set();
-            diseases.forEach(disease => {
-                const normKey = normalizeTerm(disease);
-                const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
-                genes.forEach(g => allGenes.add(g));
-            });
-            const geneList = Array.from(allGenes);
-            if (geneList.length === 0) {
-                htmlResult = `<div class="ai-result-card"><p>No genes found for <strong>${matchedClassification}</strong>.</p></div>`;
-            } else {
-                const geneObjects = geneList.map(g => ({
-                    gene: g,
-                    description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Ciliary protein'
-                }));
-                lastQueryContext = {
-                    type: 'list_followup',
-                    data: geneObjects,
-                    term: `Genes in ${matchedClassification}`
-                };
-                htmlResult = `<div class="ai-result-card">
-                    <h4>Genes Associated with ${matchedClassification}</h4>
-                    <p>Found <strong>${geneList.length}</strong> unique genes across all related diseases.</p>
-                    <p>Would you like to <strong>view the full list</strong>?</p>
+                if (targetGenes.size === 0) {
+                    return `<div class="ai-result-card"><p>No genes found for the requested group.</p></div>`;
+                }
+                const mappings = [];
+                targetGenes.forEach(humanGene => {
+                    const geneData = window.CiliAI.lookups.geneMap[humanGene];
+                    if (geneData) {
+                        const orthoField = `Ortholog_${requestedOrganism}`;
+                        const ortholog = geneData[orthoField];
+                        if (ortholog && ortholog !== 'null' && ortholog.trim()) {
+                            mappings.push({ human: humanGene, ortholog: ortholog.trim() });
+                        }
+                    }
+                });
+                if (mappings.length === 0) {
+                    const orgName = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
+                    return `<div class="ai-result-card"><p>No ${orgName} orthologs found.</p></div>`;
+                }
+                mappings.sort((a, b) => a.human.localeCompare(b.human));
+                const listHtml = mappings.map(m => `<li><strong>${m.human}</strong> → <em>${m.ortholog}</em></li>`).join('');
+                const groupName = qLower.includes('all') ? 'All Ciliopathies' :
+                                  qLower.includes('joubert') ? 'Joubert Syndrome' :
+                                  qLower.includes('primary') ? 'Primary Ciliopathies' :
+                                  qLower.includes('motile') ? 'Motile Ciliopathies' :
+                                  qLower.includes('atypical') ? 'Atypical Ciliopathies' : 'Group';
+                const orgDisplay = requestedOrganism === 'C_elegans' ? 'C. elegans' : requestedOrganism;
+                return `<div class="ai-result-card">
+                    <h4>${orgDisplay} Orthologs: ${groupName}</h4>
+                    <p><strong>${mappings.length}</strong> mappings:</p>
+                    <ul style="columns: 2;">${listHtml}</ul>
                 </div>`;
             }
-            window.addChatMessage(htmlResult, false);
-            return;
+            return null;
         }
-        // === C. Shared genes between any two classifications or diseases ===
-        if (qLower.includes('shared') || qLower.includes('overlap') || qLower.includes('common') || qLower.includes('between')) {
+    },
+
+    // List diseases in classification
+    {
+        priority: 84,
+        matcher: (qLower) => {
+            const classificationKeywords = Object.keys({
+                'primary ciliopathies': 'Primary Ciliopathies',
+                'primary': 'Primary Ciliopathies',
+                'motile ciliopathies': 'Motile Ciliopathies',
+                'motile': 'Motile Ciliopathies',
+                'secondary diseases': 'Secondary Diseases',
+                'secondary': 'Secondary Diseases',
+                'atypical ciliopathies': 'Atypical Ciliopathies',
+                'atypical': 'Atypical Ciliopathies'
+            }).find(kw => qLower.includes(kw)) && !qLower.includes('genes');
+            return classificationKeywords;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const classificationMap = getDiseaseClassificationMap();
+            const classificationKeywords = {
+                'primary ciliopathies': 'Primary Ciliopathies',
+                'primary': 'Primary Ciliopathies',
+                'motile ciliopathies': 'Motile Ciliopathies',
+                'motile': 'Motile Ciliopathies',
+                'secondary diseases': 'Secondary Diseases',
+                'secondary': 'Secondary Diseases',
+                'atypical ciliopathies': 'Atypical Ciliopathies',
+                'atypical': 'Atypical Ciliopathies'
+            };
+            let matchedClassification = null;
+            for (const [kw, full] of Object.entries(classificationKeywords)) {
+                if (qLower.includes(kw)) {
+                    matchedClassification = full;
+                    break;
+                }
+            }
+            if (matchedClassification) {
+                const diseases = classificationMap[matchedClassification];
+                return `<div class="ai-result-card">
+                    <h4>${matchedClassification} (${diseases.length} diseases)</h4>
+                    <ul style="columns: 2; font-size: 13px; line-height: 1.5;">
+                        ${diseases.map(d => `<li>${d}</li>`).join('')}
+                    </ul>
+                </div>`;
+            }
+            return null;
+        }
+    },
+
+    // Genes in a classification
+    {
+        priority: 83,
+        matcher: (qLower) => {
+            const classificationKeywords = Object.keys({
+                'primary ciliopathies': 'Primary Ciliopathies',
+                'primary': 'Primary Ciliopathies',
+                'motile ciliopathies': 'Motile Ciliopathies',
+                'motile': 'Motile Ciliopathies',
+                'secondary diseases': 'Secondary Diseases',
+                'secondary': 'Secondary Diseases',
+                'atypical ciliopathies': 'Atypical Ciliopathies',
+                'atypical': 'Atypical Ciliopathies'
+            }).find(kw => qLower.includes(kw)) && qLower.includes('genes');
+            return classificationKeywords;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const classificationMap = getDiseaseClassificationMap();
+            const classificationKeywords = {
+                'primary ciliopathies': 'Primary Ciliopathies',
+                'primary': 'Primary Ciliopathies',
+                'motile ciliopathies': 'Motile Ciliopathies',
+                'motile': 'Motile Ciliopathies',
+                'secondary diseases': 'Secondary Diseases',
+                'secondary': 'Secondary Diseases',
+                'atypical ciliopathies': 'Atypical Ciliopathies',
+                'atypical': 'Atypical Ciliopathies'
+            };
+            let matchedClassification = null;
+            for (const [kw, full] of Object.entries(classificationKeywords)) {
+                if (qLower.includes(kw)) {
+                    matchedClassification = full;
+                    break;
+                }
+            }
+            if (qLower.includes('genes') && matchedClassification) {
+                const diseases = classificationMap[matchedClassification];
+                let allGenes = new Set();
+                diseases.forEach(disease => {
+                    const normKey = window.CiliAI.utils.normalizeTerm(disease);
+                    const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                    genes.forEach(g => allGenes.add(g));
+                });
+                const geneList = Array.from(allGenes);
+                if (geneList.length === 0) {
+                    return `<div class="ai-result-card"><p>No genes found for <strong>${matchedClassification}</strong>.</p></div>`;
+                } else {
+                    const geneObjects = geneList.map(g => ({
+                        gene: g,
+                        description: window.CiliAI.lookups.geneMap[g]?.Localization || 'Ciliary protein'
+                    }));
+                    window.lastQueryContext = {
+                        type: 'list_followup',
+                        data: geneObjects,
+                        term: `Genes in ${matchedClassification}`
+                    };
+                    return `<div class="ai-result-card">
+                        <h4>Genes Associated with ${matchedClassification}</h4>
+                        <p>Found <strong>${geneList.length}</strong> unique genes across all related diseases.</p>
+                        <p>Would you like to <strong>view the full list</strong>?</p>
+                    </div>`;
+                }
+            }
+            return null;
+        }
+    },
+
+    // Shared genes between classifications or diseases
+    {
+        priority: 82,
+        matcher: (qLower) => qLower.includes('shared') || qLower.includes('overlap') || qLower.includes('common') || qLower.includes('between'),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const classificationKeywords = {
+                'primary ciliopathies': 'Primary Ciliopathies',
+                'primary': 'Primary Ciliopathies',
+                'motile ciliopathies': 'Motile Ciliopathies',
+                'motile': 'Motile Ciliopathies',
+                'secondary diseases': 'Secondary Diseases',
+                'secondary': 'Secondary Diseases',
+                'atypical ciliopathies': 'Atypical Ciliopathies',
+                'atypical': 'Atypical Ciliopathies'
+            };
             let set1 = null, set2 = null;
             let name1 = '', name2 = '';
             const foundClasses = Object.keys(classificationKeywords).filter(k => qLower.includes(k));
@@ -4188,11 +4250,11 @@ else if (
                 set1 = new Set();
                 set2 = new Set();
                 diseases1.forEach(d => {
-                    const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+                    const genes = window.CiliAI.lookups.byCiliopathy[window.CiliAI.utils.normalizeTerm(d)] || [];
                     genes.forEach(g => set1.add(g));
                 });
                 diseases2.forEach(d => {
-                    const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+                    const genes = window.CiliAI.lookups.byCiliopathy[window.CiliAI.utils.normalizeTerm(d)] || [];
                     genes.forEach(g => set2.add(g));
                 });
             } else {
@@ -4206,25 +4268,25 @@ else if (
                 if (foundDiseases.length >= 2) {
                     name1 = diseaseKeywords[foundDiseases[0]];
                     name2 = diseaseKeywords[foundDiseases[1]];
-                    set1 = new Set(window.CiliAI.lookups.byCiliopathy[normalizeTerm(name1)] || []);
-                    set2 = new Set(window.CiliAI.lookups.byCiliopathy[normalizeTerm(name2)] || []);
+                    set1 = new Set(window.CiliAI.lookups.byCiliopathy[window.CiliAI.utils.normalizeTerm(name1)] || []);
+                    set2 = new Set(window.CiliAI.lookups.byCiliopathy[window.CiliAI.utils.normalizeTerm(name2)] || []);
                 }
             }
             if (set1 && set2) {
                 const overlap = [...set1].filter(g => set2.has(g));
                 if (overlap.length === 0) {
-                    htmlResult = `<div class="ai-result-card">
+                    return `<div class="ai-result-card">
                         <h4>No Shared Genes</h4>
                         <p>No overlapping genes found between <strong>${name1}</strong> and <strong>${name2}</strong>.</p>
                     </div>`;
                 } else {
                     const geneObjects = overlap.map(g => ({ gene: g }));
-                    lastQueryContext = {
+                    window.lastQueryContext = {
                         type: 'list_followup',
                         data: geneObjects,
                         term: `Shared: ${name1} ∩ ${name2}`
                     };
-                    htmlResult = `<div class="ai-result-card">
+                    return `<div class="ai-result-card">
                         <h4>Shared Genes: ${name1} ∩ ${name2}</h4>
                         <p><strong>${overlap.length}</strong> gene(s) in common:</p>
                         <p><strong>${overlap.join(', ')}</strong></p>
@@ -4232,87 +4294,88 @@ else if (
                         <p>Would you like to <strong>view details</strong>?</p>
                     </div>`;
                 }
-                window.addChatMessage(htmlResult, false);
-                return;
             }
+            return null;
         }
-        // === SAFE "yes" HANDLER FOR LIST FOLLOW-UP ===
-        if ((qLower === 'yes' || qLower === 'y' || qLower === 'sure' || qLower === 'show' || qLower === 'list') &&
-            lastQueryContext && lastQueryContext.type === 'list_followup') {
-            if (lastQueryContext.data && lastQueryContext.data.length > 0) {
-                window.showDataInLeftPanel(lastQueryContext.term || 'Gene List', lastQueryContext.data);
-                window.addChatMessage(`Displaying <strong>${lastQueryContext.term}</strong> (${lastQueryContext.data.length} genes) in the main panel.`, false);
+    },
+
+    // SAFE "yes" HANDLER FOR LIST FOLLOW-UP
+    {
+        priority: 80,
+        matcher: (qLower) => /^(yes|y|sure|ok|okay|yep|show|view|list|show list|view list|display)/i.test(qLower) && window.lastQueryContext && window.lastQueryContext.type === 'list_followup',
+        handler: async (query) => {
+            if (window.lastQueryContext.data && window.lastQueryContext.data.length > 0) {
+                window.showDataInLeftPanel(window.lastQueryContext.term || 'Gene List', window.lastQueryContext.data);
+                window.lastQueryContext = { type: null, data: [], term: null };
+                return `Displaying <strong>${window.lastQueryContext.term}</strong> (${window.lastQueryContext.data.length} genes) in the main panel.`;
             } else {
-                window.addChatMessage(`No genes to display for <strong>${lastQueryContext.term}</strong>.`, false);
+                window.lastQueryContext = { type: null, data: [], term: null };
+                return `No genes to display for <strong>${window.lastQueryContext.term}</strong>.`;
             }
-            lastQueryContext = { type: null, data: [], term: null };
-            return;
         }
-        // === ORTHOLOG QUESTIONS (Mouse, Drosophila, C. elegans) ===
-        if (qLower.includes('ortholog') || qLower.includes('orthologue')) {
-            const genes = extractMultipleGenes(query);
-            if (genes.length === 0) {
-                window.addChatMessage(`<div class="ai-result-card"><p>Please specify a gene (e.g., "ortholog of ARL13B").</p></div>`, false);
-                return;
-            }
-            const geneSymbol = genes[0];
+    },
+
+    // Ortholog Questions
+    {
+        priority: 79,
+        matcher: (qLower) => qLower.includes('ortholog') || qLower.includes('orthologue'),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const match1 = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i);
+            const match2 = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i);
+            const match = match1 || match2;
+            if (!match) return null;
+            const geneSymbol = (match1 ? match1[1] : match2[2]).toUpperCase();
+            const organism = (match1 ? match1[2] : match2[1]);
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return `<div class="ai-result-card"><p>Please specify a gene (e.g., "ortholog of ARL13B").</p></div>`;
             const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
-            if (!geneData) {
-                window.addChatMessage(`<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in database.</p></div>`, false);
-                return;
-            }
+            if (!geneData) return `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in database.</p></div>`;
             const mouse = geneData.Ortholog_Mouse || 'Not reported';
             const drosophila = geneData.Ortholog_Drosophila || 'Not reported';
             const celegans = geneData.Ortholog_C_elegans || 'Not reported';
             let response = `<div class="ai-result-card">
                 <h4>Orthologs of ${geneSymbol}</h4>
                 <ul style="margin: 10px 0;">`;
-            if (qLower.includes('mouse') || qLower.includes('all')) {
-                response += `<li><strong>Mouse:</strong> ${mouse}</li>`;
-            }
-            if (qLower.includes('drosophila') || qLower.includes('fly') || qLower.includes('all')) {
-                response += `<li><strong>Drosophila:</strong> ${drosophila}</li>`;
-            }
-            if (qLower.includes('c. elegans') || qLower.includes('worm') || qLower.includes('all')) {
-                response += `<li><strong>C. elegans:</strong> ${celegans}</li>`;
-            }
+            if (qLower.includes('mouse') || qLower.includes('all')) response += `<li><strong>Mouse:</strong> ${mouse}</li>`;
+            if (qLower.includes('drosophila') || qLower.includes('fly') || qLower.includes('all')) response += `<li><strong>Drosophila:</strong> ${drosophila}</li>`;
+            if (qLower.includes('c. elegans') || qLower.includes('worm') || qLower.includes('all')) response += `<li><strong>C. elegans:</strong> ${celegans}</li>`;
             response += `</ul></div>`;
-            window.addChatMessage(response, false);
-            return;
+            return response;
         }
-        // === TOTAL UNIQUE GENES IN CILIOPATHIES ===
-        const ciliopathyQueryPatterns = [
-            'how many unique genes.*ciliopathies',
-            'how many unique.*ciliopathy genes',
-            'how many.*unique genes.*ciliopathies',
-            'total unique genes.*ciliopathies',
-            'total.*unique.*ciliopathy genes',
-            'number of unique genes.*ciliopathies',
-            'unique genes in ciliopathies',
-            'ciliopathies unique genes count',
-            'how many genes are in ciliopathies'
-        ];
-        const matchesCiliopathyCount = ciliopathyQueryPatterns.some(pattern =>
-            new RegExp(pattern, 'i').test(query)
-        );
-        if (matchesCiliopathyCount ||
-            (qLower.includes('how many') && qLower.includes('unique') && qLower.includes('genes') && qLower.includes('ciliopathies'))) {
-            const includedClasses = [
-                'Primary Ciliopathies',
-                'Motile Ciliopathies',
-                'Atypical Ciliopathies'
+    },
+
+    // Total unique genes in ciliopathies
+    {
+        priority: 78,
+        matcher: (qLower) => {
+            const patterns = [
+                'how many unique genes.*ciliopathies',
+                'how many unique.*ciliopathy genes',
+                'how many.*unique genes.*ciliopathies',
+                'total unique genes.*ciliopathies',
+                'total.*unique.*ciliopathy genes',
+                'number of unique genes.*ciliopathies',
+                'unique genes in ciliopathies',
+                'ciliopathies unique genes count',
+                'how many genes are in ciliopathies'
             ];
+            return patterns.some(p => new RegExp(p, 'i').test(qLower)) || (qLower.includes('how many') && qLower.includes('unique') && qLower.includes('genes') && qLower.includes('ciliopathies'));
+        },
+        handler: async (query) => {
+            const includedClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
+            const classificationMap = getDiseaseClassificationMap();
             let allUniqueGenes = new Set();
             includedClasses.forEach(className => {
                 const diseases = classificationMap[className] || [];
                 diseases.forEach(disease => {
-                    const normKey = normalizeTerm(disease);
+                    const normKey = window.CiliAI.utils.normalizeTerm(disease);
                     const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
                     genes.forEach(g => allUniqueGenes.add(g));
                 });
             });
             const totalCount = allUniqueGenes.size;
-            htmlResult = `<div class="ai-result-card">
+            return `<div class="ai-result-card">
                 <h4>Total Unique Genes in Ciliopathies</h4>
                 <p>Across <strong>Primary, Motile, and Atypical Ciliopathies</strong>:</p>
                 <p style="font-size:22px; font-weight:bold; color:#2b6cb0; margin:20px 0;">
@@ -4321,11 +4384,15 @@ else if (
                 <p>This count includes all known causative and associated genes from the three core ciliopathy classes.</p>
                 <p><em>(Secondary diseases are excluded from this total.)</em></p>
             </div>`;
-            window.addChatMessage(htmlResult, false);
-            return;
         }
-        // === "How many genes are in [disease/classification]?" ===
-        if (qLower.match(/how many.*genes.*(in|for|are|associated with)/i)) {
+    },
+
+    // "How many genes are in [disease/classification]?"
+    {
+        priority: 77,
+        matcher: (qLower) => new RegExp(/how many.*genes.*(in|for|are|associated with)/i).test(qLower),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
             let target = null;
             if (qLower.includes('joubert')) target = 'Joubert Syndrome';
             else if (qLower.includes('mks') || qLower.includes('meckel')) target = 'Meckel–Gruber Syndrome';
@@ -4338,20 +4405,26 @@ else if (
             else if (qLower.includes('atypical ciliopathies')) target = 'Atypical Ciliopathies';
             if (target) {
                 let geneList = [];
+                const classificationMap = getDiseaseClassificationMap();
                 if (target === 'Primary Ciliopathies' || target === 'Motile Ciliopathies' || target === 'Atypical Ciliopathies') {
                     const diseases = classificationMap[target] || [];
                     let set = new Set();
                     diseases.forEach(d => {
-                        const genes = window.CiliAI.lookups.byCiliopathy[normalizeTerm(d)] || [];
+                        const genes = window.CiliAI.lookups.byCiliopathy[window.CiliAI.utils.normalizeTerm(d)] || [];
                         genes.forEach(g => set.add(g));
                     });
                     geneList = Array.from(set);
                 } else {
-                    const normKey = normalizeTerm(target);
+                    const normKey = window.CiliAI.utils.normalizeTerm(target);
                     geneList = window.CiliAI.lookups.byCiliopathy[normKey] || [];
                 }
                 const count = geneList.length;
-                htmlResult = `<div class="ai-result-card">
+                window.lastQueryContext = {
+                    type: 'list_followup',
+                    data: geneList.map(g => ({ gene: g })),
+                    term: `Genes in ${target}`
+                };
+                return `<div class="ai-result-card">
                     <h4>Genes in ${target}</h4>
                     <p style="font-size:18px; font-weight:bold; color:#2b6cb0; margin:15px 0;">
                         <strong>${count}</strong> unique gene${count === 1 ? '' : 's'}
@@ -4359,53 +4432,47 @@ else if (
                     <p>These are all known causative/associated genes in the database.</p>
                     <p>Would you like to <strong>view the full list</strong>?</p>
                 </div>`;
-                lastQueryContext = {
-                    type: 'list_followup',
-                    data: geneList.map(g => ({ gene: g })),
-                    term: `Genes in ${target}`
-                };
-                window.addChatMessage(htmlResult, false);
-                return;
             }
+            return null;
         }
-        // === Disease implicated by a gene ===
-        if ((qLower.includes('disease') || qLower.includes('ciliopathy')) &&
-            (qLower.includes('implicated') || qLower.includes('associated') || qLower.includes('linked') || qLower.includes('cause')) &&
-            qLower.includes('with')) {
-            const genes = extractMultipleGenes(query);
-            if (genes.length === 0) return;
+    },
+
+    // Disease implicated by a gene
+    {
+        priority: 76,
+        matcher: (qLower) => (qLower.includes('disease') || qLower.includes('ciliopathy')) && (qLower.includes('implicated') || qLower.includes('associated') || qLower.includes('linked') || qLower.includes('cause')) && qLower.includes('with'),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return null;
             const geneSymbol = genes[0];
             const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
             if (!geneData) {
-                htmlResult = `<div class="ai-result-card">
+                return `<div class="ai-result-card">
                     <p>Gene <strong>${geneSymbol}</strong> not found in the database.</p>
                 </div>`;
-                window.addChatMessage(htmlResult, false);
-                return;
             }
             let associatedDiseases = [];
             Object.keys(window.CiliAI.lookups.byCiliopathy).forEach(normKey => {
                 const diseaseGenes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
                 if (diseaseGenes.includes(geneSymbol)) {
                     let foundName = normKey;
+                    const classificationMap = getDiseaseClassificationMap();
                     Object.values(classificationMap).flat().forEach(d => {
-                        if (normalizeTerm(d) === normKey) foundName = d;
+                        if (window.CiliAI.utils.normalizeTerm(d) === normKey) foundName = d;
                     });
                     associatedDiseases.push(foundName);
                 }
             });
             if (associatedDiseases.length === 0 && geneData.Ciliopathies) {
-                associatedDiseases = Array.isArray(geneData.Ciliopathies)
-                    ? geneData.Ciliopathies
-                    : [geneData.Ciliopathies];
+                associatedDiseases = window.CiliAI.utils.ensureArray(geneData.Ciliopathies);
             }
             if (associatedDiseases.length === 0) {
-                htmlResult = `<div class="ai-result-card">
+                return `<div class="ai-result-card">
                     <p><strong>${geneSymbol}</strong> is a known ciliary gene but not yet directly linked to a specific ciliopathy in the current database.</p>
                     <p>It localizes to the <strong>${geneData.Localization || 'cilium'}</strong> and is highly conserved.</p>
                 </div>`;
             } else {
-                htmlResult = `<div class="ai-result-card">
+                return `<div class="ai-result-card">
                     <h4>Disease Associations: ${geneSymbol}</h4>
                     <p><strong>${geneSymbol}</strong> is implicated in the following ciliopathies:</p>
                     <ul>
@@ -4414,74 +4481,91 @@ else if (
                     <p>These are typically <strong>transition zone</strong> disorders with overlapping phenotypes (brain, retina, kidney).</p>
                 </div>`;
             }
-            window.addChatMessage(htmlResult, false);
-            return;
         }
-        // === Mouse Knockout Phenotype Handler ===
-        if (qLower.includes('mouse') && (qLower.includes('knockout') || qLower.includes('phenotype')) && qLower.includes('of')) {
-            const genes = extractMultipleGenes(query);
-            if (genes.length > 0) {
-                const gene = genes[0];
-                const data = window.CiliAI.lookups.geneMap[gene];
-                if (data && (data.mouse_phenotype || data.mouse_ciliopathy_phenotype)) {
-                    const pheno = data.mouse_phenotype || 'Ciliopathy-related phenotype observed';
-                    const model = data.Ortholog_Mouse ? ` (${data.Ortholog_Mouse} mouse model)` : '';
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>Mouse Knockout Phenotype: ${gene}${model}</h4>
-                        <p><strong>Phenotype:</strong> ${pheno}</p>
-                        ${data.mouse_ciliopathy_phenotype ? '<p>Known ciliopathy model.</p>' : ''}
-                    </div>`;
-                } else {
-                    htmlResult = `<div class="ai-result-card">
-                        <p>No mouse knockout phenotype data available for <strong>${gene}</strong> in current database.</p>
-                    </div>`;
-                }
-                window.addChatMessage(htmlResult, false);
-                return;
+    },
+
+    // Mouse Knockout Phenotype
+    {
+        priority: 75,
+        matcher: (qLower) => qLower.includes('mouse') && (qLower.includes('knockout') || qLower.includes('phenotype')) && qLower.includes('of'),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return null;
+            const gene = genes[0];
+            const data = window.CiliAI.lookups.geneMap[gene];
+            if (data && (data.mouse_phenotype || data.mouse_ciliopathy_phenotype)) {
+                const pheno = data.mouse_phenotype || 'Ciliopathy-related phenotype observed';
+                const model = data.Ortholog_Mouse ? ` (${data.Ortholog_Mouse} mouse model)` : '';
+                return `<div class="ai-result-card">
+                    <h4>Mouse Knockout Phenotype: ${gene}${model}</h4>
+                    <p><strong>Phenotype:</strong> ${pheno}</p>
+                    ${data.mouse_ciliopathy_phenotype ? '<p>Known ciliopathy model.</p>' : ''}
+                </div>`;
+            } else {
+                return `<div class="ai-result-card">
+                    <p>No mouse knockout phenotype data available for <strong>${gene}</strong> in current database.</p>
+                </div>`;
             }
         }
-        // Intent 1: Greetings
-        const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
-        const terminologyQueries = window.terminologyQueries || {};
-        if (simpleGreetings.includes(qLower)) {
-            window.addChatMessage("Hello! I'm CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
-            return;
+    },
+
+    // Greetings
+    {
+        priority: 70,
+        matcher: (qLower) => ['hello', 'hi', 'hey', 'greetings'].includes(qLower),
+        handler: async (query) => {
+            return "Hello! I'm CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.";
         }
-        if (terminologyQueries[qLower]) {
-            window.addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
-            return;
+    },
+
+    // Terminology Queries
+    {
+        priority: 69,
+        matcher: (qLower) => window.terminologyQueries && window.terminologyQueries[qLower],
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            return window.terminologyQueries[qLower] ? `<div class="ai-result-card"><p>${window.terminologyQueries[qLower]}</p></div>` : null;
         }
-        // Intent 2: Default Buttons
-        if (qLower === 'plot default umap') {
-            if (!window.CiliAI.activeDataset) window.CiliAI.activeDataset = 'lung';
-            window.renderUMAPPlot('WDR31', ['WDR31']);
-            const dsName = window.CiliAI.datasets[window.CiliAI.activeDataset].name;
-            htmlResult = `<div class="ai-result-card"><p>Displaying ${dsName} scRNA-seq UMAP for <strong>WDR31</strong> on the left.</p></div>`;
+    },
+
+    // Default Buttons (plot default umap, phylogeny)
+    {
+        priority: 68,
+        matcher: (qLower) => qLower === 'plot default umap' || qLower === 'plot default phylogeny',
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            if (qLower === 'plot default umap') {
+                if (!window.CiliAI.activeDataset) window.CiliAI.activeDataset = 'lung';
+                window.renderUMAPPlot('WDR31', ['WDR31']);
+                const dsName = window.CiliAI.datasets[window.CiliAI.activeDataset].name;
+                return `<div class="ai-result-card"><p>Displaying ${dsName} scRNA-seq UMAP for <strong>WDR31</strong> on the left.</p></div>`;
+            } else if (qLower === 'plot default phylogeny') {
+                return await window.handleAIQuery(`show nevers plot for ${window.DEFAULT_PHYLO_GENES.join(',')}`);
+            }
+            return null;
         }
-        else if (qLower === 'plot default phylogeny') {
-            htmlResult = await window.handleAIQuery(`show nevers plot for ${DEFAULT_PHYLO_GENES.join(',')}`);
-            return;
-        }
-        // Intent 3: Contextual Follow-up
-        const isComplexQuery = qLower.includes('expression') || qLower.includes('plot') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('kidney') || qLower.includes('lung') || qLower.includes('evolution');
-        const yesRegex = /^(yes|yeah|sure|ok|okay|yep|show|view|list|show list|view list|display)/i;
-        if (!isComplexQuery && htmlResult === null && yesRegex.test(qLower) && window.CiliAI.lastQueryContext && window.CiliAI.lastQueryContext.type) {
-            if (window.CiliAI.lastQueryContext.type === 'list_followup') {
+    },
+
+    // Contextual Follow-up (e.g., "yes" for lists, screens)
+    {
+        priority: 67,
+        matcher: (qLower) => {
+            const isComplexQuery = qLower.includes('expression') || qLower.includes('plot') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('kidney') || qLower.includes('lung') || qLower.includes('evolution');
+            const yesRegex = /^(yes|yeah|sure|ok|okay|yep|show|view|list|show list|view list|display)/i;
+            return !isComplexQuery && yesRegex.test(qLower) && window.lastQueryContext && window.lastQueryContext.type;
+        },
+        handler: async (query) => {
+            const type = window.lastQueryContext.type;
+            if (type === 'list_followup') {
                 if (typeof window.showDataInLeftPanel === 'function') {
-                    window.showDataInLeftPanel(
-                        window.CiliAI.lastQueryContext.term || 'Gene List',
-                        window.CiliAI.lastQueryContext.data || []
-                    );
-                    window.addChatMessage(`Displaying <strong>${window.CiliAI.lastQueryContext.term}</strong> in the main panel.`, false);
+                    window.showDataInLeftPanel(window.lastQueryContext.term || 'Gene List', window.lastQueryContext.data || []);
+                    window.lastQueryContext = { type: null, data: [], term: null };
+                    return `Displaying <strong>${window.lastQueryContext.term}</strong> in the main panel.`;
                 }
-                window.CiliAI.lastQueryContext = { type: null, data: [], term: null };
-                return;
-            }
-            else if (window.CiliAI.lastQueryContext.type === 'screen_references') {
-                htmlResult = window.handleScreenReferenceFollowup();
-                window.CiliAI.lastQueryContext = { type: null, data: [], term: null };
-            }
-            else if (window.CiliAI.lastQueryContext.type === 'top_500_ciliary') {
+            } else if (type === 'screen_references') {
+                window.lastQueryContext = { type: null, data: [], term: null };
+                return window.handleScreenReferenceFollowup();
+            } else if (type === 'top_500_ciliary') {
                 const top500 = window.CiliAI.masterData.slice(0, 500).map(g => ({
                     Gene: g.Gene,
                     Localization: g.Localization || '-',
@@ -4489,13 +4573,25 @@ else if (
                 }));
                 if (typeof window.showDataInLeftPanel === 'function') {
                     window.showDataInLeftPanel('Top 500 Ciliary Genes', top500);
-                    htmlResult = "I've loaded the top 500 ciliary genes into the main panel.";
+                    window.lastQueryContext = { type: null };
+                    return "I've loaded the top 500 ciliary genes into the main panel.";
                 }
-                window.CiliAI.lastQueryContext = { type: null };
             }
+            return null;
         }
-        // Intent 4: List Genes
-        if (htmlResult === null && (match = qLower.match(/^(?:list|show|display|find|give me)\s+(?:all\s+)?(.+?)\s+genes$/i))) {
+    },
+
+    // List Genes (by localization, compartment, module)
+    {
+        priority: 66,
+        matcher: (qLower) => {
+            const match = qLower.match(/^(?:list|show|display|find|give me)\s+(?:all\s+)?(.+?)\s+genes$/i);
+            return !!match;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const match = qLower.match(/^(?:list|show|display|find|give me)\s+(?:all\s+)?(.+?)\s+genes$/i);
+            if (!match) return null;
             const term = match[1].trim();
             const termUpper = term.toUpperCase();
             let genes = [];
@@ -4507,15 +4603,20 @@ else if (
             }
             if (genes.length > 0) {
                 const rows = genes.map(g => ({ gene: g }));
-                window.CiliAI.lastQueryContext = { type: 'list_followup', term: `${term} genes`, data: rows };
-                htmlResult = `<div class="ai-result-card"><p>Found <strong>${genes.length}</strong> genes associated with <strong>${term}</strong>.</p><p>Would you like to <strong>view the full list</strong>?</p></div>`;
+                window.lastQueryContext = { type: 'list_followup', term: `${term} genes`, data: rows };
+                return `<div class="ai-result-card"><p>Found <strong>${genes.length}</strong> genes associated with <strong>${term}</strong>.</p><p>Would you like to <strong>view the full list</strong>?</p></div>`;
             } else {
-                htmlResult = `I couldn't find a gene set for <strong>${term}</strong> in the database.`;
+                return `I couldn't find a gene set for <strong>${term}</strong> in the database.`;
             }
         }
-        // Intent 5: Phylogeny
-        if (htmlResult === null && (qLower.includes('evolution') || qLower.includes('conservation') || qLower.includes('phylogenetic') || qLower.includes('phylogeny') || qLower.includes('evo of') || qLower.match(/show.+evolution/i) || (qLower.includes('show') && qLower.includes('li')))) {
-            let genes = window.extractMultipleGenes(query);
+    },
+
+    // Phylogeny Queries
+    {
+        priority: 65,
+        matcher: (qLower) => qLower.includes('evolution') || qLower.includes('conservation') || qLower.includes('phylogenetic') || qLower.includes('phylogeny') || qLower.includes('evo of') || qLower.match(/show.+evolution/i) || (qLower.includes('show') && qLower.includes('li')),
+        handler: async (query) => {
+            let genes = window.CiliAI.utils.extractGenes(query);
             if (genes.length === 0) {
                 const geneMatch = query.match(/[A-Z0-9]{3,}/g);
                 if (geneMatch) genes = geneMatch.map(g => g.toUpperCase()).filter(g => window.CiliAI.lookups.geneMap[g]);
@@ -4534,711 +4635,666 @@ else if (
                     const res = window.renderLiPhylogenyHeatmap(genes);
                     if (res && res.plotData) Plotly.newPlot('cilia-svg', res.plotData, res.plotLayout);
                 }
-                htmlResult = `<div class="ai-result-card"><p>Displaying phylogenetic conservation for <strong>${genes.length} genes</strong> in the main panel.</p></div>`;
+                return `<div class="ai-result-card"><p>Displaying phylogenetic conservation for <strong>${genes.length} genes</strong> in the main panel.</p></div>`;
             } else {
-                htmlResult = "Please specify a valid gene symbol for evolutionary analysis (e.g., 'Show evolution of BBS1').";
+                return "Please specify a valid gene symbol for evolutionary analysis (e.g., 'Show evolution of BBS1').";
             }
         }
-        // Intent 6: Screen References
-        else if (htmlResult === null && (qLower.includes('show screen reference') || qLower.includes('show publication detail') || qLower.includes('provide the paper'))) {
-            htmlResult = window.handleScreenReferenceFollowup();
+    },
+
+    // Screen References Follow-up
+    {
+        priority: 64,
+        matcher: (qLower) => qLower.includes('show screen reference') || qLower.includes('show publication detail') || qLower.includes('provide the paper'),
+        handler: async (query) => {
+            return window.handleScreenReferenceFollowup ? window.handleScreenReferenceFollowup() : null;
         }
-        // Intent 7: Screens/Phenotypes
-        else if (htmlResult === null && (qLower.includes('loss-of-function') || qLower.includes('lof') || qLower.includes('overexpression') || qLower.includes('oe') || qLower.includes('percent ciliated') || qLower.includes('cilia length') || (qLower.includes('effect') && qLower.includes('of')))) {
-            const genes = window.extractMultipleGenes(query);
-            if (genes.length > 0) htmlResult = window.handleScreenQuery(genes[genes.length - 1]);
-            else htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
+    },
+
+    // Screens/Phenotypes
+    {
+        priority: 63,
+        matcher: (qLower) => qLower.includes('loss-of-function') || qLower.includes('lof') || qLower.includes('overexpression') || qLower.includes('oe') || qLower.includes('percent ciliated') || qLower.includes('cilia length') || (qLower.includes('effect') && qLower.includes('of')),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
+            return window.handleScreenQuery ? window.handleScreenQuery(genes[genes.length - 1]) : null;
         }
-        // Intent 8: What is [Gene]
-        else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
-            htmlResult = await window.displayFullGeneInfo(match[1].toUpperCase());
+    },
+
+    // What is [Gene]
+    {
+        priority: 62,
+        matcher: (qLower) => {
+            const match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i);
+            return !!match;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([a-z0-9\-]{3,})\??$/i);
+            if (!match) return null;
+            return await window.displayFullGeneInfo(match[1].toUpperCase());
         }
-        // Intent 9: Orthologs
-        else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
-            htmlResult = window.handleOrthologQuery(match[1].toUpperCase(), match[2]);
+    },
+
+    // Ortholog Queries (Alternative Patterns)
+    {
+        priority: 61,
+        matcher: (qLower) => {
+            const match1 = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i);
+            const match2 = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i);
+            return match1 || match2;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const match1 = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i);
+            const match2 = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i);
+            const match = match1 || match2;
+            if (!match) return null;
+            return window.handleOrthologQuery ? window.handleOrthologQuery((match1 ? match1[1] : match2[2]).toUpperCase(), (match1 ? match1[2] : match2[1])) : null;
         }
-        else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
-            htmlResult = window.handleOrthologQuery(match[2].toUpperCase(), match[1]);
+    },
+
+    // Domain Architecture
+    {
+        priority: 60,
+        matcher: (qLower) => {
+            const match = qLower.match(/(?:show )?(?:domains?|domain architecture|pfa?m?s?)(?: (?:of|for|in))?\s+(.+)/i);
+            return !!match;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const match = qLower.match(/(?:show )?(?:domains?|domain architecture|pfa?m?s?)(?: (?:of|for|in))?\s+(.+)/i);
+            if (!match) return null;
+            const rawInput = match[1];
+            const genes = window.CiliAI.utils.extractGenes(rawInput);
+            if (genes.length === 0) {
+                return `<div class="ai-result-card">
+                    <p>No valid gene symbols found.</p>
+                    <p><strong>Examples:</strong><br>
+                    • "Show domains for IFT88"<br>
+                    • "Domain architecture of WDR35"<br>
+                    • "Pfam domains in BBS1 and BBS4"</p>
+                </div>`;
+            }
+            // Switch to domain view
+            window.switchView('domain');
+            let responseHtml = `<div class="ai-result-card">
+                <h4>🧬 Protein Domain Architecture</h4>
+                <p>Showing Pfam domains for: <strong>${genes.slice(0, 3).join(', ')}${genes.length > 3 ? ' and ' + (genes.length - 3) + ' more' : ''}</strong></p>`;
+            if (genes.length === 1) {
+                const gene = genes[0].toUpperCase();
+                const geneData = window.CiliAI.lookups.geneMap[gene];
+                const hasDomains = geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions);
+                window.showDomainViewer(gene);
+                responseHtml += hasDomains
+                    ? `<p>Interactive domain map displayed → hover for details.</p>`
+                    : `<p><em>${gene}</em> has no annotated Pfam domains.</p>`;
+            } else {
+                window.showDomainViewer(genes[0]);
+                responseHtml += `<ul style="margin:10px 0; padding-left:20px; font-size:13px;">`;
+                genes.slice(0, 6).forEach(g => {
+                    const geneData = window.CiliAI.lookups.geneMap[g];
+                    const domainCount = geneData?.PFAM_IDs ? geneData.PFAM_IDs.split(/[,;]/).filter(Boolean).length
+                                    : geneData?.Domain_Descriptions ? geneData.Domain_Descriptions.split(/[,;]/).filter(Boolean).length : 0;
+                    responseHtml += `<li><strong>${g}</strong>: ${domainCount} domain${domainCount !== 1 ? 's' : ''}</li>`;
+                });
+                if (genes.length > 6) responseHtml += `<li><em>...and ${genes.length - 6} more</em></li>`;
+                responseHtml += `</ul>`;
+                responseHtml += `<p><strong>${genes[0]}</strong> is shown in full detail above. Type "domains for [other gene]" to switch.</p>`;
+            }
+            responseHtml += `
+                <p style="margin-top:12px; font-size:12px; color:#666;">
+                    🎨 Colors follow <strong>Nature journal</strong> style • Labels are staggered to prevent overlap
+                </p>
+            </div>`;
+            return responseHtml;
         }
-       // === Intent 10: Domain Architecture Visualizer (Multi-Gene, Nature Palette, Anti-Overlap) ===
-else if (htmlResult === null && (match = qLower.match(/(?:show )?(?:domains?|domain architecture|pfa?m?s?)(?: (?:of|for|in))?\s+(.+)/i))) {
-    const rawInput = match[1];
-    const genes = window.extractMultipleGenes(rawInput);
+    },
 
-    if (genes.length === 0) {
-        htmlResult = `<div class="ai-result-card">
-            <p>No valid gene symbols found.</p>
-            <p><strong>Examples:</strong><br>
-            • "Show domains for IFT88"<br>
-            • "Domain architecture of WDR35"<br>
-            • "Pfam domains in BBS1 and BBS4"</p>
-        </div>`;
-    } else {
-        // Switch to domain view
-        window.switchView('domain');
-
-        let responseHtml = `<div class="ai-result-card">
-            <h4>🧬 Protein Domain Architecture</h4>
-            <p>Showing Pfam domains for: <strong>${genes.slice(0, 3).join(', ')}${genes.length > 3 ? ' and ' + (genes.length - 3) + ' more' : ''}</strong></p>`;
-
-        // Show first gene fully, others as compact list if many
-        if (genes.length === 1) {
-            const gene = genes[0].toUpperCase();
-            const geneData = window.CiliAI.lookups.geneMap[gene];
-            const hasDomains = geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions);
-
-            window.showDomainViewer(gene); // This already uses Nature colors + anti-overlap staggering
-
-            responseHtml += hasDomains
-                ? `<p>Interactive domain map displayed → hover for details.</p>`
-                : `<p><em>${gene}</em> has no annotated Pfam domains.</p>`;
-        } else {
-            // Multi-gene: show compact summary + trigger first one in viewer
-            window.showDomainViewer(genes[0]);
-
-            responseHtml += `<ul style="margin:10px 0; padding-left:20px; font-size:13px;">`;
-            genes.slice(0, 6).forEach(g => {
-                const geneData = window.CiliAI.lookups.geneMap[g];
-                const domainCount = geneData?.PFAM_IDs ? geneData.PFAM_IDs.split(/[,;]/).filter(Boolean).length
-                                : geneData?.Domain_Descriptions ? geneData.Domain_Descriptions.split(/[,;]/).filter(Boolean).length : 0;
-                responseHtml += `<li><strong>${g}</strong>: ${domainCount} domain${domainCount !== 1 ? 's' : ''}</li>`;
-            });
-            if (genes.length > 6) responseHtml += `<li><em>...and ${genes.length - 6} more</em></li>`;
-            responseHtml += `</ul>`;
-            responseHtml += `<p><strong>${genes[0]}</strong> is shown in full detail above. Type "domains for [other gene]" to switch.</p>`;
-        }
-
-        responseHtml += `
-            <p style="margin-top:12px; font-size:12px; color:#666;">
-                🎨 Colors follow <strong>Nature journal</strong> style • Labels are staggered to prevent overlap
-            </p>
-        </div>`;
-        htmlResult = responseHtml;
-    }
-
-    window.addChatMessage(htmlResult, false);
-    return;
-}
-        // Intent 11: Modules
-        else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
+    // Functional Modules of Gene
+    {
+        priority: 59,
+        matcher: (qLower) => {
+            const match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i);
+            return !!match;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i);
+            if (!match) return null;
             const gene = match[1].toUpperCase();
             const g = window.CiliAI.lookups.geneMap[gene];
-            if (g && g['Functional.category']) htmlResult = window.formatListResult(`Functional Modules for ${gene}`, window.ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
-            else htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
+            if (g && g['Functional.category']) {
+                return window.formatListResult(`Functional Modules for ${gene}`, window.CiliAI.utils.ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
+            } else {
+                return `No functional modules listed for <strong>${gene}</strong>.`;
+            }
         }
-// =======================================================
-// (12) INTENT: Expression / UMAP Plot (Single Gene or Complex)
-// =======================================================
-else if (
-    htmlResult === null &&
-    (
-        qLower.includes('plot') ||
-        qLower.includes('display') ||
-        qLower.includes('heatmap') ||
-        qLower.includes('umap') ||
-        qLower.includes('scrna') ||
-        qLower.includes('expression')
-    ) &&
-    !qLower.includes('compare') &&  // Critical: prevent overlap with compare intent
-    !qLower.includes(' vs ') &&
-    !qLower.includes(' versus ')
-) {
-    // ---------------------------------------------------
-    // 1. Dynamic Dataset Inference
-    // ---------------------------------------------------
-    const availableDatasets = Object.keys(window.CiliAI.datasets);
-    // Sort by length desc to ensure "lung_downsampled" matches before "lung"
-    availableDatasets.sort((a, b) => b.length - a.length);
+    },
 
-    let detectedDS = null;
-    
-    // Check query for dataset names or aliases
-    for (const dsKey of availableDatasets) {
-        let isMatch = qLower.includes(dsKey);
-        // Aliases
-        if (dsKey === 'olfactory' && (qLower.includes('nose') || qLower.includes('smell'))) isMatch = true;
-        if (dsKey === 'hypothalamus' && (qLower.includes('brain') || qLower.includes('neuron'))) isMatch = true;
-        if (dsKey === 'chondrocyte' && (qLower.includes('cartilage') || qLower.includes('disc'))) isMatch = true;
-        if (dsKey === 'kidney' && qLower.includes('renal')) isMatch = true;
-        if (dsKey === 'liver' && qLower.includes('hepatic')) isMatch = true;
-        
-        if (isMatch) {
-            detectedDS = dsKey;
-            break; // Stop at first valid match
+    // Expression / UMAP Plot (Single Gene or Complex)
+    {
+        priority: 58,
+        matcher: (qLower) => (qLower.includes('plot') || qLower.includes('display') || qLower.includes('heatmap') || qLower.includes('umap') || qLower.includes('scrna') || qLower.includes('expression')) && !qLower.includes('compare') && !qLower.includes(' vs ') && !qLower.includes(' versus '),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const availableDatasets = Object.keys(window.CiliAI.datasets);
+            availableDatasets.sort((a, b) => b.length - a.length);
+            let detectedDS = null;
+            for (const dsKey of availableDatasets) {
+                let isMatch = qLower.includes(dsKey);
+                if (dsKey === 'olfactory' && (qLower.includes('nose') || qLower.includes('smell'))) isMatch = true;
+                if (dsKey === 'hypothalamus' && (qLower.includes('brain') || qLower.includes('neuron'))) isMatch = true;
+                if (dsKey === 'chondrocyte' && (qLower.includes('cartilage') || qLower.includes('disc'))) isMatch = true;
+                if (dsKey === 'kidney' && qLower.includes('renal')) isMatch = true;
+                if (dsKey === 'liver' && qLower.includes('hepatic')) isMatch = true;
+                if (isMatch) {
+                    detectedDS = dsKey;
+                    break;
+                }
+            }
+            if (detectedDS) {
+                window.CiliAI.activeDataset = detectedDS;
+                if (qLower.startsWith('switch to') && qLower.split(' ').length <= 4) {
+                    return `Switched to <strong>${window.CiliAI.datasets[detectedDS].name}</strong> dataset.`;
+                }
+            }
+            let genes = window.CiliAI.utils.extractGenes(query);
+            let finalTargetTerm = null;
+            let isComplex = false;
+            if (genes.length === 0) {
+                let cleanQuery = qLower.replace(/plot|display|show|visualize|umap|heatmap|scrna|expression/g, '').replace(/in|for|of|from/g, '').trim();
+                const complexName = window.extractComplexIntent ? window.extractComplexIntent(cleanQuery) : null;
+                if (complexName) {
+                    const complexGenes = window.getGenesByComplex ? window.getGenesByComplex(complexName).map(g => g.gene) : [];
+                    if (complexGenes.length > 0) {
+                        genes = complexGenes;
+                        finalTargetTerm = complexName;
+                        isComplex = true;
+                    }
+                } else if (cleanQuery.length > 2) {
+                    genes = window.CiliAI.utils.extractGenes(cleanQuery);
+                }
+            }
+            const finalGenes = genes.length > 0 ? genes : ['WDR31'];
+            const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
+            const zoomMatch = qLower.match(/zoom to\s+([\w\s\-\(\)]+?)(?:\s+(?:in|for)|$)/i);
+            const zoomToCellType = zoomMatch ? zoomMatch[1].trim() : null;
+            await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
+            const currentDS = window.CiliAI.activeDataset;
+            const currentName = window.CiliAI.datasets[currentDS].name;
+            const genesArg = finalGenes.join(',');
+            const zoomArg = zoomToCellType || '';
+            const switchButtons = availableDatasets.filter(ds => ds !== currentDS).map(ds => {
+                const shortName = window.CiliAI.datasets[ds].name.replace('Human ', '').replace('Organoid', 'Org.');
+                return `<button class="ciliai-button" style="font-size:10px; padding:5px 10px; background:#ffffff; color:#475569; border:1px solid #cbd5e0; border-radius:12px; margin:2px;" onmouseover="this.style.borderColor='#3b82f6'; this.style.color='#3b82f6'" onmouseout="this.style.borderColor='#cbd5e0'; this.style.color='#475569'" onclick="window.switchDatasetAndPlot('${ds}', '${geneSymbol}', '${genesArg}', '${zoomArg}')"> 📍 ${shortName}</button>`;
+            }).join('');
+            return `
+                <div class="ai-result-card" style="border-left: 4px solid #2b6cb0; padding:15px; font-family:'Inter',sans-serif;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px;">
+                        <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Visualization Active</span>
+                        <span style="font-size:10px; background:#ebf8ff; color:#2b6cb0; padding:2px 6px; border-radius:4px; font-weight:600;">UMAP</span>
+                    </div>
+                    <table style="width:100%; font-size:13px; border-collapse:collapse; margin-bottom:12px;">
+                        <tr>
+                            <td style="color:#64748b; padding:4px 0; width:70px; vertical-align:top;">Dataset:</td>
+                            <td style="font-weight:600; color:#2d3748;">${currentName}</td>
+                        </tr>
+                        <tr>
+                            <td style="color:#64748b; padding:4px 0; vertical-align:top;">Target:</td>
+                            <td style="font-weight:600; color:#2b6cb0;">
+                                ${geneSymbol}
+                                ${isComplex ? '<span style="font-weight:400; color:#666; font-size:11px;">(Complex Avg)</span>' : ''}
+                                ${finalGenes.length > 1 && !isComplex ? `<span style="font-weight:400; color:#666; font-size:11px;">(+${finalGenes.length-1} others)</span>` : ''}
+                            </td>
+                        </tr>
+                        ${zoomToCellType ? `<tr><td style="color:#64748b; padding:4px 0;">Zoom:</td><td>${zoomToCellType}</td></tr>` : ''}
+                    </table>
+                    <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+                        <div style="font-size:10px; font-weight:700; color:#475569; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Compare in other tissues</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                            ${switchButtons}
+                        </div>
+                    </div>
+                    <div style="margin-top:12px; text-align:right; display:flex; justify-content:flex-end; gap:10px;">
+                        <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" style="font-size:11px; text-decoration:none; color:#475569; display:flex; align-items:center;">
+                            ⬇️ CSV Data
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+    },
+
+    // Compare Genes
+    {
+        priority: 57,
+        matcher: (qLower) => qLower.includes('compare') || qLower.includes(' vs ') || qLower.includes(' versus ') || qLower.includes('difference between'),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length < 2) {
+                return `<div class="ai-result-card">
+                    <p>Please provide at least two genes to compare.</p>
+                    <p><strong>Examples:</strong><br>
+                    • "Compare WDR31 and WDR54"<br>
+                    • "Compare expressions of WDR31, WDR54 and IFT88"<br>
+                    • "IFT88 vs IFT140 expression"</p>
+                </div>`;
+            }
+            const compareGenes = genes.slice(0, 6).map(g => g.toUpperCase());
+            const validGenes = compareGenes.filter(g => window.CiliAI.lookups.geneMap[g]);
+            const missing = compareGenes.filter(g => !window.CiliAI.lookups.geneMap[g]);
+            let responseHtml = `<div class="ai-result-card"><h4>🔬 Comparative Analysis</h4>`;
+            if (missing.length > 0) {
+                responseHtml += `<p><strong>Not found:</strong> ${missing.join(', ')}</p>`;
+            }
+            if (validGenes.length < 2) {
+                responseHtml += `<p>Not enough valid genes to compare.</p></div>`;
+                return responseHtml;
+            }
+            const hasExpressionQuery = qLower.includes('expression') || qLower.includes('expressed') || qLower.includes('level');
+            const hasLocalizationQuery = qLower.includes('localization') || qLower.includes('located') || qLower.includes('compartment') || qLower.includes('where');
+            if (hasExpressionQuery) {
+                window.switchView('plot');
+                const primaryGene = validGenes[0];
+                await window.renderUMAPPlot(primaryGene, validGenes, null);
+                const currentDS = window.CiliAI.activeDataset || 'lung';
+                const dsName = window.CiliAI.datasets[currentDS].name;
+                const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
+                const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
+                const genesArg = validGenes.join(',');
+                responseHtml += `
+                    <p><strong>Expression Comparison</strong> across <strong>${validGenes.length}</strong> genes in <strong>${dsName}</strong>:</p>
+                    <p>Colored by <strong>average expression</strong> of the gene set.<br>
+                       Click points to see localization of individual cells.</p>
+                    <ul style="margin:10px 0; padding-left:20px; font-size:13.5px;">
+                        ${validGenes.map((g, i) => {
+                            const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5', '#9f7aea'];
+                            return `<li style="margin:4px 0;">
+                                <span style="display:inline-block; width:12px; height:12px; background:${colors[i]}; border-radius:3px; margin-right:8px;"></span>
+                                <strong>${g}</strong>
+                            </li>`;
+                        }).join('')}
+                    </ul>
+                    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="ciliai-button"
+                            onclick="window.switchDatasetAndPlot('${nextDS}', '${validGenes[0]}', '${genesArg}', '')">
+                            🔄 Switch to ${nextDSLabel}
+                        </button>
+                        <a href="#" onclick="window.downloadUMAPDataAsCSV('${validGenes.join('_')}')" class="ai-action">
+                            ⬇️ CSV
+                        </a>
+                    </div>
+                    <p style="margin-top:10px; font-size:12px; color:#666;">
+                        💡 Higher color intensity = higher average expression of these genes.
+                    </p>
+                `;
+            } else if (hasLocalizationQuery) {
+                window.switchView('diagram');
+                window.showDiagram();
+                window.SpatialManager.clearOverlays();
+                window.SpatialManager.applyMultiOverlay(validGenes);
+                responseHtml += `<p><strong>Localization Comparison</strong> (colored overlays):</p><ul style="margin:8px 0;">`;
+                const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+                validGenes.forEach((g, i) => {
+                    const loc = window.CiliAI.lookups.geneMap[g]?.Localization || 'Not annotated';
+                    responseHtml += `<li style="margin:4px 0;">
+                        <span style="display:inline-block; width:12px; height:12px; background:${colors[i]}; border-radius:3px; margin-right:8px;"></span>
+                        <strong>${g}</strong>: ${loc}
+                    </li>`;
+                });
+                responseHtml += `</ul><p><em>👆 Overlapping colors show shared compartments.</em></p>`;
+            } else {
+                window.switchView('diagram');
+                window.showDiagram();
+                window.SpatialManager.clearOverlays();
+                window.SpatialManager.applyMultiOverlay(validGenes);
+                responseHtml += `<p><strong>Comparing ${validGenes.length} genes</strong>:</p>
+                    <table style="width:100%; font-size:13px; margin:10px 0; border-collapse:collapse;">
+                        <tr style="background:#f7fafc;">
+                            <th style="text-align:left; padding:6px;">Gene</th>
+                            <th style="text-align:left; padding:6px;">Localization</th>
+                            <th style="text-align:left; padding:6px;">Ciliopathy</th>
+                        </tr>`;
+                validGenes.forEach((g, i) => {
+                    const data = window.CiliAI.lookups.geneMap[g];
+                    const loc = data?.Localization || '—';
+                    const disease = data?.Ciliopathy && data?.Ciliopathy !== 'Not specified' ? 'Yes' : 'No';
+                    const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+                    responseHtml += `<tr>
+                        <td style="padding:6px; font-weight:600; color:${colors[i]};">${g}</td>
+                        <td style="padding:6px;">${loc}</td>
+                        <td style="padding:6px;">${disease}</td>
+                    </tr>`;
+                });
+                responseHtml += `</table>
+                    <p><em>Multi-colored overlay active on the ciliary diagram → click compartments to explore.</em></p>`;
+            }
+            responseHtml += `</div>`;
+            return responseHtml;
+        }
+    },
+
+    // Variants
+    {
+        priority: 56,
+        matcher: (qLower) => qLower.includes('variant') || qLower.includes('mutation'),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return null;
+            return await window.fetchVariantData(genes[0]);
+        }
+    },
+
+    // Batch Query
+    {
+        priority: 55,
+        matcher: (qLower) => query.includes(',') && window.CiliAI.utils.extractGenes(query).length > 1,
+        handler: async (query) => {
+            return window.handleBatchQuery ? window.handleBatchQuery(query) : null;
+        }
+    },
+
+    // Fold Change
+    {
+        priority: 54,
+        matcher: (qLower) => {
+            const foldChangeMatch = qLower.match(/compare\s+(.+)\s+in\s+(.+)\s+vs\s+(.+)/i);
+            return !!foldChangeMatch;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const foldChangeMatch = qLower.match(/compare\s+(.+)\s+in\s+(.+)\s+vs\s+(.+)/i);
+            if (!foldChangeMatch) return null;
+            const result = window.calculateFoldChangeForComplex(foldChangeMatch[1].trim().toUpperCase(), foldChangeMatch[2].trim(), foldChangeMatch[3].trim());
+            if (result.error) return `<div class="ai-result-card"><h4>Differential Expression Error</h4><p>${result.error}</p></div>`;
+            return `<div class="ai-result-card"><h4>Differential Expression: ${result.complex}</h4><p>Comparing average expression in **${result.cellTypeA}** (A) vs **${result.cellTypeB}** (B) (N=${result.count} genes).</p><p><strong>Fold Change (A/B): ${result.foldChange.toFixed(3)}</strong></p></div>`;
+        }
+    },
+
+    // Phylogeny Overlap
+    {
+        priority: 53,
+        matcher: (qLower) => {
+            const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
+            return classOverlapMatch && qLower.includes('li');
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
+            if (!classOverlapMatch) return null;
+            const dataLoaded = await window.ensurePhylogenyDataLoaded();
+            if (dataLoaded) {
+                const result = window.getPhylogenyClassSpeciesOverlap(classOverlapMatch[1].trim(), classOverlapMatch[2].trim(), 'li');
+                if (result.error) return `<div class="ai-result-card"><h4>Error</h4><p>${result.error}</p></div>`;
+                return `<div class="ai-result-card"><h4>Overlap: ${result.classA} vs ${result.classB}</h4><p>Found **${result.sharedCount}** shared species.</p></div>`;
+            }
+            return null;
+        }
+    },
+
+    // Enrichment
+    {
+        priority: 52,
+        matcher: (qLower) => {
+            const enrichmentMatch = qLower.match(/enrichment for (.+)/);
+            return !!enrichmentMatch;
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const enrichmentMatch = qLower.match(/enrichment for (.+)/);
+            if (!enrichmentMatch) return null;
+            const geneList = window.CiliAI.utils.extractGenes(enrichmentMatch[1]);
+            const terms = window.getEnrichedGOTerms ? window.getEnrichedGOTerms(geneList) : [];
+            if (terms.length > 0) return `<div class="ai-result-card"><h4>Enrichment</h4><p>Top term: ${terms[0].term}</p></div>`;
+            return "No enrichment found.";
+        }
+    },
+
+    // Show Ciliary Cells
+    {
+        priority: 51,
+        matcher: (qLower) => qLower.includes('show') && qLower.includes('ciliary cells'),
+        handler: async (query) => {
+            window.renderUMAPPlot('CLUSTER_VIEW');
+            window.lastQueryContext = { type: 'top_500_ciliary' };
+            return `<div class="ai-result-card"><p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p><p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p></div>`;
+        }
+    },
+
+    // Localization Queries (Where is [GENE] localized?)
+    {
+        priority: 50,
+        matcher: (qLower) => (qLower.startsWith('where is') || qLower.startsWith('where are') || qLower.includes('localization of') || qLower.includes('localisation of') || qLower.includes('localized') || qLower.includes('localised') || qLower.match(/tell me.*locali[sz]ation/)) && (qLower.includes('where') || qLower.includes('locali') || qLower.includes('located')),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) {
+                return `
+                    <div class="ai-result-card">
+                        <p>I couldn't identify any gene symbols in your question.</p>
+                        <p><strong>Examples:</strong><br>
+                        • "Where is IFT88 localized?"<br>
+                        • "Where are BBS1, BBS5 and ELMOD3 located?"<br>
+                        • "Tell me the localization of PCM1"</p>
+                    </div>
+                `;
+            }
+            window.switchView('diagram');
+            window.showDiagram();
+            window.SpatialManager.clearOverlays();
+            let responseHtml = '<div class="ai-result-card"><h4>📍 Gene Localization in the Cilium</h4>';
+            const validGenes = [];
+            const unknownGenes = [];
+            genes.forEach(geneSymbol => {
+                geneSymbol = geneSymbol.toUpperCase().trim();
+                const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+                if (!geneData) {
+                    unknownGenes.push(geneSymbol);
+                    return;
+                }
+                validGenes.push({
+                    symbol: geneSymbol,
+                    localization: geneData.Localization?.trim() || 'Unknown / Not annotated'
+                });
+            });
+            if (unknownGenes.length > 0) {
+                responseHtml += `<p><strong>Not found:</strong> ${unknownGenes.join(', ')}</p>`;
+            }
+            if (validGenes.length === 0) {
+                responseHtml += `<p>No known genes from your query were found in the database.</p></div>`;
+                return responseHtml;
+            }
+            if (validGenes.length === 1) {
+                const { symbol, localization } = validGenes[0];
+                let highlighted = false;
+                if (localization && localization !== 'Unknown / Not annotated') {
+                    highlighted = window.SpatialManager.highlight(localization, symbol);
+                }
+                const status = highlighted ? '✅ Highlighted and zoomed on the diagram' : 'ℹ️ Localization known but not mappable to specific compartment — full view shown';
+                responseHtml += `
+                    <p>
+                        <span class="gene-badge" style="font-size:14px; padding:6px 14px;">${symbol}</span><br><br>
+                        <strong>Localized to:</strong> <span style="color:#2b6cb0; font-weight:600;">${localization}</span><br><br>
+                        <em>${status}</em>
+                    </p>
+                `;
+            } else {
+                window.SpatialManager.applyMultiOverlay(validGenes.map(g => g.symbol));
+                responseHtml += `<p><strong>Multiple genes queried:</strong></p>`;
+                validGenes.forEach(({ symbol, localization }, i) => {
+                    const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+                    const color = colors[i % colors.length];
+                    responseHtml += `
+                        <p style="margin:8px 0;">
+                            <span class="gene-badge" style="background:${color}; color:white;">${symbol}</span>
+                            → <strong>${localization}</strong>
+                        </p>
+                    `;
+                });
+                responseHtml += `<p style="margin-top:14px;"><em>
+                    👆 Each gene is shown with a distinct colored overlay on the interactive cilium diagram.
+                </em></p>`;
+            }
+            responseHtml += `
+                <p style="margin-top:16px; font-size:13px; color:#666;">
+                    💡 <strong>Tip:</strong> You can click on compartments in the diagram to explore, or zoom using the controls.
+                </p>
+            </div>`;
+            return responseHtml;
+        }
+    },
+
+    // Multi-gene Overlay
+    {
+        priority: 49,
+        matcher: (qLower) => qLower.startsWith('multi:') || qLower.includes('multi:'),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            let geneString = query.replace(/^multi:?/i, '').trim();
+            geneString = geneString.replace(/^[:\s,]+/, '').replace(/[\.\?!]*$/, '');
+            let genes = window.CiliAI.utils.extractGenes(geneString);
+            if (genes.length === 0 && geneString) {
+                genes = geneString.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(g => g.length >= 3 && /^[A-Z0-9]+$/.test(g));
+            }
+            if (genes.length < 2) {
+                return `
+                    <div class="ai-result-card">
+                        <p>Please provide at least 2 valid gene symbols.</p>
+                        <p><strong>Example:</strong> Multi: IFT88, FOXJ1</p>
+                        <p>Or: Multi: BBS1, CEP290, TMEM67</p>
+                    </div>
+                `;
+            }
+            window.resetViews();
+            if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
+                window.SpatialManager.applyMultiOverlay(genes);
+            }
+            const geneList = genes.join(', ');
+            const preview = genes.length > 8 ? genes.slice(0, 8).join(', ') + '...' : geneList;
+            return `
+                <div class="ai-result-card">
+                    <h4>Multi-gene Localization</h4>
+                    <p><strong>Genes:</strong> ${geneList} (${genes.length} total)</p>
+                    <p><strong>Preview:</strong> ${preview}</p>
+                    <p>Each gene is highlighted in a <strong>different color</strong> on the interactive ciliary diagram.</p>
+                </div>
+            `;
+        }
+    },
+
+    // GO Term / Functional Heatmap
+    {
+        priority: 48,
+        matcher: (qLower) => qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:'),
+        handler: async (query) => {
+            let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
+            if (!term) {
+                return `<div class="ai-result-card"><p>Please provide a GO term or functional category (e.g., "GO: intraflagellar transport").</p></div>`;
+            }
+            let genes = [];
+            if (typeof window.getGenesByFunction === 'function') {
+                genes = window.getGenesByFunction(term);
+            }
+            const lowerTerm = term.toLowerCase();
+            const fallbackMap = {
+                'intraflagellar transport': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46', 'KIF3A', 'KIF3B', 'KIF17', 'DYNC2H1'],
+                'ift': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46'],
+                'bbsome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'TTC8', 'BBS9', 'BBIP1'],
+                'transition zone': ['TMEM67', 'TMEM216', 'TMEM237', 'CEP290', 'CC2D2A', 'TCTN1', 'TCTN2', 'MKS1', 'NPHP1', 'RPGRIP1L'],
+                'dynein arm': ['DNAH5', 'DNAH11', 'DNAI1', 'DNAI2', 'DNAAF1', 'DNAAF2', 'LRRC6'],
+                'radial spoke': ['RSPH1', 'RSPH4A', 'RSPH9', 'DRC1']
+            };
+            if (genes.length === 0) {
+                for (const key in fallbackMap) {
+                    if (lowerTerm.includes(key)) {
+                        genes = fallbackMap[key];
+                        break;
+                    }
+                }
+            }
+            if (genes.length === 0) {
+                return `
+                    <div class="ai-result-card">
+                        <p>No genes found for <strong>"${term}"</strong>.</p>
+                        <p>Try common terms like "intraflagellar transport", "bbsome", or "transition zone".</p>
+                    </div>
+                `;
+            }
+            window.resetViews();
+            if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
+                const upperGenes = genes.map(g => g.toUpperCase());
+                window.SpatialManager.applyMultiOverlay(upperGenes);
+            }
+            const preview = genes.slice(0, 12).join(', ');
+            const more = genes.length > 12 ? `... and ${genes.length - 12} more` : '';
+            return `
+                <div class="ai-result-card">
+                    <h4>Functional Category / GO Term: ${term}</h4>
+                    <p>Found <strong>${genes.length}</strong> genes.</p>
+                    <p><strong>Examples:</strong> ${preview}${more}</p>
+                    <p>A <strong>multi-colored overlay</strong> has been applied to the ciliary diagram showing localization.</p>
+                </div>
+            `;
+        }
+    },
+
+    // Fallback Intent
+    {
+        priority: 0,
+        matcher: () => true,
+        handler: async (query) => {
+            const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
+            if (intent && intent.handler) {
+                return intent.handler(intent.entity, query);
+            }
+            let term = window.CiliAI.utils.normalizeQuery(query);
+            const match = term.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
+            if (match) term = match[1];
+            term = term.replace(/[?.]/g, '').trim().toUpperCase();
+            const genes = window.CiliAI.utils.extractGenes(term);
+            if (genes.length > 0) {
+                return await window.displayFullGeneInfo(genes[0]);
+            } else {
+                return `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, localization, or GO term.`;
+            }
         }
     }
+];
 
-    // Apply switch if detected
-    if (detectedDS) {
-        window.CiliAI.activeDataset = detectedDS;
-        // If the query was *only* a switch command (e.g., "switch to liver"), stop here
-        if (qLower.startsWith('switch to') && qLower.split(' ').length <= 4) {
-            window.addChatMessage(`Switched to <strong>${window.CiliAI.datasets[detectedDS].name}</strong> dataset.`, false);
+// 3. Sort Handlers by Priority (Descending)
+intentHandlers.sort((a, b) => b.priority - a.priority);
+
+// 4. New Dispatcher: handleAIQuery (Replaces old version)
+window.handleAIQuery = async function (query) {
+    const chatWindow = document.getElementById('messages');
+    if (!chatWindow || !query) return;
+    const qLower = window.CiliAI.utils.normalizeQuery(query);
+    if (window.log) window.log(`Routing query: ${query}`);
+    try {
+        if (!window.CiliAI || !window.CiliAI.ready) {
+            window.addChatMessage("Data is still loading, please wait...", false);
             return;
         }
-    }
-
-    // ---------------------------------------------------
-    // 2. Robust Target Extraction (Gene or Complex)
-    // ---------------------------------------------------
-    let genes = window.extractMultipleGenes(query);
-    let finalTargetTerm = null;
-    let isComplex = false;
-
-    // If no genes found via regex, check for complex names or clean parsing
-    if (genes.length === 0) {
-        // Remove command words to help complex extraction
-        let cleanQuery = qLower
-            .replace(/plot|display|show|visualize|umap|heatmap|scrna|expression/g, '')
-            .replace(/in|for|of|from/g, '')
-            .trim();
-            
-        // Check for complex intent
-        const complexName = window.extractComplexIntent(cleanQuery);
-        if (complexName) {
-            const complexGenes = window.getGenesByComplex(complexName).map(g => g.gene);
-            if (complexGenes.length > 0) {
-                genes = complexGenes;
-                finalTargetTerm = complexName;
-                isComplex = true;
-            }
-        } 
-        // Fallback: If "Plot X" and X isn't a gene/complex, try using it as raw target
-        else if (cleanQuery.length > 2) {
-             // Try one last extraction on cleaned string
-             genes = window.extractMultipleGenes(cleanQuery);
-        }
-    }
-
-    // Default to WDR31 if absolutely nothing found
-    const finalGenes = genes.length > 0 ? genes : ['WDR31']; 
-    const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
-    
-    // ---------------------------------------------------
-    // 3. Zoom-to-Cell-Type Parsing
-    // ---------------------------------------------------
-    const zoomMatch = qLower.match(/zoom to\s+([\w\s\-\(\)]+?)(?:\s+(?:in|for)|$)/i);
-    const zoomToCellType = zoomMatch ? zoomMatch[1].trim() : null;
-
-    // ---------------------------------------------------
-    // 4. Render UMAP 
-    // ---------------------------------------------------
-    await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
-
-    // ---------------------------------------------------
-    // 5. Generate Aesthetic UI (Result Card)
-    // ---------------------------------------------------
-    const currentDS = window.CiliAI.activeDataset;
-    const currentName = window.CiliAI.datasets[currentDS].name;
-    const genesArg = finalGenes.join(',');
-    const zoomArg = zoomToCellType || '';
-
-    // Generate Tissue Switch Chips
-    const switchButtons = availableDatasets
-        .filter(ds => ds !== currentDS)
-        .map(ds => {
-            const shortName = window.CiliAI.datasets[ds].name.replace('Human ', '').replace('Organoid', 'Org.');
-            return `
-                <button class="ciliai-button"
-                    style="font-size:10px; padding:5px 10px; background:#ffffff; color:#475569; border:1px solid #cbd5e0; border-radius:12px; margin:2px;"
-                    onmouseover="this.style.borderColor='#3b82f6'; this.style.color='#3b82f6'"
-                    onmouseout="this.style.borderColor='#cbd5e0'; this.style.color='#475569'"
-                    onclick="window.switchDatasetAndPlot('${ds}', '${geneSymbol}', '${genesArg}', '${zoomArg}')">
-                    📍 ${shortName}
-                </button>
-            `;
-        }).join('');
-
-    // Aesthetic Table Layout
-    htmlResult = `
-        <div class="ai-result-card" style="border-left: 4px solid #2b6cb0; padding:15px; font-family:'Inter',sans-serif;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px;">
-                <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Visualization Active</span>
-                <span style="font-size:10px; background:#ebf8ff; color:#2b6cb0; padding:2px 6px; border-radius:4px; font-weight:600;">UMAP</span>
-            </div>
-            
-            <table style="width:100%; font-size:13px; border-collapse:collapse; margin-bottom:12px;">
-                <tr>
-                    <td style="color:#64748b; padding:4px 0; width:70px; vertical-align:top;">Dataset:</td>
-                    <td style="font-weight:600; color:#2d3748;">${currentName}</td>
-                </tr>
-                <tr>
-                    <td style="color:#64748b; padding:4px 0; vertical-align:top;">Target:</td>
-                    <td style="font-weight:600; color:#2b6cb0;">
-                        ${geneSymbol} 
-                        ${isComplex ? '<span style="font-weight:400; color:#666; font-size:11px;">(Complex Avg)</span>' : ''}
-                        ${finalGenes.length > 1 && !isComplex ? `<span style="font-weight:400; color:#666; font-size:11px;">(+${finalGenes.length-1} others)</span>` : ''}
-                    </td>
-                </tr>
-                ${zoomToCellType ? `<tr><td style="color:#64748b; padding:4px 0;">Zoom:</td><td>${zoomToCellType}</td></tr>` : ''}
-            </table>
-
-            <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
-                <div style="font-size:10px; font-weight:700; color:#475569; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Compare in other tissues</div>
-                <div style="display:flex; flex-wrap:wrap; gap:4px;">
-                    ${switchButtons}
-                </div>
-            </div>
-            
-            <div style="margin-top:12px; text-align:right; display:flex; justify-content:flex-end; gap:10px;">
-                <a href="#" class="ai-action" onclick="window.downloadUMAPDataAsCSV('${geneSymbol}')" style="font-size:11px; text-decoration:none; color:#475569; display:flex; align-items:center;">
-                    ⬇️ CSV Data
-                </a>
-            </div>
-        </div>
-    `;
-}
-// =======================================================
-// (13) INTENT: Compare Genes — NOW WITH EXPRESSION PLOTTING SUPPORT
-// =======================================================
-else if (
-    htmlResult === null && 
-    (qLower.includes('compare') || qLower.includes(' vs ') || qLower.includes(' versus ') || qLower.includes('difference between'))
-) {
-    const genes = window.extractMultipleGenes(query);
-
-    if (genes.length < 2) {
-        htmlResult = `<div class="ai-result-card">
-            <p>Please provide at least two genes to compare.</p>
-            <p><strong>Examples:</strong><br>
-            • "Compare WDR31 and WDR54"<br>
-            • "Compare expressions of WDR31, WDR54 and IFT88"<br>
-            • "IFT88 vs IFT140 expression"</p>
-        </div>`;
-        window.addChatMessage(htmlResult, false);
-        return;
-    }
-
-    const compareGenes = genes.slice(0, 6).map(g => g.toUpperCase()); // Limit to 6
-    const validGenes = compareGenes.filter(g => window.CiliAI.lookups.geneMap[g]);
-    const missing = compareGenes.filter(g => !window.CiliAI.lookups.geneMap[g]);
-
-    let responseHtml = `<div class="ai-result-card"><h4>🔬 Comparative Analysis</h4>`;
-
-    if (missing.length > 0) {
-        responseHtml += `<p><strong>Not found:</strong> ${missing.join(', ')}</p>`;
-    }
-
-    if (validGenes.length < 2) {
-        responseHtml += `<p>Not enough valid genes to compare.</p></div>`;
-        window.addChatMessage(responseHtml, false);
-        return;
-    }
-
-    // === Detect comparison type ===
-    const hasExpressionQuery = qLower.includes('expression') || qLower.includes('expressed') || qLower.includes('level');
-    const hasLocalizationQuery = qLower.includes('localization') || qLower.includes('located') || qLower.includes('compartment') || qLower.includes('where');
-
-    if (hasExpressionQuery) {
-        // === EXPRESSION COMPARISON: Multi-gene UMAP overlay ===
-        window.switchView('plot');
-
-        // Use the same rendering function as single-gene plots
-        const primaryGene = validGenes[0];
-        await window.renderUMAPPlot(primaryGene, validGenes, null); // null = no cell type zoom
-
-        const currentDS = window.CiliAI.activeDataset || 'lung';
-        const dsName = window.CiliAI.datasets[currentDS].name;
-        const nextDS = currentDS === 'lung' ? 'kidney' : 'lung';
-        const nextDSLabel = nextDS === 'lung' ? 'Lung' : 'Kidney';
-
-        const genesArg = validGenes.join(',');
-
-        responseHtml += `
-            <p><strong>Expression Comparison</strong> across <strong>${validGenes.length}</strong> genes in <strong>${dsName}</strong>:</p>
-            <p>Colored by <strong>average expression</strong> of the gene set.<br>
-               Click points to see localization of individual cells.</p>
-            <ul style="margin:10px 0; padding-left:20px; font-size:13.5px;">
-                ${validGenes.map((g, i) => {
-                    const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5', '#9f7aea'];
-                    return `<li style="margin:4px 0;">
-                        <span style="display:inline-block; width:12px; height:12px; background:${colors[i]}; border-radius:3px; margin-right:8px;"></span>
-                        <strong>${g}</strong>
-                    </li>`;
-                }).join('')}
-            </ul>
-            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-                <button class="ciliai-button"
-                    onclick="window.switchDatasetAndPlot('${nextDS}', '${validGenes[0]}', '${genesArg}', '')">
-                    🔄 Switch to ${nextDSLabel}
-                </button>
-                <a href="#" onclick="window.downloadUMAPDataAsCSV('${validGenes.join('_')}')" class="ai-action">
-                    ⬇️ CSV
-                </a>
-            </div>
-            <p style="margin-top:10px; font-size:12px; color:#666;">
-                💡 Higher color intensity = higher average expression of these genes.
-            </p>
-        `;
-
-    } else if (hasLocalizationQuery) {
-        // === LOCALIZATION COMPARISON ===
-        window.switchView('diagram');
-        window.showDiagram();
-        SpatialManager.clearOverlays();
-        SpatialManager.applyMultiOverlay(validGenes);
-
-        responseHtml += `<p><strong>Localization Comparison</strong> (colored overlays):</p><ul style="margin:8px 0;">`;
-        const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
-        validGenes.forEach((g, i) => {
-            const loc = window.CiliAI.lookups.geneMap[g]?.Localization || 'Not annotated';
-            responseHtml += `<li style="margin:4px 0;">
-                <span style="display:inline-block; width:12px; height:12px; background:${colors[i]}; border-radius:3px; margin-right:8px;"></span>
-                <strong>${g}</strong>: ${loc}
-            </li>`;
-        });
-        responseHtml += `</ul><p><em>👆 Overlapping colors show shared compartments.</em></p>`;
-
-    } else {
-        // === DEFAULT: Summary + Localization Overlay ===
-        window.switchView('diagram');
-        window.showDiagram();
-        SpatialManager.clearOverlays();
-        SpatialManager.applyMultiOverlay(validGenes);
-
-        responseHtml += `<p><strong>Comparing ${validGenes.length} genes</strong>:</p>
-            <table style="width:100%; font-size:13px; margin:10px 0; border-collapse:collapse;">
-                <tr style="background:#f7fafc;">
-                    <th style="text-align:left; padding:6px;">Gene</th>
-                    <th style="text-align:left; padding:6px;">Localization</th>
-                    <th style="text-align:left; padding:6px;">Ciliopathy</th>
-                </tr>`;
-        validGenes.forEach((g, i) => {
-            const data = window.CiliAI.lookups.geneMap[g];
-            const loc = data?.Localization || '—';
-            const disease = data?.Ciliopathy && data?.Ciliopathy !== 'Not specified' ? 'Yes' : 'No';
-            const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
-            responseHtml += `<tr>
-                <td style="padding:6px; font-weight:600; color:${colors[i]};">${g}</td>
-                <td style="padding:6px;">${loc}</td>
-                <td style="padding:6px;">${disease}</td>
-            </tr>`;
-        });
-        responseHtml += `</table>
-            <p><em>Multi-colored overlay active on the ciliary diagram → click compartments to explore.</em></p>`;
-    }
-
-    responseHtml += `</div>`;
-    htmlResult = responseHtml;
-    window.addChatMessage(htmlResult, false);
-    return;
-}
-
-    // Intent 14: Variants
-        else if (htmlResult === null && (qLower.includes('variant') || qLower.includes('mutation'))) {
-            const genes = window.extractMultipleGenes(query);
-            if(genes.length > 0) htmlResult = await window.fetchVariantData(genes[0]);
-        }
-        // Intent 15: Batch Query
-        else if (htmlResult === null && query.includes(',') && window.extractMultipleGenes(query).length > 1) {
-            htmlResult = window.handleBatchQuery(query);
-        }
-        // Intent 16: Fold Change
-        else if (htmlResult === null) {
-            const foldChangeMatch = qLower.match(/compare\s+(.+)\s+in\s+(.+)\s+vs\s+(.+)/i);
-            if (foldChangeMatch) {
-                const result = window.calculateFoldChangeForComplex(foldChangeMatch[1].trim().toUpperCase(), foldChangeMatch[2].trim(), foldChangeMatch[3].trim());
-                if (result.error) htmlResult = `<div class="ai-result-card"><h4>Differential Expression Error</h4><p>${result.error}</p></div>`;
-                else htmlResult = `<div class="ai-result-card"><h4>Differential Expression: ${result.complex}</h4><p>Comparing average expression in **${result.cellTypeA}** (A) vs **${result.cellTypeB}** (B) (N=${result.count} genes).</p><p><strong>Fold Change (A/B): ${result.foldChange.toFixed(3)}</strong></p></div>`;
-            }
-        }
-        // Intent 17: Phylogeny Overlap
-        else if (htmlResult === null) {
-            const classOverlapMatch = qLower.match(/species overlap between\s+(.+)\s+and\s+(.+)/i);
-            if (classOverlapMatch && qLower.includes('li')) {
-                const dataLoaded = await window.ensurePhylogenyDataLoaded();
-                if (dataLoaded) {
-                    const result = window.getPhylogenyClassSpeciesOverlap(classOverlapMatch[1].trim(), classOverlapMatch[2].trim(), 'li');
-                    if (result.error) htmlResult = `<div class="ai-result-card"><h4>Error</h4><p>${result.error}</p></div>`;
-                    else htmlResult = `<div class="ai-result-card"><h4>Overlap: ${result.classA} vs ${result.classB}</h4><p>Found **${result.sharedCount}** shared species.</p></div>`;
+        let htmlResult = null;
+        for (const intent of intentHandlers) {
+            if (intent.matcher(qLower)) {
+                htmlResult = await intent.handler(query);
+                if (htmlResult) {
+                    window.addChatMessage(htmlResult, false);
+                    return;  // Stop after first successful handler
                 }
             }
         }
-        // Intent 18: Enrichment
-        else if (htmlResult === null) {
-            const enrichmentMatch = qLower.match(/enrichment for (.+)/);
-            if (enrichmentMatch) {
-                const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
-                const terms = window.getEnrichedGOTerms(geneList);
-                if (terms.length > 0) htmlResult = `<div class="ai-result-card"><h4>Enrichment</h4><p>Top term: ${terms[0].term}</p></div>`;
-                else htmlResult = "No enrichment found.";
-            }
-        }
-        // Intent 19: Show Ciliary Cells
-        else if (htmlResult === null && qLower.includes('show') && qLower.includes('ciliary cells')) {
-            window.renderUMAPPlot('CLUSTER_VIEW');
-            window.CiliAI.lastQueryContext = { type: 'top_500_ciliary' };
-            htmlResult = `<div class="ai-result-card"><p>I've displayed the UMAP with <strong>all cell clusters</strong> highlighted.</p><p>Would you like to view the <strong>top 500 genes</strong> enriched in these ciliary cells?</p></div>`;
-        }
-
-    // === 20. Intent: Localization queries (e.g., "Where is WDR31 localized?") ===
-else if (
-    htmlResult === null &&
-    (
-        qLower.startsWith('where is') ||
-        qLower.startsWith('where are') ||
-        qLower.includes('localization of') ||
-        qLower.includes('localisation of') ||
-        qLower.includes('localized') ||
-        qLower.includes('localised') ||
-        qLower.match(/tell me.*locali[sz]ation/)
-    ) &&
-    (qLower.includes('where') || qLower.includes('locali') || qLower.includes('located'))
-) {
-    const genes = extractMultipleGenes(query);
-
-    if (genes.length === 0) {
-        window.addChatMessage(`
-            <div class="ai-result-card">
-                <p>I couldn't identify any gene symbols in your question.</p>
-                <p><strong>Examples:</strong><br>
-                • "Where is IFT88 localized?"<br>
-                • "Where are BBS1, BBS5 and ELMOD3 located?"<br>
-                • "Tell me the localization of PCM1"</p>
-            </div>
-        `, false);
-        return;
-    }
-
-    // Ensure we're in diagram view
-    window.switchView('diagram');
-    window.showDiagram(); // Explicitly show diagram
-    SpatialManager.clearOverlays(); // Clean previous overlays
-
-    let responseHtml = '<div class="ai-result-card"><h4>📍 Gene Localization in the Cilium</h4>';
-
-    const validGenes = [];
-    const unknownGenes = [];
-
-    genes.forEach(geneSymbol => {
-        geneSymbol = geneSymbol.toUpperCase().trim();
-        const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
-
-        if (!geneData) {
-            unknownGenes.push(geneSymbol);
-            return;
-        }
-
-        validGenes.push({
-            symbol: geneSymbol,
-            localization: geneData.Localization?.trim() || 'Unknown / Not annotated'
-        });
-    });
-
-    // Report missing genes
-    if (unknownGenes.length > 0) {
-        responseHtml += `<p><strong>Not found:</strong> ${unknownGenes.join(', ')}</p>`;
-    }
-
-    if (validGenes.length === 0) {
-        responseHtml += `<p>No known genes from your query were found in the database.</p></div>`;
-        window.addChatMessage(responseHtml, false);
-        return;
-    }
-
-    // Single gene → precise highlight + zoom
-    if (validGenes.length === 1) {
-        const { symbol, localization } = validGenes[0];
-        let highlighted = false;
-
-        if (localization && localization !== 'Unknown / Not annotated') {
-            highlighted = SpatialManager.highlight(localization, symbol);
-        }
-
-        const status = highlighted
-            ? '✅ Highlighted and zoomed on the diagram'
-            : 'ℹ️ Localization known but not mappable to specific compartment — full view shown';
-
-        responseHtml += `
-            <p>
-                <span class="gene-badge" style="font-size:14px; padding:6px 14px;">${symbol}</span><br><br>
-                <strong>Localized to:</strong> <span style="color:#2b6cb0; font-weight:600;">${localization}</span><br><br>
-                <em>${status}</em>
-            </p>
-        `;
-    }
-    // Multiple genes → multi-colored overlay
-    else {
-        SpatialManager.applyMultiOverlay(validGenes.map(g => g.symbol));
-
-        responseHtml += `<p><strong>Multiple genes queried:</strong></p>`;
-        validGenes.forEach(({ symbol, localization }, i) => {
-            const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
-            const color = colors[i % colors.length];
-
-            responseHtml += `
-                <p style="margin:8px 0;">
-                    <span class="gene-badge" style="background:${color}; color:white;">${symbol}</span>
-                    → <strong>${localization}</strong>
-                </p>
-            `;
-        });
-
-        responseHtml += `<p style="margin-top:14px;"><em>
-            👆 Each gene is shown with a distinct colored overlay on the interactive cilium diagram.
-        </em></p>`;
-    }
-
-    responseHtml += `
-        <p style="margin-top:16px; font-size:13px; color:#666;">
-            💡 <strong>Tip:</strong> You can click on compartments in the diagram to explore, or zoom using the controls.
-        </p>
-    </div>`;
-
-    window.addChatMessage(responseHtml, false);
-    return;
-}
-    
-        // === 21. Intent: Multi-gene Overlay (Visualizer) ===
-else if (htmlResult === null && (qLower.startsWith('multi:') || qLower.includes('multi:'))) {
-    // Extract the part after "multi:" and clean it
-    let geneString = query.replace(/^multi:?/i, '').trim();
-    
-    // Remove any leading/trailing punctuation or words
-    geneString = geneString.replace(/^[:\s,]+/, '').replace(/[\.\?!]*$/, '');
-
-    // Use extractMultipleGenes on the cleaned string
-    let genes = extractMultipleGenes(geneString);
-
-    // Fallback: if no genes found, try splitting by comma/space manually
-    if (genes.length === 0 && geneString) {
-        genes = geneString
-            .split(/[\s,]+/)
-            .map(g => g.trim().toUpperCase())
-            .filter(g => g.length >= 3 && /^[A-Z0-9]+$/.test(g));
-    }
-
-    if (genes.length < 2) {
-        window.addChatMessage(`
-            <div class="ai-result-card">
-                <p>Please provide at least 2 valid gene symbols.</p>
-                <p><strong>Example:</strong> Multi: IFT88, FOXJ1</p>
-                <p>Or: Multi: BBS1, CEP290, TMEM67</p>
-            </div>
-        `, false);
-        return;
-    }
-
-    // Success: Show diagram and apply multi-overlay
-    window.resetViews();
-
-    if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
-        window.SpatialManager.applyMultiOverlay(genes);
-    }
-
-    const geneList = genes.join(', ');
-    const preview = genes.length > 8 ? genes.slice(0, 8).join(', ') + '...' : geneList;
-
-    window.addChatMessage(`
-        <div class="ai-result-card">
-            <h4>Multi-gene Localization</h4>
-            <p><strong>Genes:</strong> ${geneList} (${genes.length} total)</p>
-            <p><strong>Preview:</strong> ${preview}</p>
-            <p>Each gene is highlighted in a <strong>different color</strong> on the interactive ciliary diagram.</p>
-        </div>
-    `, false);
-
-    return;
-}
-
-    
-        // === 22. Intent: GO Term / Functional Heatmap (Visualizer) ===
-else if (htmlResult === null && (qLower.startsWith('go:') || qLower.includes('go term:') || qLower.includes('functional category') || qLower.startsWith('function:'))) {
-    let term = query.replace(/^(go:|go term:|function:|functional category:?)\s*/i, '').trim();
-
-    if (!term) {
-        window.addChatMessage(`<div class="ai-result-card"><p>Please provide a GO term or functional category (e.g., "GO: intraflagellar transport").</p></div>`, false);
-        return;
-    }
-
-    // Primary: Use database search if available
-    let genes = [];
-    if (typeof window.getGenesByFunction === 'function') {
-        genes = window.getGenesByFunction(term);
-    }
-
-    // Hardcoded fallbacks for key ciliary terms (ensures "intraflagellar transport" always works)
-    const lowerTerm = term.toLowerCase();
-    const fallbackMap = {
-        'intraflagellar transport': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46', 'KIF3A', 'KIF3B', 'KIF17', 'DYNC2H1'],
-        'ift': ['IFT88', 'IFT81', 'IFT172', 'IFT140', 'IFT122', 'WDR19', 'TTC21B', 'IFT80', 'IFT57', 'TRAF3IP1', 'CLUAP1', 'IFT20', 'IFT74', 'IFT52', 'IFT46'],
-        'bbsome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'TTC8', 'BBS9', 'BBIP1'],
-        'transition zone': ['TMEM67', 'TMEM216', 'TMEM237', 'CEP290', 'CC2D2A', 'TCTN1', 'TCTN2', 'MKS1', 'NPHP1', 'RPGRIP1L'],
-        'dynein arm': ['DNAH5', 'DNAH11', 'DNAI1', 'DNAI2', 'DNAAF1', 'DNAAF2', 'LRRC6'],
-        'radial spoke': ['RSPH1', 'RSPH4A', 'RSPH9', 'DRC1']
-    };
-
-    if (genes.length === 0) {
-        for (const key in fallbackMap) {
-            if (lowerTerm.includes(key)) {
-                genes = fallbackMap[key];
-                break;
-            }
-        }
-    }
-
-    if (genes.length === 0) {
-        window.addChatMessage(`
-            <div class="ai-result-card">
-                <p>No genes found for <strong>"${term}"</strong>.</p>
-                <p>Try common terms like "intraflagellar transport", "bbsome", or "transition zone".</p>
-            </div>
-        `, false);
-        return;
-    }
-
-    // Apply visualization
-    window.resetViews();
-
-    if (window.SpatialManager && typeof window.SpatialManager.applyMultiOverlay === 'function') {
-        // Use multi-overlay for distinct colors per gene
-        const upperGenes = genes.map(g => g.toUpperCase());
-        window.SpatialManager.applyMultiOverlay(upperGenes);
-    }
-
-    const preview = genes.slice(0, 12).join(', ');
-    const more = genes.length > 12 ? `... and ${genes.length - 12} more` : '';
-
-    window.addChatMessage(`
-        <div class="ai-result-card">
-            <h4>Functional Category / GO Term: ${term}</h4>
-            <p>Found <strong>${genes.length}</strong> genes.</p>
-            <p><strong>Examples:</strong> ${preview}${more}</p>
-            <p>A <strong>multi-colored overlay</strong> has been applied to the ciliary diagram showing localization.</p>
-        </div>
-    `, false);
-
-    return;
-}
-// Fallback intent
-if (htmlResult === null) {
-    const intent = window.flexibleIntentParser ? window.flexibleIntentParser(query) : null;
-    if (intent && intent.handler) {
-        htmlResult = intent.handler(intent.entity, query);
-    }
-
-    if (htmlResult === null) {
-        let term = qLower;
-        const match = qLower.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
-        if (match) term = match[1];
-
-        term = term.replace(/[?.]/g, '').trim().toUpperCase();
-        const genes = window.extractMultipleGenes ? window.extractMultipleGenes(term) : [];
-
-        if (genes.length > 0) {
-            htmlResult = await window.displayFullGeneInfo(genes[0]);
-        } else {
-            htmlResult = `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, localization, or GO term.`;
-        }
-    }
-}
-
-        if (htmlResult) window.addChatMessage(htmlResult, false);
+        // If no handler matched, fallback to default (already in fallback handler)
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
         window.addChatMessage(`An internal error occurred: ${e.message}`, false);
     }
 };
+
 
 window.fetchVariantData = async function(geneSymbol) {
     try {
@@ -6313,3 +6369,4 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
