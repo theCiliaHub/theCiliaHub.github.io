@@ -3137,6 +3137,22 @@ function extractPhenotypeIntent(qLower) {
     return null;
 }
 
+// --- NEW HELPER: Extract Domain Keywords ---
+window.extractDomainIntent = function(qLower) {
+    const keywords = [
+        'wd40 domain', 'pfam domain', 'wd40', 'pf13432', 
+        'coiled-coil', 'ef-hand', 'tpr', 'aaa+ atpase', 
+        'aaa domain', 'atpase domain', 'wd40 repeat', 'domain'
+    ];
+    for (const term of keywords) {
+        if (qLower.includes(term)) {
+            return term;
+        }
+    }
+    return null;
+};
+
+
 /**
  * (REPLACEMENT) Complex Query Router
  * Fixes "List transition zone genes" by allowing single intents if "list" is present.
@@ -4000,6 +4016,51 @@ const intentHandlers = [
         }
     },
 
+    // NEW PRIORITY 88: Structure / Localization Gene Lists (Fixes queries without verbs)
+    {
+        priority: 88,
+        matcher: (qLower) => {
+            // Matches "Transition zone genes", "Basal body genes", etc.
+            return (qLower.includes('genes') && (qLower.includes('transition zone') || qLower.includes('basal body') || qLower.includes('axoneme') || qLower.includes('centrosome') || qLower.includes('membrane'))) ||
+                   (qLower.includes('display') && (qLower.includes('transition zone') || qLower.includes('basal body') || qLower.includes('axoneme')));
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            let loc = null;
+            if (qLower.includes('transition zone')) loc = 'Transition Zone';
+            else if (qLower.includes('basal body')) loc = 'Basal Body';
+            else if (qLower.includes('axoneme')) loc = 'Axoneme';
+            else if (qLower.includes('membrane')) loc = 'Ciliary Membrane';
+            else if (qLower.includes('centrosome')) loc = 'Centrosome';
+
+            if (loc) {
+                let genes = [];
+                // Use global helper if available, otherwise manual filter
+                if (window.getGenesByLocalization) {
+                    genes = window.getGenesByLocalization(loc);
+                } else {
+                    // Fallback manual filter
+                    const normLoc = loc.toLowerCase();
+                    window.CiliAI.masterData.forEach(g => {
+                        if (g.Localization && g.Localization.toLowerCase().includes(normLoc)) {
+                            genes.push({ gene: g.Gene, localization: g.Localization });
+                        }
+                    });
+                }
+                
+                if (genes.length > 0) {
+                    // Use formatListResult to display table immediately
+                    return window.formatListResult 
+                        ? window.formatListResult(`Genes in ${loc}`, genes, `Found ${genes.length} genes localized to ${loc}.`)
+                        : `Found ${genes.length} genes in ${loc}. (Visualizer loading...)`;
+                } else {
+                     return `<div class="ai-result-card"><p>No genes found specifically localized to <strong>${loc}</strong>.</p></div>`;
+                }
+            }
+            return null;
+        }
+    },
+
     // Ciliopathy classification, overlap, orthologs (combined for efficiency)
     {
         priority: 85,
@@ -4800,41 +4861,42 @@ const intentHandlers = [
     }
 },
 
-    // Domain Architecture (Replaced CEP290 with WDR31 in suggestions)
+  // Domain Architecture (Fixed: Handles "WDR31 domains" and "Show domains for WDR31")
     {
         priority: 60,
         matcher: (qLower) => {
-            const match = qLower.match(/(?:show )?(?:domains?|domain architecture|pfa?m?s?)(?: (?:of|for|in))?\s+(.+)/i);
-            return !!match;
+            const hasKeyword = qLower.includes('domain') || qLower.includes('pfam') || qLower.includes('architecture') || qLower.includes('motif');
+            // Check if we can extract a gene
+            const genes = window.CiliAI.utils.extractGenes(qLower);
+            return hasKeyword && genes.length > 0;
         },
         handler: async (query) => {
-            const qLower = window.CiliAI.utils.normalizeQuery(query);
-            const match = qLower.match(/(?:show )?(?:domains?|domain architecture|pfa?m?s?)(?: (?:of|for|in))?\s+(.+)/i);
-            if (!match) return null;
-            const rawInput = match[1];
-            const genes = window.CiliAI.utils.extractGenes(rawInput);
+            const genes = window.CiliAI.utils.extractGenes(query);
+            
             if (genes.length === 0) {
-                return `<div class="ai-result-card">
-                    <p>No valid gene symbols found.</p>
-                    <p><strong>Examples:</strong><br>
-                    • "Show domains for IFT88"<br>
-                    • "Domain architecture of WDR35"<br>
-                    • "Pfam domains in BBS1 and BBS4"</p>
-                </div>`;
+                return `<div class="ai-result-card"><p>I understood you want to see protein domains, but I couldn't identify the gene symbol.</p></div>`;
             }
+
             // Switch to domain view
             window.switchView('domain');
+            
             let responseHtml = `<div class="ai-result-card">
                 <h4>🧬 Protein Domain Architecture</h4>
                 <p>Showing Pfam domains for: <strong>${genes.slice(0, 3).join(', ')}${genes.length > 3 ? ' and ' + (genes.length - 3) + ' more' : ''}</strong></p>`;
+            
             if (genes.length === 1) {
                 const gene = genes[0].toUpperCase();
                 const geneData = window.CiliAI.lookups.geneMap[gene];
+                
+                // Ensure lookup exists to prevent crash
+                window.CiliAI.lookups.pfamByGene = window.CiliAI.lookups.pfamByGene || {};
+                
                 const hasDomains = geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions);
                 window.showDomainViewer(gene);
+                
                 responseHtml += hasDomains
                     ? `<p>Interactive domain map displayed → hover for details.</p>`
-                    : `<p><em>${gene}</em> has no annotated Pfam domains.</p>`;
+                    : `<p><em>${gene}</em> has no annotated Pfam domains in the database.</p>`;
             } else {
                 window.showDomainViewer(genes[0]);
                 responseHtml += `<ul style="margin:10px 0; padding-left:20px; font-size:13px;">`;
@@ -4848,15 +4910,16 @@ const intentHandlers = [
                 responseHtml += `</ul>`;
                 responseHtml += `<p><strong>${genes[0]}</strong> is shown in full detail above. Type "domains for [other gene]" to switch.</p>`;
             }
+            
             responseHtml += `
                 <p style="margin-top:12px; font-size:12px; color:#666;">
-                    🎨 Colors follow <strong>Nature journal</strong> style • Labels are staggered to prevent overlap
+                    🎨 Colors follow <strong>Nature journal</strong> style
                 </p>
             </div>`;
             return responseHtml;
         }
     },
-
+    
     // Functional Modules of Gene
     {
         priority: 59,
@@ -6558,6 +6621,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
