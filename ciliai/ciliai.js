@@ -6380,14 +6380,13 @@ window.showPlot = function(plotData, title = "Gene Expression UMAP") {
 };
 
 window.showDomainViewer = function (gene) {
-    // --- HARD GUARDS (legacy-safe) ---
     if (!window.CiliAI) return;
-    if (!window.CiliAI.lookups) window.CiliAI.lookups = {};
-    if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
-    if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+    // Force-init the entire lookups chain early
+    window.CiliAI.lookups = window.CiliAI.lookups || {};
+    window.CiliAI.lookups.geneMap = window.CiliAI.lookups.geneMap || {};
+    window.CiliAI.lookups.pfamByGene = window.CiliAI.lookups.pfamByGene || {};
 
     gene = gene.toUpperCase();
-
     const domainContainer = document.getElementById('domain-viewer');
     const titleEl = document.getElementById('current-viz-title');
 
@@ -6531,6 +6530,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
