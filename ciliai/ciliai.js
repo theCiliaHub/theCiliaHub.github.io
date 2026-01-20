@@ -26,6 +26,7 @@ if (!window.CiliAI.masterData) window.CiliAI.masterData = [];
 if (!window.CiliAI.lookups) window.CiliAI.lookups = { geneMap: {}, cellDataCache: {}, byCiliopathy: {} };
 if (window.CiliAI.ready === undefined) window.CiliAI.ready = false;
 
+
 // CRITICAL FIX: Initialize Legacy Globals for SpatialManager/Zoom
 // The 'Cannot set properties of undefined' error happens because legacy code expects window.zoomStateByGene
 window.zoomStateByGene = window.zoomStateByGene || {}; 
@@ -2707,51 +2708,68 @@ function renderMiniComplexList(data) {
     }
     return html;
 }
-
-    
+ 
  /**
  * ROBUST LOCALIZATION SEARCH
  * Scans both the lookup maps AND the raw master database column.
  */
 function getGenesByLocalization(term) {
-    if (!term) return [];
-    if (normTerm === 'tz') normTerm = 'transition zone';
+    if (!term || !window.CiliAI || !window.CiliAI.lookups) return [];
+
+    // --- Normalize search term ---
     let normTerm = term.toLowerCase().trim();
-    
+
+    // Handle common aliases
+    if (normTerm === 'tz' || normTerm === 'transition-zone') {
+        normTerm = 'transition zone';
+    }
+
     const L = window.CiliAI.lookups;
     const geneMap = L.geneMap || {};
-    let matchingGenes = new Set(); 
+    const matchingGenes = new Set();
 
-    // 1. Search in pre-defined localization sets (Fast lookup)
+    // --------------------------------------------------
+    // 1. FAST PATH: Pre-defined localization lookup
+    // --------------------------------------------------
     if (L.byLocalization) {
-        Object.keys(L.byLocalization).forEach(key => {
-            if (key.toLowerCase().includes(normTerm)) {
-                L.byLocalization[key].forEach(geneSymbol => {
-                    matchingGenes.add(geneSymbol.toUpperCase());
+        Object.entries(L.byLocalization).forEach(([key, genes]) => {
+            if (key && key.toLowerCase().includes(normTerm)) {
+                genes.forEach(geneSymbol => {
+                    if (geneSymbol) {
+                        matchingGenes.add(geneSymbol.toUpperCase());
+                    }
                 });
             }
         });
     }
 
-    // 2. CRITICAL FIX: Scan the Master Data 'Localization' column directly
-    // This ensures we catch everything "Transition Zone" even if the lookup map is incomplete.
-    if (window.CiliAI.masterData) {
-        window.CiliAI.masterData.forEach(g => {
-            if (g.Gene && g.Localization && g.Localization.toLowerCase().includes(normTerm)) {
-                matchingGenes.add(g.Gene.toUpperCase());
+    // --------------------------------------------------
+    // 2. ROBUST PATH: Scan master data directly
+    //    (critical for Transition Zone completeness)
+    // --------------------------------------------------
+    if (Array.isArray(window.CiliAI.masterData)) {
+        window.CiliAI.masterData.forEach(row => {
+            if (!row || !row.Gene || !row.Localization) return;
+
+            const loc = row.Localization.toLowerCase().replace(/-/g, ' ');
+            if (loc.includes(normTerm)) {
+                matchingGenes.add(row.Gene.toUpperCase());
             }
         });
     }
 
-    // Return formatted objects
+    // --------------------------------------------------
+    // 3. Return standardized objects
+    // --------------------------------------------------
     return Array.from(matchingGenes).map(gene => {
-        const geneData = geneMap[gene];
+        const geneData = geneMap[gene] || {};
         return {
-            gene: gene,
-            localization: geneData?.Localization || `Found in ${term}`
+            gene,
+            localization: geneData.Localization || term
         };
     });
 }
+
 
     function getGenesByDomain(domainTerm, query) {
         const normTerm = normalizeTerm(domainTerm);
@@ -6361,34 +6379,46 @@ window.showPlot = function(plotData, title = "Gene Expression UMAP") {
     window.addEventListener('resize', resizeHandler);
 };
 window.showDomainViewer = function (gene) {
-    if (!window.CiliAI || !window.CiliAI.lookups) return;
+    // --- Hard guards ---
+    if (!window.CiliAI || !window.CiliAI.lookups || !gene) return;
 
-    gene = gene.toUpperCase();
+    gene = String(gene).trim().toUpperCase();
 
-    // ✅ Ensure lookup caches exist
+    // --- Ensure Pfam cache exists (CRITICAL FIX) ---
     if (!window.CiliAI.lookups.pfamByGene) {
         window.CiliAI.lookups.pfamByGene = {};
     }
 
     const domainContainer = document.getElementById('domain-viewer');
     const titleEl = document.getElementById('current-viz-title');
+    const ciliaSvg = document.getElementById('cilia-svg');
+    const plotlyContainer = document.getElementById('plotly-container');
 
-    // UI switching
-    document.getElementById('cilia-svg').style.display = 'none';
-    document.getElementById('plotly-container').style.display = 'none';
+    // --- DOM guards ---
+    if (!domainContainer || !titleEl) {
+        console.warn('Domain viewer DOM elements missing.');
+        return;
+    }
+
+    // --- UI switching ---
+    if (ciliaSvg) ciliaSvg.style.display = 'none';
+    if (plotlyContainer) plotlyContainer.style.display = 'none';
     domainContainer.style.display = 'flex';
     domainContainer.innerHTML = '';
     titleEl.textContent = `Pfam Domains: ${gene}`;
 
-    // --- Resolve Pfam domains ---
+    // --- Resolve Pfam domains (cache → geneMap fallback) ---
     let pfam = window.CiliAI.lookups.pfamByGene[gene] || [];
 
     if (!pfam.length) {
         const geneData = window.CiliAI.lookups.geneMap?.[gene];
 
         if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
-            const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
-            const parts = desc.split(/[;,]/).map(s => s.trim()).filter(Boolean);
+            const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || '';
+            const parts = desc
+                .split(/[;,]/)
+                .map(s => s.trim())
+                .filter(Boolean);
 
             if (parts.length) {
                 pfam = parts.map((part, i) => ({
@@ -6398,13 +6428,13 @@ window.showDomainViewer = function (gene) {
                     end: (i * 200) + 150
                 }));
 
-                // ✅ cache once
+                // Cache once (NO recursion)
                 window.CiliAI.lookups.pfamByGene[gene] = pfam;
             }
         }
     }
 
-    // --- No domains case ---
+    // --- No domain data case ---
     if (!pfam.length) {
         domainContainer.innerHTML = `
             <div style="padding:20px; text-align:center; color:#666;">
@@ -6414,12 +6444,14 @@ window.showDomainViewer = function (gene) {
     }
 
     // --- Render SVG ---
-    const seqLength = Math.max(...pfam.map(d => d.end), 1000);
+    const seqLength = Math.max(...pfam.map(d => d.end || 0), 1000);
+
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 150`);
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '100%');
 
+    // Backbone
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', '50');
     line.setAttribute('y1', '75');
@@ -6430,9 +6462,12 @@ window.showDomainViewer = function (gene) {
     line.setAttribute('stroke-linecap', 'round');
     svg.appendChild(line);
 
+    // Domains
     pfam.forEach((domain, index) => {
+        if (!domain || domain.start == null || domain.end == null) return;
+
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        const width = domain.end - domain.start + 1;
+        const width = Math.max(domain.end - domain.start + 1, 10);
 
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', domain.start + 50);
@@ -6440,12 +6475,12 @@ window.showDomainViewer = function (gene) {
         rect.setAttribute('width', width);
         rect.setAttribute('height', '40');
         rect.setAttribute('rx', '8');
-        rect.setAttribute('fill', `hsl(${index * 50 + 200}, 80%, 60%)`);
+        rect.setAttribute('fill', `hsl(${(index * 47 + 210) % 360}, 80%, 60%)`);
         rect.setAttribute('stroke', '#fff');
         rect.setAttribute('stroke-width', '2');
 
         const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        title.textContent = `${domain.name} (${domain.start}-${domain.end})`;
+        title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
         rect.appendChild(title);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -6455,7 +6490,7 @@ window.showDomainViewer = function (gene) {
         text.setAttribute('font-size', '12');
         text.setAttribute('font-weight', 'bold');
         text.setAttribute('fill', '#333');
-        text.textContent = domain.name;
+        text.textContent = domain.name || domain.id;
 
         group.appendChild(rect);
         group.appendChild(text);
@@ -6464,7 +6499,6 @@ window.showDomainViewer = function (gene) {
 
     domainContainer.appendChild(svg);
 };
-
 
 window.downloadCurrentVisualization = function() {
     if (window.CiliAI?.currentPlot) {
@@ -6503,6 +6537,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
