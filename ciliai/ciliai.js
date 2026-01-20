@@ -6379,39 +6379,38 @@ window.showPlot = function(plotData, title = "Gene Expression UMAP") {
     window.addEventListener('resize', resizeHandler);
 };
 window.showDomainViewer = function (gene) {
-    // --- Hard guards ---
-    if (!window.CiliAI || !window.CiliAI.lookups || !gene) return;
+    // --- HARD GUARANTEE GLOBALS ---
+    if (!window.CiliAI) window.CiliAI = {};
+    if (!window.CiliAI.lookups) window.CiliAI.lookups = {};
+    if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+    if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
 
-    gene = String(gene).trim().toUpperCase();
+    if (!gene) return;
 
-    // --- Ensure Pfam cache exists (CRITICAL FIX) ---
-    if (!window.CiliAI.lookups.pfamByGene) {
-        window.CiliAI.lookups.pfamByGene = {};
-    }
+    gene = gene.toUpperCase();
 
     const domainContainer = document.getElementById('domain-viewer');
     const titleEl = document.getElementById('current-viz-title');
-    const ciliaSvg = document.getElementById('cilia-svg');
-    const plotlyContainer = document.getElementById('plotly-container');
 
-    // --- DOM guards ---
     if (!domainContainer || !titleEl) {
-        console.warn('Domain viewer DOM elements missing.');
+        console.warn('[CiliAI] Domain viewer elements missing');
         return;
     }
 
     // --- UI switching ---
-    if (ciliaSvg) ciliaSvg.style.display = 'none';
-    if (plotlyContainer) plotlyContainer.style.display = 'none';
+    document.getElementById('cilia-svg')?.style && (document.getElementById('cilia-svg').style.display = 'none');
+    document.getElementById('plotly-container')?.style && (document.getElementById('plotly-container').style.display = 'none');
     domainContainer.style.display = 'flex';
     domainContainer.innerHTML = '';
     titleEl.textContent = `Pfam Domains: ${gene}`;
 
-    // --- Resolve Pfam domains (cache → geneMap fallback) ---
-    let pfam = window.CiliAI.lookups.pfamByGene[gene] || [];
+    // --- Resolve Pfam domains ---
+    let pfam = window.CiliAI.lookups.pfamByGene[gene];
 
-    if (!pfam.length) {
-        const geneData = window.CiliAI.lookups.geneMap?.[gene];
+    if (!Array.isArray(pfam) || pfam.length === 0) {
+        pfam = [];
+
+        const geneData = window.CiliAI.lookups.geneMap[gene];
 
         if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
             const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || '';
@@ -6420,21 +6419,19 @@ window.showDomainViewer = function (gene) {
                 .map(s => s.trim())
                 .filter(Boolean);
 
-            if (parts.length) {
-                pfam = parts.map((part, i) => ({
-                    id: `DOM_${i + 1}`,
-                    name: part,
-                    start: (i * 200) + 50,
-                    end: (i * 200) + 150
-                }));
+            pfam = parts.map((part, i) => ({
+                id: `DOM_${i + 1}`,
+                name: part,
+                start: i * 200 + 50,
+                end: i * 200 + 150
+            }));
 
-                // Cache once (NO recursion)
-                window.CiliAI.lookups.pfamByGene[gene] = pfam;
-            }
+            // ✅ SAFE CACHE WRITE
+            window.CiliAI.lookups.pfamByGene[gene] = pfam;
         }
     }
 
-    // --- No domain data case ---
+    // --- No domains case ---
     if (!pfam.length) {
         domainContainer.innerHTML = `
             <div style="padding:20px; text-align:center; color:#666;">
@@ -6444,14 +6441,12 @@ window.showDomainViewer = function (gene) {
     }
 
     // --- Render SVG ---
-    const seqLength = Math.max(...pfam.map(d => d.end || 0), 1000);
-
+    const seqLength = Math.max(...pfam.map(d => d.end), 1000);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 150`);
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '100%');
 
-    // Backbone
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', '50');
     line.setAttribute('y1', '75');
@@ -6462,12 +6457,8 @@ window.showDomainViewer = function (gene) {
     line.setAttribute('stroke-linecap', 'round');
     svg.appendChild(line);
 
-    // Domains
     pfam.forEach((domain, index) => {
-        if (!domain || domain.start == null || domain.end == null) return;
-
-        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        const width = Math.max(domain.end - domain.start + 1, 10);
+        const width = domain.end - domain.start + 1;
 
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', domain.start + 50);
@@ -6475,12 +6466,12 @@ window.showDomainViewer = function (gene) {
         rect.setAttribute('width', width);
         rect.setAttribute('height', '40');
         rect.setAttribute('rx', '8');
-        rect.setAttribute('fill', `hsl(${(index * 47 + 210) % 360}, 80%, 60%)`);
+        rect.setAttribute('fill', `hsl(${index * 60 + 200}, 80%, 60%)`);
         rect.setAttribute('stroke', '#fff');
         rect.setAttribute('stroke-width', '2');
 
         const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        title.textContent = `${domain.name || domain.id} (${domain.start}-${domain.end})`;
+        title.textContent = `${domain.name} (${domain.start}-${domain.end})`;
         rect.appendChild(title);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -6490,11 +6481,10 @@ window.showDomainViewer = function (gene) {
         text.setAttribute('font-size', '12');
         text.setAttribute('font-weight', 'bold');
         text.setAttribute('fill', '#333');
-        text.textContent = domain.name || domain.id;
+        text.textContent = domain.name;
 
-        group.appendChild(rect);
-        group.appendChild(text);
-        svg.appendChild(group);
+        svg.appendChild(rect);
+        svg.appendChild(text);
     });
 
     domainContainer.appendChild(svg);
@@ -6537,6 +6527,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
