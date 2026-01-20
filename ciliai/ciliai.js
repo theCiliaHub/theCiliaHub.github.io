@@ -6378,56 +6378,56 @@ window.showPlot = function(plotData, title = "Gene Expression UMAP") {
     window.removeEventListener('resize', resizeHandler);
     window.addEventListener('resize', resizeHandler);
 };
-window.showDomainViewer = function (gene) {
-    // --- HARD GUARANTEE GLOBALS ---
-    if (!window.CiliAI) window.CiliAI = {};
-    if (!window.CiliAI.lookups) window.CiliAI.lookups = {};
-    if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
-    if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
 
-    if (!gene) return;
+window.showDomainViewer = function (gene) {
+    // --- HARD GUARDS (legacy-safe) ---
+    if (!window.CiliAI) return;
+    if (!window.CiliAI.lookups) window.CiliAI.lookups = {};
+    if (!window.CiliAI.lookups.geneMap) window.CiliAI.lookups.geneMap = {};
+    if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
 
     gene = gene.toUpperCase();
 
     const domainContainer = document.getElementById('domain-viewer');
     const titleEl = document.getElementById('current-viz-title');
 
-    if (!domainContainer || !titleEl) {
-        console.warn('[CiliAI] Domain viewer elements missing');
-        return;
-    }
+    if (!domainContainer || !titleEl) return;
 
     // --- UI switching ---
-    document.getElementById('cilia-svg')?.style && (document.getElementById('cilia-svg').style.display = 'none');
-    document.getElementById('plotly-container')?.style && (document.getElementById('plotly-container').style.display = 'none');
+    const ciliaSvg = document.getElementById('cilia-svg');
+    const plotly = document.getElementById('plotly-container');
+    if (ciliaSvg) ciliaSvg.style.display = 'none';
+    if (plotly) plotly.style.display = 'none';
+
     domainContainer.style.display = 'flex';
     domainContainer.innerHTML = '';
     titleEl.textContent = `Pfam Domains: ${gene}`;
 
     // --- Resolve Pfam domains ---
-    let pfam = window.CiliAI.lookups.pfamByGene[gene];
+    let pfam = window.CiliAI.lookups.pfamByGene[gene] || [];
 
-    if (!Array.isArray(pfam) || pfam.length === 0) {
-        pfam = [];
-
+    if (!pfam.length) {
         const geneData = window.CiliAI.lookups.geneMap[gene];
 
         if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
-            const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || '';
+            const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
             const parts = desc
                 .split(/[;,]/)
                 .map(s => s.trim())
                 .filter(Boolean);
 
-            pfam = parts.map((part, i) => ({
-                id: `DOM_${i + 1}`,
-                name: part,
-                start: i * 200 + 50,
-                end: i * 200 + 150
-            }));
+            if (parts.length) {
+                pfam = parts.map((part, i) => ({
+                    id: `DOM_${i + 1}`,
+                    name: part,
+                    start: (i * 200) + 50,
+                    end: (i * 200) + 150
+                }));
 
-            // ✅ SAFE CACHE WRITE
-            window.CiliAI.lookups.pfamByGene[gene] = pfam;
+                // 🔒 ABSOLUTE SAFETY: re-assert cache before write
+                window.CiliAI.lookups.pfamByGene ||= {};
+                window.CiliAI.lookups.pfamByGene[gene] = pfam;
+            }
         }
     }
 
@@ -6442,6 +6442,7 @@ window.showDomainViewer = function (gene) {
 
     // --- Render SVG ---
     const seqLength = Math.max(...pfam.map(d => d.end), 1000);
+
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 150`);
     svg.setAttribute('width', '100%');
@@ -6458,6 +6459,7 @@ window.showDomainViewer = function (gene) {
     svg.appendChild(line);
 
     pfam.forEach((domain, index) => {
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         const width = domain.end - domain.start + 1;
 
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -6466,7 +6468,7 @@ window.showDomainViewer = function (gene) {
         rect.setAttribute('width', width);
         rect.setAttribute('height', '40');
         rect.setAttribute('rx', '8');
-        rect.setAttribute('fill', `hsl(${index * 60 + 200}, 80%, 60%)`);
+        rect.setAttribute('fill', `hsl(${index * 50 + 200}, 80%, 60%)`);
         rect.setAttribute('stroke', '#fff');
         rect.setAttribute('stroke-width', '2');
 
@@ -6483,12 +6485,14 @@ window.showDomainViewer = function (gene) {
         text.setAttribute('fill', '#333');
         text.textContent = domain.name;
 
-        svg.appendChild(rect);
-        svg.appendChild(text);
+        group.appendChild(rect);
+        group.appendChild(text);
+        svg.appendChild(group);
     });
 
     domainContainer.appendChild(svg);
 };
+
 
 window.downloadCurrentVisualization = function() {
     if (window.CiliAI?.currentPlot) {
@@ -6527,6 +6531,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
