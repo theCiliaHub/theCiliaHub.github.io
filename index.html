@@ -542,20 +542,21 @@
                     <div id="vizActiveDescription" style="display:none"></div>
                 </div>
             </div>
-           <div class="landing-dashboard">
-    <div class="stat-item">
-        <div class="stat-value" id="stat-genes">Loading...</div>
-        <div class="stat-label">Ciliary Genes</div>
-    </div>
-    <div class="stat-item">
-        <div class="stat-value" id="stat-ciliopathys">Loading...</div>
-        <div class="stat-label">Ciliopathy Diseases</div>
-    </div>
-    <div class="stat-item">
-        <div class="stat-value" id="stat-ciliopathy-genes">Loading...</div>
-        <div class="stat-label">Ciliopathy Genes</div>
-    </div>
-</div>
+            <div class="landing-dashboard">
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-genes">...</div>
+                    <div class="stat-label">Ciliary Genes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-ciliopathys">...</div>
+                    <div class="stat-label">Ciliopathy Diseases</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-ciliopathy-genes">...</div>
+                    <div class="stat-label">Ciliopathy Genes</div>
+                </div>
+            </div>
+        </div>
         <aside class="right-panel">
             <div class="chat-header">
               <h2>CiliAI Assistant</h2>
@@ -1464,81 +1465,62 @@ window.showGoldStandardTable = function() {
 // ==========================================================
 // AUTOMATIC STATISTICS CALCULATION
 // ==========================================================
-// ==========================================================
-// AUTOMATIC STATISTICS CALCULATION
-// ==========================================================
-// ==========================================================
-// AUTOMATIC STATISTICS CALCULATION
-// ==========================================================
 window.calculateAndDisplayStatistics = function() {
-    console.log("Calculating statistics...");
-    
-    if (!window.CiliAI || !window.CiliAI.masterData || !Array.isArray(window.CiliAI.masterData)) {
-        console.warn("Data not ready for statistics calculation", window.CiliAI);
-        // Set default values
-        document.getElementById('stat-genes').textContent = "...";
-        document.getElementById('stat-ciliopathys').textContent = "...";
-        document.getElementById('stat-ciliopathy-genes').textContent = "...";
+    if (!window.CiliAI || !window.CiliAI.masterData || !window.CiliAI.lookups.geneMap) {
+        console.warn("Data not ready for statistics calculation");
         return;
     }
 
-    try {
-        // 1. Total Ciliary Genes
-        const totalGenes = window.CiliAI.masterData.length;
-        console.log(`Total genes: ${totalGenes}`);
-        
-        // 2. Ciliopathy Diseases and Genes
-        const ciliopathyDiseases = new Set();
-        const ciliopathyGenes = new Set();
-        
-        // Process each gene
-        window.CiliAI.masterData.forEach(gene => {
-            if (gene.Gene && (gene.Ciliopathies || gene.Ciliopathy)) {
-                let ciliopathyData = gene.Ciliopathies || gene.Ciliopathy;
-                
-                // Handle different data formats
-                if (typeof ciliopathyData === 'string') {
-                    // Split by common delimiters
-                    const diseases = ciliopathyData.split(/[;,]/)
-                        .map(d => d.trim())
-                        .filter(d => d.length > 0);
-                    
-                    diseases.forEach(disease => {
-                        if (disease && !disease.includes('None') && !disease.includes('none')) {
-                            ciliopathyDiseases.add(disease);
-                            ciliopathyGenes.add(gene.Gene);
-                        }
-                    });
-                } else if (Array.isArray(ciliopathyData)) {
-                    ciliopathyData.forEach(disease => {
-                        if (disease && typeof disease === 'string' && 
-                            !disease.includes('None') && !disease.includes('none')) {
+    // 1. Total Ciliary Genes
+    const totalGenes = window.CiliAI.masterData.length;
+    
+    // 2. Ciliopathy Diseases (only primary, motile, and atypical)
+    const ciliopathyDiseases = new Set();
+    const ciliopathyGenes = new Set();
+    
+    // Define categories to include (primary, motile, atypical)
+    const includedCategories = [
+        'primary ciliopathy',
+        'motile ciliopathy', 
+        'atypical ciliopathy',
+        'Primary ciliopathy',
+        'Motile ciliopathy',
+        'Atypical ciliopathy'
+    ];
+    
+    // Filter genes for ciliopathies
+    window.CiliAI.masterData.forEach(gene => {
+        if (gene.Ciliopathies || gene.Ciliopathy) {
+            let ciliopathyData = gene.Ciliopathies || gene.Ciliopathy;
+            
+            // Handle both array and string formats
+            if (typeof ciliopathyData === 'string') {
+                ciliopathyData = ciliopathyData.split(/[;,]/).map(s => s.trim());
+            }
+            
+            if (Array.isArray(ciliopathyData)) {
+                ciliopathyData.forEach(disease => {
+                    if (disease && disease.trim() !== '') {
+                        // Check if disease belongs to included categories
+                        const diseaseLower = disease.toLowerCase();
+                        if (includedCategories.some(cat => diseaseLower.includes(cat.toLowerCase()))) {
                             ciliopathyDiseases.add(disease.trim());
                             ciliopathyGenes.add(gene.Gene);
                         }
-                    });
-                }
+                    }
+                });
             }
-        });
-        
-        console.log(`Found ${ciliopathyDiseases.size} ciliopathy diseases`);
-        console.log(`Found ${ciliopathyGenes.size} ciliopathy genes`);
-        
-        // Update the dashboard
-        document.getElementById('stat-genes').textContent = totalGenes.toLocaleString();
-        document.getElementById('stat-ciliopathys').textContent = ciliopathyDiseases.size.toLocaleString();
-        document.getElementById('stat-ciliopathy-genes').textContent = ciliopathyGenes.size.toLocaleString();
-        
-    } catch (error) {
-        console.error("Error calculating statistics:", error);
-        // Set error values
-        document.getElementById('stat-genes').textContent = "Error";
-        document.getElementById('stat-ciliopathys').textContent = "Error";
-        document.getElementById('stat-ciliopathy-genes').textContent = "Error";
-    }
+        }
+    });
+    
+    // Update the dashboard with calculated values
+    document.getElementById('stat-genes').textContent = totalGenes.toLocaleString();
+    document.getElementById('stat-ciliopathys').textContent = ciliopathyDiseases.size.toLocaleString();
+    document.getElementById('stat-ciliopathy-genes').textContent = ciliopathyGenes.size.toLocaleString();
+    
+    console.log(`Statistics calculated: ${totalGenes} genes, ${ciliopathyDiseases.size} ciliopathy diseases, ${ciliopathyGenes.size} ciliopathy genes`);
 };
 
-    
 /* ============ DATA LOADING & PROCESSING ENGINE ============ */
 
 // 1. TSV Parser (Kept Original)
@@ -1758,10 +1740,11 @@ window.loadCiliAIData = async function() {
             console.log(`Loaded expression data for ${Object.keys(expressionData).length} genes`);
         }
 
-       window.CiliAI.ready = true;
-    window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes + expression)`, 'ready');
-    console.log("✅ CiliAI fully loaded with Lung Organoid (UMAP + CellxGene expression).");
-    return true;
+        window.CiliAI.ready = true;
+        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes + expression)`, 'ready');
+        console.log("✅ CiliAI fully loaded with Lung Organoid (UMAP + CellxGene expression).");
+
+        return true;
 
     } catch (e) {
         console.error("Load failed:", e);
@@ -2163,28 +2146,24 @@ window.handleUserSend = function() {
         };
         
 // 9. INIT & STARTUP
-   window.initCiliAI = async function() {
-    window.updateStatus('Loading databases...', 'loading');
-    if (window.generateAndInjectSVG) {
-        window.generateAndInjectSVG();
-    }
-    const loaded = await window.loadCiliAIData();
-    if (loaded) {
-        window.addChatMessage("👋 CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
-        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-        
-        // ADD THIS: Calculate and display statistics after data is loaded
-        if (window.calculateAndDisplayStatistics) {
-            // Give it a small delay to ensure DOM is ready
-            setTimeout(() => {
-                window.calculateAndDisplayStatistics();
-            }, 300);
+    window.initCiliAI = async function() {
+        window.updateStatus('Loading databases...', 'loading');
+        if (window.generateAndInjectSVG) {
+            window.generateAndInjectSVG();
         }
-    } else {
-        window.updateStatus('Load failed', 'error');
-        window.addChatMessage("⚠️ Failed to load data. Please refresh the page.", false);
-    }
-};
+        const loaded = await window.loadCiliAIData();
+        if (loaded) {
+            window.addChatMessage("👋 CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
+            window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
+        } else {
+            window.updateStatus('Load failed', 'error');
+            window.addChatMessage("⚠️ Failed to load data. Please refresh the page.", false);
+        }
+    };
+
+    document.getElementById('chatInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') window.handleUserSend();
+    });
 
     // Start App
     window.initCiliAI();
@@ -2192,7 +2171,4 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
-
-
-
 
