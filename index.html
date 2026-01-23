@@ -706,6 +706,117 @@
         </aside>
     </div>
 <script>
+/* ==============================================================
+ * MODULE: GOLD STANDARD DATABASE VIEW (Left Panel Integration)
+ * ============================================================== */
+
+// 1. Main Render Function (Target: #cilia-svg container)
+window.showGoldStandardTable = function() {
+    // Switch to Diagram view logic (hides plotly/domain containers)
+    window.switchView('diagram'); 
+    
+    const container = document.getElementById('cilia-svg');
+    if (!container) return;
+    
+    // Ensure we have data
+    if (!window.CiliAI || !window.CiliAI.masterData) {
+        window.addChatMessage("Error: Database not loaded.", false);
+        return;
+    }
+
+    // Sort Data: Alphabetical by Gene
+    const allGenes = window.CiliAI.masterData.sort((a, b) => a.Gene.localeCompare(b.Gene));
+    const totalCount = allGenes.length;
+
+    // --- Inject Full UI Structure into Left Panel ---
+    container.innerHTML = `
+        <div class="ciliai-table-container" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: white;">
+            
+            <div style="padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 12px; align-items: center; background: #f8fafc; flex-shrink: 0;">
+                <div style="flex: 1;">
+                    <h3 style="margin: 0; color: #005b96; font-size: 16px; font-weight: 700;">Ciliary Gene Database</h3>
+                    <p style="margin: 2px 0 0; font-size: 11px; color: #64748b;">
+                        <strong>${totalCount.toLocaleString()}</strong> Genes • Localization • Diseases
+                    </p>
+                </div>
+                
+                <input type="text" id="gs-search" placeholder="Search gene, disease..." 
+                       style="padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 13px; width: 220px; outline: none; transition: border-color 0.2s;"
+                       onfocus="this.style.borderColor='#005b96'" onblur="this.style.borderColor='#cbd5e0'"
+                       onkeyup="window.filterGoldStandardTable()">
+                       
+                <button onclick="window.downloadGoldStandardCSV()" class="ciliai-button" 
+                        style="height: 36px; margin:0; padding: 0 16px; display:flex; align-items:center; gap:6px; background: #005b96; color: white; border:none; border-radius:6px; font-weight:600; cursor:pointer;">
+                    ⬇ CSV
+                </button>
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; padding: 0; position: relative;">
+                <table id="gs-table" style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Inter', sans-serif; table-layout: fixed;">
+                    <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 5; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        <tr>
+                            <th style="padding: 12px 10px; text-align: left; color: #475569; width: 90px; border-bottom: 2px solid #e2e8f0;">Gene ↕</th>
+                            <th style="padding: 12px 10px; text-align: left; color: #475569; width: 250px; border-bottom: 2px solid #e2e8f0;">Description ↕</th>
+                            <th style="padding: 12px 10px; text-align: left; color: #475569; width: 160px; border-bottom: 2px solid #e2e8f0;">Localization ↕</th>
+                            <th style="padding: 12px 10px; text-align: left; color: #475569; width: 160px; border-bottom: 2px solid #e2e8f0;">Ciliopathy ↕</th>
+                            <th style="padding: 12px 10px; text-align: left; color: #475569; width: 110px; border-bottom: 2px solid #e2e8f0;">Mouse ↕</th>
+                            <th style="padding: 12px 10px; text-align: center; color: #475569; width: 90px; border-bottom: 2px solid #e2e8f0;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gs-tbody">
+                        </tbody>
+                </table>
+            </div>
+            <div style="padding: 8px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8;">
+                Displaying all ${totalCount.toLocaleString()} records.
+            </div>
+        </div>
+    `;
+
+    // --- Efficient Row Rendering ---
+    const tbody = document.getElementById('gs-tbody');
+    const fragment = document.createDocumentFragment();
+    
+    allGenes.forEach(g => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #f1f5f9';
+        tr.className = 'gs-row'; // Marker class for filtering
+        
+        // Safe Data Extraction
+        const desc = g['Gene.Description'] || '-';
+        const loc = g.Localization || '-';
+        const mouse = g.Ortholog_Mouse || '-';
+        
+        // Handle Disease Array or String
+        let disease = '-';
+        if (Array.isArray(g.Ciliopathies)) disease = g.Ciliopathies.join('; ');
+        else if (g.Ciliopathy) disease = g.Ciliopathy;
+
+        tr.innerHTML = `
+            <td style="padding: 8px 10px; font-weight: 700; color: #005b96; vertical-align:top; overflow:hidden; text-overflow:ellipsis;">${g.Gene}</td>
+            <td style="padding: 8px 10px; color: #475569; line-height:1.4; vertical-align:top;">${desc}</td>
+            <td style="padding: 8px 10px; color: #334155; vertical-align:top;">${loc}</td>
+            <td style="padding: 8px 10px; color: #be185d; vertical-align:top;">${disease}</td>
+            <td style="padding: 8px 10px; font-style: italic; color: #64748b; vertical-align:top;">${mouse}</td>
+            <td style="padding: 8px 10px; text-align: center; vertical-align:top;">
+                <div style="display: flex; gap: 8px; justify-content: center;">
+                    <button onclick="window.displayFullGeneInfo('${g.Gene}')" title="View Details" style="cursor:pointer; border:none; background: #e0f2fe; color: #005b96; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;">👁️</button>
+                    <button onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])" title="Visualize Expression" style="cursor:pointer; border:none; background: #f0fdf4; color: #166534; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;">📊</button>
+                </div>
+            </td>
+        `;
+        fragment.appendChild(tr);
+    });
+    
+    tbody.appendChild(fragment);
+    
+    // Update Title in Header
+    const titleEl = document.getElementById('current-viz-title');
+    if(titleEl) titleEl.textContent = "Database: Ciliary Gene Inventory";
+};
+
+
+    
     /* ============ UI INTERFACE LAYER ============ */
         // 1. Initialize Global State WITH NEW PERSISTENCE FEATURES
         window.CiliAI = {
@@ -2010,4 +2121,5 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
