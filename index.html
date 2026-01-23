@@ -1189,29 +1189,35 @@
              pfamLookup = window.CiliAI.lookups.pfamByGene || {};
              pfam = pfamLookup[gene.toUpperCase()] || [];
             
-            if (!pfam.length) {
-                // Check for raw text descriptions as fallback
-                 geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
-                if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
-                     desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
-                     parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
-                    
-                    if (parts.length > 0) {
-                         domains = parts.map((part, i) => ({
-                            id: `DOM_${i+1}`,
-                            name: part.trim(),
-                            start: (i * 200) + 50,
-                            end: (i * 200) + 150
-                        }));
-                        window.CiliAI.lookups.pfamByGene[gene.toUpperCase()] = domains;
-                        window.showDomainViewer(gene); // Retry
-                        return;
-                    }
-                }
-                
-                domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
-                return;
+           if (!pfam.length) {
+    // Check for raw text descriptions as fallback
+    const geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
+    if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
+        const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
+        const parts = desc.split(/[;,]/).filter(s => s.trim().length > 0);
+        
+        if (parts.length > 0) {
+            const domains = parts.map((part, i) => ({
+                id: `DOM_${i+1}`,
+                name: part.trim(),
+                start: (i * 200) + 50,
+                end: (i * 200) + 150
+            }));
+            
+            // FIX: Ensure the parent object exists before setting property
+            if (!window.CiliAI.lookups.pfamByGene) {
+                window.CiliAI.lookups.pfamByGene = {};
             }
+            window.CiliAI.lookups.pfamByGene[gene.toUpperCase()] = domains;
+            
+            window.showDomainViewer(gene); // Retry
+            return;
+        }
+    }
+    
+    domainContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No Pfam domain data available for this gene.</div>';
+    return;
+}
             // --- 1. Setup Canvas & Scaling ---
             const seqLength = Math.max(...pfam.map(d => d.end), 1000);
             const svgWidth = 1000; // Internal coordinate width
@@ -2004,3 +2010,4 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
