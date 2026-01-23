@@ -1533,96 +1533,63 @@ window.median = function (arr) {
     }
 
 
-/**
- * Renders the Gold Standard Database View
- * Replicates the specific table layout requested for the "Complete Ciliary Gene List"
- */
-window.renderGoldStandardView = function() {
-    // 1. Get Data (Sort alphabetically by Gene)
-    // We use the masterData loaded in CiliAI
-    const allGenes = window.CiliAI.masterData.sort((a, b) => a.Gene.localeCompare(b.Gene));
-    const totalCount = allGenes.length;
 
-    // 2. Define Columns
-    const columns = [
-        { label: 'Gene ↕', key: 'Gene', width: '80px', isBold: true },
-        { label: 'Description ↕', key: 'Gene.Description', width: '200px' },
-        { label: 'Localization ↕', key: 'Localization', width: '150px' },
-        { label: 'Ciliopathy ↕', key: 'Ciliopathies', width: '150px' },
-        { label: 'Mouse Ortholog ↕', key: 'Ortholog_Mouse', width: '120px' },
-        { label: 'Actions', key: 'actions', width: '80px' }
-    ];
-
-    // 3. Generate Rows (Limit to first 100 for performance, with "Load More" capability logic implies)
-    // For this specific view, we map the exact data points requested.
+// 2. Real-time Filter Function (Optimized)
+window.filterGoldStandardTable = function() {
+    const input = document.getElementById('gs-search');
+    if(!input) return;
     
-    let tableRows = '';
-    
-    // We render a slice to keep the DOM light, but the count reflects the full DB
-    const displayGenes = allGenes.slice(0, 100); 
+    const filter = input.value.toUpperCase();
+    const rows = document.getElementsByClassName('gs-row');
 
-    displayGenes.forEach(g => {
-        // Data Safe Handling
-        const desc = g['Gene.Description'] || '-';
-        const loc = g.Localization || '-';
-        
-        // Handle Ciliopathy (Array or String)
-        let disease = '-';
+    // Simple text search across the row
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        // We check Gene (0) and Ciliopathy (3) columns specifically for better UX, or full text
+        const text = row.textContent || row.innerText; 
+        if (text.toUpperCase().indexOf(filter) > -1) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    }
+};
+
+// 3. Download Full CSV Function
+window.downloadGoldStandardCSV = function() {
+    if (!window.CiliAI || !window.CiliAI.masterData) return;
+    
+    const data = window.CiliAI.masterData;
+    let csv = 'Gene,Description,Localization,Ciliopathy,Mouse_Ortholog,Ensembl_ID\n';
+    
+    data.forEach(g => {
+        let disease = '';
         if (Array.isArray(g.Ciliopathies)) disease = g.Ciliopathies.join('; ');
         else if (g.Ciliopathy) disease = g.Ciliopathy;
         
-        const mouse = g.Ortholog_Mouse || '-';
+        // Escape quotes to prevent CSV breakage
+        const safe = (val) => `"${(val || '').toString().replace(/"/g, '""')}"`;
 
-        tableRows += `
-            <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 10px; color: #005b96; font-weight: 700;">${g.Gene}</td>
-                <td style="padding: 10px; font-size: 12px; color: #475569; line-height: 1.3;">${desc}</td>
-                <td style="padding: 10px; font-size: 12px; color: #334155;">${loc}</td>
-                <td style="padding: 10px; font-size: 12px; color: #be185d;">${disease}</td>
-                <td style="padding: 10px; font-size: 12px; color: #475569; font-style: italic;">${mouse}</td>
-                <td style="padding: 10px; text-align: center;">
-                    <div style="display: flex; gap: 8px; justify-content: center;">
-                        <button onclick="window.displayFullGeneInfo('${g.Gene}')" title="View Details" style="border:none; background:none; cursor:pointer; font-size: 16px;">👁️</button>
-                        <button onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])" title="View Plot" style="border:none; background:none; cursor:pointer; font-size: 16px;">📊</button>
-                    </div>
-                </td>
-            </tr>
-        `;
+        const row = [
+            safe(g.Gene),
+            safe(g['Gene.Description']),
+            safe(g.Localization),
+            safe(disease),
+            safe(g.Ortholog_Mouse),
+            safe(g['Ensembl ID'])
+        ];
+        csv += row.join(',') + '\n';
     });
-
-    // 4. Construct Final HTML
-    return `
-        <div class="ai-result-card" style="padding: 0; overflow: hidden; font-family: 'Inter', sans-serif; border: 1px solid #e2e8f0;">
-            <div style="padding: 15px 20px; background: #fff; border-bottom: 1px solid #e2e8f0;">
-                <h3 style="margin: 0; color: #005b96; font-size: 16px; font-weight: 700;">Ciliary Gene Database</h3>
-                <p style="margin: 5px 0 0; font-size: 12px; color: #64748b;">
-                    Comprehensive catalog of <strong>${totalCount.toLocaleString()}</strong> genes, localization, and disease associations.
-                </p>
-            </div>
-            
-            <div style="max-height: 400px; overflow-y: auto;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                        <tr>
-                            ${columns.map(col => `
-                                <th style="padding: 10px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; width: ${col.width};">
-                                    ${col.label}
-                                </th>
-                            `).join('')}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tableRows}
-                    </tbody>
-                </table>
-            </div>
-            <div style="padding: 10px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8;">
-                Showing first 100 genes. Use search to find specific targets.
-            </div>
-        </div>
-    `;
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'CiliAI_Gold_Standard_Database.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 };
-
 
  /**
  * Calculates the Jaccard index between two gene sets.
@@ -3935,17 +3902,24 @@ window.handleCellTypeQuestion = function(query) {
 
 const intentHandlers = [
     
-    {
-        priority: 200,
+   if (typeof intentHandlers !== 'undefined') {
+    intentHandlers.unshift({
+        priority: 200, 
         matcher: (qLower) => 
             qLower.includes('complete ciliary gene list') || 
             qLower.includes('gold standard') || 
             qLower.includes('database view') ||
-            (qLower.includes('show') && qLower.includes('database')),
+            (qLower.includes('show') && qLower.includes('database') && qLower.includes('all')),
         handler: async (query) => {
-            return window.renderGoldStandardView();
+            // Trigger the left panel view
+            window.showGoldStandardTable();
+            // Return text response to chat
+            return `I've loaded the <strong>Gold Standard Ciliary Gene Database</strong> into the main diagram panel.<br><br>
+                    ✅ <strong>Search:</strong> Use the bar at the top of the panel.<br>
+                    ✅ <strong>Export:</strong> Click the '⬇ CSV' button.`;
         }
-    },
+    });
+},
     
     // Highest Priority: Cell-type specific questions
     {
@@ -6726,6 +6700,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
