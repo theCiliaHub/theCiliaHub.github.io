@@ -711,11 +711,6 @@
  * ============================================================== */
 
 // 1. Main Render Function (Target: #cilia-svg container)
-/* ==============================================================
- * MODULE: GOLD STANDARD DATABASE VIEW (Left Panel Integration)
- * ============================================================== */
-
-// 1. Main Render Function (Target: #cilia-svg container)
 window.showGoldStandardTable = function() {
     // Switch to Diagram view logic (hides plotly/domain containers)
     window.switchView('diagram'); 
@@ -734,9 +729,8 @@ window.showGoldStandardTable = function() {
     const totalCount = allGenes.length;
 
     // --- Inject Full UI Structure into Left Panel ---
-    // We override styles here to ensure the table fills the panel correctly
     container.innerHTML = `
-        <div class="ciliai-table-container" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: white; border-radius: 0 0 12px 12px;">
+        <div class="ciliai-table-container" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: white;">
             
             <div style="padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 12px; align-items: center; background: #f8fafc; flex-shrink: 0;">
                 <div style="flex: 1;">
@@ -752,7 +746,6 @@ window.showGoldStandardTable = function() {
                        onkeyup="window.filterGoldStandardTable()">
                        
                 <button onclick="window.downloadGoldStandardCSV()" class="ciliai-button" 
-                        title="Download Full Database as CSV"
                         style="height: 36px; margin:0; padding: 0 16px; display:flex; align-items:center; gap:6px; background: #005b96; color: white; border:none; border-radius:6px; font-weight:600; cursor:pointer;">
                     ⬇ CSV
                 </button>
@@ -821,6 +814,7 @@ window.showGoldStandardTable = function() {
     const titleEl = document.getElementById('current-viz-title');
     if(titleEl) titleEl.textContent = "Database: Ciliary Gene Inventory";
 };
+
 
     
     /* ============ UI INTERFACE LAYER ============ */
@@ -2127,6 +2121,4 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
-
-
 
