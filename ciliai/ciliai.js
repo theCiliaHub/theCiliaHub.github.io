@@ -5369,22 +5369,36 @@ const intentHandlers = [
 
         /* ---------- 🔑 UPDATED EXPRESSION COMPARISON ---------- */
         if (hasExpressionQuery) {
-            window.switchView('plot');
-            await window.renderUMAPGrid('EXPRESSION_COMPARISON', validGenes);
+    // 🔴 CRITICAL: prevent single-gene fallback
+    window.switchView('plot');
 
-            return `
-                <div class="ai-result-card">
-                    <h4>🔬 Expression Comparison</h4>
-                    <p>Each gene is shown in its <strong>own UMAP panel</strong>.</p>
-                    <ul>
-                        ${validGenes.map(g => `<li><strong>${g}</strong></li>`).join('')}
-                    </ul>
-                    <p style="font-size:12px;color:#666;">
-                        Color intensity reflects expression (TPM) per gene.
-                    </p>
-                </div>
-            `;
-        }
+    await window.renderUMAPGrid({
+        genes: validGenes,
+        datasetKey: window.CiliAI.activeDataset,
+        containerId: 'plotly-container'
+    });
+
+    const dsKey = window.CiliAI.activeDataset;
+    const dsName = window.CiliAI.datasets[dsKey].name;
+
+    responseHtml += `
+        <p><strong>Expression Comparison</strong></p>
+        <p>
+            Each gene is shown in its <strong>own UMAP panel</strong> in
+            <strong>${dsName}</strong>.
+        </p>
+        <ul style="margin:8px 0 12px 18px; font-size:13px;">
+            ${validGenes.map(g => `<li><strong>${g}</strong></li>`).join('')}
+        </ul>
+        <p style="font-size:12px; color:#666;">
+            🎨 Color intensity reflects expression (TPM) per gene.<br>
+            🔗 Zoom & pan are synchronized across panels.
+        </p>
+    `;
+
+    responseHtml += `</div>`;
+    return responseHtml; // ⬅️ ⬅️ ⬅️ THIS IS ESSENTIAL
+}
 
         /* ---------- Localization / fallback (UNCHANGED) ---------- */
         window.switchView('diagram');
@@ -6878,6 +6892,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
