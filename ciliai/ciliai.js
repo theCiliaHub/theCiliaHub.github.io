@@ -3819,16 +3819,31 @@ window.renderUMAPGrid = async function (...args) {
         const expr = new Float32Array(nCells).fill(0);
         let found = false;
 
-        const raw = expressionSource[gene];
+       // Resolve gene index (CellxGene-safe)
+let geneIndex = null;
 
-        // CellxGene sparse format
-        if (raw && raw.cells && raw.expression) {
-            for (let k = 0; k < raw.cells.length; k++) {
-                const idx = raw.cells[k];
-                if (idx < nCells) expr[idx] = raw.expression[k];
+if (dataset.geneIndex && dataset.geneIndex[gene] !== undefined) {
+    geneIndex = dataset.geneIndex[gene];
+} else if (dataset.genes && Array.isArray(dataset.genes)) {
+    geneIndex = dataset.genes.indexOf(gene);
+}
+
+if (geneIndex === null || geneIndex < 0) {
+    console.warn(`[CiliAI] Gene not found in expression matrix: ${gene}`);
+} else {
+    const raw = expressionSource[geneIndex];
+
+    // Sparse CellxGene format
+    if (raw && raw.cells && raw.expression) {
+        for (let k = 0; k < raw.cells.length; k++) {
+            const cellIdx = raw.cells[k];
+            if (cellIdx < nCells) {
+                expr[cellIdx] = raw.expression[k];
             }
-            found = true;
         }
+        found = true;
+    }
+}
 
         if (!found) {
             console.warn(`[CiliAI] Expression not found for ${gene}`);
@@ -6892,6 +6907,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
