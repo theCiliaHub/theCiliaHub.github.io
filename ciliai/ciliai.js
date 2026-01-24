@@ -3715,11 +3715,11 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 };
 
 /**
- * Multi-gene UMAP Grid with:
- * - Dynamic rows/cols
+ * Multi-gene UMAP Grid (FULLY FIXED)
+ * - Correct expression decoding (all dataset formats)
+ * - Dynamic grid
  * - Gene-specific colorbars
- * - Linked hover & zoom
- * Browser-safe Plotly.js implementation
+ * - Linked hover + linked zoom
  */
 window.renderUMAPGrid = async function (
     displayName = 'Multi-Gene UMAP',
@@ -3785,16 +3785,48 @@ window.renderUMAPGrid = async function (
 
     /* ---------------- Build each subplot ---------------- */
     targetGenes.forEach((gene, idx) => {
-        let raw = dataset.expression?.[gene] || window.CiliAI.cellDataCache?.[gene];
-        if (!raw) return;
 
-        let expr;
+        /* ---------- FIXED EXPRESSION RESOLUTION ---------- */
+        let expr = new Float32Array(sourceData.length).fill(0);
+        let geneFound = false;
+
+        // Case 1: gene-keyed sparse array
+        let raw = dataset.expression?.[gene] || window.CiliAI.cellDataCache?.[gene];
         if (Array.isArray(raw)) {
             expr = decodeSparse(raw, sourceData.length);
-        } else {
-            expr = new Float32Array(sourceData.length).fill(0);
+            geneFound = true;
         }
 
+        // Case 2: { cells: [], expression: [] } (e.g. hypothalamus)
+        else if (raw && raw.cells && raw.expression) {
+            raw.cells.forEach((cellIdx, k) => {
+                if (cellIdx < expr.length) {
+                    expr[cellIdx] = raw.expression[k];
+                }
+            });
+            geneFound = true;
+        }
+
+        // Case 3: cell-centric dictionary (MOST DATASETS)
+        else if (dataset.expression && typeof dataset.expression === 'object') {
+            sourceData.forEach((p, i) => {
+                const cellId = p.cell_id || p.id;
+                if (
+                    cellId &&
+                    dataset.expression[cellId] &&
+                    dataset.expression[cellId][gene] !== undefined
+                ) {
+                    expr[i] = dataset.expression[cellId][gene];
+                    geneFound = true;
+                }
+            });
+        }
+
+        if (!geneFound) {
+            console.warn(`[CiliAI] Expression not found for gene: ${gene}`);
+        }
+
+        /* ---------- Build trace ---------- */
         let x = [], y = [], color = [], size = [], text = [];
         let maxExpr = 0;
 
@@ -3839,7 +3871,11 @@ window.renderUMAPGrid = async function (
                 cmin: 0,
                 cmax: maxExpr || 1,
                 opacity: 0.85,
-                colorscale: dataset.colorScale || [[0, '#e2e8f0'], [0.5, '#3b82f6'], [1, '#1e40af']],
+                colorscale: dataset.colorScale || [
+                    [0, '#e2e8f0'],
+                    [0.5, '#3b82f6'],
+                    [1, '#1e40af']
+                ],
                 showscale: true,
                 colorbar: {
                     title: gene,
@@ -3892,17 +3928,20 @@ window.renderUMAPGrid = async function (
     plotDiv.on('plotly_hover', (event) => {
         if (!event?.points?.length) return;
         const pointIndex = event.points[0].pointIndex;
-        Plotly.Fx.hover(plotDiv, traces.map((_, i) => ({
-            curveNumber: i,
-            pointIndex
-        })));
+        Plotly.Fx.hover(
+            plotDiv,
+            traces.map((_, i) => ({
+                curveNumber: i,
+                pointIndex
+            }))
+        );
     });
 
     plotDiv.on('plotly_unhover', () => {
         Plotly.Fx.unhover(plotDiv);
     });
 
-    /* ---------------- Click → localization ---------------- */
+    /* ---------------- Click → ciliary localization ---------------- */
     plotDiv.on('plotly_click', (event) => {
         const cd = event.points?.[0]?.customdata;
         if (!cd) return;
@@ -6891,6 +6930,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
