@@ -20,6 +20,21 @@ if (!window.CiliAI.datasets) {
     };
 }
 
+/* ------------------------------------------------------------------
+ * Legacy compatibility: resetZoom (required by SpatialManager)
+ * ------------------------------------------------------------------ */
+if (!window.CiliAI.resetZoom) {
+    window.CiliAI.resetZoom = function () {
+        const el = document.getElementById('umap-container');
+        if (window.Plotly && el) {
+            Plotly.relayout(el, {
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            });
+        }
+    };
+}
+
 // Initialize Global State Properties
 if (!window.CiliAI.activeDataset) window.CiliAI.activeDataset = 'lung';
 if (!window.CiliAI.masterData) window.CiliAI.masterData = [];
@@ -3721,50 +3736,47 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
  * - Gene-specific colorbars
  * - Linked hover + linked zoom
  */
-window.renderUMAPGrid = function ({
+window.renderUMAPGrid = async function ({
     genes,
-    datasetKey = CiliAI.currentDataset,
+    datasetKey = window.CiliAI.activeDataset,
     containerId = 'umap-container'
 }) {
-    const dataset = CiliAI.datasets[datasetKey];
-    if (!dataset || !dataset.umap || !dataset.expression) {
-        console.error('[CiliAI] Dataset incomplete');
+    const dataset = window.CiliAI.datasets?.[datasetKey];
+
+    const expressionSource =
+        dataset?.expressionMatrix ||
+        dataset?.expression ||
+        dataset?.cellxgene;
+
+    if (!dataset || !dataset.umap || !expressionSource) {
+        console.error('[CiliAI] Dataset incomplete', datasetKey);
         return;
     }
 
     const sourceData = dataset.umap;
     const nCells = sourceData.length;
 
-    /* ---------------------------
-     * Build subplot layout
-     * --------------------------- */
-    const rows = 1;
-    const cols = genes.length;
-
     const traces = [];
     const layout = {
-        grid: { rows, columns: cols, pattern: 'independent' },
-        margin: { l: 20, r: 20, t: 40, b: 20 },
+        grid: { rows: 1, columns: genes.length, pattern: 'independent' },
+        margin: { l: 30, r: 30, t: 50, b: 30 },
         showlegend: false,
-        uirevision: 'linked-umap',   // ✅ enables zoom persistence
+        uirevision: 'linked-umap',
         annotations: []
     };
 
-    /* ---------------------------
-     * Per-gene panels
-     * --------------------------- */
     genes.forEach((gene, i) => {
-        const axisId = i + 1;
-        const xref = axisId === 1 ? 'x' : `x${axisId}`;
-        const yref = axisId === 1 ? 'y' : `y${axisId}`;
+        const axisIndex = i + 1;
+        const xaxis = axisIndex === 1 ? 'x' : `x${axisIndex}`;
+        const yaxis = axisIndex === 1 ? 'y' : `y${axisIndex}`;
 
-        /* ---------------------------
-         * Resolve expression (CellxGene format)
-         * --------------------------- */
+        /* --------------------------------------------------
+         * Expression resolution (CellxGene format)
+         * -------------------------------------------------- */
         const expr = new Float32Array(nCells).fill(0);
         let geneFound = false;
 
-        const raw = dataset.expression[gene];
+        const raw = expressionSource[gene];
 
         if (raw && raw.cells && raw.expression) {
             raw.cells.forEach((cellIdx, k) => {
@@ -3779,9 +3791,9 @@ window.renderUMAPGrid = function ({
             console.warn(`[CiliAI] Expression not found for gene: ${gene}`);
         }
 
-        /* ---------------------------
+        /* --------------------------------------------------
          * Trace
-         * --------------------------- */
+         * -------------------------------------------------- */
         traces.push({
             type: 'scattergl',
             mode: 'markers',
@@ -3789,84 +3801,81 @@ window.renderUMAPGrid = function ({
             y: sourceData.map(p => p.y),
             marker: {
                 size: 4,
+                opacity: 0.85,
                 color: Array.from(expr),
                 colorscale: 'Viridis',
                 showscale: true,
                 colorbar: {
                     title: gene,
                     len: 0.85,
-                    x: 1.02 + i * 0.08
+                    thickness: 10,
+                    x: 1.02 + i * 0.07
                 }
             },
             hovertemplate:
-                `Gene: ${gene}<br>` +
-                'UMAP1: %{x:.2f}<br>' +
-                'UMAP2: %{y:.2f}<br>' +
-                'Expr: %{marker.color:.2f}<extra></extra>',
-            xaxis: xref,
-            yaxis: yref
+                `<b>${gene}</b><br>` +
+                `UMAP1: %{x:.2f}<br>` +
+                `UMAP2: %{y:.2f}<br>` +
+                `Expr: %{marker.color:.2f}` +
+                `<extra></extra>`,
+            xaxis,
+            yaxis
         });
 
-        /* ---------------------------
-         * Axes
-         * --------------------------- */
-        layout[xref] = {
+        layout[xaxis] = {
             title: 'UMAP1',
             zeroline: false,
             showgrid: false
         };
 
-        layout[yref] = {
+        layout[yaxis] = {
             title: 'UMAP2',
             zeroline: false,
             showgrid: false
         };
 
-        /* ---------------------------
-         * Title annotation
-         * --------------------------- */
         layout.annotations.push({
             text: gene,
             xref: 'paper',
             yref: 'paper',
-            x: (i + 0.5) / cols,
-            y: 1.08,
+            x: (i + 0.5) / genes.length,
+            y: 1.12,
             showarrow: false,
             font: { size: 14, weight: 'bold' }
         });
     });
 
-    /* ---------------------------
+    /* --------------------------------------------------
      * Render
-     * --------------------------- */
-    Plotly.newPlot(containerId, traces, layout, {
+     * -------------------------------------------------- */
+    await Plotly.newPlot(containerId, traces, layout, {
         responsive: true,
         scrollZoom: true
     });
 
-    /* ---------------------------
-     * Linked zoom / pan (SAFE)
-     * --------------------------- */
+    /* --------------------------------------------------
+     * Linked zoom / pan (SAFE, no Plotly.matches)
+     * -------------------------------------------------- */
     const container = document.getElementById(containerId);
 
     container.on('plotly_relayout', ev => {
-        const updates = {};
+        if (!ev['xaxis.range[0]']) return;
 
-        if (ev['xaxis.range[0]']) {
-            genes.forEach((_, i) => {
-                const ax = i === 0 ? 'xaxis' : `xaxis${i + 1}`;
-                const ay = i === 0 ? 'yaxis' : `yaxis${i + 1}`;
-                updates[`${ax}.range`] = [
-                    ev['xaxis.range[0]'],
-                    ev['xaxis.range[1]']
-                ];
-                updates[`${ay}.range`] = [
-                    ev['yaxis.range[0]'],
-                    ev['yaxis.range[1]']
-                ];
-            });
-            Plotly.relayout(containerId, updates);
-        }
+        const update = {};
+        genes.forEach((_, i) => {
+            const ax = i === 0 ? 'xaxis' : `xaxis${i + 1}`;
+            const ay = i === 0 ? 'yaxis' : `yaxis${i + 1}`;
+            update[`${ax}.range`] = [
+                ev['xaxis.range[0]'],
+                ev['xaxis.range[1]']
+            ];
+            update[`${ay}.range`] = [
+                ev['yaxis.range[0]'],
+                ev['yaxis.range[1]']
+            ];
+        });
+
+        Plotly.relayout(containerId, update);
     });
 };
 
@@ -6832,6 +6841,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
