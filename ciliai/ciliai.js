@@ -5278,7 +5278,11 @@ const intentHandlers = [
         if (!isComplex && finalGenes.length > 1) {
             await window.renderUMAPGrid('GENE_GRID', finalGenes, zoomToCellType);
         } else {
-            await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
+           await window.renderUMAPGrid({
+            genes: validGenes,
+            datasetKey: window.CiliAI.activeDataset,
+        containerId: 'umap-container'
+        });
         }
 
         /* ---------- UI card (UNCHANGED) ---------- */
@@ -6841,6 +6845,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
