@@ -3736,69 +3736,110 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
  * - Gene-specific colorbars
  * - Linked hover + linked zoom
  */
-window.renderUMAPGrid = async function ({
-    genes,
-    datasetKey = window.CiliAI.activeDataset,
-    containerId = 'umap-container'
-}) {
+window.renderUMAPGrid = async function (...args) {
+    /* --------------------------------------------------
+     * Argument normalization (CRITICAL FIX)
+     * -------------------------------------------------- */
+    let genes, datasetKey, containerId;
+
+    // New-style call: renderUMAPGrid({ genes, datasetKey, containerId })
+    if (args.length === 1 && typeof args[0] === 'object' && !Array.isArray(args[0])) {
+        genes = args[0].genes;
+        datasetKey = args[0].datasetKey;
+        containerId = args[0].containerId;
+    }
+    // Legacy call: renderUMAPGrid(genesArray)
+    else if (Array.isArray(args[0])) {
+        genes = args[0];
+        datasetKey = window.CiliAI.activeDataset;
+        containerId = 'umap-container';
+    }
+    // Fallback
+    else {
+        genes = [];
+        datasetKey = window.CiliAI.activeDataset;
+        containerId = 'umap-container';
+    }
+
+    if (!Array.isArray(genes) || genes.length === 0) {
+        console.error('[CiliAI] renderUMAPGrid called without genes');
+        return;
+    }
+
+    datasetKey ||= window.CiliAI.activeDataset;
+    containerId ||= 'umap-container';
+
+    /* --------------------------------------------------
+     * Dataset validation
+     * -------------------------------------------------- */
     const dataset = window.CiliAI.datasets?.[datasetKey];
+    if (!dataset || !Array.isArray(dataset.umap)) {
+        console.error('[CiliAI] Dataset incomplete:', datasetKey);
+        return;
+    }
 
     const expressionSource =
-        dataset?.expressionMatrix ||
-        dataset?.expression ||
-        dataset?.cellxgene;
+        dataset.expressionMatrix ||
+        dataset.expression ||
+        dataset.cellxgene;
 
-    if (!dataset || !dataset.umap || !expressionSource) {
-        console.error('[CiliAI] Dataset incomplete', datasetKey);
+    if (!expressionSource) {
+        console.error('[CiliAI] No expression source found:', datasetKey);
         return;
     }
 
     const sourceData = dataset.umap;
     const nCells = sourceData.length;
 
+    /* --------------------------------------------------
+     * Layout
+     * -------------------------------------------------- */
     const traces = [];
     const layout = {
-        grid: { rows: 1, columns: genes.length, pattern: 'independent' },
-        margin: { l: 30, r: 30, t: 50, b: 30 },
+        grid: {
+            rows: 1,
+            columns: genes.length,
+            pattern: 'independent'
+        },
+        margin: { l: 40, r: 40, t: 60, b: 40 },
         showlegend: false,
         uirevision: 'linked-umap',
         annotations: []
     };
 
+    /* --------------------------------------------------
+     * Build panels
+     * -------------------------------------------------- */
     genes.forEach((gene, i) => {
         const axisIndex = i + 1;
         const xaxis = axisIndex === 1 ? 'x' : `x${axisIndex}`;
         const yaxis = axisIndex === 1 ? 'y' : `y${axisIndex}`;
 
-        /* --------------------------------------------------
-         * Expression resolution (CellxGene format)
-         * -------------------------------------------------- */
+        /* ---------------- Expression extraction ---------------- */
         const expr = new Float32Array(nCells).fill(0);
-        let geneFound = false;
+        let found = false;
 
         const raw = expressionSource[gene];
 
+        // CellxGene sparse format
         if (raw && raw.cells && raw.expression) {
-            raw.cells.forEach((cellIdx, k) => {
-                if (cellIdx < nCells) {
-                    expr[cellIdx] = raw.expression[k];
-                }
-            });
-            geneFound = true;
+            for (let k = 0; k < raw.cells.length; k++) {
+                const idx = raw.cells[k];
+                if (idx < nCells) expr[idx] = raw.expression[k];
+            }
+            found = true;
         }
 
-        if (!geneFound) {
-            console.warn(`[CiliAI] Expression not found for gene: ${gene}`);
+        if (!found) {
+            console.warn(`[CiliAI] Expression not found for ${gene}`);
         }
 
-        /* --------------------------------------------------
-         * Trace
-         * -------------------------------------------------- */
+        /* ---------------- Trace ---------------- */
         traces.push({
             type: 'scattergl',
             mode: 'markers',
-            x: sourceData.map(p => p.x),
-            y: sourceData.map(p => p.y),
+            x: sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1),
+            y: sourceData.map(p => p.y ?? p.umap_y ?? p.UMAP_2),
             marker: {
                 size: 4,
                 opacity: 0.85,
@@ -3822,24 +3863,15 @@ window.renderUMAPGrid = async function ({
             yaxis
         });
 
-        layout[xaxis] = {
-            title: 'UMAP1',
-            zeroline: false,
-            showgrid: false
-        };
-
-        layout[yaxis] = {
-            title: 'UMAP2',
-            zeroline: false,
-            showgrid: false
-        };
+        layout[xaxis] = { visible: false };
+        layout[yaxis] = { visible: false };
 
         layout.annotations.push({
             text: gene,
             xref: 'paper',
             yref: 'paper',
             x: (i + 0.5) / genes.length,
-            y: 1.12,
+            y: 1.15,
             showarrow: false,
             font: { size: 14, weight: 'bold' }
         });
@@ -3850,15 +3882,16 @@ window.renderUMAPGrid = async function ({
      * -------------------------------------------------- */
     await Plotly.newPlot(containerId, traces, layout, {
         responsive: true,
-        scrollZoom: true
+        scrollZoom: true,
+        displaylogo: false
     });
 
     /* --------------------------------------------------
-     * Linked zoom / pan (SAFE, no Plotly.matches)
+     * Linked zoom / pan (SAFE)
      * -------------------------------------------------- */
-    const container = document.getElementById(containerId);
+    const el = document.getElementById(containerId);
 
-    container.on('plotly_relayout', ev => {
+    el.on('plotly_relayout', ev => {
         if (!ev['xaxis.range[0]']) return;
 
         const update = {};
@@ -6845,6 +6878,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
