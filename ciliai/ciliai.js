@@ -3738,7 +3738,7 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
  */
 window.renderUMAPGrid = async function (...args) {
     /* --------------------------------------------------
-     * Argument normalization (CRITICAL FIX)
+     * Argument normalization
      * -------------------------------------------------- */
     let genes, datasetKey, containerId;
 
@@ -3792,7 +3792,7 @@ window.renderUMAPGrid = async function (...args) {
     const nCells = sourceData.length;
 
     /* --------------------------------------------------
-     * Layout
+     * Layout Initialization
      * -------------------------------------------------- */
     const traces = [];
     const layout = {
@@ -3803,7 +3803,9 @@ window.renderUMAPGrid = async function (...args) {
         },
         margin: { l: 40, r: 40, t: 60, b: 40 },
         showlegend: false,
-        uirevision: 'linked-umap',
+        // Remove global title (The "Banner")
+        title: undefined, 
+        uirevision: 'linked-umap-' + genes.join('-'),
         annotations: []
     };
 
@@ -3812,53 +3814,58 @@ window.renderUMAPGrid = async function (...args) {
      * -------------------------------------------------- */
     genes.forEach((gene, i) => {
         const axisIndex = i + 1;
-        const xaxis = axisIndex === 1 ? 'x' : `x${axisIndex}`;
-        const yaxis = axisIndex === 1 ? 'y' : `y${axisIndex}`;
+        const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
+        const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
+        const xaxisRef = axisIndex === 1 ? 'x' : `x${axisIndex}`;
+        const yaxisRef = axisIndex === 1 ? 'y' : `y${axisIndex}`;
 
         /* ---------------- Expression extraction ---------------- */
         const expr = new Float32Array(nCells).fill(0);
         let found = false;
 
-       // Resolve gene index (CellxGene-safe)
-let geneIndex = null;
+        // Try exact match or case-insensitive fallback if needed
+        const raw = expressionSource[gene];
 
-if (dataset.geneIndex && dataset.geneIndex[gene] !== undefined) {
-    geneIndex = dataset.geneIndex[gene];
-} else if (dataset.genes && Array.isArray(dataset.genes)) {
-    geneIndex = dataset.genes.indexOf(gene);
-}
-
-if (geneIndex === null || geneIndex < 0) {
-    console.warn(`[CiliAI] Gene not found in expression matrix: ${gene}`);
-} else {
-    const raw = expressionSource[geneIndex];
-
-    // Sparse CellxGene format
-    if (raw && raw.cells && raw.expression) {
-        for (let k = 0; k < raw.cells.length; k++) {
-            const cellIdx = raw.cells[k];
-            if (cellIdx < nCells) {
-                expr[cellIdx] = raw.expression[k];
+        // CellxGene sparse format
+        if (raw && raw.cells && raw.expression) {
+            for (let k = 0; k < raw.cells.length; k++) {
+                const idx = raw.cells[k];
+                if (idx < nCells) expr[idx] = raw.expression[k];
             }
+            found = true;
         }
-        found = true;
-    }
-}
+        // Dense array format fallback
+        else if (Array.isArray(raw)) {
+             for (let k = 0; k < raw.length; k++) {
+                if (k < nCells) expr[k] = raw[k];
+             }
+             found = true;
+        }
 
         if (!found) {
             console.warn(`[CiliAI] Expression not found for ${gene}`);
         }
 
         /* ---------------- Trace ---------------- */
+        // SAFE Coordinate mapping: Fallback to 0 if undefined to prevent Axis Scaling Error
+        const xCoords = sourceData.map(p => {
+            const v = p.x ?? p.umap_x ?? p.UMAP_1;
+            return (v === undefined || v === null) ? 0 : v;
+        });
+        const yCoords = sourceData.map(p => {
+            const v = p.y ?? p.umap_y ?? p.UMAP_2;
+            return (v === undefined || v === null) ? 0 : v;
+        });
+
         traces.push({
             type: 'scattergl',
             mode: 'markers',
-            x: sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1),
-            y: sourceData.map(p => p.y ?? p.umap_y ?? p.UMAP_2),
+            x: xCoords,
+            y: yCoords,
             marker: {
                 size: 4,
                 opacity: 0.85,
-                color: Array.from(expr),
+                color: Array.from(expr), // Convert Float32Array to standard array for Plotly
                 colorscale: 'Viridis',
                 showscale: true,
                 colorbar: {
@@ -3874,57 +3881,53 @@ if (geneIndex === null || geneIndex < 0) {
                 `UMAP2: %{y:.2f}<br>` +
                 `Expr: %{marker.color:.2f}` +
                 `<extra></extra>`,
-            xaxis,
-            yaxis
+            xaxis: xaxisRef,
+            yaxis: yaxisRef
         });
 
-        layout[xaxis] = { visible: false };
-        layout[yaxis] = { visible: false };
+        /* ---------------- Axis Config (Linked Zoom) ---------------- */
+        // Define axis properties. If i > 0, match to the first axis (x/y)
+        layout[xaxisName] = { 
+            visible: false,
+            matches: i > 0 ? 'x' : undefined 
+        };
+        layout[yaxisName] = { 
+            visible: false,
+            matches: i > 0 ? 'y' : undefined 
+        };
 
+        /* ---------------- Panel Title (Annotation) ---------------- */
         layout.annotations.push({
             text: gene,
             xref: 'paper',
             yref: 'paper',
-            x: (i + 0.5) / genes.length,
-            y: 1.15,
+            x: (i + 0.5) / genes.length, // Centered per grid column
+            y: 1.1, // Slightly above plot
             showarrow: false,
-            font: { size: 14, weight: 'bold' }
+            font: { size: 14, weight: 'bold' },
+            xanchor: 'center',
+            yanchor: 'bottom'
         });
     });
 
     /* --------------------------------------------------
      * Render
      * -------------------------------------------------- */
-    await Plotly.newPlot(containerId, traces, layout, {
+    const config = {
         responsive: true,
         scrollZoom: true,
         displaylogo: false
-    });
+    };
 
-    /* --------------------------------------------------
-     * Linked zoom / pan (SAFE)
-     * -------------------------------------------------- */
-    const el = document.getElementById(containerId);
+    // Use react for efficient updates if it exists, otherwise newPlot
+    if (window.Plotly && window.Plotly.react) {
+        await window.Plotly.react(containerId, traces, layout, config);
+    } else {
+        await window.Plotly.newPlot(containerId, traces, layout, config);
+    }
 
-    el.on('plotly_relayout', ev => {
-        if (!ev['xaxis.range[0]']) return;
-
-        const update = {};
-        genes.forEach((_, i) => {
-            const ax = i === 0 ? 'xaxis' : `xaxis${i + 1}`;
-            const ay = i === 0 ? 'yaxis' : `yaxis${i + 1}`;
-            update[`${ax}.range`] = [
-                ev['xaxis.range[0]'],
-                ev['xaxis.range[1]']
-            ];
-            update[`${ay}.range`] = [
-                ev['yaxis.range[0]'],
-                ev['yaxis.range[1]']
-            ];
-        });
-
-        Plotly.relayout(containerId, update);
-    });
+    // NOTE: Manual 'plotly_relayout' listener removed.
+    // The 'matches' property in layout handles synchronization natively and efficiently.
 };
 
 
@@ -6907,6 +6910,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
