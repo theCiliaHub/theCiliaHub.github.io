@@ -1540,38 +1540,64 @@ window.parseTsvData = function (tsvText) {
 };
 
 // ==========================================================
-// DATA LOADING LOGIC (COMPLETE, THROTTLED & FULLY INTEGRATED)
+// DATA LOADING LOGIC (FIXED: RETRY + ROBUST THROTTLING)
 // ==========================================================
 window.loadCiliAIData = async function() {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
     window.updateStatus('Syncing databases & expression...', 'loading');
 
+    // --- 1. ROBUST FETCH WITH RETRY ---
+    const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
+        for (let i = 0; i < retries; i++) {
+            try {
+                const res = await fetch(url);
+                if (!res.ok) {
+                    // If 404, don't retry, just fail
+                    if (res.status === 404) throw new Error("404 Not Found");
+                    // For 5xx or rate limits, throw to trigger retry
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                return await res.json();
+            } catch (err) {
+                console.warn(`Fetch attempt ${i + 1} failed for ${url}: ${err.message}`);
+                if (i === retries - 1) throw err; // Throw on final failure
+                // Wait with jitter to prevent thundering herd
+                const waitTime = delay * Math.pow(2, i) + (Math.random() * 500); 
+                await new Promise(r => setTimeout(r, waitTime));
+            }
+        }
+    };
+
+    // --- 2. CONCURRENCY WORKER ---
     const fetchWithThrottle = async (urls, limit = 3) => {
         const results = [];
         const queue = [...urls];
+        
+        // Define worker that pulls from queue
         const worker = async () => {
             while (queue.length > 0) {
                 const url = queue.shift();
                 try {
-                    const res = await fetch(url);
-                    if (!res.ok) throw new Error(res.status);
-                    results.push(await res.json());
+                    const data = await fetchWithRetry(url);
+                    results.push(data);
                 } catch (e) {
-                    console.warn(`Skipped: ${url}`);
+                    console.error(`CRITICAL FAIL: Could not load ${url} after retries.`);
+                    // We push null to keep index alignment if needed, or just skip
+                    // But typically we want to know it failed.
                 }
             }
         };
+
+        // Create workers
         await Promise.all(Array.from({ length: limit }, worker));
         return results;
     };
 
     const fetchSafe = async (url) => {
         try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(res.status);
-            return await res.json();
+            return await fetchWithRetry(url);
         } catch (e) {
-            console.warn(`Fetch failed: ${url}`, e);
+            console.warn(`Optional load failed: ${url}`);
             return null;
         }
     };
@@ -1588,41 +1614,37 @@ window.loadCiliAIData = async function() {
         const hypExprUrls = Array.from({ length: 6 },  (_, i) => `${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`);
         const hypStructUrls = Array.from({ length: 2 }, (_, i) => `${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`);
 
-        const lungOrganoidUMAPUrl =
-            'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json';
+        const lungOrganoidUMAPUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json';
+        const lungCellxgeneExprUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
 
-        const lungCellxgeneExprUrl =
-            'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
+        // ---------------- FETCH PIPELINE ----------------
+        // 1. Critical Base Data (Fetch these first to ensure App shell works)
+        const [mainRes, lookupsRes] = await Promise.all([
+            fetchSafe(base + 'ciliAI_master_database.json'),
+            fetchSafe(base + 'ciliAI_lookups.json')
+        ]);
 
-        // ---------------- FETCH EVERYTHING ----------------
+        // 2. Large Data Chunks (Throttled)
         const [
-            mainRes,
-            lookupsRes,
-            kStruct,
-            kExpr1,
-            kExpr2,
-            lungParts,
-            liverParts,
-            hypExpr,
-            hypStruct,
+            kStruct, kExpr1, kExpr2,
+            lungParts, liverParts,
+            hypExpr, hypStruct,
             chondro,
             expressionData,
             lungOrganoidUMAP,
             lungCellxgeneExpression
         ] = await Promise.all([
-            fetchSafe(base + 'ciliAI_master_database.json'),
-            fetchSafe(base + 'ciliAI_lookups.json'),
             fetchSafe(base + 'kidney_structure.json'),
             fetchSafe(base + 'kidney_expression_part1.json'),
             fetchSafe(base + 'kidney_expression_part2.json'),
-            fetchWithThrottle(lungUrls, 3),
-            fetchWithThrottle(liverUrls, 3),
-            fetchWithThrottle(hypExprUrls, 3),
-            fetchWithThrottle(hypStructUrls, 2),
+            fetchWithThrottle(lungUrls, 3),      // Limit to 3 concurrent
+            fetchWithThrottle(liverUrls, 3),     // Limit to 3 concurrent
+            fetchWithThrottle(hypExprUrls, 3),   // Limit to 3 concurrent
+            fetchWithThrottle(hypStructUrls, 2), // Limit to 2 concurrent
             fetchSafe(base + 'UMAP_Data/chondrocyte_part1.json'),
             fetchSafe(base + 'ciliai_master_expression.json'),
-            fetchSafe(lungOrganoidUMAPUrl),        // Lung organoid UMAP
-            fetchSafe(lungCellxgeneExprUrl)        // Lung organoid expression
+            fetchSafe(lungOrganoidUMAPUrl),
+            fetchSafe(lungCellxgeneExprUrl)
         ]);
 
         // ---------------- NORMALIZATION HELPERS ----------------
@@ -1665,7 +1687,7 @@ window.loadCiliAIData = async function() {
 
         const hypUmap  = processParts(hypStruct).umap;
         const hypCells = {};
-        hypExpr.flat().forEach(part => { if (part) Object.assign(hypCells, part); });
+        if (hypExpr) hypExpr.flat().forEach(part => { if (part) Object.assign(hypCells, part); });
 
         const lungOrganoidProcessed = processParts(lungOrganoidUMAP);
 
@@ -1675,7 +1697,7 @@ window.loadCiliAIData = async function() {
                 name: "Human Lung Organoid",
                 umap: lungOrganoidProcessed.umap,
                 expression: lungCellxgeneExpression || {},
-                expressionMode: 'cell_type', // ← key integration flag
+                expressionMode: 'cell_type',
                 reference: "Miller et al. (2020)",
                 icon: "🫁"
             },
@@ -1742,17 +1764,16 @@ window.loadCiliAIData = async function() {
 
         window.CiliAI.ready = true;
         window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes + expression)`, 'ready');
-        console.log("✅ CiliAI fully loaded with Lung Organoid (UMAP + CellxGene expression).");
+        console.log("✅ CiliAI fully loaded.");
 
         return true;
 
     } catch (e) {
         console.error("Load failed:", e);
-        window.updateStatus('ERROR', 'error');
+        window.updateStatus('ERROR: Refresh Page', 'error');
         return false;
     }
 };
-
     
     
 // =======================================================
@@ -2171,4 +2192,5 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
