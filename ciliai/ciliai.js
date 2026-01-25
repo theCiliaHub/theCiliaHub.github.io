@@ -5263,7 +5263,7 @@ const intentHandlers = [
         }
     },
 
- // Expression / UMAP Plot (Single Gene or Complex)
+// Expression / UMAP Plot (Single Gene or Complex)
 {
     priority: 58,
     matcher: (qLower) =>
@@ -5325,15 +5325,20 @@ const intentHandlers = [
         const zoomMatch = qLower.match(/zoom to\s+([\w\s\-\(\)]+?)(?:\s+(?:in|for)|$)/i);
         const zoomToCellType = zoomMatch ? zoomMatch[1].trim() : null;
 
-        /* ---------- 🔑 NEW RENDER LOGIC ---------- */
+        /* ---------- 🔑 NEW RENDER LOGIC (FIXED) ---------- */
         if (!isComplex && finalGenes.length > 1) {
-            await window.renderUMAPGrid('GENE_GRID', finalGenes, zoomToCellType);
+            // Multi-gene: Use Grid
+            await window.renderUMAPGrid({
+                genes: finalGenes,
+                datasetKey: window.CiliAI.activeDataset,
+                containerId: 'plotly-container'
+            });
         } else {
-           await window.renderUMAPGrid({
-            genes: validGenes,
-            datasetKey: window.CiliAI.activeDataset,
-        containerId: 'umap-container'
-        });
+            // Single gene or Complex: Use Standard Plot (enables side controls)
+            // ERROR WAS HERE: 'validGenes' changed to 'finalGenes'
+            // LOGIC FIX: Changed renderUMAPGrid back to renderUMAPPlot for single view
+            window.switchView('plot');
+            await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
         }
 
         /* ---------- UI card (UNCHANGED) ---------- */
@@ -5352,7 +5357,8 @@ const intentHandlers = [
         `;
     }
 },
-// Compare Genes
+    
+// Compare Genes (Multi-Gene View)
 {
     priority: 57,
     matcher: (qLower) =>
@@ -5365,9 +5371,12 @@ const intentHandlers = [
         const qLower = window.CiliAI.utils.normalizeQuery(query);
         const genes = window.CiliAI.utils.extractGenes(query);
 
+        // 1. Initialize Response HTML container
+        let responseHtml = '<div class="ai-result-card">';
+
         if (genes.length < 2) {
             return `<div class="ai-result-card">
-                <p>Please provide at least two genes to compare.</p>
+                <p>Please provide at least two genes to compare (e.g., "Compare IFT88 vs BBS1").</p>
             </div>`;
         }
 
@@ -5377,63 +5386,67 @@ const intentHandlers = [
             .slice(0, 6);
 
         if (validGenes.length < 2) {
-            return `<div class="ai-result-card"><p>Not enough valid genes.</p></div>`;
+            return `<div class="ai-result-card"><p>Could not find at least two valid genes in the database to compare.</p></div>`;
         }
 
         const hasExpressionQuery =
             qLower.includes('expression') ||
             qLower.includes('expressed') ||
-            qLower.includes('level');
+            qLower.includes('level') ||
+            qLower.includes('plot'); // Added 'plot' to trigger expression view by default for comparisons
 
         /* ---------- 🔑 UPDATED EXPRESSION COMPARISON ---------- */
         if (hasExpressionQuery) {
-    // 🔴 CRITICAL: prevent single-gene fallback
-    window.switchView('plot');
+            window.switchView('plot');
 
-    await window.renderUMAPGrid({
-        genes: validGenes,
-        datasetKey: window.CiliAI.activeDataset,
-        containerId: 'plotly-container'
-    });
+            await window.renderUMAPGrid({
+                genes: validGenes,
+                datasetKey: window.CiliAI.activeDataset,
+                containerId: 'plotly-container'
+            });
 
-    const dsKey = window.CiliAI.activeDataset;
-    const dsName = window.CiliAI.datasets[dsKey].name;
+            const dsKey = window.CiliAI.activeDataset;
+            const dsName = window.CiliAI.datasets[dsKey].name;
 
-    responseHtml += `
-        <p><strong>Expression Comparison</strong></p>
-        <p>
-            Each gene is shown in its <strong>own UMAP panel</strong> in
-            <strong>${dsName}</strong>.
-        </p>
-        <ul style="margin:8px 0 12px 18px; font-size:13px;">
-            ${validGenes.map(g => `<li><strong>${g}</strong></li>`).join('')}
-        </ul>
-        <p style="font-size:12px; color:#666;">
-            🎨 Color intensity reflects expression (TPM) per gene.<br>
-            🔗 Zoom & pan are synchronized across panels.
-        </p>
-    `;
+            responseHtml += `
+                <h4>Expression Comparison</h4>
+                <p>
+                    Each gene is shown in its <strong>own UMAP panel</strong> in
+                    <strong>${dsName}</strong>.
+                </p>
+                <ul style="margin:8px 0 12px 18px; font-size:13px;">
+                    ${validGenes.map(g => `<li><strong>${g}</strong></li>`).join('')}
+                </ul>
+                <p style="font-size:12px; color:#666;">
+                    🎨 Color intensity reflects expression (TPM).<br>
+                    🔗 Zoom & pan are synchronized across all panels.
+                </p>
+            </div>`; // Close card
 
-    responseHtml += `</div>`;
-    return responseHtml; // ⬅️ ⬅️ ⬅️ THIS IS ESSENTIAL
-}
+            return responseHtml;
+        }
 
-        /* ---------- Localization / fallback (UNCHANGED) ---------- */
+        /* ---------- Localization / Fallback (Diagram) ---------- */
         window.switchView('diagram');
         window.showDiagram();
         window.SpatialManager.clearOverlays();
         window.SpatialManager.applyMultiOverlay(validGenes);
 
-        return `
-            <div class="ai-result-card">
-                <h4>📍 Localization Comparison</h4>
-                <p>Multi-color overlays applied on the ciliary diagram.</p>
+        responseHtml += `
+            <h4>📍 Localization Comparison</h4>
+            <p><strong>${validGenes.join(' vs ')}</strong></p>
+            <p>Multi-color overlays applied on the ciliary diagram.</p>
+            <div style="display:flex; gap:5px; flex-wrap:wrap; margin-top:8px;">
+                ${validGenes.map(g => `<span class="gene-badge">${g}</span>`).join('')}
             </div>
-        `;
+            <p style="font-size:12px; color:#666; margin-top:10px;">
+                (To see expression plots instead, ask "Compare expression of ${validGenes[0]} and ${validGenes[1]}")
+            </p>
+        </div>`; // Close card
+
+        return responseHtml;
     }
 },
-
-
     // Variants
     {
         priority: 56,
@@ -6910,6 +6923,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
