@@ -3736,41 +3736,34 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
  * - Gene-specific colorbars
  * - Linked hover + linked zoom
  */
+/**
+ * Multi-gene UMAP Grid (FIXED: Cell-Centric Support + Distinct Color Scales)
+ */
 window.renderUMAPGrid = async function (...args) {
     /* --------------------------------------------------
-     * Argument normalization
+     * 1. Argument normalization
      * -------------------------------------------------- */
     let genes, datasetKey, containerId;
 
-    // New-style call: renderUMAPGrid({ genes, datasetKey, containerId })
     if (args.length === 1 && typeof args[0] === 'object' && !Array.isArray(args[0])) {
         genes = args[0].genes;
         datasetKey = args[0].datasetKey;
         containerId = args[0].containerId;
-    }
-    // Legacy call: renderUMAPGrid(genesArray)
-    else if (Array.isArray(args[0])) {
+    } else if (Array.isArray(args[0])) {
         genes = args[0];
         datasetKey = window.CiliAI.activeDataset;
         containerId = 'umap-container';
-    }
-    // Fallback
-    else {
-        genes = [];
-        datasetKey = window.CiliAI.activeDataset;
-        containerId = 'umap-container';
-    }
-
-    if (!Array.isArray(genes) || genes.length === 0) {
-        console.error('[CiliAI] renderUMAPGrid called without genes');
+    } else {
         return;
     }
+
+    if (!Array.isArray(genes) || genes.length === 0) return;
 
     datasetKey ||= window.CiliAI.activeDataset;
     containerId ||= 'umap-container';
 
     /* --------------------------------------------------
-     * Dataset validation
+     * 2. Dataset validation
      * -------------------------------------------------- */
     const dataset = window.CiliAI.datasets?.[datasetKey];
     if (!dataset || !Array.isArray(dataset.umap)) {
@@ -3778,84 +3771,90 @@ window.renderUMAPGrid = async function (...args) {
         return;
     }
 
-    const expressionSource =
-        dataset.expressionMatrix ||
-        dataset.expression ||
-        dataset.cellxgene;
-
-    if (!expressionSource) {
-        console.error('[CiliAI] No expression source found:', datasetKey);
-        return;
-    }
-
     const sourceData = dataset.umap;
     const nCells = sourceData.length;
+    
+    // Determine extraction mode: Cell-Centric vs Gene-Centric
+    const expressionSource = dataset.expressionMatrix || dataset.expression || dataset.cellxgene;
+    
+    // If it's an object but keys are NOT the requested genes, assume cell-centric dictionary
+    const isCellCentric = expressionSource && typeof expressionSource === 'object' && 
+                          !Array.isArray(expressionSource) &&
+                          (!expressionSource[genes[0].toUpperCase()] && !expressionSource[genes[1]?.toUpperCase()]);
 
     /* --------------------------------------------------
-     * Layout Initialization
+     * 3. Layout Initialization & Color Configuration
      * -------------------------------------------------- */
+    // Palette of distinct single-hue scales for clear comparison
+    const colorScales = ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 'Teal', 'YlGnBu', 'Magma'];
+    
     const traces = [];
     const layout = {
-        grid: {
-            rows: 1,
-            columns: genes.length,
-            pattern: 'independent'
-        },
-        margin: { l: 40, r: 40, t: 60, b: 40 },
+        grid: { rows: 1, columns: genes.length, pattern: 'independent' },
+        margin: { l: 40, r: 40, t: 50, b: 40 },
         showlegend: false,
-        // Remove global title (The "Banner")
         title: undefined, 
-        uirevision: 'linked-umap-' + genes.join('-'),
+        uirevision: 'linked-umap-' + genes.join('-') + '-' + Date.now(),
         annotations: []
     };
 
     /* --------------------------------------------------
-     * Build panels
+     * 4. Build panels
      * -------------------------------------------------- */
     genes.forEach((gene, i) => {
+        const geneUpper = gene.toUpperCase();
         const axisIndex = i + 1;
-        const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
-        const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
         const xaxisRef = axisIndex === 1 ? 'x' : `x${axisIndex}`;
         const yaxisRef = axisIndex === 1 ? 'y' : `y${axisIndex}`;
+        const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
+        const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
 
-        /* ---------------- Expression extraction ---------------- */
+        /* --- DATA EXTRACTION --- */
         const expr = new Float32Array(nCells).fill(0);
         let found = false;
 
-        // Try exact match or case-insensitive fallback if needed
-        const raw = expressionSource[gene];
-
-        // CellxGene sparse format
-        if (raw && raw.cells && raw.expression) {
-            for (let k = 0; k < raw.cells.length; k++) {
-                const idx = raw.cells[k];
-                if (idx < nCells) expr[idx] = raw.expression[k];
+        // Path A: Gene-Centric (Sparse/Dense - New Format)
+        if (!isCellCentric && expressionSource) {
+            const raw = expressionSource[geneUpper];
+            if (raw) {
+                if (raw.cells && raw.expression) {
+                    // Sparse object { cells: [], expression: [] }
+                    for (let k = 0; k < raw.cells.length; k++) {
+                        const idx = raw.cells[k];
+                        if (idx < nCells) expr[idx] = raw.expression[k];
+                    }
+                    found = true;
+                } else if (Array.isArray(raw)) {
+                    // Dense array
+                    for (let k = 0; k < Math.min(raw.length, nCells); k++) expr[k] = raw[k];
+                    found = true;
+                }
             }
-            found = true;
-        }
-        // Dense array format fallback
-        else if (Array.isArray(raw)) {
-             for (let k = 0; k < raw.length; k++) {
-                if (k < nCells) expr[k] = raw[k];
-             }
-             found = true;
         }
 
-        if (!found) {
-            console.warn(`[CiliAI] Expression not found for ${gene}`);
+        // Path B: Cell-Centric (Legacy Dictionary: { cell_id: { GENE: val } })
+        if (!found && expressionSource) {
+            sourceData.forEach((point, idx) => {
+                const cellId = point.cell_id || point.id;
+                if (cellId && expressionSource[cellId]) {
+                    const val = expressionSource[cellId][geneUpper];
+                    if (val !== undefined && val !== null) {
+                        expr[idx] = val;
+                        found = true;
+                    }
+                }
+            });
         }
+        /* --- END DATA EXTRACTION --- */
 
-        /* ---------------- Trace ---------------- */
-        // SAFE Coordinate mapping: Fallback to 0 if undefined to prevent Axis Scaling Error
-        const xCoords = sourceData.map(p => {
-            const v = p.x ?? p.umap_x ?? p.UMAP_1;
-            return (v === undefined || v === null) ? 0 : v;
-        });
-        const yCoords = sourceData.map(p => {
-            const v = p.y ?? p.umap_y ?? p.UMAP_2;
-            return (v === undefined || v === null) ? 0 : v;
-        });
+        if (!found && i === 0) console.warn(`[CiliAI] No expression data for ${geneUpper} in ${datasetKey}`);
+
+        // Safe Coordinates
+        const xCoords = sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1 ?? 0);
+        const yCoords = sourceData.map(p => p.y ?? p.umap_y ?? p.UMAP_2 ?? 0);
+
+        // Select distinct colorscale based on index
+        const currentScale = colorScales[i % colorScales.length];
 
         traces.push({
             type: 'scattergl',
@@ -3865,69 +3864,44 @@ window.renderUMAPGrid = async function (...args) {
             marker: {
                 size: 4,
                 opacity: 0.85,
-                color: Array.from(expr), // Convert Float32Array to standard array for Plotly
-                colorscale: 'Viridis',
+                color: Array.from(expr), // Convert typed array to JS array
+                colorscale: currentScale, // DISTINCT COLOR per gene
                 showscale: true,
                 colorbar: {
-                    title: gene,
+                    title: geneUpper,
                     len: 0.85,
                     thickness: 10,
-                    x: 1.02 + i * 0.07
+                    x: 1.02 + i * 0.12, // Increased offset to prevent overlap
+                    xpad: 10
                 }
             },
-            hovertemplate:
-                `<b>${gene}</b><br>` +
-                `UMAP1: %{x:.2f}<br>` +
-                `UMAP2: %{y:.2f}<br>` +
-                `Expr: %{marker.color:.2f}` +
-                `<extra></extra>`,
+            hovertemplate: `<b>${geneUpper}</b><br>Expr: %{marker.color:.2f}<extra></extra>`,
             xaxis: xaxisRef,
             yaxis: yaxisRef
         });
 
-        /* ---------------- Axis Config (Linked Zoom) ---------------- */
-        // Define axis properties. If i > 0, match to the first axis (x/y)
-        layout[xaxisName] = { 
-            visible: false,
-            matches: i > 0 ? 'x' : undefined 
-        };
-        layout[yaxisName] = { 
-            visible: false,
-            matches: i > 0 ? 'y' : undefined 
-        };
+        // Linked Zoom Layout
+        layout[xaxisName] = { visible: false, matches: i > 0 ? 'x' : undefined };
+        layout[yaxisName] = { visible: false, matches: i > 0 ? 'y' : undefined };
 
-        /* ---------------- Panel Title (Annotation) ---------------- */
+        // Title Annotation
         layout.annotations.push({
-            text: gene,
-            xref: 'paper',
-            yref: 'paper',
-            x: (i + 0.5) / genes.length, // Centered per grid column
-            y: 1.1, // Slightly above plot
+            text: geneUpper,
+            xref: 'paper', yref: 'paper',
+            x: (i + 0.5) / genes.length, 
+            y: 1.05,
             showarrow: false,
-            font: { size: 14, weight: 'bold' },
-            xanchor: 'center',
-            yanchor: 'bottom'
+            font: { size: 14, weight: 'bold', color: '#2d3748' },
+            xanchor: 'center', yanchor: 'bottom'
         });
     });
 
     /* --------------------------------------------------
-     * Render
+     * 5. Render
      * -------------------------------------------------- */
-    const config = {
-        responsive: true,
-        scrollZoom: true,
-        displaylogo: false
-    };
-
-    // Use react for efficient updates if it exists, otherwise newPlot
-    if (window.Plotly && window.Plotly.react) {
-        await window.Plotly.react(containerId, traces, layout, config);
-    } else {
-        await window.Plotly.newPlot(containerId, traces, layout, config);
-    }
-
-    // NOTE: Manual 'plotly_relayout' listener removed.
-    // The 'matches' property in layout handles synchronization natively and efficiently.
+    const config = { responsive: true, scrollZoom: true, displaylogo: false };
+    
+    await Plotly.newPlot(containerId, traces, layout, config);
 };
 
 
@@ -6923,6 +6897,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
