@@ -810,207 +810,248 @@ window.showGoldStandardTable = function() {
 
 
     
-    /* ============ UI INTERFACE LAYER ============ */
-        // 1. Initialize Global State WITH NEW PERSISTENCE FEATURES
-        window.CiliAI = {
-            activeDataset: 'lung',
-            datasets: {
-                lung: { name: 'Human Lung Organoid', umap: null, colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] },
-                kidney: { name: 'Human Kidney', umap: null, expression: null, colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']] }
-            },
-            data: { umap: [] },
-            masterData: [],
-            ready: false,
-            lookups: {
-                geneMap: {},
-                umapByGene: {},
-                goMap: {}, // New: GO term to genes
-                pfamByGene: {} // New: Gene to Pfam domains
-            },
-            cellDataCache: {},
-            lastQueryContext: { type: null, data: [], term: null },
-            CiliAI_UMAP: null,
-            currentPlot: null,
-            
-            // Zoom persistence state
-            zoomStateByGene: {}, // { GENE: localization }
-            activeGeneContext: null
-        };
-        // =======================================================
-        // (2) SPATIAL INTELLIGENCE MANAGER
-        // =======================================================
-    // =======================================================
-// Attach to window for global access
+ /* ============ UI INTERFACE LAYER ============ */
+
+// 1. Initialize Global State (SAFE MERGE)
+// We check if it exists, then merge properties to avoid wiping out functions like resetZoom
+window.CiliAI = window.CiliAI || {};
+
+Object.assign(window.CiliAI, {
+    activeDataset: window.CiliAI.activeDataset || 'lung',
+    datasets: window.CiliAI.datasets || {
+        lung: { name: 'Human Lung Organoid', umap: null, colorScale: [[0, '#e2e8f0'], [0.1, '#fed7d7'], [1, '#c53030']] },
+        kidney: { name: 'Human Kidney', umap: null, expression: null, colorScale: [[0, '#F3F4F6'], [0.2, '#C4B5FD'], [0.5, '#8B5CF6'], [1, '#4C1D95']] }
+    },
+    data: window.CiliAI.data || { umap: [] },
+    masterData: window.CiliAI.masterData || [],
+    ready: window.CiliAI.ready || false,
+    lookups: window.CiliAI.lookups || {
+        geneMap: {},
+        umapByGene: {},
+        goMap: {},
+        pfamByGene: {}
+    },
+    cellDataCache: window.CiliAI.cellDataCache || {},
+    lastQueryContext: window.CiliAI.lastQueryContext || { type: null, data: [], term: null },
+    
+    // Zoom persistence state
+    zoomStateByGene: window.CiliAI.zoomStateByGene || {}, 
+    activeGeneContext: window.CiliAI.activeGeneContext || null,
+    
+    // Placeholder for UMAP data
+    CiliAI_UMAP: window.CiliAI.CiliAI_UMAP || null,
+    currentPlot: window.CiliAI.currentPlot || null
+});
+
 // =======================================================
-        const SpatialManager = {
-            // Location normalization map (user → SVG IDs)
-            locMap: {
-                "transition zone": "transition-zone",
-                "tz": "transition-zone",
-                "axoneme": "axoneme",
-                "axonemal": "axoneme",
-                "basal body": "basal-body",
-                "centriole": "basal-body",
-                "ciliary tip": "ciliary-tip",
-                "membrane": "ciliary-membrane",
-                "ciliary membrane": "ciliary-membrane",
-                "cell body": "cell-body",
-                "cytosol": "cell-body",
-                "nucleus": "nucleus"
-            },
-           // Gene-aware highlighting with persistence
-            highlight: function (locTerm, gene = null) {
-                if (!locTerm) return false;
-                const container = document.getElementById('cilia-svg');
-                if (!container) return false;
-                // --- FIX: Force visibility of the diagram container ---
-                container.style.display = 'flex';
-                if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
-                if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
-                document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
-                // Ensure SVG exists (if it was cleared)
-                if (!container.querySelector('svg')) {
-                    window.generateAndInjectSVG();
-                }
-                const normalized = locTerm.toLowerCase().trim();
-                
-                // Map broad terms like "cilia" to specific SVG parts if needed
-                let targetId = this.locMap[normalized];
-                if (!targetId && normalized.includes('cilia')) targetId = 'axoneme'; // Fallback for general "cilia" queries
-                // Clear previous highlights
-                document.querySelectorAll('.cilia-part')
-                    .forEach(el => el.classList.remove('active-highlight'));
-                if (!targetId) return false;
-                const element = document.getElementById(targetId);
-                if (!element) return false;
-                // Highlight + zoom
-                element.classList.add('active-highlight');
-                this.zoomTo(element);
-                // Persist gene → spatial context
-                if (gene) {
-                    if (!window.CiliAI.zoomStateByGene) {
-                        window.CiliAI.zoomStateByGene = {};
-                    }
-                    window.CiliAI.zoomStateByGene[gene] = locTerm;
-                    window.CiliAI.activeGeneContext = gene;
-                }
-                return true;
-            },
-            // Smooth zoom animation to target structure
-            zoomTo: function (element) {
-                const viewport = document.getElementById('viewport-group');
-                if (!viewport || !element.getBBox) return;
-                const box = element.getBBox();
-                const centerX = box.x + box.width / 2;
-                const centerY = box.y + box.height / 2;
-                const dx = 150 - centerX;
-                const dy = 200 - centerY;
-                viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
-                viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
-                viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
-            },
-            // Smooth animated reset
-            resetZoom: function () {
-                const viewport = document.getElementById('viewport-group');
-                if (viewport) {
-                    viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
-                    viewport.style.transform = "translate(0,0) scale(1)";
-                }
-                document.querySelectorAll('.cilia-part')
-                    .forEach(el => el.classList.remove('active-highlight'));
-            },
-            // Utility: restore spatial context by gene
-            restoreByGene: function (gene) {
-                if (!gene) return false;
-                const loc = window.CiliAI?.zoomStateByGene?.[gene];
-                if (!loc) return false;
-                return this.highlight(loc, gene);
-            },
-            // New: Apply GO Heatmap
-            applyHeatmap: function(goTerm) {
-                const svg = document.getElementById('cilia-diagram');
-                if (!svg) return;
-                // Remove existing overlays
-                document.querySelectorAll('.heatmap-overlay').forEach(el => el.remove());
-                // Get genes for GO
-                const genes = window.CiliAI.lookups.goMap[goTerm.toUpperCase()] || [];
-                if (!genes.length) return;
-                // Group by location
-                const locCounts = {};
-                genes.forEach(geneSymbol => {
-                    const gene = window.CiliAI.lookups.geneMap[geneSymbol];
-                    if (gene && gene.Localization) {
-                        const loc = gene.Localization.toLowerCase();
-                        locCounts[loc] = (locCounts[loc] || 0) + 1;
-                    }
-                });
-                const maxCount = Math.max(...Object.values(locCounts), 1);
-                // Add overlays
-                let overlayGroup = svg.querySelector('#heatmap-group');
-                if (!overlayGroup) {
-                    overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                    overlayGroup.id = 'heatmap-group';
-                    svg.querySelector('#viewport-group').appendChild(overlayGroup);
-                }
-                Object.entries(locCounts).forEach(([loc, count]) => {
-                    const svgId = this.locMap[loc];
-                    if (!svgId) return;
-                    const element = document.getElementById(svgId);
-                    if (!element) return;
-                    const clone = element.cloneNode(true);
-                    clone.id = '';
-                    clone.classList.add('heatmap-overlay');
-                    clone.removeAttribute('tabindex');
-                    clone.style.fill = 'url(#heatmapGrad)';
-                    clone.style.opacity = (count / maxCount) * 0.7;
-                    overlayGroup.appendChild(clone);
-                });
-                window.showDiagram();
-                window.CiliAI.resetZoom(); // Reset to show full heatmap
-            },
-            // New: Apply Multi-Gene Overlay
-            applyMultiOverlay: function(genes) {
-                const svg = document.getElementById('cilia-diagram');
-                if (!svg) return;
-                // Remove existing overlays
-                document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
-                let overlayGroup = svg.querySelector('#multi-group');
-                if (!overlayGroup) {
-                    overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                    overlayGroup.id = 'multi-group';
-                    overlayGroup.style.mixBlendMode = 'multiply';
-                    svg.querySelector('#viewport-group').appendChild(overlayGroup);
-                }
-                genes.forEach((geneSymbol, index) => {
-                    const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
-                    if (!gene || !gene.Localization) return;
-                    const loc = gene.Localization.toLowerCase();
-                    const svgId = this.locMap[loc];
-                    if (!svgId) return;
-                    const element = document.getElementById(svgId);
-                    if (!element) return;
-                    const clone = element.cloneNode(true);
-                    clone.id = '';
-                    clone.classList.add('multi-overlay');
-                    clone.removeAttribute('tabindex');
-                    // Cycle colors for distinction
-                    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
-                    clone.style.fill = colors[index % colors.length];
-                    overlayGroup.appendChild(clone);
-                });
-                window.showDiagram();
-                window.CiliAI.resetZoom();
-            },
-            // New: Clear Overlays
-            clearOverlays: function() {
-                document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
-            }
-        };
+// (2) SPATIAL INTELLIGENCE MANAGER
+// =======================================================
+const SpatialManager = {
+    // Location normalization map (user → SVG IDs)
+    locMap: {
+        "transition zone": "transition-zone", "tz": "transition-zone",
+        "axoneme": "axoneme", "axonemal": "axoneme",
+        "basal body": "basal-body", "centriole": "basal-body",
+        "ciliary tip": "ciliary-tip",
+        "membrane": "ciliary-membrane", "ciliary membrane": "ciliary-membrane",
+        "cell body": "cell-body", "cytosol": "cell-body",
+        "nucleus": "nucleus"
+    },
+
+    // Gene-aware highlighting with persistence
+    highlight: function (locTerm, gene = null) {
+        if (!locTerm) return false;
+        const container = document.getElementById('cilia-svg');
+        if (!container) return false;
+
+        // Force visibility of diagram
+        container.style.display = 'flex';
+        if (document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
+        if (document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
         
+        const titleEl = document.getElementById('current-viz-title');
+        if (titleEl) titleEl.textContent = "Diagram: Spatial Intelligence";
+
+        // Ensure SVG exists (if it was cleared)
+        if (!container.querySelector('svg')) {
+            if (window.generateAndInjectSVG) window.generateAndInjectSVG();
+        }
+
+        const normalized = locTerm.toLowerCase().trim();
+
+        // Map broad terms like "cilia" to specific SVG parts if needed
+        let targetId = this.locMap[normalized];
+        if (!targetId && normalized.includes('cilia')) targetId = 'axoneme'; // Fallback
+
+        // Clear previous highlights
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+
+        if (!targetId) return false;
+        const element = document.getElementById(targetId);
+        if (!element) return false;
+
+        // Highlight + zoom
+        element.classList.add('active-highlight');
+        this.zoomTo(element);
+
+        // Persist gene → spatial context
+        if (gene) {
+            window.CiliAI.zoomStateByGene[gene] = locTerm;
+            window.CiliAI.activeGeneContext = gene;
+        }
+        return true;
+    },
+
+    // Smooth zoom animation to target structure
+    zoomTo: function (element) {
+        const viewport = document.getElementById('viewport-group');
+        if (!viewport || !element.getBBox) return;
+        
+        try {
+            const box = element.getBBox();
+            const centerX = box.x + box.width / 2;
+            const centerY = box.y + box.height / 2;
+            const dx = 150 - centerX;
+            const dy = 200 - centerY;
+            viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
+            viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+            viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
+        } catch(e) {
+            console.warn("Zoom calculation failed", e);
+        }
+    },
+
+    // Smooth animated reset
+    resetZoom: function () {
+        const viewport = document.getElementById('viewport-group');
+        if (viewport) {
+            viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
+            viewport.style.transform = "translate(0,0) scale(1)";
+        }
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+    },
+
+    // Utility: restore spatial context by gene
+    restoreByGene: function (gene) {
+        if (!gene) return false;
+        const loc = window.CiliAI?.zoomStateByGene?.[gene];
+        if (!loc) return false;
+        return this.highlight(loc, gene);
+    },
+
+    // New: Apply GO Heatmap
+    applyHeatmap: function (goTerm) {
+        const svg = document.getElementById('cilia-diagram');
+        if (!svg) return;
+
+        // Remove existing overlays
+        document.querySelectorAll('.heatmap-overlay').forEach(el => el.remove());
+
+        // Get genes for GO
+        const genes = window.CiliAI.lookups.goMap[goTerm.toUpperCase()] || [];
+        if (!genes.length) return;
+
+        // Group by location
+        const locCounts = {};
+        genes.forEach(geneSymbol => {
+            const gene = window.CiliAI.lookups.geneMap[geneSymbol];
+            if (gene && gene.Localization) {
+                const loc = gene.Localization.toLowerCase();
+                locCounts[loc] = (locCounts[loc] || 0) + 1;
+            }
+        });
+
+        const maxCount = Math.max(...Object.values(locCounts), 1);
+
+        // Add overlays
+        let overlayGroup = svg.querySelector('#heatmap-group');
+        if (!overlayGroup) {
+            overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            overlayGroup.id = 'heatmap-group';
+            // Ensure viewport group exists
+            const viewport = svg.querySelector('#viewport-group');
+            if (viewport) viewport.appendChild(overlayGroup);
+        }
+
+        Object.entries(locCounts).forEach(([loc, count]) => {
+            const svgId = this.locMap[loc];
+            if (!svgId) return;
+            const element = document.getElementById(svgId);
+            if (!element) return;
+
+            const clone = element.cloneNode(true);
+            clone.id = '';
+            clone.classList.add('heatmap-overlay');
+            clone.removeAttribute('tabindex');
+            clone.style.fill = 'url(#heatmapGrad)';
+            // Fallback fill if gradient missing
+            if(!document.getElementById('heatmapGrad')) clone.style.fill = '#ff0000';
+            
+            clone.style.opacity = (count / maxCount) * 0.7;
+            overlayGroup.appendChild(clone);
+        });
+
+        if(window.showDiagram) window.showDiagram();
+        this.resetZoom(); // FIX: Calls local resetZoom, not the missing global one
+    },
+
+    // New: Apply Multi-Gene Overlay
+    applyMultiOverlay: function (genes) {
+        const svg = document.getElementById('cilia-diagram');
+        if (!svg) return;
+
+        // Remove existing overlays
+        document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
+
+        let overlayGroup = svg.querySelector('#multi-group');
+        if (!overlayGroup) {
+            overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            overlayGroup.id = 'multi-group';
+            overlayGroup.style.mixBlendMode = 'multiply';
+            const viewport = svg.querySelector('#viewport-group');
+            if (viewport) viewport.appendChild(overlayGroup);
+        }
+
+        genes.forEach((geneSymbol, index) => {
+            const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
+            if (!gene || !gene.Localization) return;
+
+            const loc = gene.Localization.toLowerCase();
+            const svgId = this.locMap[loc];
+
+            if (!svgId) return;
+            const element = document.getElementById(svgId);
+            if (!element) return;
+
+            const clone = element.cloneNode(true);
+            clone.id = '';
+            clone.classList.add('multi-overlay');
+            clone.removeAttribute('tabindex');
+
+            // Cycle colors for distinction
+            const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
+            clone.style.fill = colors[index % colors.length];
+            
+            overlayGroup.appendChild(clone);
+        });
+
+        if(window.showDiagram) window.showDiagram();
+        this.resetZoom(); // FIX: Calls local resetZoom, not the missing global one
+    },
+
+    // New: Clear Overlays
+    clearOverlays: function () {
+        document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
+    }
+};
+
+// Attach to window for global access
+window.SpatialManager = SpatialManager;
+    
         // =======================================================
         // PUBLIC BRIDGE — Legacy compatibility
         // =======================================================
-        window.SpatialManager = SpatialManager;
+  
         window.highlightCiliumLocation = function(locTerm, gene = null) {
         return SpatialManager.highlight(locTerm, gene);
 };
@@ -2192,5 +2233,6 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
