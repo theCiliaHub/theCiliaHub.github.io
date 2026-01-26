@@ -3742,12 +3742,6 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
  * - Gene-specific colorbars
  * - Linked hover + linked zoom
  */
-/**
- * Multi-gene UMAP Grid (FIXED: Cell-Centric Support + Distinct Color Scales)
- */
-/**
- * Multi-gene UMAP Grid (Enhanced: Missing Data Detection + Casing Fallback)
- */
 window.renderUMAPGrid = async function (...args) {
     /* --------------------------------------------------
      * 1. Argument Normalization
@@ -3775,8 +3769,10 @@ window.renderUMAPGrid = async function (...args) {
      * 2. Dataset Validation
      * -------------------------------------------------- */
     const dataset = window.CiliAI.datasets?.[datasetKey];
-    if (!dataset || !Array.isArray(dataset.umap)) {
-        console.error('[CiliAI] Dataset incomplete:', datasetKey);
+    if (!dataset || !Array.isArray(dataset.umap) || dataset.umap.length === 0) {
+        console.error('[CiliAI] Dataset incomplete or empty:', datasetKey);
+        // Clean exit to prevent crash
+        document.getElementById(containerId).innerHTML = '<div style="padding:20px; color:red">Error: Dataset UMAP coordinates not loaded.</div>';
         return;
     }
 
@@ -3784,7 +3780,7 @@ window.renderUMAPGrid = async function (...args) {
     const nCells = sourceData.length;
     const expressionSource = dataset.expressionMatrix || dataset.expression || dataset.cellxgene;
 
-    // Heuristic: Is this a legacy cell-centric dictionary?
+    // Legacy cell-centric check
     const isCellCentric = expressionSource && typeof expressionSource === 'object' && 
                           !Array.isArray(expressionSource) &&
                           (!expressionSource[genes[0].toUpperCase()] && !expressionSource[genes[1]?.toUpperCase()]);
@@ -3806,20 +3802,44 @@ window.renderUMAPGrid = async function (...args) {
     /* --------------------------------------------------
      * 4. Build Panels
      * -------------------------------------------------- */
+    // Pre-calculate coordinates ONCE to check validity
+    const xCoords = new Float32Array(nCells);
+    const yCoords = new Float32Array(nCells);
+    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+
+    for (let i = 0; i < nCells; i++) {
+        const p = sourceData[i];
+        // Robust extraction: Handle all known key variations
+        const px = p.x ?? p.umap_x ?? p.UMAP_1 ?? 0;
+        const py = p.y ?? p.umap_y ?? p.UMAP_2 ?? 0;
+        xCoords[i] = px;
+        yCoords[i] = py;
+        
+        if (px < xMin) xMin = px;
+        if (px > xMax) xMax = px;
+        if (py < yMin) yMin = py;
+        if (py > yMax) yMax = py;
+    }
+
+    // Safety: If range is 0 (all points identical/zero), prevent scaling error
+    if (xMin >= xMax || yMin >= yMax) {
+        console.warn("[CiliAI] UMAP coordinates have zero range. Adding padding.");
+        xMin -= 1; xMax += 1;
+        yMin -= 1; yMax += 1;
+    }
+
     genes.forEach((gene, i) => {
         const geneUpper = gene.toUpperCase();
         const axisIndex = i + 1;
-        const xaxisRef = axisIndex === 1 ? 'x' : `x${axisIndex}`;
-        const yaxisRef = axisIndex === 1 ? 'y' : `y${axisIndex}`;
         const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
         const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
+        const xaxisRef = axisIndex === 1 ? 'x' : `x${axisIndex}`;
+        const yaxisRef = axisIndex === 1 ? 'y' : `y${axisIndex}`;
 
         // --- Data Extraction ---
         const expr = new Float32Array(nCells).fill(0);
         let found = false;
         let maxValue = 0;
-
-        // Try multiple casing formats if exact match fails
         const keysToTry = [geneUpper, gene, gene.charAt(0) + gene.slice(1).toLowerCase()];
 
         if (!isCellCentric && expressionSource) {
@@ -3841,7 +3861,6 @@ window.renderUMAPGrid = async function (...args) {
             }
         }
 
-        // Cell-Centric Fallback
         if (!found && expressionSource) {
             sourceData.forEach((point, idx) => {
                 const cellId = point.cell_id || point.id;
@@ -3858,7 +3877,6 @@ window.renderUMAPGrid = async function (...args) {
             });
         }
 
-        // Calculate Max Value to check if data is just zeros
         if (found) {
             for (let k = 0; k < expr.length; k++) {
                 if (expr[k] > maxValue) maxValue = expr[k];
@@ -3866,8 +3884,6 @@ window.renderUMAPGrid = async function (...args) {
         }
 
         // --- Trace Creation ---
-        const xCoords = sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1 ?? 0);
-        const yCoords = sourceData.map(p => p.y ?? p.umap_y ?? p.UMAP_2 ?? 0);
         const currentScale = colorScales[i % colorScales.length];
 
         traces.push({
@@ -3878,11 +3894,11 @@ window.renderUMAPGrid = async function (...args) {
             marker: {
                 size: 4,
                 opacity: 0.85,
-                color: Array.from(expr),
+                color: expr, 
                 colorscale: currentScale,
                 showscale: true,
                 cmin: 0,
-                cmax: maxValue > 0 ? maxValue : 1, // Prevent divide by zero scale
+                cmax: maxValue > 0 ? maxValue : 1, 
                 colorbar: {
                     title: geneUpper,
                     len: 0.85,
@@ -3896,10 +3912,18 @@ window.renderUMAPGrid = async function (...args) {
             yaxis: yaxisRef
         });
 
-        layout[xaxisName] = { visible: false, matches: i > 0 ? 'x' : undefined };
-        layout[yaxisName] = { visible: false, matches: i > 0 ? 'y' : undefined };
+        // Set explicit range to prevent "axis scaling" error if data is sparse/bad
+        layout[xaxisName] = { 
+            visible: false, 
+            matches: i > 0 ? 'x' : undefined,
+            range: [xMin, xMax] 
+        };
+        layout[yaxisName] = { 
+            visible: false, 
+            matches: i > 0 ? 'y' : undefined,
+            range: [yMin, yMax]
+        };
 
-        // Title Annotation
         layout.annotations.push({
             text: geneUpper,
             xref: 'paper', yref: 'paper',
@@ -3910,18 +3934,16 @@ window.renderUMAPGrid = async function (...args) {
             xanchor: 'center', yanchor: 'bottom'
         });
 
-        // --- MISSING DATA WARNING ---
         if (!found || maxValue === 0) {
             layout.annotations.push({
                 text: "DATA NOT AVAILABLE",
                 xref: `x${axisIndex}`, yref: `y${axisIndex}`,
-                x: 0, y: 0, // Centered if axes range is centered
+                x: 0, y: 0,
                 showarrow: false,
                 font: { size: 16, color: 'red', weight: 'bold' },
                 bgcolor: 'rgba(255,255,255,0.8)',
                 bordercolor: 'red',
-                borderwidth: 1,
-                borderpad: 4
+                borderwidth: 1
             });
         }
     });
@@ -3930,9 +3952,22 @@ window.renderUMAPGrid = async function (...args) {
      * 5. Render
      * -------------------------------------------------- */
     const config = { responsive: true, scrollZoom: true, displaylogo: false };
-    await Plotly.newPlot(containerId, traces, layout, config);
-};
+    
+    // Safety check for Plotly
+    if (!window.Plotly) {
+        console.error("Plotly not loaded");
+        return;
+    }
 
+    try {
+        await Plotly.newPlot(containerId, traces, layout, config);
+    } catch (e) {
+        console.error("Plotly render failed:", e);
+        // Fallback: Try purging and re-rendering simply
+        Plotly.purge(containerId);
+        document.getElementById(containerId).innerHTML = `<div style="color:red; padding:20px;">Plot Error: ${e.message}</div>`;
+    }
+};
 // =======================================================
 // Helper: Organ-Specific Colors (Updated with new types)
 // =======================================================
@@ -6925,6 +6960,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
