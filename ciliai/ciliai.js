@@ -3736,18 +3736,16 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 };
 
 // ==========================================================
-// FIXED: Multi-gene UMAP Grid for Image Panel Display
+// FIXED: Multi-gene UMAP Grid with Proper Data Extraction
 // ==========================================================
 
 /**
- * Multi-gene UMAP Grid - FIXED VERSION
- * Displays multiple genes side-by-side in the image panel container
- * Features:
- * - Correct expression decoding for all dataset formats
- * - Dynamic grid layout
- * - Gene-specific distinct colorbars
- * - Linked hover + linked zoom
- * - Proper container handling for image panel
+ * Multi-gene UMAP Grid - FULLY FIXED VERSION
+ * Addresses:
+ * - Correct container targeting (umap-container for image panel)
+ * - Proper expression data extraction from all formats
+ * - Handles zero-expression gracefully (no Plotly errors)
+ * - Validates data before rendering
  */
 window.renderUMAPGrid = async function (...args) {
     /* --------------------------------------------------
@@ -3762,7 +3760,7 @@ window.renderUMAPGrid = async function (...args) {
     } else if (Array.isArray(args[0])) {
         genes = args[0];
         datasetKey = args.length > 1 ? args[1] : window.CiliAI.activeDataset;
-        containerId = args.length > 2 ? args[2] : 'umap-container';
+        containerId = args.length > 2 ? args[2] : 'umap-container'; // DEFAULT to umap-container!
     } else {
         console.error('[CiliAI] renderUMAPGrid: Invalid arguments');
         return;
@@ -3773,8 +3771,13 @@ window.renderUMAPGrid = async function (...args) {
         return;
     }
 
-    datasetKey = datasetKey || window.CiliAI.activeDataset;
+    // Normalize gene names to uppercase
+    genes = genes.map(g => g.toUpperCase());
+
+    datasetKey = datasetKey || window.CiliAI.activeDataset || 'lung';
     containerId = containerId || 'umap-container';
+
+    console.log(`[CiliAI] renderUMAPGrid: genes=${genes.join(',')}, dataset=${datasetKey}, container=${containerId}`);
 
     /* --------------------------------------------------
      * 2. Dataset validation
@@ -3791,18 +3794,138 @@ window.renderUMAPGrid = async function (...args) {
     const sourceData = dataset.umap;
     const nCells = sourceData.length;
     
-    // Determine extraction mode: Cell-Centric vs Gene-Centric
-    const expressionSource = dataset.expressionMatrix || dataset.expression || dataset.cellxgene;
-    
-    // If it's an object but keys are NOT the requested genes, assume cell-centric dictionary
-    const isCellCentric = expressionSource && typeof expressionSource === 'object' && 
-                          !Array.isArray(expressionSource) &&
-                          (!expressionSource[genes[0].toUpperCase()] && !expressionSource[genes[1]?.toUpperCase()]);
+    console.log(`[CiliAI] Dataset ${datasetKey}: ${nCells} cells`);
 
     /* --------------------------------------------------
-     * 3. Layout Initialization & Color Configuration
+     * 3. Helper: Universal expression extractor
      * -------------------------------------------------- */
-    // Palette of distinct single-hue scales for clear comparison
+    const extractExpression = (geneUpper) => {
+        const expr = new Float32Array(nCells).fill(0);
+        let found = false;
+        let maxExpr = 0;
+
+        // Try multiple data sources in order
+        const sources = [
+            dataset.expression,
+            dataset.expressionMatrix,
+            dataset.cellxgene,
+            window.CiliAI.cellDataCache
+        ];
+
+        for (const source of sources) {
+            if (!source) continue;
+
+            // FORMAT 1: Sparse object {cells: [], expression: []}
+            if (source[geneUpper]?.cells && source[geneUpper]?.expression) {
+                const raw = source[geneUpper];
+                for (let k = 0; k < raw.cells.length; k++) {
+                    const idx = raw.cells[k];
+                    if (idx < nCells) {
+                        expr[idx] = raw.expression[k];
+                        if (raw.expression[k] > maxExpr) maxExpr = raw.expression[k];
+                    }
+                }
+                found = true;
+                console.log(`[CiliAI] ✓ Found ${geneUpper} in sparse format (${raw.cells.length} cells)`);
+                break;
+            }
+
+            // FORMAT 2: Dense or sparse array
+            if (Array.isArray(source[geneUpper])) {
+                const raw = source[geneUpper];
+                
+                // Check if sparse: [idx, val, idx, val, ...]
+                if (raw.length > 2 && raw.length % 2 === 0 && 
+                    Number.isInteger(raw[0]) && raw[0] < nCells) {
+                    // Decode sparse
+                    for (let k = 0; k < raw.length; k += 2) {
+                        const idx = raw[k];
+                        const val = raw[k + 1];
+                        if (idx < nCells) {
+                            expr[idx] = val;
+                            if (val > maxExpr) maxExpr = val;
+                        }
+                    }
+                } else {
+                    // Dense array
+                    for (let k = 0; k < Math.min(raw.length, nCells); k++) {
+                        expr[k] = raw[k] || 0;
+                        if (raw[k] > maxExpr) maxExpr = raw[k];
+                    }
+                }
+                found = true;
+                console.log(`[CiliAI] ✓ Found ${geneUpper} in array format`);
+                break;
+            }
+
+            // FORMAT 3: Cell-centric dictionary {cell_id: {GENE: val}}
+            if (typeof source === 'object' && !Array.isArray(source)) {
+                let cellCount = 0;
+                sourceData.forEach((point, idx) => {
+                    const cellId = point.cell_id || point.id || point.barcode;
+                    if (cellId && source[cellId]?.[geneUpper] !== undefined) {
+                        expr[idx] = source[cellId][geneUpper];
+                        if (source[cellId][geneUpper] > maxExpr) maxExpr = source[cellId][geneUpper];
+                        cellCount++;
+                    }
+                });
+                if (cellCount > 0) {
+                    found = true;
+                    console.log(`[CiliAI] ✓ Found ${geneUpper} in cell-centric format (${cellCount} cells)`);
+                    break;
+                }
+            }
+
+            // FORMAT 4: Cell type averages {cell_type: {GENE: val}}
+            if (typeof source === 'object' && !found) {
+                let cellCount = 0;
+                sourceData.forEach((point, idx) => {
+                    const cellType = point.cell_type;
+                    if (cellType && source[cellType]?.[geneUpper] !== undefined) {
+                        expr[idx] = source[cellType][geneUpper];
+                        if (source[cellType][geneUpper] > maxExpr) maxExpr = source[cellType][geneUpper];
+                        cellCount++;
+                    }
+                });
+                if (cellCount > 0) {
+                    found = true;
+                    console.log(`[CiliAI] ✓ Found ${geneUpper} in cell-type format (${cellCount} cells)`);
+                    break;
+                }
+            }
+        }
+
+        return { expr, found, maxExpr };
+    };
+
+    /* --------------------------------------------------
+     * 4. Extract expression for all genes
+     * -------------------------------------------------- */
+    const geneData = [];
+    let anyGenesFound = false;
+
+    for (const gene of genes) {
+        const result = extractExpression(gene);
+        geneData.push(result);
+        if (result.found) anyGenesFound = true;
+        
+        if (!result.found) {
+            console.warn(`[CiliAI] ⚠ No expression data for ${gene} in ${datasetKey}`);
+        }
+    }
+
+    if (!anyGenesFound) {
+        const msg = `⚠️ None of the genes [${genes.join(', ')}] were found in ${dataset.name}. Available genes might use different naming.`;
+        console.error('[CiliAI]', msg);
+        if (typeof window.addChatMessage === 'function') {
+            window.addChatMessage(msg, false);
+        }
+        return;
+    }
+
+    /* --------------------------------------------------
+     * 5. Layout Configuration
+     * -------------------------------------------------- */
     const colorScales = [
         'Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 
         [[0, '#f0f9ff'], [0.5, '#0ea5e9'], [1, '#0c4a6e']], // Teal
@@ -3810,142 +3933,51 @@ window.renderUMAPGrid = async function (...args) {
     ];
     
     const traces = [];
-    const gridRows = Math.ceil(genes.length / 3); // Max 3 columns
+    const gridRows = Math.ceil(genes.length / 3);
     const gridCols = Math.min(genes.length, 3);
     
     const layout = {
         grid: { rows: gridRows, columns: gridCols, pattern: 'independent' },
-        margin: { l: 40, r: 150, t: 60, b: 40 }, // Extra right margin for colorbars
+        margin: { l: 40, r: 150, t: 60, b: 40 },
         showlegend: false,
         title: {
-            text: `<b>${dataset.name}</b> - Gene Expression Comparison`,
+            text: `<b>${dataset.name}</b> - ${genes.join(' vs ')}`,
             font: { size: 14, color: '#2d3748' }
         },
-        uirevision: 'linked-umap-' + genes.join('-') + '-' + Date.now(),
+        uirevision: 'linked-umap-' + genes.join('-'),
         annotations: [],
         hovermode: 'closest'
     };
 
     /* --------------------------------------------------
-     * 4. Helper: Decode sparse expression data
-     * -------------------------------------------------- */
-    const decodeSparse = (sparse, total) => {
-        const dense = new Float32Array(total).fill(0);
-        if (!sparse) return dense;
-        if (Array.isArray(sparse)) {
-            // Format: [idx1, val1, idx2, val2, ...]
-            for (let k = 0; k < sparse.length; k += 2) {
-                const idx = sparse[k];
-                const val = sparse[k + 1];
-                if (idx < total) dense[idx] = val;
-            }
-        }
-        return dense;
-    };
-
-    /* --------------------------------------------------
-     * 5. Build panels for each gene
+     * 6. Build traces
      * -------------------------------------------------- */
     genes.forEach((gene, i) => {
-        const geneUpper = gene.toUpperCase();
+        const { expr, found, maxExpr } = geneData[i];
         const row = Math.floor(i / gridCols) + 1;
         const col = (i % gridCols) + 1;
         
-        // Calculate axis indices for grid layout
         const axisIndex = i + 1;
         const xaxisRef = axisIndex === 1 ? 'x' : `x${axisIndex}`;
         const yaxisRef = axisIndex === 1 ? 'y' : `y${axisIndex}`;
         const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
         const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
 
-        /* --- DATA EXTRACTION --- */
-        const expr = new Float32Array(nCells).fill(0);
-        let found = false;
-        let maxExpr = 0;
-
-        // Path A: Gene-Centric (New Format - Sparse/Dense)
-        if (!isCellCentric && expressionSource) {
-            const raw = expressionSource[geneUpper];
-            if (raw) {
-                if (raw.cells && raw.expression) {
-                    // Sparse object format: { cells: [indices], expression: [values] }
-                    for (let k = 0; k < raw.cells.length; k++) {
-                        const idx = raw.cells[k];
-                        if (idx < nCells) {
-                            expr[idx] = raw.expression[k];
-                            if (raw.expression[k] > maxExpr) maxExpr = raw.expression[k];
-                        }
-                    }
-                    found = true;
-                } else if (Array.isArray(raw)) {
-                    // Check if it's sparse array format [idx, val, idx, val, ...]
-                    if (raw.length > 0 && raw.length % 2 === 0) {
-                        const decoded = decodeSparse(raw, nCells);
-                        for (let k = 0; k < nCells; k++) {
-                            expr[k] = decoded[k];
-                            if (decoded[k] > maxExpr) maxExpr = decoded[k];
-                        }
-                        found = true;
-                    } else {
-                        // Dense array format
-                        for (let k = 0; k < Math.min(raw.length, nCells); k++) {
-                            expr[k] = raw[k] || 0;
-                            if (raw[k] > maxExpr) maxExpr = raw[k];
-                        }
-                        found = true;
-                    }
-                }
-            }
-        }
-
-        // Path B: Cell-Centric (Legacy Dictionary: { cell_id: { GENE: val } })
-        if (!found && expressionSource) {
-            sourceData.forEach((point, idx) => {
-                const cellId = point.cell_id || point.id;
-                if (cellId && expressionSource[cellId]) {
-                    const val = expressionSource[cellId][geneUpper];
-                    if (val !== undefined && val !== null) {
-                        expr[idx] = val;
-                        if (val > maxExpr) maxExpr = val;
-                        found = true;
-                    }
-                }
-            });
-        }
-
-        // Path C: Cell type average fallback
-        if (!found && dataset.expression && typeof dataset.expression === 'object') {
-            sourceData.forEach((point, idx) => {
-                const cellType = point.cell_type;
-                if (cellType && dataset.expression[cellType]) {
-                    const val = dataset.expression[cellType][geneUpper];
-                    if (val !== undefined && val !== null) {
-                        expr[idx] = val;
-                        if (val > maxExpr) maxExpr = val;
-                        found = true;
-                    }
-                }
-            });
-        }
-
-        /* --- END DATA EXTRACTION --- */
-
-        if (!found) {
-            console.warn(`[CiliAI] No expression data for ${geneUpper} in ${datasetKey}`);
-        }
-
-        // Extract coordinates safely
+        // Extract coordinates
         const xCoords = sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1 ?? 0);
         const yCoords = sourceData.map(p => p.y ?? p.umap_y ?? p.UMAP_2 ?? 0);
         
-        // Build hover text with cell type
+        // Build hover text
         const hoverText = sourceData.map((p, idx) => {
             const cellType = p.cell_type || 'Unknown';
-            return `<b>${cellType}</b><br>${geneUpper}: ${expr[idx].toFixed(2)} TPM`;
+            return `<b>${cellType}</b><br>${gene}: ${expr[idx].toFixed(2)} TPM`;
         });
 
-        // Select distinct colorscale based on index
+        // Select colorscale
         const currentScale = colorScales[i % colorScales.length];
+
+        // CRITICAL FIX: Ensure valid color range even if no expression
+        const colorMax = maxExpr > 0 ? maxExpr : 0.1;
 
         traces.push({
             type: 'scattergl',
@@ -3955,21 +3987,21 @@ window.renderUMAPGrid = async function (...args) {
             text: hoverText,
             hovertemplate: '%{text}<extra></extra>',
             marker: {
-                size: 5,
-                opacity: 0.75,
-                color: Array.from(expr), // Convert typed array to JS array
+                size: found ? 5 : 3,
+                opacity: found ? 0.75 : 0.3,
+                color: Array.from(expr),
                 cmin: 0,
-                cmax: maxExpr > 0 ? maxExpr : 1,
-                colorscale: currentScale, // DISTINCT COLOR per gene
+                cmax: colorMax, // FIXED: Always positive range
+                colorscale: currentScale,
                 showscale: true,
                 colorbar: {
                     title: {
-                        text: geneUpper,
+                        text: gene + (found ? '' : '<br>(Not Found)'),
                         font: { size: 10, weight: 'bold' }
                     },
                     len: 0.7,
                     thickness: 12,
-                    x: 1.02 + (i * 0.08), // Stagger colorbars to prevent overlap
+                    x: 1.02 + (i * 0.08),
                     y: 0.5,
                     xpad: 5,
                     tickfont: { size: 9 }
@@ -3979,36 +4011,36 @@ window.renderUMAPGrid = async function (...args) {
             yaxis: yaxisRef
         });
 
-        // Configure axes for this panel (hidden, linked zoom)
+        // Axis config with linked zoom
         layout[xaxisName] = { 
             visible: false, 
             showgrid: false,
             zeroline: false,
-            matches: i > 0 ? 'x' : undefined // Link all to first plot's zoom
+            matches: i > 0 ? 'x' : undefined
         };
         layout[yaxisName] = { 
             visible: false, 
             showgrid: false,
             zeroline: false,
-            matches: i > 0 ? 'y' : undefined // Link all to first plot's zoom
+            matches: i > 0 ? 'y' : undefined
         };
 
-        // Add gene name as title annotation above each panel
+        // Gene label annotation
         layout.annotations.push({
-            text: `<b>${geneUpper}</b>`,
+            text: `<b>${gene}</b>${found ? '' : ' ⚠️'}`,
             xref: 'paper', 
             yref: 'paper',
             x: (col - 0.5) / gridCols,
             y: 1 - ((row - 1) / gridRows) + 0.02,
             showarrow: false,
-            font: { size: 12, weight: 'bold', color: '#2d3748' },
+            font: { size: 12, weight: 'bold', color: found ? '#2d3748' : '#dc2626' },
             xanchor: 'center', 
             yanchor: 'bottom'
         });
     });
 
     /* --------------------------------------------------
-     * 6. Render to specified container
+     * 7. Render
      * -------------------------------------------------- */
     const targetContainer = document.getElementById(containerId);
     if (!targetContainer) {
@@ -4016,7 +4048,6 @@ window.renderUMAPGrid = async function (...args) {
         return;
     }
 
-    // Ensure container is visible
     targetContainer.style.display = 'block';
     
     const config = { 
@@ -4026,23 +4057,79 @@ window.renderUMAPGrid = async function (...args) {
         modeBarButtonsToRemove: ['lasso2d', 'select2d']
     };
     
-    await Plotly.newPlot(containerId, traces, layout, config);
-    
-    console.log(`[CiliAI] Rendered ${genes.length} genes in grid layout at #${containerId}`);
-    
-    // Add chat confirmation if available
-    if (typeof window.addChatMessage === 'function') {
-        window.addChatMessage(`
-            <div class="ai-result-card">
-                <p><strong>Multi-Gene Comparison</strong></p>
-                <p>Displaying <strong>${genes.join(', ')}</strong> across ${dataset.name}</p>
-                <p style="font-size:11px; color:#64748b; margin-top:8px;">
-                    📊 ${genes.length} panels • Linked zoom enabled • Distinct color scales
-                </p>
-            </div>
-        `, false);
+    try {
+        await Plotly.newPlot(containerId, traces, layout, config);
+        console.log(`[CiliAI] ✓ Rendered ${genes.length} genes in grid layout at #${containerId}`);
+        
+        if (typeof window.addChatMessage === 'function') {
+            const foundGenes = genes.filter((g, i) => geneData[i].found);
+            const notFoundGenes = genes.filter((g, i) => !geneData[i].found);
+            
+            let message = `
+                <div class="ai-result-card">
+                    <p><strong>Gene Expression Comparison</strong></p>
+                    <p>Displaying <strong>${genes.join(' vs ')}</strong> in ${dataset.name}</p>`;
+            
+            if (foundGenes.length > 0) {
+                message += `<p style="font-size:11px; color:#059669;">✓ Found: ${foundGenes.join(', ')}</p>`;
+            }
+            if (notFoundGenes.length > 0) {
+                message += `<p style="font-size:11px; color:#dc2626;">⚠ Not found: ${notFoundGenes.join(', ')}</p>`;
+            }
+            
+            message += `
+                    <p style="font-size:11px; color:#64748b; margin-top:8px;">
+                        📊 ${genes.length} panels • Linked zoom • Distinct colors
+                    </p>
+                </div>`;
+            
+            window.addChatMessage(message, false);
+        }
+    } catch (error) {
+        console.error('[CiliAI] Plotly render error:', error);
+        if (typeof window.addChatMessage === 'function') {
+            window.addChatMessage(`⚠️ Error rendering plot: ${error.message}`, false);
+        }
     }
 };
+
+// ==========================================================
+// DEBUG: Check what expression data is available
+// ==========================================================
+
+window.debugGeneExpression = function(gene, datasetKey = null) {
+    datasetKey = datasetKey || window.CiliAI.activeDataset;
+    const dataset = window.CiliAI.datasets?.[datasetKey];
+    
+    if (!dataset) {
+        console.error('Dataset not found:', datasetKey);
+        return;
+    }
+    
+    const geneUpper = gene.toUpperCase();
+    console.log(`\n=== DEBUG: ${geneUpper} in ${datasetKey} ===`);
+    console.log('Dataset keys:', Object.keys(dataset));
+    
+    if (dataset.expression) {
+        console.log('dataset.expression type:', typeof dataset.expression);
+        console.log('dataset.expression keys (first 10):', Object.keys(dataset.expression).slice(0, 10));
+        console.log(`Has ${geneUpper}:`, geneUpper in dataset.expression);
+        if (dataset.expression[geneUpper]) {
+            console.log(`${geneUpper} data type:`, typeof dataset.expression[geneUpper]);
+            console.log(`${geneUpper} data sample:`, dataset.expression[geneUpper]);
+        }
+    }
+    
+    if (dataset.expressionMatrix) {
+        console.log('Has expressionMatrix');
+    }
+    
+    if (window.CiliAI.cellDataCache) {
+        console.log('Has cellDataCache:', geneUpper in window.CiliAI.cellDataCache);
+    }
+};
+
+
 
 // ==========================================================
 // UTILITY: Reset and show image panel container
@@ -7064,6 +7151,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
