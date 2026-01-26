@@ -3739,6 +3739,10 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 // FIXED: Multi-gene UMAP Grid with Proper Data Extraction
 // ==========================================================
 
+// ==========================================================
+// FIXED: Multi-gene UMAP Grid with Proper Data Extraction
+// ==========================================================
+
 /**
  * Multi-gene UMAP Grid - FULLY FIXED VERSION
  * Addresses:
@@ -3954,14 +3958,14 @@ window.renderUMAPGrid = async function (...args) {
      * -------------------------------------------------- */
     genes.forEach((gene, i) => {
         const { expr, found, maxExpr } = geneData[i];
-        const row = Math.floor(i / gridCols) + 1;
-        const col = (i % gridCols) + 1;
         
-        const axisIndex = i + 1;
-        const xaxisRef = axisIndex === 1 ? 'x' : `x${axisIndex}`;
-        const yaxisRef = axisIndex === 1 ? 'y' : `y${axisIndex}`;
-        const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
-        const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
+        // Calculate grid position (1-indexed for Plotly)
+        const col = (i % gridCols) + 1;
+        const row = Math.floor(i / gridCols) + 1;
+        
+        // Create unique axis references for EACH gene
+        const xaxisRef = i === 0 ? 'x' : `x${i + 1}`;
+        const yaxisRef = i === 0 ? 'y' : `y${i + 1}`;
 
         // Extract coordinates
         const xCoords = sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1 ?? 0);
@@ -3991,7 +3995,7 @@ window.renderUMAPGrid = async function (...args) {
                 opacity: found ? 0.75 : 0.3,
                 color: Array.from(expr),
                 cmin: 0,
-                cmax: colorMax, // FIXED: Always positive range
+                cmax: colorMax,
                 colorscale: currentScale,
                 showscale: true,
                 colorbar: {
@@ -3999,43 +4003,54 @@ window.renderUMAPGrid = async function (...args) {
                         text: gene + (found ? '' : '<br>(Not Found)'),
                         font: { size: 10, weight: 'bold' }
                     },
-                    len: 0.7,
+                    len: 0.6,
                     thickness: 12,
-                    x: 1.02 + (i * 0.08),
+                    x: 1.02 + (i * 0.09),
                     y: 0.5,
-                    xpad: 5,
+                    xpad: 10,
                     tickfont: { size: 9 }
                 }
             },
             xaxis: xaxisRef,
-            yaxis: yaxisRef
+            yaxis: yaxisRef,
+            name: gene
         });
 
-        // Axis config with linked zoom
-        layout[xaxisName] = { 
+        // Configure axes for this subplot
+        const xaxisKey = i === 0 ? 'xaxis' : `xaxis${i + 1}`;
+        const yaxisKey = i === 0 ? 'yaxis' : `yaxis${i + 1}`;
+        
+        layout[xaxisKey] = { 
             visible: false, 
             showgrid: false,
             zeroline: false,
-            matches: i > 0 ? 'x' : undefined
+            showticklabels: false,
+            anchor: yaxisRef,
+            domain: undefined // Let grid handle it
         };
-        layout[yaxisName] = { 
+        layout[yaxisKey] = { 
             visible: false, 
             showgrid: false,
             zeroline: false,
-            matches: i > 0 ? 'y' : undefined
+            showticklabels: false,
+            anchor: xaxisRef,
+            domain: undefined // Let grid handle it
         };
 
-        // Gene label annotation
+        // Gene label annotation above each subplot
+        const xPosition = (col - 0.5) / gridCols;
+        const yPosition = 1 - ((row - 1) / gridRows) - 0.02;
+        
         layout.annotations.push({
             text: `<b>${gene}</b>${found ? '' : ' ⚠️'}`,
             xref: 'paper', 
             yref: 'paper',
-            x: (col - 0.5) / gridCols,
-            y: 1 - ((row - 1) / gridRows) + 0.02,
+            x: xPosition,
+            y: yPosition,
             showarrow: false,
-            font: { size: 12, weight: 'bold', color: found ? '#2d3748' : '#dc2626' },
+            font: { size: 13, weight: 'bold', color: found ? '#2d3748' : '#dc2626' },
             xanchor: 'center', 
-            yanchor: 'bottom'
+            yanchor: 'top'
         });
     });
 
@@ -4128,7 +4143,6 @@ window.debugGeneExpression = function(gene, datasetKey = null) {
         console.log('Has cellDataCache:', geneUpper in window.CiliAI.cellDataCache);
     }
 };
-
 
 
 // ==========================================================
@@ -7151,6 +7165,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
