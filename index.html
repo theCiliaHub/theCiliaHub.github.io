@@ -1581,40 +1581,36 @@ window.parseTsvData = function (tsvText) {
 };
 
 // ==========================================================
-// DATA LOADING LOGIC (FIXED: RETRY + ROBUST THROTTLING)
+// DATA LOADING LOGIC (FIXED: WATERFALL SEQUENCING)
 // ==========================================================
 window.loadCiliAIData = async function() {
     const base = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-    window.updateStatus('Syncing databases & expression...', 'loading');
+    window.updateStatus('Syncing databases...', 'loading');
 
-    // --- 1. ROBUST FETCH WITH RETRY ---
-    const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
+    // --- 1. ROBUST FETCH WITH RETRY & LONGER BACKOFF ---
+    const fetchWithRetry = async (url, retries = 4, delay = 2000) => { // Increased retries & delay
         for (let i = 0; i < retries; i++) {
             try {
                 const res = await fetch(url);
                 if (!res.ok) {
-                    // If 404, don't retry, just fail
                     if (res.status === 404) throw new Error("404 Not Found");
-                    // For 5xx or rate limits, throw to trigger retry
                     throw new Error(`HTTP ${res.status}`);
                 }
                 return await res.json();
             } catch (err) {
-                console.warn(`Fetch attempt ${i + 1} failed for ${url}: ${err.message}`);
-                if (i === retries - 1) throw err; // Throw on final failure
-                // Wait with jitter to prevent thundering herd
-                const waitTime = delay * Math.pow(2, i) + (Math.random() * 500); 
+                console.warn(`Attempt ${i + 1} failed for ${url}: ${err.message}`);
+                if (i === retries - 1) throw err;
+                // Exponential backoff + Jitter to prevent collisions
+                const waitTime = delay * Math.pow(2, i) + (Math.random() * 1000);
                 await new Promise(r => setTimeout(r, waitTime));
             }
         }
     };
 
-    // --- 2. CONCURRENCY WORKER ---
-    const fetchWithThrottle = async (urls, limit = 3) => {
+    // --- 2. SEQUENTIAL THROTTLE WORKER ---
+    const fetchWithThrottle = async (urls, limit = 2) => { // Conservative limit
         const results = [];
         const queue = [...urls];
-        
-        // Define worker that pulls from queue
         const worker = async () => {
             while (queue.length > 0) {
                 const url = queue.shift();
@@ -1622,32 +1618,26 @@ window.loadCiliAIData = async function() {
                     const data = await fetchWithRetry(url);
                     results.push(data);
                 } catch (e) {
-                    console.error(`CRITICAL FAIL: Could not load ${url} after retries.`);
-                    // We push null to keep index alignment if needed, or just skip
-                    // But typically we want to know it failed.
+                    console.error(`Failed to load ${url}`);
                 }
             }
         };
-
-        // Create workers
         await Promise.all(Array.from({ length: limit }, worker));
         return results;
     };
 
     const fetchSafe = async (url) => {
-        try {
-            return await fetchWithRetry(url);
-        } catch (e) {
-            console.warn(`Optional load failed: ${url}`);
-            return null;
-        }
+        try { return await fetchWithRetry(url); } catch (e) { return null; }
     };
 
     try {
+        // Safe Init
         window.CiliAI = window.CiliAI || {};
-        window.CiliAI.datasets = window.CiliAI.datasets || {};
-        window.CiliAI.lookups = window.CiliAI.lookups || { geneMap: {} };
-        window.CiliAI.cellDataCache = window.CiliAI.cellDataCache || {};
+        Object.assign(window.CiliAI, {
+            datasets: window.CiliAI.datasets || {},
+            lookups: window.CiliAI.lookups || { geneMap: {} },
+            cellDataCache: window.CiliAI.cellDataCache || {}
+        });
 
         // ---------------- URL DEFINITIONS ----------------
         const lungUrls    = Array.from({ length: 15 }, (_, i) => `${base}UMAP_Data/lung_downsampled_part${i + 1}.json`);
@@ -1655,40 +1645,49 @@ window.loadCiliAIData = async function() {
         const hypExprUrls = Array.from({ length: 6 },  (_, i) => `${base}UMAP_Data/hypothalamus_expression_part${i + 1}.json`);
         const hypStructUrls = Array.from({ length: 2 }, (_, i) => `${base}UMAP_Data/hypothalamus_structure_part${i + 1}.json`);
 
-        const lungOrganoidUMAPUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json';
-        const lungCellxgeneExprUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
+        // ---------------- WATERFALL LOADING (Sequential Groups) ----------------
+        // This prevents HTTP/2 protocol errors by not firing 50 requests at once.
 
-        // ---------------- FETCH PIPELINE ----------------
-        // 1. Critical Base Data (Fetch these first to ensure App shell works)
+        // Group 1: Core Metadata (Essential)
+        console.log("Loading Core Data...");
         const [mainRes, lookupsRes] = await Promise.all([
             fetchSafe(base + 'ciliAI_master_database.json'),
             fetchSafe(base + 'ciliAI_lookups.json')
         ]);
 
-        // 2. Large Data Chunks (Throttled)
-        const [
-            kStruct, kExpr1, kExpr2,
-            lungParts, liverParts,
-            hypExpr, hypStruct,
-            chondro,
-            expressionData,
-            lungOrganoidUMAP,
-            lungCellxgeneExpression
-        ] = await Promise.all([
+        // Group 2: Kidney & Chondrocyte (Small Datasets)
+        console.log("Loading Kidney/Chondrocyte...");
+        const [kStruct, kExpr1, kExpr2, chondro] = await Promise.all([
             fetchSafe(base + 'kidney_structure.json'),
             fetchSafe(base + 'kidney_expression_part1.json'),
             fetchSafe(base + 'kidney_expression_part2.json'),
-            fetchWithThrottle(lungUrls, 3),      // Limit to 3 concurrent
-            fetchWithThrottle(liverUrls, 3),     // Limit to 3 concurrent
-            fetchWithThrottle(hypExprUrls, 3),   // Limit to 3 concurrent
-            fetchWithThrottle(hypStructUrls, 2), // Limit to 2 concurrent
-            fetchSafe(base + 'UMAP_Data/chondrocyte_part1.json'),
-            fetchSafe(base + 'ciliai_master_expression.json'),
-            fetchSafe(lungOrganoidUMAPUrl),
-            fetchSafe(lungCellxgeneExprUrl)
+            fetchSafe(base + 'UMAP_Data/chondrocyte_part1.json')
         ]);
 
-        // ---------------- NORMALIZATION HELPERS ----------------
+        // Group 3: Lung (Large - Throttled)
+        console.log("Loading Lung...");
+        const lungParts = await fetchWithThrottle(lungUrls, 2);
+
+        // Group 4: Liver (Large - Throttled)
+        console.log("Loading Liver...");
+        const liverParts = await fetchWithThrottle(liverUrls, 2);
+
+        // Group 5: Hypothalamus (Large - Throttled)
+        console.log("Loading Hypothalamus...");
+        const hypExpr = await fetchWithThrottle(hypExprUrls, 2);
+        const hypStruct = await fetchWithThrottle(hypStructUrls, 2);
+
+        // Group 6: Organoid & Expression Atlas
+        console.log("Loading Organoids...");
+        const [expressionData, lungOrganoidUMAP, lungCellxgeneExpression] = await Promise.all([
+            fetchSafe(base + 'ciliai_master_expression.json'),
+            fetchSafe('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json'),
+            fetchSafe('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json')
+        ]);
+
+        // ---------------- DATA PROCESSING & NORMALIZATION ----------------
+        window.updateStatus('Processing datasets...', 'loading');
+
         const processParts = (parts) => {
             const res = { umap: [], cells: {} };
             const list = Array.isArray(parts) ? parts : [parts];
@@ -1710,8 +1709,7 @@ window.loadCiliAIData = async function() {
             let pid = p.cell_id ?? p.id;
             if (px !== undefined && py !== undefined) {
                 res.umap.push({
-                    x: parseFloat(px),
-                    y: parseFloat(py),
+                    x: parseFloat(px), y: parseFloat(py),
                     cell_id: pid,
                     cell_type: p.cluster || p.cell_type || p.type || 'Unknown'
                 });
@@ -1721,15 +1719,12 @@ window.loadCiliAIData = async function() {
             }
         };
 
-        // ---------------- PROCESS DATA ----------------
-        const mergedLung    = processParts(lungParts);
-        const mergedLiver   = processParts(liverParts);
+        const mergedLung = processParts(lungParts);
+        const mergedLiver = processParts(liverParts);
         const mergedChondro = processParts(chondro);
-
-        const hypUmap  = processParts(hypStruct).umap;
+        const hypUmap = processParts(hypStruct).umap;
         const hypCells = {};
         if (hypExpr) hypExpr.flat().forEach(part => { if (part) Object.assign(hypCells, part); });
-
         const lungOrganoidProcessed = processParts(lungOrganoidUMAP);
 
         // ---------------- DATASET REGISTRATION ----------------
@@ -1784,7 +1779,7 @@ window.loadCiliAIData = async function() {
             }
         };
 
-        // ---------------- GLOBAL REGISTRATION ----------------
+        // ---------------- MASTER DATA REGISTRATION ----------------
         window.CiliAI.masterData = mainRes?.masterData || [];
         window.CiliAI.lookups = lookupsRes?.lookups || { geneMap: {} };
 
@@ -1792,21 +1787,18 @@ window.loadCiliAIData = async function() {
             window.CiliAI.expressionAtlas = expressionData;
             Object.entries(expressionData).forEach(([gene, exprObj]) => {
                 const upperGene = gene.toUpperCase();
-                window.CiliAI.lookups.geneMap[upperGene] =
-                    window.CiliAI.lookups.geneMap[upperGene] || { Gene: upperGene };
+                window.CiliAI.lookups.geneMap[upperGene] = window.CiliAI.lookups.geneMap[upperGene] || { Gene: upperGene };
                 window.CiliAI.lookups.geneMap[upperGene].expression = {
                     tissue: exprObj,
                     n_tissues: exprObj.n_tissues_expressed || 0,
                     category: exprObj.Category || 'Unknown'
                 };
             });
-            console.log(`Loaded expression data for ${Object.keys(expressionData).length} genes`);
         }
 
         window.CiliAI.ready = true;
-        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes + expression)`, 'ready');
+        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
         console.log("✅ CiliAI fully loaded.");
-
         return true;
 
     } catch (e) {
@@ -1815,7 +1807,6 @@ window.loadCiliAIData = async function() {
         return false;
     }
 };
-    
     
 // =======================================================
 // View Switching Function (FIXED)
@@ -2233,6 +2224,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
