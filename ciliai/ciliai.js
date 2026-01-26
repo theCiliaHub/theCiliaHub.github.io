@@ -2482,7 +2482,7 @@ window.openTab = function(evt, tabName) {
 };
 
 // ==============================================================
-// 2. MAIN GENE DISPLAY FUNCTION
+// 2. MAIN GENE DISPLAY FUNCTION (Updated: Ciliary Tissues)
 // ==============================================================
 window.displayFullGeneInfo = async function(geneSymbol) {
     if(typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
@@ -2571,21 +2571,23 @@ window.displayFullGeneInfo = async function(geneSymbol) {
         <div id="tab-expression" class="cilia-tab-content">
             <div style="margin-bottom:20px;">
                 <button class="ciliai-button" onclick="window.renderUMAPPlot('${geneSymbol}')">
-                    🔄 View UMAP Plot
+                     🔄 View UMAP Plot
                 </button>
             </div>`;
 
-    // 1. Bulk Tissue Data
+    // 1. Bulk Tissue Data (Updated Labels)
     if (Object.keys(tissueExpr).length > 0) {
+        const tissueLabel = nTissues === 1 ? 'Ciliary Tissue' : 'Ciliary Tissues';
+
         html += `
-            <div class="section-header" style="margin-bottom:12px;">Bulk Tissue RNA-seq</div>
+            <div class="section-header" style="margin-bottom:12px;">Bulk RNA-seq (Ciliary Tissues)</div>
             
             <div style="display:flex; gap:10px; margin-bottom:12px;">
                  <span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:4px; border:1px solid #bae6fd;">
                     Category: <strong>${exprCategory}</strong>
                  </span>
                  <span style="font-size:11px; background:#f0fdf4; color:#15803d; padding:4px 8px; border-radius:4px; border:1px solid #bbf7d0;">
-                    Expressed in <strong>${nTissues}</strong> tissues
+                    Expressed in <strong>${nTissues}</strong> ${tissueLabel}
                  </span>
             </div>
 
@@ -2624,7 +2626,10 @@ window.displayFullGeneInfo = async function(geneSymbol) {
                 : '<p style="color:#64748b;">No phylogenetic data available.</p>'}
             <div style="margin-top:20px;">
                 <button class="ciliai-button" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">
-                    View Phylogeny Heatmap
+                    
+
+[Image of Phylogenetic Tree]
+ View Phylogeny Heatmap
                 </button>
             </div>
         </div>`;
@@ -2637,7 +2642,6 @@ window.displayFullGeneInfo = async function(geneSymbol) {
 // ==============================================================
 // 1. DATA DISPLAY HELPERS (Expression Atlas)
 // ==============================================================
-
 // Tissue-level expression table (sorted descending TPM)
 window.renderTissueExpressionTable = function(tissueData) {
     if (!tissueData) return '';
@@ -2647,11 +2651,14 @@ window.renderTissueExpressionTable = function(tissueData) {
     
     const sorted = validEntries.sort(([,a], [,b]) => b - a); // highest TPM first
 
+    // Detect if this is the new "Ciliary Tissue" dataset format
+    const hasCiliaryContext = true; // Since we are enforcing this meaning now
+
     let html = `
         <table class="fancy-table" style="width:100%; margin-top:8px;">
             <thead>
                 <tr>
-                    <th style="background:#f1f5f9; color:#475569;">Tissue / Dataset</th>
+                    <th style="background:#f1f5f9; color:#475569;">Ciliary Tissue</th>
                     <th style="text-align:right; width:120px; background:#f1f5f9; color:#475569;">TPM</th>
                 </tr>
             </thead>
@@ -2689,12 +2696,11 @@ window.renderTissueExpressionTable = function(tissueData) {
             </tbody>
         </table>
         <div style="margin-top:8px; font-size:11px; color:#94a3b8; font-style:italic; text-align:right;">
-            Source: CiliAI Integrated Expression Atlas (2024)
+            Source: CiliAI Integrated Expression Atlas (Ciliary Tissues Only)
         </div>`;
 
     return html;
 };
-
 
 // ==============================================================
 // 3. SEARCH HELPERS (Pan-ciliary / Idio-specific)
@@ -3739,9 +3745,12 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 /**
  * Multi-gene UMAP Grid (FIXED: Cell-Centric Support + Distinct Color Scales)
  */
+/**
+ * Multi-gene UMAP Grid (Enhanced: Missing Data Detection + Casing Fallback)
+ */
 window.renderUMAPGrid = async function (...args) {
     /* --------------------------------------------------
-     * 1. Argument normalization
+     * 1. Argument Normalization
      * -------------------------------------------------- */
     let genes, datasetKey, containerId;
 
@@ -3763,7 +3772,7 @@ window.renderUMAPGrid = async function (...args) {
     containerId ||= 'umap-container';
 
     /* --------------------------------------------------
-     * 2. Dataset validation
+     * 2. Dataset Validation
      * -------------------------------------------------- */
     const dataset = window.CiliAI.datasets?.[datasetKey];
     if (!dataset || !Array.isArray(dataset.umap)) {
@@ -3773,21 +3782,17 @@ window.renderUMAPGrid = async function (...args) {
 
     const sourceData = dataset.umap;
     const nCells = sourceData.length;
-    
-    // Determine extraction mode: Cell-Centric vs Gene-Centric
     const expressionSource = dataset.expressionMatrix || dataset.expression || dataset.cellxgene;
-    
-    // If it's an object but keys are NOT the requested genes, assume cell-centric dictionary
+
+    // Heuristic: Is this a legacy cell-centric dictionary?
     const isCellCentric = expressionSource && typeof expressionSource === 'object' && 
                           !Array.isArray(expressionSource) &&
                           (!expressionSource[genes[0].toUpperCase()] && !expressionSource[genes[1]?.toUpperCase()]);
 
     /* --------------------------------------------------
-     * 3. Layout Initialization & Color Configuration
+     * 3. Layout Setup
      * -------------------------------------------------- */
-    // Palette of distinct single-hue scales for clear comparison
     const colorScales = ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 'Teal', 'YlGnBu', 'Magma'];
-    
     const traces = [];
     const layout = {
         grid: { rows: 1, columns: genes.length, pattern: 'independent' },
@@ -3799,7 +3804,7 @@ window.renderUMAPGrid = async function (...args) {
     };
 
     /* --------------------------------------------------
-     * 4. Build panels
+     * 4. Build Panels
      * -------------------------------------------------- */
     genes.forEach((gene, i) => {
         const geneUpper = gene.toUpperCase();
@@ -3809,51 +3814,60 @@ window.renderUMAPGrid = async function (...args) {
         const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
         const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
 
-        /* --- DATA EXTRACTION --- */
+        // --- Data Extraction ---
         const expr = new Float32Array(nCells).fill(0);
         let found = false;
+        let maxValue = 0;
 
-        // Path A: Gene-Centric (Sparse/Dense - New Format)
+        // Try multiple casing formats if exact match fails
+        const keysToTry = [geneUpper, gene, gene.charAt(0) + gene.slice(1).toLowerCase()];
+
         if (!isCellCentric && expressionSource) {
-            const raw = expressionSource[geneUpper];
-            if (raw) {
-                if (raw.cells && raw.expression) {
-                    // Sparse object { cells: [], expression: [] }
-                    for (let k = 0; k < raw.cells.length; k++) {
-                        const idx = raw.cells[k];
-                        if (idx < nCells) expr[idx] = raw.expression[k];
+            for (const key of keysToTry) {
+                const raw = expressionSource[key];
+                if (raw) {
+                    if (raw.cells && raw.expression) {
+                        for (let k = 0; k < raw.cells.length; k++) {
+                            const idx = raw.cells[k];
+                            if (idx < nCells) expr[idx] = raw.expression[k];
+                        }
+                        found = true;
+                    } else if (Array.isArray(raw)) {
+                        for (let k = 0; k < Math.min(raw.length, nCells); k++) expr[k] = raw[k];
+                        found = true;
                     }
-                    found = true;
-                } else if (Array.isArray(raw)) {
-                    // Dense array
-                    for (let k = 0; k < Math.min(raw.length, nCells); k++) expr[k] = raw[k];
-                    found = true;
+                    if (found) break;
                 }
             }
         }
 
-        // Path B: Cell-Centric (Legacy Dictionary: { cell_id: { GENE: val } })
+        // Cell-Centric Fallback
         if (!found && expressionSource) {
             sourceData.forEach((point, idx) => {
                 const cellId = point.cell_id || point.id;
                 if (cellId && expressionSource[cellId]) {
-                    const val = expressionSource[cellId][geneUpper];
-                    if (val !== undefined && val !== null) {
-                        expr[idx] = val;
-                        found = true;
+                    for (const key of keysToTry) {
+                        const val = expressionSource[cellId][key];
+                        if (val !== undefined && val !== null) {
+                            expr[idx] = val;
+                            found = true;
+                            break;
+                        }
                     }
                 }
             });
         }
-        /* --- END DATA EXTRACTION --- */
 
-        if (!found && i === 0) console.warn(`[CiliAI] No expression data for ${geneUpper} in ${datasetKey}`);
+        // Calculate Max Value to check if data is just zeros
+        if (found) {
+            for (let k = 0; k < expr.length; k++) {
+                if (expr[k] > maxValue) maxValue = expr[k];
+            }
+        }
 
-        // Safe Coordinates
+        // --- Trace Creation ---
         const xCoords = sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1 ?? 0);
         const yCoords = sourceData.map(p => p.y ?? p.umap_y ?? p.UMAP_2 ?? 0);
-
-        // Select distinct colorscale based on index
         const currentScale = colorScales[i % colorScales.length];
 
         traces.push({
@@ -3864,14 +3878,16 @@ window.renderUMAPGrid = async function (...args) {
             marker: {
                 size: 4,
                 opacity: 0.85,
-                color: Array.from(expr), // Convert typed array to JS array
-                colorscale: currentScale, // DISTINCT COLOR per gene
+                color: Array.from(expr),
+                colorscale: currentScale,
                 showscale: true,
+                cmin: 0,
+                cmax: maxValue > 0 ? maxValue : 1, // Prevent divide by zero scale
                 colorbar: {
                     title: geneUpper,
                     len: 0.85,
                     thickness: 10,
-                    x: 1.02 + i * 0.12, // Increased offset to prevent overlap
+                    x: 1.02 + i * 0.12,
                     xpad: 10
                 }
             },
@@ -3880,7 +3896,6 @@ window.renderUMAPGrid = async function (...args) {
             yaxis: yaxisRef
         });
 
-        // Linked Zoom Layout
         layout[xaxisName] = { visible: false, matches: i > 0 ? 'x' : undefined };
         layout[yaxisName] = { visible: false, matches: i > 0 ? 'y' : undefined };
 
@@ -3894,16 +3909,29 @@ window.renderUMAPGrid = async function (...args) {
             font: { size: 14, weight: 'bold', color: '#2d3748' },
             xanchor: 'center', yanchor: 'bottom'
         });
+
+        // --- MISSING DATA WARNING ---
+        if (!found || maxValue === 0) {
+            layout.annotations.push({
+                text: "DATA NOT AVAILABLE",
+                xref: `x${axisIndex}`, yref: `y${axisIndex}`,
+                x: 0, y: 0, // Centered if axes range is centered
+                showarrow: false,
+                font: { size: 16, color: 'red', weight: 'bold' },
+                bgcolor: 'rgba(255,255,255,0.8)',
+                bordercolor: 'red',
+                borderwidth: 1,
+                borderpad: 4
+            });
+        }
     });
 
     /* --------------------------------------------------
      * 5. Render
      * -------------------------------------------------- */
     const config = { responsive: true, scrollZoom: true, displaylogo: false };
-    
     await Plotly.newPlot(containerId, traces, layout, config);
 };
-
 
 // =======================================================
 // Helper: Organ-Specific Colors (Updated with new types)
@@ -6897,6 +6925,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
