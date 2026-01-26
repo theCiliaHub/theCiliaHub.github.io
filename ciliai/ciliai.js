@@ -3735,16 +3735,23 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     `, false);
 };
 
+// ==========================================================
+// FIXED: Multi-gene UMAP Grid for Image Panel Display
+// ==========================================================
+
 /**
- * Multi-gene UMAP Grid (FULLY FIXED)
- * - Correct expression decoding (all dataset formats)
- * - Dynamic grid
- * - Gene-specific colorbars
+ * Multi-gene UMAP Grid - FIXED VERSION
+ * Displays multiple genes side-by-side in the image panel container
+ * Features:
+ * - Correct expression decoding for all dataset formats
+ * - Dynamic grid layout
+ * - Gene-specific distinct colorbars
  * - Linked hover + linked zoom
+ * - Proper container handling for image panel
  */
 window.renderUMAPGrid = async function (...args) {
     /* --------------------------------------------------
-     * 1. Argument Normalization
+     * 1. Argument normalization
      * -------------------------------------------------- */
     let genes, datasetKey, containerId;
 
@@ -3754,136 +3761,190 @@ window.renderUMAPGrid = async function (...args) {
         containerId = args[0].containerId;
     } else if (Array.isArray(args[0])) {
         genes = args[0];
-        datasetKey = window.CiliAI.activeDataset;
-        containerId = 'umap-container';
+        datasetKey = args.length > 1 ? args[1] : window.CiliAI.activeDataset;
+        containerId = args.length > 2 ? args[2] : 'umap-container';
     } else {
+        console.error('[CiliAI] renderUMAPGrid: Invalid arguments');
         return;
     }
 
-    if (!Array.isArray(genes) || genes.length === 0) return;
+    if (!Array.isArray(genes) || genes.length === 0) {
+        console.error('[CiliAI] renderUMAPGrid: No genes provided');
+        return;
+    }
 
-    datasetKey ||= window.CiliAI.activeDataset;
-    containerId ||= 'umap-container';
+    datasetKey = datasetKey || window.CiliAI.activeDataset;
+    containerId = containerId || 'umap-container';
 
     /* --------------------------------------------------
-     * 2. Dataset Validation
+     * 2. Dataset validation
      * -------------------------------------------------- */
     const dataset = window.CiliAI.datasets?.[datasetKey];
-    if (!dataset || !Array.isArray(dataset.umap) || dataset.umap.length === 0) {
-        console.error('[CiliAI] Dataset incomplete or empty:', datasetKey);
-        // Clean exit to prevent crash
-        document.getElementById(containerId).innerHTML = '<div style="padding:20px; color:red">Error: Dataset UMAP coordinates not loaded.</div>';
+    if (!dataset || !Array.isArray(dataset.umap)) {
+        console.error('[CiliAI] Dataset incomplete:', datasetKey);
+        if (typeof window.addChatMessage === 'function') {
+            window.addChatMessage(`⚠️ Dataset "${datasetKey}" not loaded or incomplete.`, false);
+        }
         return;
     }
 
     const sourceData = dataset.umap;
     const nCells = sourceData.length;
+    
+    // Determine extraction mode: Cell-Centric vs Gene-Centric
     const expressionSource = dataset.expressionMatrix || dataset.expression || dataset.cellxgene;
-
-    // Legacy cell-centric check
+    
+    // If it's an object but keys are NOT the requested genes, assume cell-centric dictionary
     const isCellCentric = expressionSource && typeof expressionSource === 'object' && 
                           !Array.isArray(expressionSource) &&
                           (!expressionSource[genes[0].toUpperCase()] && !expressionSource[genes[1]?.toUpperCase()]);
 
     /* --------------------------------------------------
-     * 3. Layout Setup
+     * 3. Layout Initialization & Color Configuration
      * -------------------------------------------------- */
-    const colorScales = ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 'Teal', 'YlGnBu', 'Magma'];
+    // Palette of distinct single-hue scales for clear comparison
+    const colorScales = [
+        'Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 
+        [[0, '#f0f9ff'], [0.5, '#0ea5e9'], [1, '#0c4a6e']], // Teal
+        'YlGnBu', 'Magma'
+    ];
+    
     const traces = [];
+    const gridRows = Math.ceil(genes.length / 3); // Max 3 columns
+    const gridCols = Math.min(genes.length, 3);
+    
     const layout = {
-        grid: { rows: 1, columns: genes.length, pattern: 'independent' },
-        margin: { l: 40, r: 40, t: 50, b: 40 },
+        grid: { rows: gridRows, columns: gridCols, pattern: 'independent' },
+        margin: { l: 40, r: 150, t: 60, b: 40 }, // Extra right margin for colorbars
         showlegend: false,
-        title: undefined, 
+        title: {
+            text: `<b>${dataset.name}</b> - Gene Expression Comparison`,
+            font: { size: 14, color: '#2d3748' }
+        },
         uirevision: 'linked-umap-' + genes.join('-') + '-' + Date.now(),
-        annotations: []
+        annotations: [],
+        hovermode: 'closest'
     };
 
     /* --------------------------------------------------
-     * 4. Build Panels
+     * 4. Helper: Decode sparse expression data
      * -------------------------------------------------- */
-    // Pre-calculate coordinates ONCE to check validity
-    const xCoords = new Float32Array(nCells);
-    const yCoords = new Float32Array(nCells);
-    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    const decodeSparse = (sparse, total) => {
+        const dense = new Float32Array(total).fill(0);
+        if (!sparse) return dense;
+        if (Array.isArray(sparse)) {
+            // Format: [idx1, val1, idx2, val2, ...]
+            for (let k = 0; k < sparse.length; k += 2) {
+                const idx = sparse[k];
+                const val = sparse[k + 1];
+                if (idx < total) dense[idx] = val;
+            }
+        }
+        return dense;
+    };
 
-    for (let i = 0; i < nCells; i++) {
-        const p = sourceData[i];
-        // Robust extraction: Handle all known key variations
-        const px = p.x ?? p.umap_x ?? p.UMAP_1 ?? 0;
-        const py = p.y ?? p.umap_y ?? p.UMAP_2 ?? 0;
-        xCoords[i] = px;
-        yCoords[i] = py;
-        
-        if (px < xMin) xMin = px;
-        if (px > xMax) xMax = px;
-        if (py < yMin) yMin = py;
-        if (py > yMax) yMax = py;
-    }
-
-    // Safety: If range is 0 (all points identical/zero), prevent scaling error
-    if (xMin >= xMax || yMin >= yMax) {
-        console.warn("[CiliAI] UMAP coordinates have zero range. Adding padding.");
-        xMin -= 1; xMax += 1;
-        yMin -= 1; yMax += 1;
-    }
-
+    /* --------------------------------------------------
+     * 5. Build panels for each gene
+     * -------------------------------------------------- */
     genes.forEach((gene, i) => {
         const geneUpper = gene.toUpperCase();
+        const row = Math.floor(i / gridCols) + 1;
+        const col = (i % gridCols) + 1;
+        
+        // Calculate axis indices for grid layout
         const axisIndex = i + 1;
-        const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
-        const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
         const xaxisRef = axisIndex === 1 ? 'x' : `x${axisIndex}`;
         const yaxisRef = axisIndex === 1 ? 'y' : `y${axisIndex}`;
+        const xaxisName = axisIndex === 1 ? 'xaxis' : `xaxis${axisIndex}`;
+        const yaxisName = axisIndex === 1 ? 'yaxis' : `yaxis${axisIndex}`;
 
-        // --- Data Extraction ---
+        /* --- DATA EXTRACTION --- */
         const expr = new Float32Array(nCells).fill(0);
         let found = false;
-        let maxValue = 0;
-        const keysToTry = [geneUpper, gene, gene.charAt(0) + gene.slice(1).toLowerCase()];
+        let maxExpr = 0;
 
+        // Path A: Gene-Centric (New Format - Sparse/Dense)
         if (!isCellCentric && expressionSource) {
-            for (const key of keysToTry) {
-                const raw = expressionSource[key];
-                if (raw) {
-                    if (raw.cells && raw.expression) {
-                        for (let k = 0; k < raw.cells.length; k++) {
-                            const idx = raw.cells[k];
-                            if (idx < nCells) expr[idx] = raw.expression[k];
+            const raw = expressionSource[geneUpper];
+            if (raw) {
+                if (raw.cells && raw.expression) {
+                    // Sparse object format: { cells: [indices], expression: [values] }
+                    for (let k = 0; k < raw.cells.length; k++) {
+                        const idx = raw.cells[k];
+                        if (idx < nCells) {
+                            expr[idx] = raw.expression[k];
+                            if (raw.expression[k] > maxExpr) maxExpr = raw.expression[k];
+                        }
+                    }
+                    found = true;
+                } else if (Array.isArray(raw)) {
+                    // Check if it's sparse array format [idx, val, idx, val, ...]
+                    if (raw.length > 0 && raw.length % 2 === 0) {
+                        const decoded = decodeSparse(raw, nCells);
+                        for (let k = 0; k < nCells; k++) {
+                            expr[k] = decoded[k];
+                            if (decoded[k] > maxExpr) maxExpr = decoded[k];
                         }
                         found = true;
-                    } else if (Array.isArray(raw)) {
-                        for (let k = 0; k < Math.min(raw.length, nCells); k++) expr[k] = raw[k];
+                    } else {
+                        // Dense array format
+                        for (let k = 0; k < Math.min(raw.length, nCells); k++) {
+                            expr[k] = raw[k] || 0;
+                            if (raw[k] > maxExpr) maxExpr = raw[k];
+                        }
                         found = true;
                     }
-                    if (found) break;
                 }
             }
         }
 
+        // Path B: Cell-Centric (Legacy Dictionary: { cell_id: { GENE: val } })
         if (!found && expressionSource) {
             sourceData.forEach((point, idx) => {
                 const cellId = point.cell_id || point.id;
                 if (cellId && expressionSource[cellId]) {
-                    for (const key of keysToTry) {
-                        const val = expressionSource[cellId][key];
-                        if (val !== undefined && val !== null) {
-                            expr[idx] = val;
-                            found = true;
-                            break;
-                        }
+                    const val = expressionSource[cellId][geneUpper];
+                    if (val !== undefined && val !== null) {
+                        expr[idx] = val;
+                        if (val > maxExpr) maxExpr = val;
+                        found = true;
                     }
                 }
             });
         }
 
-        if (found) {
-            for (let k = 0; k < expr.length; k++) {
-                if (expr[k] > maxValue) maxValue = expr[k];
-            }
+        // Path C: Cell type average fallback
+        if (!found && dataset.expression && typeof dataset.expression === 'object') {
+            sourceData.forEach((point, idx) => {
+                const cellType = point.cell_type;
+                if (cellType && dataset.expression[cellType]) {
+                    const val = dataset.expression[cellType][geneUpper];
+                    if (val !== undefined && val !== null) {
+                        expr[idx] = val;
+                        if (val > maxExpr) maxExpr = val;
+                        found = true;
+                    }
+                }
+            });
         }
 
-        // --- Trace Creation ---
+        /* --- END DATA EXTRACTION --- */
+
+        if (!found) {
+            console.warn(`[CiliAI] No expression data for ${geneUpper} in ${datasetKey}`);
+        }
+
+        // Extract coordinates safely
+        const xCoords = sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1 ?? 0);
+        const yCoords = sourceData.map(p => p.y ?? p.umap_y ?? p.UMAP_2 ?? 0);
+        
+        // Build hover text with cell type
+        const hoverText = sourceData.map((p, idx) => {
+            const cellType = p.cell_type || 'Unknown';
+            return `<b>${cellType}</b><br>${geneUpper}: ${expr[idx].toFixed(2)} TPM`;
+        });
+
+        // Select distinct colorscale based on index
         const currentScale = colorScales[i % colorScales.length];
 
         traces.push({
@@ -3891,83 +3952,126 @@ window.renderUMAPGrid = async function (...args) {
             mode: 'markers',
             x: xCoords,
             y: yCoords,
+            text: hoverText,
+            hovertemplate: '%{text}<extra></extra>',
             marker: {
-                size: 4,
-                opacity: 0.85,
-                color: expr, 
-                colorscale: currentScale,
-                showscale: true,
+                size: 5,
+                opacity: 0.75,
+                color: Array.from(expr), // Convert typed array to JS array
                 cmin: 0,
-                cmax: maxValue > 0 ? maxValue : 1, 
+                cmax: maxExpr > 0 ? maxExpr : 1,
+                colorscale: currentScale, // DISTINCT COLOR per gene
+                showscale: true,
                 colorbar: {
-                    title: geneUpper,
-                    len: 0.85,
-                    thickness: 10,
-                    x: 1.02 + i * 0.12,
-                    xpad: 10
+                    title: {
+                        text: geneUpper,
+                        font: { size: 10, weight: 'bold' }
+                    },
+                    len: 0.7,
+                    thickness: 12,
+                    x: 1.02 + (i * 0.08), // Stagger colorbars to prevent overlap
+                    y: 0.5,
+                    xpad: 5,
+                    tickfont: { size: 9 }
                 }
             },
-            hovertemplate: `<b>${geneUpper}</b><br>Expr: %{marker.color:.2f}<extra></extra>`,
             xaxis: xaxisRef,
             yaxis: yaxisRef
         });
 
-        // Set explicit range to prevent "axis scaling" error if data is sparse/bad
+        // Configure axes for this panel (hidden, linked zoom)
         layout[xaxisName] = { 
             visible: false, 
-            matches: i > 0 ? 'x' : undefined,
-            range: [xMin, xMax] 
+            showgrid: false,
+            zeroline: false,
+            matches: i > 0 ? 'x' : undefined // Link all to first plot's zoom
         };
         layout[yaxisName] = { 
             visible: false, 
-            matches: i > 0 ? 'y' : undefined,
-            range: [yMin, yMax]
+            showgrid: false,
+            zeroline: false,
+            matches: i > 0 ? 'y' : undefined // Link all to first plot's zoom
         };
 
+        // Add gene name as title annotation above each panel
         layout.annotations.push({
-            text: geneUpper,
-            xref: 'paper', yref: 'paper',
-            x: (i + 0.5) / genes.length, 
-            y: 1.05,
+            text: `<b>${geneUpper}</b>`,
+            xref: 'paper', 
+            yref: 'paper',
+            x: (col - 0.5) / gridCols,
+            y: 1 - ((row - 1) / gridRows) + 0.02,
             showarrow: false,
-            font: { size: 14, weight: 'bold', color: '#2d3748' },
-            xanchor: 'center', yanchor: 'bottom'
+            font: { size: 12, weight: 'bold', color: '#2d3748' },
+            xanchor: 'center', 
+            yanchor: 'bottom'
         });
-
-        if (!found || maxValue === 0) {
-            layout.annotations.push({
-                text: "DATA NOT AVAILABLE",
-                xref: `x${axisIndex}`, yref: `y${axisIndex}`,
-                x: 0, y: 0,
-                showarrow: false,
-                font: { size: 16, color: 'red', weight: 'bold' },
-                bgcolor: 'rgba(255,255,255,0.8)',
-                bordercolor: 'red',
-                borderwidth: 1
-            });
-        }
     });
 
     /* --------------------------------------------------
-     * 5. Render
+     * 6. Render to specified container
      * -------------------------------------------------- */
-    const config = { responsive: true, scrollZoom: true, displaylogo: false };
-    
-    // Safety check for Plotly
-    if (!window.Plotly) {
-        console.error("Plotly not loaded");
+    const targetContainer = document.getElementById(containerId);
+    if (!targetContainer) {
+        console.error(`[CiliAI] Container "${containerId}" not found`);
         return;
     }
 
-    try {
-        await Plotly.newPlot(containerId, traces, layout, config);
-    } catch (e) {
-        console.error("Plotly render failed:", e);
-        // Fallback: Try purging and re-rendering simply
-        Plotly.purge(containerId);
-        document.getElementById(containerId).innerHTML = `<div style="color:red; padding:20px;">Plot Error: ${e.message}</div>`;
+    // Ensure container is visible
+    targetContainer.style.display = 'block';
+    
+    const config = { 
+        responsive: true, 
+        scrollZoom: true, 
+        displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    };
+    
+    await Plotly.newPlot(containerId, traces, layout, config);
+    
+    console.log(`[CiliAI] Rendered ${genes.length} genes in grid layout at #${containerId}`);
+    
+    // Add chat confirmation if available
+    if (typeof window.addChatMessage === 'function') {
+        window.addChatMessage(`
+            <div class="ai-result-card">
+                <p><strong>Multi-Gene Comparison</strong></p>
+                <p>Displaying <strong>${genes.join(', ')}</strong> across ${dataset.name}</p>
+                <p style="font-size:11px; color:#64748b; margin-top:8px;">
+                    📊 ${genes.length} panels • Linked zoom enabled • Distinct color scales
+                </p>
+            </div>
+        `, false);
     }
 };
+
+// ==========================================================
+// UTILITY: Reset and show image panel container
+// ==========================================================
+
+/**
+ * Helper function to prepare image panel for UMAP grid display
+ */
+window.prepareImagePanelForUMAP = function(containerId = 'umap-container') {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error(`[CiliAI] Container #${containerId} not found`);
+        return false;
+    }
+    
+    // Clear any existing content
+    container.innerHTML = '';
+    
+    // Ensure it's visible and sized properly
+    container.style.display = 'block';
+    container.style.width = '100%';
+    container.style.height = '100%';
+    container.style.minHeight = '500px';
+    
+    return true;
+};
+
+
+
 // =======================================================
 // Helper: Organ-Specific Colors (Updated with new types)
 // =======================================================
@@ -6960,6 +7064,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
