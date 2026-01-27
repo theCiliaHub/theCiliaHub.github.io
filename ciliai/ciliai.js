@@ -5903,6 +5903,7 @@ intentHandlers.sort((a, b) => b.priority - a.priority);
 
 // 4. New Dispatcher: handleAIQuery (Replaces old version)
 window.handleAIQuery = async function (query) {
+    originalHandleAIQuery(query);
     const chatWindow = document.getElementById('messages');
     if (!chatWindow || !query) return;
 
@@ -7087,6 +7088,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
