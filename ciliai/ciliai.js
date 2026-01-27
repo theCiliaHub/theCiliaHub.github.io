@@ -975,140 +975,33 @@ function addChatMessage(html, isUser = false) {
         document.body.removeChild(link);
     }
     
-  window.injectTableCSS = function() {
+ window.injectTableCSS = function() {
     const styleId = 'ciliai-table-styles';
     
-    // Force refresh: Remove existing style tag if it exists to ensure updates apply
+    // Force refresh: Remove existing style tag if it exists
     const existingStyle = document.getElementById(styleId);
     if (existingStyle) existingStyle.remove();
 
     const css = `
         /* --- Layout & Container --- */
-        .interactive-cilium.table-view-active { 
-            max-width: none !important; 
-            padding: 0 !important; 
-            border: none !important; 
-            box-shadow: none !important; 
-            height: 100%; 
-            background: white;
-        }
-
-        .ciliai-table-container { 
-            width: 100%; 
-            height: 100%; 
-            display: flex; 
-            flex-direction: column; 
-            padding: 0; 
-            background: #fff;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .ciliai-table-container h3 {
-            font-size: 16px;
-            color: #2b3a42; 
-            margin: 0 0 10px 0;
-            font-weight: 700;
-        }
+        .interactive-cilium.table-view-active { max-width: none !important; padding: 0 !important; border: none !important; box-shadow: none !important; height: 100%; background: white; }
+        .ciliai-table-container { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 0; background: #fff; font-family: 'Inter', sans-serif; }
+        .ciliai-table-container h3 { font-size: 16px; color: #2b3a42; margin: 0 0 10px 0; font-weight: 700; padding: 10px 10px 0 10px; }
 
         /* --- Buttons --- */
-        .ciliai-button { 
-            padding: 6px 12px;
-            background: #6c8aa3;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s;
-            font-size: 12px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            height: 32px;
-        }
-        .ciliai-button:hover { 
-            background: #547a90; 
-        }
+        .ciliai-button { padding: 6px 12px; background: #6c8aa3; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; height: 32px; margin-right: 5px; }
+        .ciliai-button:hover { background: #547a90; }
 
         /* --- Scroll Area --- */
-        .ciliai-table-scroll-wrapper { 
-            flex: 1; 
-            overflow-y: auto; 
-            border-top: 1px solid #e2e8f0; 
-            border-bottom: 1px solid #e2e8f0; 
-            background: #fff;
-        }
-
-        /* --- Custom Scrollbar --- */
-        .ciliai-table-scroll-wrapper::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .ciliai-table-scroll-wrapper::-webkit-scrollbar-track {
-            background: #f1f5f9; 
-        }
-        .ciliai-table-scroll-wrapper::-webkit-scrollbar-thumb {
-            background: #cbd5e0; 
-            border-radius: 4px;
-        }
-        .ciliai-table-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8; 
-        }
-
-        /* --- Table Styling --- */
-        .ciliai-data-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            font-size: 12px; 
-            color: #334155;
-        }
-
-        .ciliai-data-table th, 
-        .ciliai-data-table td { 
-            padding: 10px 12px; 
-            text-align: left; 
-            border-bottom: 1px solid #f1f5f9; 
-        }
-
-        /* Sticky Header */
-        .ciliai-data-table th { 
-            background: #f8fafc; 
-            color: #475569;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.05em;
-            position: sticky; 
-            top: 0; 
-            z-index: 10; /* Ensure it stays on top */
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
+        .ciliai-table-scroll-wrapper { flex: 1; overflow-y: auto; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; background: #fff; }
         
-        .ciliai-data-table th:hover {
-            background: #e2e8f0;
-        }
-
-        /* Row Interactions */
-        .ciliai-data-table tbody tr {
-            transition: background-color 0.1s;
-        }
-        .ciliai-data-table tbody tr:hover { 
-            background-color: #f0f9ff; 
-        }
-
-        .ciliai-data-table tr:last-child td { 
-            border-bottom: none; 
-        }
-
-        /* Typography Highlights */
-        .ciliai-data-table td strong { 
-            color: #2b6cb0; 
-            font-weight: 600; 
-            cursor: pointer;
-        }
-        .ciliai-data-table td strong:hover {
-            text-decoration: underline;
-        }
+        /* --- Table Styling --- */
+        .ciliai-data-table { width: 100%; border-collapse: collapse; font-size: 12px; color: #334155; }
+        .ciliai-data-table th, .ciliai-data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+        .ciliai-data-table th { background: #b3cde0; color: #1f2a33; font-weight: 600; text-transform: uppercase; font-size: 11px; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .ciliai-data-table tbody tr:hover { background-color: #e3f0fa; }
+        .ciliai-data-table td strong { color: #6c8aa3; font-weight: 600; cursor: pointer; }
+        .ciliai-data-table td strong:hover { text-decoration: underline; color: #2b6cb0; }
     `;
     const styleEl = document.createElement('style');
     styleEl.id = styleId;
@@ -1695,91 +1588,136 @@ window.renderGoldStandardView = function() {
 };
 
 /**
- * Filters genes based on advanced tissue expression logic.
- * Supports: "only in [Tissue]", "not in [Tissue]", "not all tissues".
+ * Advanced Tissue Query Handler
+ * Handles: "only expressed in...", "enriched in...", "not all ciliated cells"
  */
 window.handleTissueExpressionQuery = function(query) {
     const qLower = query.toLowerCase();
-    
-    // 1. Identify Target Tissue
+
+    // 1. Map user terms (including cell types) to Database Tissue Keys
     const tissueMap = {
         'hypothalamus': 'Hypothalamus',
-        'kidney': 'Kidney',
         'liver': 'Liver',
-        'lung': 'Lung_Primary', // Primary cilia context
+        'kidney': 'Kidney',
+        'proximal tubule': 'Kidney',    // Map cell type -> Tissue
+        'renal': 'Kidney',
+        'lung': 'Lung_Primary',         // Default Lung -> Primary
+        'primary cilia': 'Lung_Primary',
+        'motile cilia': 'Lung_Motile',
+        'respiratory': 'Lung_Motile',
         'olfactory': 'Olfactory',
+        'nose': 'Olfactory',
         'pancreas': 'Pancreas',
         'skeleton': 'Skeleton',
-        'bone': 'Skeleton'
+        'bone': 'Skeleton',
+        'chondrocyte': 'Skeleton'
     };
-    
-    let targetTissue = null;
-    for (const [key, val] of Object.entries(tissueMap)) {
+
+    let targetKey = null;
+    let displayTerm = null;
+
+    // Find longest matching keyword to prioritize specific terms (e.g. "Proximal Tubule")
+    const sortedKeys = Object.keys(tissueMap).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
         if (qLower.includes(key)) {
-            targetTissue = val;
+            targetKey = tissueMap[key];
+            // Format display name nicely
+            displayTerm = key.charAt(0).toUpperCase() + key.slice(1);
             break;
         }
     }
 
-    // 2. Identify Logic Mode
-    let mode = 'all'; 
-    if (qLower.includes('only expressed in') || qLower.includes('specific to') || qLower.includes('exclusively')) {
+    // 2. Determine Logic Mode
+    let mode = 'enriched'; // Default behavior
+    if (qLower.includes('only') || qLower.includes('exclusively') || qLower.includes('specific to')) {
         mode = 'exclusive';
-    } else if (qLower.includes('not all ciliated cells') || qLower.includes('variable expression')) {
+    } else if (qLower.includes('not all') || qLower.includes('variable')) {
         mode = 'variable';
-    } else if (qLower.includes('not expressed in')) {
+    } else if (qLower.includes('not expressed in') || qLower.includes('absent') || qLower.includes('excluded')) {
         mode = 'excluded';
     }
 
-    // 3. Scan Database
+    // 3. Filter Database
     const results = [];
     const geneMap = window.CiliAI.lookups.geneMap;
-    
+
     Object.values(geneMap).forEach(gene => {
         if (!gene.expression || !gene.expression.tissue) return;
-        const tissues = gene.expression.tissue;
-        const tissueKeys = Object.keys(tissues).filter(k => k !== 'n_tissues_expressed' && k !== 'Category' && typeof tissues[k] === 'number');
+        const t = gene.expression.tissue;
         
-        // LOGIC: Exclusive to Tissue
-        if (mode === 'exclusive' && targetTissue) {
-            const targetVal = tissues[targetTissue] || 0;
-            if (targetVal > 1) {
-                const isExclusive = tissueKeys.every(k => (k === targetTissue) || tissues[k] < 1);
-                if (isExclusive) results.push({ gene: gene.Gene, val: targetVal });
+        // Calculate stats for comparison
+        const otherValues = Object.keys(t)
+            .filter(k => k !== targetKey && typeof t[k] === 'number')
+            .map(k => t[k]);
+        const maxOthers = Math.max(...otherValues, 0);
+        const targetVal = t[targetKey] || 0;
+
+        // --- Logic: Exclusive (Only in X) ---
+        if (mode === 'exclusive' && targetKey) {
+            // Must be present in Target (>1 TPM) and absent/low in others (<1 TPM)
+            if (targetVal > 1 && maxOthers < 1) {
+                results.push({ 
+                    gene: gene.Gene, 
+                    val: targetVal, 
+                    desc: `${targetVal.toFixed(1)} TPM (Others < 1)` 
+                });
             }
-        }
-        // LOGIC: Not in All (Variable)
+        } 
+        // --- Logic: Enriched (High in X) ---
+        else if (mode === 'enriched' && targetKey) {
+            // Target is high (>5) and significantly higher than others (1.5x)
+            if (targetVal > 5 && targetVal > maxOthers * 1.5) {
+                 results.push({ 
+                     gene: gene.Gene, 
+                     val: targetVal, 
+                     desc: `Highest in ${displayTerm} (${targetVal.toFixed(1)} TPM)` 
+                 });
+            }
+        } 
+        // --- Logic: Variable (Not in all) ---
         else if (mode === 'variable') {
-            const nExpressed = gene.expression.n_tissues || 0;
-            if (nExpressed > 0 && nExpressed < tissueKeys.length) {
-                results.push({ gene: gene.Gene, description: `Expressed in ${nExpressed}/${tissueKeys.length} tissues` });
+            const n = gene.expression.n_tissues || 0;
+            // Present in some (>0) but not all (<8)
+            if (n > 0 && n < 8) {
+                 results.push({ 
+                     gene: gene.Gene, 
+                     val: n, 
+                     desc: `Expressed in ${n}/8 ciliated tissues` 
+                 });
             }
-        }
-        // LOGIC: Excluded
-        else if (mode === 'excluded' && targetTissue) {
-            const val = tissues[targetTissue] || 0;
-            const nExpressed = gene.expression.n_tissues || 0;
-            if (val < 0.5 && nExpressed >= 1) {
-                results.push({ gene: gene.Gene, description: `Absent in ${targetTissue}` });
-            }
+        } 
+        // --- Logic: Excluded (Absent in X) ---
+        else if (mode === 'excluded' && targetKey) {
+             // Low in target (<0.5) but is a ciliary gene (present in >4 others)
+             if (targetVal < 0.5 && gene.expression.n_tissues > 4) {
+                 results.push({ 
+                     gene: gene.Gene, 
+                     val: 0, 
+                     desc: `Absent in ${displayTerm}` 
+                 });
+             }
         }
     });
+    
+    // Sort by expression value (descending) or count
+    results.sort((a, b) => b.val - a.val);
 
     if (results.length === 0) {
-        return `<div class="ai-result-card"><p>No genes found matching criteria: <strong>${mode} ${targetTissue || ''}</strong>.</p></div>`;
+        return `<div class="ai-result-card"><p>No genes found matching criteria: <strong>${mode} ${displayTerm || ''}</strong>.</p></div>`;
     }
 
-    results.sort((a, b) => (b.val || 0) - (a.val || 0));
+    const title = mode === 'variable' ? 'Variable Expression Ciliary Genes' : 
+                  `${mode.charAt(0).toUpperCase() + mode.slice(1)} to ${displayTerm}`;
+    
+    // Prepare table context
+    window.lastQueryContext = {
+        type: 'list_followup',
+        data: results.map(r => ({ gene: r.gene, description: r.desc })), // Standardize for table
+        term: title
+    };
 
-    const title = mode === 'exclusive' ? `Genes Exclusive to ${targetTissue}` :
-                  mode === 'variable' ? `Genes Not in All Ciliated Tissues` :
-                  `Genes Absent in ${targetTissue}`;
-
-    window.lastQueryContext = { type: 'list_followup', data: results, term: title };
-
-    return window.formatListResult(title, results, `Found ${results.length} genes matching criteria.`);
+    return window.formatListResult(title, results.map(r => ({ gene: r.gene, description: r.desc })), `Found ${results.length} genes based on expression in ciliated cells.`);
 };
-
 
  /**
  * Calculates the Jaccard index between two gene sets.
@@ -4430,6 +4368,14 @@ const intentHandlers = [
             return window.renderGoldStandardView();
         }
     },
+{
+        priority: 155, // High priority
+        matcher: (qLower) => qLower.includes('gold standard') || qLower.includes('all ciliary genes'),
+        handler: async () => {
+            return window.renderGoldStandardView();
+        }
+    },
+    
     // --- ADD THESE TO YOUR intentHandlers ARRAY ---
 
     // 1. "Display all ciliary genes" / "Gold standard"
@@ -7216,6 +7162,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
