@@ -5905,10 +5905,9 @@ intentHandlers.sort((a, b) => b.priority - a.priority);
 window.handleAIQuery = async function (query) {
     // Early guards
     if (!query || typeof query !== 'string') return;
-
     const chatWindow = document.getElementById('messages');
     if (!chatWindow) return;
-
+    
     // Ensure utils
     if (!window.CiliAI?.utils) {
         console.warn("Re-initializing CiliAI.utils");
@@ -5919,18 +5918,20 @@ window.handleAIQuery = async function (query) {
             ensureArray: (v) => Array.isArray(v) ? v : (v ? [v] : [])
         };
     }
-
+    
     const qLower = window.CiliAI.utils.normalizeQuery(query);
+    
+    // Fixed: Use proper function call syntax with parentheses
     if (window.log) window.log(`Routing query: ${query}`);
-
+    
     try {
         if (!window.CiliAI || !window.CiliAI.ready) {
             window.addChatMessage("Data is still loading, please wait...", false);
             return;
         }
-
+        
         let htmlResult = null;
-
+        
         for (const intent of intentHandlers) {
             if (intent.matcher(qLower)) {
                 htmlResult = await intent.handler(query);
@@ -5940,18 +5941,19 @@ window.handleAIQuery = async function (query) {
                 }
             }
         }
-
+        
         // Fallback if nothing matched
         window.addChatMessage(
             `I didn't understand: "<strong>${query}</strong>".<br>Try: "What is IFT20?", "Compare WDR31 vs IFT20", or "help"`,
             false
         );
-
     } catch (e) {
         console.error("handleAIQuery failed:", e);
+        // Fixed: Use proper function call syntax with parentheses
         window.addChatMessage(`Error: ${e.message}`, false);
     }
 };
+
 
 window.fetchVariantData = async function(geneSymbol) {
     try {
@@ -7095,6 +7097,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
