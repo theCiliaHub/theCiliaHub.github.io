@@ -5901,15 +5901,23 @@ const intentHandlers = [
 // 3. Sort Handlers by Priority (Descending)
 intentHandlers.sort((a, b) => b.priority - a.priority);
 
-// 4. New Dispatcher: handleAIQuery (Replaces old version)
+// 4. Dispatcher: handleAIQuery (Safe, standalone version)
 window.handleAIQuery = async function (query) {
-    originalHandleAIQuery(query);
-    const chatWindow = document.getElementById('messages');
-    if (!chatWindow || !query) return;
+    // ── Early exit if no query or chat window missing ───────────────────────
+    if (!query || typeof query !== 'string') {
+        console.warn("handleAIQuery: empty or invalid query");
+        return;
+    }
 
-    // Fail-safe: Ensure utils exist (fixes "Cannot read properties of undefined")
-    if (!window.CiliAI.utils) {
-        console.warn("CiliAI.utils was missing. Re-initializing.");
+    const chatWindow = document.getElementById('messages');
+    if (!chatWindow) {
+        console.warn("Chat window (#messages) not found");
+        return;
+    }
+
+    // ── Fail-safe: Ensure CiliAI.utils exists ───────────────────────────────
+    if (!window.CiliAI?.utils) {
+        console.warn("CiliAI.utils missing — re-initializing.");
         window.CiliAI.utils = {
             normalizeQuery: (q) => (q || '').toLowerCase().trim(),
             extractGenes: (q) => window.extractMultipleGenes ? window.extractMultipleGenes(q) : [],
@@ -5918,12 +5926,14 @@ window.handleAIQuery = async function (query) {
         };
     }
 
-    // Defensive normalization
+    // ── Normalize query once ────────────────────────────────────────────────
     const qLower = window.CiliAI.utils.normalizeQuery(query);
 
-    if (window.log) window.log(`Routing query: ${query}`);
+    // Optional logging (uncomment if needed)
+    // if (window.log) window.log(`Routing query: ${query}`);
 
     try {
+        // Readiness check
         if (!window.CiliAI || !window.CiliAI.ready) {
             window.addChatMessage("Data is still loading, please wait...", false);
             return;
@@ -5931,20 +5941,34 @@ window.handleAIQuery = async function (query) {
 
         let htmlResult = null;
 
+        // Try all intent handlers in priority order
         for (const intent of intentHandlers) {
             if (intent.matcher(qLower)) {
                 htmlResult = await intent.handler(query);
                 if (htmlResult) {
                     window.addChatMessage(htmlResult, false);
-                    return;
+                    return; // Exit after successful handling
                 }
             }
         }
+
+        // Fallback when no intent matched
+        window.addChatMessage(
+            `Sorry, I didn't understand: "<strong>${query}</strong>".<br>` +
+            `Try asking about a gene (e.g. "What is IFT88?"), localization, expression, or "help".`,
+            false
+        );
+
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
-        window.addChatMessage(`An internal error occurred: ${e.message}`, false);
+        window.addChatMessage(
+            `An internal error occurred while processing your query.<br>` +
+            `<small style="color:#666;">${e.message}</small>`,
+            false
+        );
     }
 };
+
 
 window.fetchVariantData = async function(geneSymbol) {
     try {
@@ -7088,6 +7112,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
