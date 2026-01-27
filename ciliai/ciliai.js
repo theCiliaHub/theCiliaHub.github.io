@@ -3736,18 +3736,21 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
 };
 
 /**
- * Renders a grid of UMAP plots — one panel per gene.
- * Each subplot uses its own color scale so low-expression genes remain visible.
- * Features: synchronized zoom/pan, dynamic sizing, clear "not found" handling.
+ * Renders a grid of UMAP plots — one panel per gene — with forced visibility
+ * for low-expression genes so that differences are always clearly visible.
  *
- * @param {string[]} genes - Array of gene symbols (uppercase)
- * @param {string} [datasetKey] - Optional dataset key (defaults to active)
- * @param {string} [containerId='plotly-container'] - Target DOM element
+ * Features:
+ * - Independent color scale per gene
+ * - Dynamic contrast boost for genes with max TPM < 4
+ * - Clear labeling of real vs stretched scale
+ * - Helpful user feedback when expression is low/missing
+ * - Responsive layout that fits container
+ * - Synchronized zoom/pan across panels
  */
 window.renderUMAPGrid = async function(genes, datasetKey = null, containerId = 'plotly-container') {
-    // ── 1. Normalize & validate inputs ──────────────────────────────────────
+    // ── 1. Input validation & normalization ─────────────────────────────────
     if (!Array.isArray(genes) || genes.length === 0) {
-        window.addChatMessage("No genes provided for grid plot.", false);
+        window.addChatMessage("No genes provided for comparison.", false);
         return;
     }
 
@@ -3767,69 +3770,75 @@ window.renderUMAPGrid = async function(genes, datasetKey = null, containerId = '
         return;
     }
 
-    // Show container & hide others
+    // Show plot container, hide others
     container.style.display = 'block';
-    if (document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
-    if (document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
+    document.getElementById('cilia-svg')?.style.display = 'none';
+    document.getElementById('domain-viewer')?.style.display = 'none';
 
-    // ── 2. Get UMAP coordinates once ────────────────────────────────────────
+    // ── 2. UMAP coordinates (shared across all panels) ──────────────────────
     const sourceData = dataset.umap;
     const nCells = sourceData.length;
 
     const x = sourceData.map(p => p.x ?? p.umap_x ?? p.UMAP_1 ?? 0);
     const y = sourceData.map(p => p.y ?? p.umap_y ?? p.UMAP_2 ?? 0);
 
-    // ── 3. Extract expression for each gene (robust across formats) ──────────
-    const geneData = [];
-    const foundStatus = [];
-
-    for (const gene of genes) {
+    // ── 3. Extract expression + compute stats per gene ──────────────────────
+    const genePanels = genes.map(gene => {
         const result = extractExpressionForGene(gene, dataset, sourceData);
-        geneData.push(result.exprArray);
-        foundStatus.push(result);
 
-        if (!result.anyNonZero) {
-            console.warn(`Zero or near-zero expression detected for ${gene} in ${datasetKey}`);
+        // ── FORCED VISIBILITY: Stretch low-expression genes ─────────────────
+        let displayMax = result.maxExpr;
+
+        // Rule 1: Minimum visible range — never let max be too small
+        if (displayMax < 4.0) {
+            displayMax = 4.0;                    // makes ~2.58 look like 4
         }
-    }
 
-    // ── 4. Decide layout: rows × cols ───────────────────────────────────────
+        // Rule 2: Extra aggressive stretch for extremely low genes
+        if (displayMax < 1.5) {
+            displayMax = Math.max(3.0, result.maxExpr * 3);
+        }
+
+        return {
+            gene,
+            exprArray: result.exprArray,
+            realMax: result.maxExpr,
+            displayMax,
+            anyNonZero: result.anyNonZero,
+            found: result.found
+        };
+    });
+
+    // ── 4. Grid layout calculation (responsive) ─────────────────────────────
     const nGenes = genes.length;
-    let cols = Math.min(nGenes, 3);           // max 3 columns
-    let rows = Math.ceil(nGenes / cols);
+    const maxCols = 3;
+    const cols = Math.min(nGenes, maxCols);
+    const rows = Math.ceil(nGenes / cols);
 
-    // Responsive sizing
     const vizCard = document.querySelector('.viz-card') || container;
     const availWidth  = vizCard.clientWidth  - 60 || 900;
-    const availHeight = vizCard.clientHeight - 100 || 700;
-    const subplotWidth  = availWidth  / cols;
-    const subplotHeight = availHeight / rows;
+    const availHeight = vizCard.clientHeight - 120 || 700;
 
-    // ── 5. Build Plotly traces & layout ─────────────────────────────────────
-    const traces = [];
     const layout = {
         grid: { rows, columns: cols, pattern: 'independent' },
         showlegend: false,
         hovermode: 'closest',
-        uirevision: 'grid-' + genes.join('-'),
+        uirevision: 'visible-grid-' + genes.join('-'),
         title: {
-            text: `Expression Comparison – ${dataset.name}<br><sub>${genes.join(' vs ')}</sub>`,
-            font: { size: 16 }
+            text: `Expression Comparison: ${genes.join(' vs ')}<br><sub>${dataset.name}</sub>`,
+            font: { size: 15 }
         },
-        margin: { l: 40, r: 40, t: 70, b: 40 },
+        margin: { l: 40, r: 100, t: 80, b: 50 },
         width: availWidth,
         height: availHeight,
         annotations: []
     };
 
-    const colorScales = [
-        'Reds', 'Blues', 'Greens', 'Purples', 'Oranges',
-        [[0,'#f0f9ff'], [0.3,'#90cdf4'], [1,'#3182ce']], // Teal-ish
-        'YlOrRd', 'Magma'
-    ];
+    const colorScales = ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 'YlOrRd', 'Magma'];
 
-    genes.forEach((gene, idx) => {
-        const { exprArray, maxExpr, anyNonZero, found } = foundStatus[idx];
+    const traces = [];
+    genePanels.forEach((panel, idx) => {
+        const { gene, exprArray, realMax, displayMax, anyNonZero, found } = panel;
 
         const row = Math.floor(idx / cols) + 1;
         const col = (idx % cols) + 1;
@@ -3840,26 +3849,25 @@ window.renderUMAPGrid = async function(genes, datasetKey = null, containerId = '
         traces.push({
             type: 'scattergl',
             mode: 'markers',
-            x: x,
-            y: y,
-            text: sourceData.map((p, i) => {
-                return `<b>${p.cell_type || '—'}</b><br>${gene}: ${exprArray[i].toFixed(2)} TPM`;
-            }),
+            x, y,
+            text: sourceData.map((p, i) => 
+                `<b>${p.cell_type || '—'}</b><br>${gene}: ${exprArray[i].toFixed(2)} TPM`
+            ),
             hovertemplate: '%{text}<extra></extra>',
             marker: {
-                size: anyNonZero ? 5 : 4,
-                opacity: anyNonZero ? 0.8 : 0.4,
+                size: anyNonZero ? 6 : 4.5,
+                opacity: anyNonZero ? 0.9 : 0.6,
                 color: exprArray,
                 cmin: 0,
-                cmax: Math.max(0.1, maxExpr * 1.15), // avoid invisible scale
+                cmax: displayMax,               // ← stretched for visibility
                 colorscale: colorScales[idx % colorScales.length],
                 showscale: true,
                 colorbar: {
-                    title: gene + (found ? '' : ' (not found)'),
+                    title: `${gene}\n(real max ${realMax.toFixed(2)})`,
                     titleside: 'right',
-                    thickness: 12,
+                    thickness: 14,
                     len: 0.6,
-                    x: 1.02 + (idx * 0.08),
+                    x: 1.02 + (idx * 0.09),
                     y: 0.5,
                     tickfont: { size: 10 }
                 }
@@ -3869,35 +3877,30 @@ window.renderUMAPGrid = async function(genes, datasetKey = null, containerId = '
             name: gene
         });
 
-        // Gene label above each subplot
+        // Panel title (with warning if very low or missing)
+        let titleColor = found && anyNonZero ? '#1e40af' : '#dc2626';
+        let titleText = `<b>${gene}</b>`;
+        if (!found) titleText += ' ⚠️ not found';
+        else if (!anyNonZero) titleText += ' (zero expression)';
+        else if (realMax < 3) titleText += ' (low)';
+
         layout.annotations.push({
-            text: `<b>${gene}</b>${found ? '' : ' ⚠️'}`,
-            xref: 'paper',
-            yref: 'paper',
+            text: titleText,
+            xref: 'paper', yref: 'paper',
             x: (col - 0.5) / cols,
-            y: 1 - ((row - 1) / rows) - 0.015,
+            y: 1 - ((row - 1) / rows) - 0.01,
             showarrow: false,
-            font: { size: 14, color: found ? '#1e40af' : '#dc2626' },
+            font: { size: 14, color: titleColor },
             xanchor: 'center',
             yanchor: 'top'
         });
 
-        // Axis config (hidden, shared zoom)
-        layout[`xaxis${idx === 0 ? '' : idx+1}`] = {
-            visible: false,
-            showgrid: false,
-            zeroline: false,
-            domain: undefined
-        };
-        layout[`yaxis${idx === 0 ? '' : idx+1}`] = {
-            visible: false,
-            showgrid: false,
-            zeroline: false,
-            domain: undefined
-        };
+        // Hidden axes
+        layout[`xaxis${idx === 0 ? '' : idx+1}`] = { visible: false, showgrid: false, domain: undefined };
+        layout[`yaxis${idx === 0 ? '' : idx+1}`] = { visible: false, showgrid: false, domain: undefined };
     });
 
-    // ── 6. Render ────────────────────────────────────────────────────────────
+    // ── 5. Render the plot ──────────────────────────────────────────────────
     try {
         await Plotly.newPlot(containerId, traces, layout, {
             responsive: true,
@@ -3906,30 +3909,35 @@ window.renderUMAPGrid = async function(genes, datasetKey = null, containerId = '
             modeBarButtonsToRemove: ['lasso2d', 'select2d']
         });
 
-        // Feedback
-        const missing = foundStatus.filter(s => !s.found).map((_,i) => genes[i]);
-        const silent = foundStatus.filter(s => s.found && !s.anyNonZero).map((_,i) => genes[i]);
+        // ── 6. User feedback message ────────────────────────────────────────
+        const lowGenes  = genePanels.filter(p => p.found && p.realMax < 4 && p.anyNonZero).map(p => p.gene);
+        const missing   = genePanels.filter(p => !p.found).map(p => p.gene);
+        const silent    = genePanels.filter(p => p.found && !p.anyNonZero).map(p => p.gene);
 
-        let msg = `<div class="ai-result-card">
-            <p><strong>Expression grid for ${genes.join(', ')}</strong> (${dataset.name})</p>
-            <p>Each gene has its own panel and color scale.</p>`;
+        let feedback = `<div class="ai-result-card">
+            <p><strong>Expression comparison: ${genes.join(' vs ')}</strong> (${dataset.name})</p>
+            <p>Each gene has its own panel and optimized color scale so differences are visible.</p>`;
 
+        if (lowGenes.length > 0) {
+            feedback += `<p style="color:#d97706;">Low but visible: ${lowGenes.join(', ')} (max < 4 TPM, scale boosted)</p>`;
+        }
         if (missing.length > 0) {
-            msg += `<p style="color:#dc2626;">⚠️ Not found in dataset: ${missing.join(', ')}</p>`;
+            feedback += `<p style="color:#dc2626;">Not found in dataset: ${missing.join(', ')}</p>`;
         }
         if (silent.length > 0) {
-            msg += `<p style="color:#d97706;">⚠️ Zero detectable expression: ${silent.join(', ')}</p>`;
+            feedback += `<p style="color:#dc2626;">Zero expression: ${silent.join(', ')}</p>`;
         }
 
-        msg += `</div>`;
+        feedback += `</div>`;
 
-        window.addChatMessage(msg, false);
+        window.addChatMessage(feedback, false);
 
     } catch (err) {
-        console.error("Plotly grid render failed:", err);
-        window.addChatMessage(`Error rendering grid: ${err.message}`, false);
+        console.error("Grid render failed:", err);
+        window.addChatMessage(`Error rendering comparison grid: ${err.message}`, false);
     }
 };
+
 
 /**
  * Robust expression extractor — supports multiple common formats
@@ -7079,6 +7087,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
