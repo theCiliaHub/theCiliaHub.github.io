@@ -1552,32 +1552,34 @@ window.median = function (arr) {
 
 
 /**
- * Renders the Gold Standard Database View
- * Replicates the specific table layout requested for the "Complete Ciliary Gene List"
+ * Renders the "Gold Standard" Database View
+ * Matches the requested format: Gene, Description, Localization, Ciliopathy, Mouse Ortholog, Actions.
+ * Includes Download capability.
  */
 window.renderGoldStandardView = function() {
     // 1. Get Data (Sort alphabetically by Gene)
-    // We use the masterData loaded in CiliAI
-    const allGenes = window.CiliAI.masterData.sort((a, b) => a.Gene.localeCompare(b.Gene));
-    const totalCount = allGenes.length;
+    // Ensure we have data
+    const allGenes = window.CiliAI.masterData || [];
+    if (allGenes.length === 0) {
+        return `<div class="ai-result-card"><p>Database is empty or loading...</p></div>`;
+    }
+    
+    const sortedGenes = [...allGenes].sort((a, b) => a.Gene.localeCompare(b.Gene));
+    const totalCount = sortedGenes.length;
 
-    // 2. Define Columns
+    // 2. Define Columns (Exact headers requested)
     const columns = [
         { label: 'Gene ↕', key: 'Gene', width: '80px', isBold: true },
-        { label: 'Description ↕', key: 'Gene.Description', width: '200px' },
+        { label: 'Description ↕', key: 'Gene.Description', width: '220px' },
         { label: 'Localization ↕', key: 'Localization', width: '150px' },
         { label: 'Ciliopathy ↕', key: 'Ciliopathies', width: '150px' },
         { label: 'Mouse Ortholog ↕', key: 'Ortholog_Mouse', width: '120px' },
         { label: 'Actions', key: 'actions', width: '80px' }
     ];
 
-    // 3. Generate Rows (Limit to first 100 for performance, with "Load More" capability logic implies)
-    // For this specific view, we map the exact data points requested.
-    
+    // 3. Generate Rows (Lazy render limit to 100 for DOM performance, full download available)
     let tableRows = '';
-    
-    // We render a slice to keep the DOM light, but the count reflects the full DB
-    const displayGenes = allGenes.slice(0, 100); 
+    const displayGenes = sortedGenes.slice(0, 100); 
 
     displayGenes.forEach(g => {
         // Data Safe Handling
@@ -1586,13 +1588,13 @@ window.renderGoldStandardView = function() {
         
         // Handle Ciliopathy (Array or String)
         let disease = '-';
-        if (Array.isArray(g.Ciliopathies)) disease = g.Ciliopathies.join('; ');
+        if (Array.isArray(g.Ciliopathies)) disease = g.Ciliopathies.join(', ');
         else if (g.Ciliopathy) disease = g.Ciliopathy;
         
         const mouse = g.Ortholog_Mouse || '-';
 
         tableRows += `
-            <tr style="border-bottom: 1px solid #f1f5f9;">
+            <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
                 <td style="padding: 10px; color: #005b96; font-weight: 700;">${g.Gene}</td>
                 <td style="padding: 10px; font-size: 12px; color: #475569; line-height: 1.3;">${desc}</td>
                 <td style="padding: 10px; font-size: 12px; color: #334155;">${loc}</td>
@@ -1611,34 +1613,147 @@ window.renderGoldStandardView = function() {
     // 4. Construct Final HTML
     return `
         <div class="ai-result-card" style="padding: 0; overflow: hidden; font-family: 'Inter', sans-serif; border: 1px solid #e2e8f0;">
-            <div style="padding: 15px 20px; background: #fff; border-bottom: 1px solid #e2e8f0;">
-                <h3 style="margin: 0; color: #005b96; font-size: 16px; font-weight: 700;">Ciliary Gene Database</h3>
-                <p style="margin: 5px 0 0; font-size: 12px; color: #64748b;">
-                    Comprehensive catalog of <strong>${totalCount.toLocaleString()}</strong> genes, localization, and disease associations.
-                </p>
+            <div style="padding: 15px 20px; background: #fff; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h3 style="margin: 0; color: #005b96; font-size: 16px; font-weight: 700;">Ciliary Gene Database</h3>
+                    <p style="margin: 5px 0 0; font-size: 12px; color: #64748b;">
+                        Comprehensive catalog of <strong>${totalCount.toLocaleString()}</strong> genes, localization, and disease associations.
+                    </p>
+                </div>
+                <button class="ciliai-button" onclick="window.downloadTableAsCSV('Ciliary_Gene_Database', window.CiliAI.masterData)" style="background:#2b6cb0; color:white; font-size:12px; padding:6px 12px; height:auto; margin:0;">
+                    ⬇ Download CSV
+                </button>
             </div>
             
-            <div style="max-height: 400px; overflow-y: auto;">
+            <div style="max-height: 500px; overflow-y: auto;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                    <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                         <tr>
-                            ${columns.map(col => `
-                                <th style="padding: 10px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; width: ${col.width};">
+                            ${columns.map((col, idx) => `
+                                <th onclick="window.sortTable('ciliai-db-table', ${idx})" style="padding: 10px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; width: ${col.width}; cursor:pointer; user-select:none;">
                                     ${col.label}
                                 </th>
                             `).join('')}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="ciliai-db-table">
                         ${tableRows}
                     </tbody>
                 </table>
             </div>
             <div style="padding: 10px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8;">
-                Showing first 100 genes. Use search to find specific targets.
+                Showing first 100 of ${totalCount.toLocaleString()} genes. Use "Search" to filter specific genes.
             </div>
         </div>
     `;
+};
+
+
+/**
+ * Filters genes based on advanced tissue expression logic.
+ * Supports: "only in [Tissue]", "not in [Tissue]", "not all tissues".
+ */
+window.handleTissueExpressionQuery = function(query) {
+    const qLower = query.toLowerCase();
+    
+    // 1. Identify Target Tissue
+    const tissueMap = {
+        'hypothalamus': 'Hypothalamus',
+        'kidney': 'Kidney',
+        'liver': 'Liver',
+        'lung': 'Lung_Primary', // Primary cilia context
+        'olfactory': 'Olfactory',
+        'pancreas': 'Pancreas',
+        'skeleton': 'Skeleton',
+        'bone': 'Skeleton'
+    };
+    
+    let targetTissue = null;
+    for (const [key, val] of Object.entries(tissueMap)) {
+        if (qLower.includes(key)) {
+            targetTissue = val;
+            break;
+        }
+    }
+
+    // 2. Identify Logic Mode
+    let mode = 'all'; 
+    if (qLower.includes('only expressed in') || qLower.includes('specific to') || qLower.includes('exclusively')) {
+        mode = 'exclusive';
+    } else if (qLower.includes('not all ciliated cells') || qLower.includes('variable expression')) {
+        mode = 'variable';
+    } else if (qLower.includes('not expressed in')) {
+        mode = 'excluded';
+    }
+
+    // 3. Scan Database
+    const results = [];
+    const geneMap = window.CiliAI.lookups.geneMap;
+    
+    // We iterate over the master list or gene map
+    Object.values(geneMap).forEach(gene => {
+        // Ensure gene has tissue expression data
+        if (!gene.expression || !gene.expression.tissue) return;
+        
+        const tissues = gene.expression.tissue;
+        const tissueKeys = Object.keys(tissues).filter(k => k !== 'n_tissues_expressed' && k !== 'Category' && typeof tissues[k] === 'number');
+        
+        // --- LOGIC: Exclusive to Tissue ---
+        if (mode === 'exclusive' && targetTissue) {
+            const targetVal = tissues[targetTissue] || 0;
+            // Criteria: Target > 1 TPM AND others < 1 TPM (or significantly lower)
+            if (targetVal > 1) {
+                const isExclusive = tissueKeys.every(k => {
+                    if (k === targetTissue) return true;
+                    return tissues[k] < 1; // Threshold for "not expressed"
+                });
+                if (isExclusive) results.push({ gene: gene.Gene, val: targetVal });
+            }
+        }
+        
+        // --- LOGIC: Not in All Ciliated Cells (Variable) ---
+        else if (mode === 'variable') {
+            const nExpressed = gene.expression.n_tissues || tissues.n_tissues_expressed || 0;
+            const totalTissues = tissueKeys.length; // usually 8
+            // If expressed in some but not all (e.g., 1 to total-1)
+            if (nExpressed > 0 && nExpressed < totalTissues) {
+                results.push({ 
+                    gene: gene.Gene, 
+                    description: `Expressed in ${nExpressed}/${totalTissues} tissues`
+                });
+            }
+        }
+        
+        // --- LOGIC: Excluded from Tissue ---
+        else if (mode === 'excluded' && targetTissue) {
+            const val = tissues[targetTissue] || 0;
+            // Check if it's generally a ciliary gene (expressed elsewhere) but NOT here
+            const nExpressed = gene.expression.n_tissues || 0;
+            if (val < 0.5 && nExpressed >= 1) {
+                results.push({ gene: gene.Gene, description: `Absent in ${targetTissue}` });
+            }
+        }
+    });
+
+    // 4. Return Formatted List
+    if (results.length === 0) {
+        return `<div class="ai-result-card"><p>No genes found matching criteria: <strong>${mode} ${targetTissue || ''}</strong>.</p></div>`;
+    }
+
+    // Sort by value (if available) or name
+    results.sort((a, b) => (b.val || 0) - (a.val || 0));
+
+    const title = mode === 'exclusive' ? `Genes Exclusive to ${targetTissue}` :
+                  mode === 'variable' ? `Genes Not in All Ciliated Tissues` :
+                  `Genes Absent in ${targetTissue}`;
+
+    window.lastQueryContext = {
+        type: 'list_followup',
+        data: results,
+        term: title
+    };
+
+    return window.formatListResult(title, results, `Found ${results.length} genes based on ciliary tissue expression.`);
 };
 
 
@@ -4291,7 +4406,32 @@ const intentHandlers = [
             return window.renderGoldStandardView();
         }
     },
-    
+    // --- ADD THESE TO YOUR intentHandlers ARRAY ---
+
+    // 1. "Display all ciliary genes" / "Gold standard"
+    {
+        priority: 150, // High priority
+        matcher: (qLower) => 
+            qLower.includes('all ciliary genes') || 
+            qLower.includes('gold standard') || 
+            qLower.includes('gold standart') || // typo tolerance
+            qLower.includes('full database'),
+        handler: async (query) => {
+            return window.renderGoldStandardView();
+        }
+    },
+
+    // 2. Tissue Specificity / Exclusion ("Only in...", "Not all...")
+    {
+        priority: 140,
+        matcher: (qLower) => 
+            (qLower.includes('only expressed in') || qLower.includes('specific to')) ||
+            (qLower.includes('not') && qLower.includes('all') && (qLower.includes('tissue') || qLower.includes('cell'))) ||
+            (qLower.includes('expressed in') && qLower.includes('only')),
+        handler: async (query) => {
+            return window.handleTissueExpressionQuery(query);
+        }
+    },
     // Highest Priority: Cell-type specific questions
     {
         priority: 100,
@@ -7051,5 +7191,6 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
