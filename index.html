@@ -581,6 +581,12 @@
         </div>
 
         <div class="suggested-chips" style="margin-bottom:20px;">
+          <span class="gene-badge" style="background:#fffaf0; color:#b7791f; border:1px solid #ecc94b;"
+                onclick="window.renderGoldStandardView()">
+            ⭐ Show Gold Standard ciliary genes
+          </span>
+            
+        <div class="suggested-chips" style="margin-bottom:20px;">
           <span class="gene-badge"
                 onclick="window.handleAIQuery('IFT88 details')">
             IFT88 Data Details
@@ -600,12 +606,6 @@
                 onclick="window.handleAIQuery('Show pan-ciliary genes')">
             Show pan-ciliary genes
           </span>
-
-          <span class="gene-badge"
-                onclick="window.handleAIQuery('Genes specific to lung')">
-            Lung-specific genes
-          </span>
-        </div>
 
         <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Ciliopathies & Diseases
@@ -2224,6 +2224,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
