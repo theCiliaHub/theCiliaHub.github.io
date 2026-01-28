@@ -576,7 +576,7 @@
 
         <strong>Quick things you can try:</strong>
 
-        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+       <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Gene & Expression
         </div>
 
@@ -593,12 +593,12 @@
 
           <span class="gene-badge"
                 onclick="window.handleAIQuery('Lung specific ciliary genes')">
-           Lung specific ciliary genes
+            Lung specific ciliary genes
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Show ciliary genes enriched in Proximal Tubule cells')">
-            Proximal Tubule ciliary genes enriched
+                onclick="window.handleAIQuery('Show  genes enriched in Proximal Tubule cells')">
+            Proximal Tubule ciliary enriched genes
           </span>
 
           <span class="gene-badge"
@@ -2205,21 +2205,32 @@ window.handleUserSend = function() {
         };
         
 // 9. INIT & STARTUP
-    window.initCiliAI = async function() {
-        window.updateStatus('Loading databases...', 'loading');
-        if (window.generateAndInjectSVG) {
-            window.generateAndInjectSVG();
-        }
-        const loaded = await window.loadCiliAIData();
-        if (loaded) {
-            window.addChatMessage("👋 CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
-            window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
-        } else {
-            window.updateStatus('Load failed', 'error');
-            window.addChatMessage("⚠️ Failed to load data. Please refresh the page.", false);
-        }
-    };
+    // 9. INIT & STARTUP
+window.initCiliAI = async function() {
+    window.updateStatus('Loading databases...', 'loading');
+    
+    // Inject SVG if available
+    if (window.generateAndInjectSVG) {
+        window.generateAndInjectSVG();
+    }
 
+    // Load Data
+    const loaded = await window.loadCiliAIData();
+    
+    if (loaded) {
+        // --- FIX: Calculate Statistics Now That Data Is Ready ---
+        if (window.calculateAndDisplayStatistics) {
+            window.calculateAndDisplayStatistics();
+        }
+
+        window.addChatMessage("👋 CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
+        window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
+    } else {
+        window.updateStatus('Load failed', 'error');
+        window.addChatMessage("⚠️ Failed to load data. Please refresh the page.", false);
+    }
+};
+    
     document.getElementById('chatInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') window.handleUserSend();
     });
@@ -2230,6 +2241,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
