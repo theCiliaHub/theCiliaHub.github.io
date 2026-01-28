@@ -1495,7 +1495,7 @@ window.median = function (arr) {
 
 /**
  * Renders the "Gold Standard" Database View
- * Matches the requested format: Gene, Description, Localization, Ciliopathy, Mouse Ortholog, Actions.
+ * UPDATED: Includes Ensembl ID and displays ALL genes (no limit).
  */
 window.renderGoldStandardView = function() {
     // 1. Get Data
@@ -1506,44 +1506,45 @@ window.renderGoldStandardView = function() {
     const sortedGenes = [...allGenes].sort((a, b) => a.Gene.localeCompare(b.Gene));
     const totalCount = sortedGenes.length;
 
-    // 2. Define Columns
+    // 2. Define Columns (Added Ensembl ID)
     const columns = [
         { label: 'Gene ↕', key: 'Gene', width: '80px' },
+        { label: 'Ensembl ID ↕', key: 'Ensembl ID', width: '110px' }, // NEW
         { label: 'Description ↕', key: 'Gene.Description', width: '220px' },
-        { label: 'Localization ↕', key: 'Localization', width: '150px' },
-        { label: 'Ciliopathy ↕', key: 'Ciliopathies', width: '150px' },
-        { label: 'Mouse Ortholog ↕', key: 'Ortholog_Mouse', width: '120px' },
+        { label: 'Localization ↕', key: 'Localization', width: '140px' },
+        { label: 'Ciliopathy ↕', key: 'Ciliopathies', width: '140px' },
+        { label: 'Mouse Ortholog ↕', key: 'Ortholog_Mouse', width: '110px' },
         { label: 'Actions', key: 'actions', width: '80px' }
     ];
 
-    // 3. Generate Rows (Lazy render first 100)
-    let tableRows = '';
-    const displayGenes = sortedGenes.slice(0, 100); 
-
-    displayGenes.forEach(g => {
+    // 3. Generate Rows (Displaying ALL genes)
+    // Using map().join('') for better performance with large lists
+    const tableRows = sortedGenes.map(g => {
+        const ensg = g['Ensembl ID'] || g['Ensembl.ID'] || '-';
         const desc = g['Gene.Description'] || '-';
         const loc = g.Localization || '-';
         let disease = Array.isArray(g.Ciliopathies) ? g.Ciliopathies.join(', ') : (g.Ciliopathy || '-');
         const mouse = g.Ortholog_Mouse || '-';
 
-        tableRows += `
+        return `
             <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td><strong>${g.Gene}</strong></td>
-                <td>${desc}</td>
-                <td>${loc}</td>
-                <td>${disease}</td>
-                <td>${mouse}</td>
-                <td style="text-align: center;">
+                <td style="padding: 10px;"><strong>${g.Gene}</strong></td>
+                <td style="padding: 10px; font-family:monospace; font-size:11px; color:#64748b;">${ensg}</td>
+                <td style="padding: 10px;">${desc}</td>
+                <td style="padding: 10px;">${loc}</td>
+                <td style="padding: 10px; color:#be185d;">${disease}</td>
+                <td style="padding: 10px; font-style: italic;">${mouse}</td>
+                <td style="text-align: center; padding: 10px;">
                     <div style="display: flex; gap: 5px; justify-content: center;">
-                        <button class="ciliai-button" style="padding:2px 6px; font-size:14px;" onclick="window.displayFullGeneInfo('${g.Gene}')">👁️</button>
-                        <button class="ciliai-button" style="padding:2px 6px; font-size:14px;" onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])">📊</button>
+                        <button class="ciliai-button" style="padding:2px 6px; height:24px; font-size:14px;" onclick="window.displayFullGeneInfo('${g.Gene}')" title="View Details">👁️</button>
+                        <button class="ciliai-button" style="padding:2px 6px; height:24px; font-size:14px;" onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])" title="Plot Expression">📊</button>
                     </div>
                 </td>
             </tr>
         `;
-    });
+    }).join('');
 
-    // 4. Construct HTML using the new showDataInLeftPanel logic manually to ensure custom structure
+    // 4. Construct HTML
     const container = document.getElementById('cilia-svg');
     if (!container) return;
     
@@ -1553,7 +1554,8 @@ window.renderGoldStandardView = function() {
     container.style.display = 'flex';
     container.closest('.interactive-cilium')?.classList.add('table-view-active');
 
-    window.injectTableCSS(); // Ensure CSS
+    // Ensure CSS is loaded
+    if(window.injectTableCSS) window.injectTableCSS();
 
     container.innerHTML = `
         <div class="ciliai-table-container">
@@ -1567,25 +1569,43 @@ window.renderGoldStandardView = function() {
                      <button id="ciliai-back-btn" class="ciliai-button" style="background: #718096;">Back</button>
                 </div>
             </div>
+            
+            <div style="padding: 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <input type="text" id="gs-filter-input" placeholder="Filter table (Gene, ENSG, Disease)..." 
+                       style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 13px;">
+            </div>
+
             <div class="ciliai-table-scroll-wrapper">
                 <table class="ciliai-data-table sortable" id="ciliai-db-table">
                     <thead>
                         <tr>
-                            ${columns.map((col, idx) => `<th onclick="window.sortTable('ciliai-db-table', ${idx})" style="cursor:pointer;">${col.label}</th>`).join('')}
+                            ${columns.map((col, idx) => `<th onclick="window.sortTable('ciliai-db-table', ${idx})" style="cursor:pointer; width:${col.width}">${col.label}</th>`).join('')}
                         </tr>
                     </thead>
-                    <tbody>${tableRows}</tbody>
+                    <tbody id="gs-table-body">${tableRows}</tbody>
                 </table>
             </div>
-            <div style="padding: 10px; text-align: center; font-size: 11px; color: #94a3b8;">
-                Showing 1-100. Download CSV for full list.
+            <div style="padding: 8px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+                Displaying all ${totalCount.toLocaleString()} records.
             </div>
         </div>
     `;
 
+    // Add Live Filter Logic for the full list
+    document.getElementById('gs-filter-input').addEventListener('keyup', function() {
+        const filter = this.value.toUpperCase();
+        const rows = document.getElementById("gs-table-body").getElementsByTagName("tr");
+        // Simple optimization: Hide rows instead of rebuilding DOM
+        for (let i = 0; i < rows.length; i++) {
+            const txtValue = rows[i].textContent || rows[i].innerText;
+            rows[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+        }
+    });
+
     document.getElementById('ciliai-back-btn').addEventListener('click', () => window.generateAndInjectSVG());
-    return `<div class="ai-result-card"><p>Displayed the <strong>Gold Standard Ciliary Gene Database</strong> in the main panel.</p></div>`;
+    return `<div class="ai-result-card"><p>Displayed the <strong>Gold Standard Ciliary Gene Database</strong> (${totalCount} genes) in the main panel.</p></div>`;
 };
+
 
 /**
  * Advanced Tissue Query Handler
@@ -7162,6 +7182,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
