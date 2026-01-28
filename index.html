@@ -2173,37 +2173,7 @@ window.handleUserSend = function() {
             window.addChatMessage(`Tell me about ${gene}`, true);
             window.handleAIQuery(`What is ${gene}?`);
         };
-        const originalHandleAIQuery = window.handleAIQuery;
-        window.handleAIQuery = async function(query) {
-            originalHandleAIQuery(query);
-            const lowerQuery = query.toLowerCase().trim();
-            const localizationPatterns = [
-                /where is (.+?) localized/i,
-                /where are (.+?) localized/i,
-                /tell me localization of (.+)/i,
-                /localization of (.+)/i,
-                /(.+?) localization/i
-            ];
-            let matchedGenes = [];
-            for (const pattern of localizationPatterns) {
-                const match = lowerQuery.match(pattern);
-                if (match && match[1]) {
-                    matchedGenes = match[1].split(/[, and]+/).map(g => g.trim().toUpperCase());
-                    break;
-                }
-            }
-            if (matchedGenes.length > 0) {
-                matchedGenes.forEach(gene => {
-                    if (window.CiliAI.lookups.geneMap[gene]) {
-                        const loc = window.CiliAI.lookups.geneMap[gene].Localization;
-                        if (loc) {
-                            window.SpatialManager.highlight(loc, gene);
-                        }
-                    }
-                });
-            }
-        };
-        
+       
 // 9. INIT & STARTUP
     // 9. INIT & STARTUP
 window.initCiliAI = async function() {
@@ -2241,6 +2211,7 @@ window.initCiliAI = async function() {
 </script>
 </body>
 </html>
+
 
 
 
