@@ -1606,15 +1606,6 @@ window.renderGoldStandardView = function() {
     return `<div class="ai-result-card"><p>Displayed the <strong>Gold Standard Ciliary Gene Database</strong> (${totalCount} genes) in the main panel.</p></div>`;
 };
 
-
-/**
- * Advanced Tissue Query Handler
- * Handles: "only expressed in...", "enriched in...", "not all ciliated cells"
- */
-/**
- * Advanced Tissue Query Handler
- * Handles: "only expressed in...", "enriched in...", "proximal tubule", "motile cilia"
- */
 /**
  * Advanced Tissue Query Handler (Fixed for Nested JSON)
  * Handles: "Hypothalamus specific", "only in Olfactory", "enriched in Proximal Tubule"
@@ -1653,6 +1644,8 @@ window.handleTissueExpressionQuery = function(query) {
     if (qLower.includes('astrocyte')) targetCellKeyword = 'Astrocytes';
     if (qLower.includes('hepatocyte')) targetCellKeyword = 'Hepatocyte';
     if (qLower.includes('chondrocyte')) targetCellKeyword = 'Chondrocytes';
+    if (qLower.includes('oligodendrocyte')) targetCellKeyword = 'Oligodendrocytes';
+    if (qLower.includes('motile')) targetCellKeyword = 'Motile';
 
     // 2. Determine Logic Mode
     let mode = 'enriched'; 
@@ -1661,12 +1654,19 @@ window.handleTissueExpressionQuery = function(query) {
 
     // 3. Helper: Get MAX value from a nested tissue object
     const getMaxVal = (obj) => {
-        if (!obj || typeof obj !== 'object') return 0;
-        const ignore = ['n_tissues_expressed', 'Category', 'Classification', 'cell_types', 'cilia_types', 'Ensembl'];
+        if (!obj || typeof obj !== 'object') return 0; // Handles null safely
+        
+        // Keys to ignore (metadata)
+        const ignore = [
+            'n_tissues_expressed', 'Category', 'Classification', 'cell_types', 
+            'cilia_types', 'Ensembl', 'In_Primary', 'In_Motile'
+        ];
         
         let max = 0;
         Object.entries(obj).forEach(([k, v]) => {
-            if (typeof v === 'number' && !ignore.includes(k)) {
+            // Check if it's a number and not a percentage key (unless percentage is all we have)
+            // Assuming expression values are the raw numbers not starting with "Pct_"
+            if (typeof v === 'number' && !ignore.includes(k) && !k.startsWith('Pct_')) {
                 if (v > max) max = v;
             }
         });
@@ -1681,26 +1681,37 @@ window.handleTissueExpressionQuery = function(query) {
         if (!gene.expression || !gene.expression.tissue) return;
         const t = gene.expression.tissue;
 
-        // Cell Type Query (e.g. "Enriched in Proximal Tubule")
+        // --- Logic A: Cell Type Query (e.g. "Enriched in Neurons") ---
         if (targetCellKeyword) {
             let maxInTarget = 0;
+            let foundInTissue = '';
+            
             // Scan all tissues for this cell type key
-            Object.values(t).forEach(tissueObj => {
-                if (typeof tissueObj === 'object') {
+            Object.entries(t).forEach(([tissueName, tissueObj]) => {
+                if (tissueObj && typeof tissueObj === 'object') {
                     Object.entries(tissueObj).forEach(([k, v]) => {
                         if (k.toLowerCase().includes(targetCellKeyword.toLowerCase()) && typeof v === 'number') {
-                            if (v > maxInTarget) maxInTarget = v;
+                            if (v > maxInTarget) {
+                                maxInTarget = v;
+                                foundInTissue = tissueName;
+                            }
                         }
                     });
                 }
             });
-            if (maxInTarget > 0.5) { // Threshold
-                results.push({ gene: gene.Gene, val: maxInTarget, desc: `Found in ${targetCellKeyword}` });
+            
+            // Threshold for "Expressed"
+            if (maxInTarget > 0.5) { 
+                results.push({ 
+                    gene: gene.Gene, 
+                    val: maxInTarget, 
+                    desc: `Expressed in ${targetCellKeyword} (${foundInTissue})` 
+                });
             }
             return;
         }
 
-        // Tissue Logic (Exclusive / Enriched)
+        // --- Logic B: Tissue Logic (Exclusive / Enriched) ---
         if (targetTissue) {
             const targetObj = t[targetTissue];
             const targetMax = getMaxVal(targetObj);
@@ -1709,21 +1720,21 @@ window.handleTissueExpressionQuery = function(query) {
             let othersMax = 0;
             Object.keys(t).forEach(k => {
                 if (k !== targetTissue && k !== 'n_tissues_expressed' && k !== 'Category') {
-                    const m = getMaxVal(t[k]);
+                    const m = getMaxVal(t[k]); 
                     if (m > othersMax) othersMax = m;
                 }
             });
 
             // LOGIC: Exclusive
             if (mode === 'exclusive') {
-                // Must be present in target (> 0.5) AND low in others (< 0.5 or 3x lower)
+                // Must be present in target (> 0.5) AND low in others (< 0.5)
                 if (targetMax > 0.5 && othersMax < 0.5) {
                     results.push({ gene: gene.Gene, val: targetMax, desc: `Specific to ${targetTissue}` });
                 }
             } 
             // LOGIC: Enriched
             else if (mode === 'enriched') {
-                if (targetMax > 1 && targetMax > othersMax) {
+                if (targetMax > 1 && targetMax > othersMax * 1.5) {
                     results.push({ gene: gene.Gene, val: targetMax, desc: `Enriched in ${targetTissue}` });
                 }
             }
@@ -1753,7 +1764,6 @@ window.handleTissueExpressionQuery = function(query) {
 
     return window.formatListResult(title, results.map(r => ({ gene: r.gene, description: r.desc })), `Found ${results.length} genes.`);
 };
-
 
  /**
  * Calculates the Jaccard index between two gene sets.
@@ -2766,17 +2776,31 @@ window.renderTissueExpressionTable = function(tissueData) {
     const getBestScore = (tObj) => {
         if (typeof tObj !== 'object' || tObj === null) return { val: 0, label: '-' };
         let max = 0;
-        let label = 'Low';
-        const ignore = ['n_tissues_expressed', 'Category', 'Classification', 'cell_types', 'cilia_types', 'Ensembl'];
+        let label = 'Low/Undetected';
+        
+        // Metadata keys to ignore when finding max expression
+        const ignore = [
+            'n_tissues_expressed', 'Category', 'Classification', 'cell_types', 
+            'cilia_types', 'Ensembl', 'In_Primary', 'In_Motile'
+        ];
 
         Object.entries(tObj).forEach(([k, v]) => {
-            if (typeof v === 'number' && !k.startsWith('Pct_') && !ignore.includes(k)) {
+            // We want numeric expression values, not Percentages (Pct_) unless that's all we have
+            if (typeof v === 'number' && !ignore.includes(k) && !k.startsWith('Pct_')) {
                 if (v > max) {
                     max = v;
-                    label = k.replace(/_/g, ' '); // e.g. "Primary_Lineage" -> "Primary Lineage"
+                    label = k.replace(/_/g, ' ')
+                             .replace('Primary cilium', 'Primary')
+                             .replace('Motile multiciliated', 'Motile');
                 }
             }
         });
+        
+        // If no raw expression found, check for Classification string
+        if (max === 0 && tObj.Classification) {
+            label = tObj.Classification;
+        }
+
         return { val: max, label };
     };
 
@@ -2784,7 +2808,8 @@ window.renderTissueExpressionTable = function(tissueData) {
     Object.entries(tissueData).forEach(([tissue, data]) => {
         if (tissue === 'n_tissues_expressed' || tissue === 'Category') return;
         const info = getBestScore(data);
-        if (info.val > 0) {
+        // Only show if there's a meaningful value or a specific classification
+        if (info.val > 0 || (info.label && info.label !== 'Low/Undetected')) {
             rows.push({ tissue, val: info.val, label: info.label });
         }
     });
@@ -2795,8 +2820,8 @@ window.renderTissueExpressionTable = function(tissueData) {
         <table class="fancy-table" style="width:100%; margin-top:8px;">
             <thead>
                 <tr>
-                    <th style="background:#f1f5f9;">Tissue / Top Cell</th>
-                    <th style="text-align:right; background:#f1f5f9;">Value</th>
+                    <th style="background:#f1f5f9;">Tissue / Top Cell Type</th>
+                    <th style="text-align:right; background:#f1f5f9;">Max TPM</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -2804,6 +2829,8 @@ window.renderTissueExpressionTable = function(tissueData) {
     rows.forEach(row => {
         const isHigh = row.val > 5;
         const barW = Math.min(100, (row.val / (rows[0].val || 1)) * 100);
+        const valDisplay = row.val > 0 ? row.val.toFixed(2) : '-';
+        
         html += `
             <tr>
                 <td>
@@ -2812,7 +2839,7 @@ window.renderTissueExpressionTable = function(tissueData) {
                 </td>
                 <td style="text-align:right;">
                     <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
-                        <span style="font-weight:700; color:${isHigh ? '#2b6cb0' : '#64748b'};">${row.val.toFixed(2)}</span>
+                        <span style="font-weight:700; color:${isHigh ? '#2b6cb0' : '#64748b'};">${valDisplay}</span>
                         <div style="width:50px; height:4px; background:#e2e8f0; border-radius:2px;">
                             <div style="width:${barW}%; height:100%; background:${isHigh ? '#3182ce' : '#cbd5e0'}; border-radius:2px;"></div>
                         </div>
@@ -2824,6 +2851,7 @@ window.renderTissueExpressionTable = function(tissueData) {
     html += `</tbody></table>`;
     return html;
 };
+
 
 // ==============================================================
 // 3. SEARCH HELPERS (Pan-ciliary / Idio-specific)
@@ -7206,6 +7234,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
