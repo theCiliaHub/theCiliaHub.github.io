@@ -3623,7 +3623,7 @@ window.terminologyQueries = {
     "what is joubert syndrome": "Joubert Syndrome is a ciliopathy with cerebellar vermis hypoplasia and the ‘molar tooth sign,’ caused by mutations in transition zone and IFT genes. (Romani et al. 2013)",
     "what is meckel-gruber syndrome": "MKS is a severe ciliopathy with brain malformations, kidney cysts, and polydactyly caused by MKS module gene defects. (Hartill et al. 2017)",
     "what is primary ciliary dyskinesia": "PCD is caused by defects in motile cilia, leading to chronic infections, infertility, and left-right asymmetry defects. (Fliegauf et al. 2007)",
-    "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
+    "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)",
     // --- NEW: Pan/Idio Definitions ---
     "what are pan-ciliary genes": "<b>Pan-ciliary genes</b> are core ciliary genes expressed in <strong>many different ciliated cell types</strong> across multiple organs (e.g., Lung, Kidney, Liver, Brain). They likely perform conserved 'housekeeping' functions essential for all cilia, such as Intraflagellar Transport (IFT) or basal body maintenance. <br><br><em>(Derived from CiliAI scRNA-seq analysis of 6 organs).</em>",
     "what is a pan-ciliary gene": "A <b>Pan-ciliary gene</b> is a ubiquitous ciliary gene found active in almost all ciliated tissues analyzed. Examples include IFT88 and ARL13B.", 
@@ -7304,6 +7304,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
