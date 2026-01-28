@@ -1608,8 +1608,7 @@ window.renderGoldStandardView = function() {
 
 /**
  * Advanced Tissue Query Handler (Granular Cell Type Support)
- * Handles: "Hypothalamus specific", "Lung specific"
- * DIFFERENTIATES: Neurons vs Astrocytes, Motile vs Primary
+ * Includes explicit definitions for Pan-ciliary vs Idio-ciliary genes.
  */
 window.handleTissueExpressionQuery = function(query) {
     const qLower = window.CiliAI.utils.normalizeQuery(query);
@@ -1620,7 +1619,7 @@ window.handleTissueExpressionQuery = function(query) {
         'liver': 'Liver',
         'kidney': 'Kidney',
         'lung': 'Lung',
-        'olfactory': 'Olfactory', // Kept for backend logic, removed from UI
+        'olfactory': 'Olfactory',
         'pancreas': 'Pancreas',
         'skeleton': 'Skeleton',
         'bone': 'Skeleton'
@@ -1640,6 +1639,7 @@ window.handleTissueExpressionQuery = function(query) {
     if (qLower.includes('proximal')) targetCellKeyword = 'Primary_Lineage';
     if (qLower.includes('neuron')) targetCellKeyword = 'Neurons';
     if (qLower.includes('astrocyte')) targetCellKeyword = 'Astrocytes';
+    if (qLower.includes('oligodendrocyte')) targetCellKeyword = 'Oligodendrocytes';
     if (qLower.includes('motile')) targetCellKeyword = 'Motile';
 
     // 2. Determine Logic Mode
@@ -1687,8 +1687,8 @@ window.handleTissueExpressionQuery = function(query) {
         // Tissue Logic
         if (targetTissue) {
             const targetData = t[targetTissue];
-            // Fix: Check if targetData exists before accessing
-            if (!targetData) return; 
+            // Safety check for null data
+            if (!targetData || typeof targetData !== 'object') return; 
 
             const { max: targetMax, topCell } = getTissueStats(targetData);
             
@@ -1703,13 +1703,11 @@ window.handleTissueExpressionQuery = function(query) {
 
             // LOGIC: Exclusive / Specific
             if (mode === 'exclusive') {
-                // Target must be distinct (>0.5) and others must be low
                 if (targetMax > 0.5 && othersMax < 0.5) {
                     results.push({ 
                         gene: gene.Gene, 
                         val: targetMax, 
-                        // Show specific cell type in description
-                        desc: `${topCell || targetTissue}` 
+                        desc: `Specific to ${topCell || targetTissue}` 
                     });
                 }
             } 
@@ -1724,10 +1722,6 @@ window.handleTissueExpressionQuery = function(query) {
                 }
             }
         }
-        // Fallback for cell type searches across all tissues
-        else if (targetCellKeyword) {
-            // ... (Existing logic for global cell search if needed) ...
-        }
     });
 
     // Sort results
@@ -1739,14 +1733,33 @@ window.handleTissueExpressionQuery = function(query) {
 
     const title = `${mode.charAt(0).toUpperCase() + mode.slice(1)}: ${targetTissue}`;
     
+    // --- NEW: Add Explanatory Card ---
+    const explanationHtml = `
+        <div class="ai-result-card" style="background:#f0f9ff; border:1px solid #bae6fd; margin-bottom:10px;">
+            <h4 style="color:#0284c7; margin-top:0;">💡 scRNA-seq Ciliary Atlas</h4>
+            <p style="font-size:12px; line-height:1.4; color:#334155;">
+                This data comes from <strong>scRNA-seq analysis of 6 different organs</strong>. Ciliary genes are classified into two main categories:
+            </p>
+            <ul style="font-size:12px; margin:5px 0 0 15px; padding:0; color:#334155;">
+                <li><strong>Pan-ciliary Genes:</strong> Expressed in many ciliated cells across different organs (conserved "housekeeping" ciliary functions).</li>
+                <li><strong>Idio-ciliary Genes:</strong> Expressed only in specific ciliated cell types or organs (specialized functions).</li>
+            </ul>
+        </div>
+    `;
+
+    // Generate List HTML
+    const listHtml = window.formatListResult(title, results.map(r => ({ gene: r.gene, description: r.desc })), `Found ${results.length} genes.`);
+
     window.lastQueryContext = {
         type: 'list_followup',
         data: results.map(r => ({ gene: r.gene, description: r.desc })),
         term: title
     };
 
-    return window.formatListResult(title, results.map(r => ({ gene: r.gene, description: r.desc })), `Found ${results.length} genes.`);
+    // Return Combined HTML
+    return explanationHtml + listHtml;
 };
+
 
 
  /**
@@ -2836,6 +2849,68 @@ window.renderTissueExpressionTable = function(tissueData) {
     return html;
 };
 
+/**
+ * Renders a Heatmap of gene expression across the 6 Ciliary Tissues
+ */
+window.renderMultiGeneTissuePlot = function(genes) {
+    if (!genes || genes.length === 0) return;
+    
+    // Switch view to plot container
+    window.switchView('plot');
+    
+    const tissues = ['Hypothalamus', 'Kidney', 'Liver', 'Lung', 'Olfactory', 'Pancreas', 'Skeleton'];
+    const zData = [];
+    const textData = [];
+    
+    // Helper to get max val from tissue object
+    const getTissueMax = (tData) => {
+        if (!tData || typeof tData !== 'object') return 0;
+        let max = 0;
+        const ignore = ['n_tissues_expressed', 'Category', 'Classification', 'cell_types', 'cilia_types'];
+        Object.entries(tData).forEach(([k, v]) => {
+            if (typeof v === 'number' && !k.startsWith('Pct_') && !ignore.includes(k)) {
+                if (v > max) max = v;
+            }
+        });
+        return max;
+    };
+
+    genes.forEach(gene => {
+        const row = [];
+        const txtRow = [];
+        const gData = window.CiliAI.lookups.geneMap[gene.toUpperCase()]?.expression?.tissue;
+        
+        tissues.forEach(t => {
+            const val = gData && gData[t] ? getTissueMax(gData[t]) : 0;
+            row.push(val);
+            txtRow.push(`Gene: ${gene}<br>Tissue: ${t}<br>Max TPM: ${val.toFixed(2)}`);
+        });
+        zData.push(row);
+        textData.push(txtRow);
+    });
+
+    const trace = {
+        z: zData,
+        x: tissues,
+        y: genes,
+        text: textData,
+        type: 'heatmap',
+        hoverinfo: 'text',
+        colorscale: 'Blues',
+        showscale: true
+    };
+
+    const layout = {
+        title: 'Ciliary Tissue Expression Profile',
+        xaxis: { title: 'Organ / Tissue' },
+        yaxis: { title: 'Genes', automargin: true },
+        margin: { l: 100, b: 100 }
+    };
+
+    Plotly.newPlot('plotly-container', [trace], layout);
+    window.addChatMessage(`Displaying expression heatmap for <strong>${genes.length} genes</strong> across ciliary tissues.`, false);
+};
+
 
 // ==============================================================
 // 3. SEARCH HELPERS (Pan-ciliary / Idio-specific)
@@ -3549,6 +3624,13 @@ window.terminologyQueries = {
     "what is meckel-gruber syndrome": "MKS is a severe ciliopathy with brain malformations, kidney cysts, and polydactyly caused by MKS module gene defects. (Hartill et al. 2017)",
     "what is primary ciliary dyskinesia": "PCD is caused by defects in motile cilia, leading to chronic infections, infertility, and left-right asymmetry defects. (Fliegauf et al. 2007)",
     "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
+    // --- NEW: Pan/Idio Definitions ---
+    "what are pan-ciliary genes": "<b>Pan-ciliary genes</b> are core ciliary genes expressed in <strong>many different ciliated cell types</strong> across multiple organs (e.g., Lung, Kidney, Liver, Brain). They likely perform conserved 'housekeeping' functions essential for all cilia, such as Intraflagellar Transport (IFT) or basal body maintenance. <br><br><em>(Derived from CiliAI scRNA-seq analysis of 6 organs).</em>",
+    "what is a pan-ciliary gene": "A <b>Pan-ciliary gene</b> is a ubiquitous ciliary gene found active in almost all ciliated tissues analyzed. Examples include IFT88 and ARL13B.", 
+    "what does pan-ciliary mean": "<b>Pan-ciliary</b> refers to genes that are ubiquitously expressed across diverse ciliated tissues, suggesting they play a fundamental role in ciliary biology regardless of cell type.",
+    "what are idio-ciliary genes": "<b>Idio-ciliary genes</b> are specialized ciliary genes expressed <strong>only in specific ciliated cell types</strong> or organs. They confer specific functions to that cilium type, such as motility in the lung (e.g., DNAH5) or sensory signaling in the nose. <br><br><em>(Derived from CiliAI scRNA-seq analysis of 6 organs).</em>",
+    "what is an idio-ciliary gene": "An <b>Idio-ciliary gene</b> is a tissue-specific ciliary gene. For example, a gene found only in the sperm flagellum or photoreceptor cilium would be idio-ciliary.",
+    "what does idio-ciliary mean": "<b>Idio-ciliary</b> (from Greek 'idios', meaning own/private) refers to genes with expression restricted to specific ciliary subtypes, indicating specialized rather than general functions."
 };
 
 // ==========================================================
@@ -4468,99 +4550,103 @@ const intentHandlers = [
         }
     },
 
-    // Pan-ciliary / Tissue Expression Category & Lists
+  // Pan-ciliary / Tissue Expression Category & Lists (UPDATED)
     {
         priority: 95,
         matcher: (qLower) => qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') || qLower.includes('ubiquitous') || qLower.includes('pan-ubiquitous') || qLower.includes('idio-ciliary') || qLower.includes('tissue-specific') || (qLower.includes('specific to') && (qLower.includes('lung') || qLower.includes('kidney') || qLower.includes('liver') || qLower.includes('skeleton') || qLower.includes('pancreas') || qLower.includes('olfactory') || qLower.includes('hypothalamus'))) || qLower.includes('category of') || (qLower.includes('expressed') && qLower.includes('category')) || qLower.includes('expressed in how many tissues') || (qLower.includes('list') && (qLower.includes('pan') || qLower.includes('ubiquit') || qLower.includes('specific') || qLower.includes('idio'))),
         handler: async (query) => {
             const qLower = window.CiliAI.utils.normalizeQuery(query);
-            let htmlResult = null;
+            
+            // --- Helper: Generate Explanation Card ---
+            const getExplanationHTML = (type) => {
+                const title = type === 'Pan' ? '💡 Pan-ciliary Genes' : '💡 Idio-ciliary Genes';
+                const text = type === 'Pan' 
+                    ? 'These genes are expressed in <strong>many ciliated cell types</strong> across 6+ organs. They typically represent the core machinery (IFT, BBSome, Transition Zone) required for all cilia.'
+                    : 'These genes are <strong>tissue-specific</strong>, expressed only in select ciliated cell types (e.g., only Lung or only Hypothalamus). They likely drive specialized functions like motility or specific signaling.';
+                
+                return `
+                <div class="ai-result-card" style="background:#f0f9ff; border:1px solid #bae6fd; margin-bottom:10px;">
+                    <h4 style="color:#0284c7; margin-top:0;">${title}</h4>
+                    <p style="font-size:12px; line-height:1.4; color:#334155; margin:5px 0;">
+                        ${text}
+                    </p>
+                    <p style="font-size:10px; color:#64748b; margin-top:5px;">
+                        <em>Based on scRNA-seq analysis of 6 different organs.</em>
+                    </p>
+                </div>`;
+            };
+
+            // 1. Single Gene Lookup (e.g. "Is IFT88 pan-ciliary?")
             const genes = window.CiliAI.utils.extractGenes(query);
             if (genes.length > 0) {
                 const geneSymbol = genes[0].toUpperCase();
                 const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
                 if (!geneData || !geneData.expression?.tissue) {
-                    htmlResult = `<div class="ai-result-card">
-                        <p>No tissue expression data available for <strong>${geneSymbol}</strong>.</p>
-                    </div>`;
-                } else {
-                    const category = geneData.expression.category || 'Unknown';
-                    const nTissues = geneData.expression.n_tissues || 0;
-                    const isPan = category.toLowerCase().includes('pan-ciliary') || category.toLowerCase().includes('ubiquitous');
-                    const isIdio = category.toLowerCase().includes('idio-ciliary') || category.toLowerCase().includes('tissue-specific');
-                    let verdict = '';
-                    if (isPan) {
-                        verdict = `<span style="color:#059669; font-weight:600;">Yes — Pan-ciliary (Ubiquitous)</span>`;
-                    } else if (isIdio) {
-                        verdict = `<span style="color:#dc2626; font-weight:600;">Yes — Idio-ciliary (Tissue-Specific)</span>`;
-                    } else {
-                        verdict = `<span style="color:#7c3aed; font-weight:600;">Multi-tissue / Intermediate</span>`;
-                    }
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>Tissue Expression Category: ${geneSymbol}</h4>
+                    return `<div class="ai-result-card"><p>No tissue expression data available for <strong>${geneSymbol}</strong>.</p></div>`;
+                }
+
+                const category = geneData.expression.category || 'Unknown';
+                const nTissues = geneData.expression.n_tissues || 0;
+                const isPan = category.toLowerCase().includes('pan-ciliary');
+                const isIdio = category.toLowerCase().includes('idio-ciliary');
+                
+                let explanation = '';
+                if (isPan) explanation = getExplanationHTML('Pan');
+                if (isIdio) explanation = getExplanationHTML('Idio');
+
+                return `
+                    ${explanation}
+                    <div class="ai-result-card">
+                        <h4>Expression Category: ${geneSymbol}</h4>
                         <p style="font-size:17px; margin:16px 0;">
-                            ${verdict}<br>
+                            <span style="color:${isPan ? '#059669' : '#7c3aed'}; font-weight:600;">${category}</span><br>
                             <span style="font-size:14px; color:#4b5563;">
-                                Category: <strong>${category}</strong><br>
-                                Detected in <strong>${nTissues}</strong> tissue${nTissues === 1 ? '' : 's'}
+                                Detected in <strong>${nTissues}</strong> / 6 ciliary tissues.
                             </span>
                         </p>
-                        <p style="font-size:13px; color:#64748b;">
-                            Data source: bulk RNA-seq across major human tissues (CiliAI 2025 integration)
-                        </p>
                     </div>`;
-                }
-                return htmlResult;
             }
-            // List requests
-            const isPanList = qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') ||
-                              qLower.includes('ubiquitous') || qLower.includes('ubiquitously expressed');
-            const isIdioList = qLower.includes('idio-ciliary') || qLower.includes('tissue-specific') ||
-                               qLower.includes('specific to') || qLower.includes('only in');
-            if (isPanList || isIdioList || qLower.includes('list') || qLower.includes('show all')) {
-                let filteredGenes = [];
-                Object.entries(window.CiliAI.lookups.geneMap).forEach(([gene, data]) => {
-                    if (!data.expression?.category) return;
-                    const cat = data.expression.category.toLowerCase();
-                    const n = data.expression.n_tissues || 0;
-                    if (isPanList && (cat.includes('pan-ciliary') || cat.includes('ubiquitous'))) {
-                        filteredGenes.push(gene);
-                    } else if (isIdioList && (cat.includes('idio-ciliary') || cat.includes('tissue-specific'))) {
-                        filteredGenes.push(gene);
-                    } else if (qLower.includes('lung') && n === 1 && (data.expression.tissue?.Lung_Primary > 0 || data.expression.tissue?.Lung_Motile > 0)) {
-                        filteredGenes.push(gene);
-                    } else if (qLower.includes('kidney') && n === 1 && data.expression.tissue?.Kidney > 0) {
-                        filteredGenes.push(gene);
-                    } else if (qLower.includes('liver') && n === 1 && data.expression.tissue?.Liver > 0) {
-                        filteredGenes.push(gene);
-                    } else if (qLower.includes('skeleton') && n === 1 && data.expression.tissue?.Skeleton > 0) {
-                        filteredGenes.push(gene);
-                    }
-                });
-                filteredGenes.sort();
-                if (filteredGenes.length === 0) {
-                    htmlResult = `<div class="ai-result-card"><p>No genes match the requested criteria in the current dataset.</p></div>`;
-                } else {
-                    const term = isPanList ? 'Pan-ciliary (Ubiquitous)' :
-                                 isIdioList ? 'Idio-ciliary (Tissue-Specific)' :
-                                 qLower.includes('lung') ? 'Lung-specific' :
-                                 qLower.includes('kidney') ? 'Kidney-specific' : 'Matching';
-                    const preview = filteredGenes.length > 12 ? filteredGenes.slice(0,12).join(', ') + ` … and ${filteredGenes.length-12} more` : filteredGenes.join(', ');
-                    htmlResult = `<div class="ai-result-card">
-                        <h4>${term} Genes</h4>
-                        <p>Found <strong>${filteredGenes.length}</strong> genes.</p>
-                        <p style="font-size:13.5px; line-height:1.5; margin:12px 0;">${preview}</p>
-                        <p style="font-size:12px; color:#64748b;">Want to see the full list or view them in the panel? Type <strong>yes</strong> or <strong>show list</strong>.</p>
-                    </div>`;
-                    window.lastQueryContext = { 
-                        type: 'list_followup',
-                        data: filteredGenes.map(g => ({ gene: g })),
-                        term: `${term} Genes (${filteredGenes.length})`
-                    };
+
+            // 2. List Generation (e.g. "Show pan-ciliary genes")
+            const isPanList = qLower.includes('pan-ciliary') || qLower.includes('pan ciliary') || qLower.includes('ubiquitous');
+            const isIdioList = qLower.includes('idio-ciliary') || qLower.includes('tissue-specific');
+
+            let filteredGenes = [];
+            Object.entries(window.CiliAI.lookups.geneMap).forEach(([gene, data]) => {
+                if (!data.expression?.category) return;
+                const cat = data.expression.category.toLowerCase();
+                const n = data.expression.n_tissues || 0;
+                const tissues = data.expression.tissue || {};
+
+                if (isPanList && (cat.includes('pan-ciliary') || cat.includes('ubiquitous'))) {
+                    filteredGenes.push(gene);
+                } else if (isIdioList && (cat.includes('idio-ciliary') || cat.includes('tissue-specific'))) {
+                    filteredGenes.push(gene);
+                } else if (qLower.includes('lung') && n === 1 && (tissues.Lung_Primary > 0 || tissues.Lung_Motile > 0)) {
+                    filteredGenes.push(gene);
                 }
-                return htmlResult;
+                // ... (other organs omitted for brevity, handled by tissue handler usually)
+            });
+
+            filteredGenes.sort();
+
+            if (filteredGenes.length === 0) {
+                return `<div class="ai-result-card"><p>No genes match the requested criteria in the current dataset.</p></div>`;
             }
-            return null;
+
+            // Prep Context & HTML
+            const term = isPanList ? 'Pan-ciliary (Ubiquitous)' : 'Idio-ciliary (Tissue-Specific)';
+            let explanation = isPanList ? getExplanationHTML('Pan') : (isIdioList ? getExplanationHTML('Idio') : '');
+
+            window.lastQueryContext = { 
+                type: 'list_followup',
+                data: filteredGenes.map(g => ({ gene: g })),
+                term: `${term} Genes (${filteredGenes.length})`
+            };
+            
+            // Return Combined HTML (Explanation + List Wrapper)
+            const listPreview = window.formatListResult(term, filteredGenes.map(g => ({ gene: g })), `Found ${filteredGenes.length} genes.`);
+            return explanation + listPreview;
         }
     },
 
@@ -7218,6 +7304,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
