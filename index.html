@@ -1505,62 +1505,75 @@ window.SpatialManager = SpatialManager;
         };
 
 // ==========================================================
-// AUTOMATIC STATISTICS CALCULATION
+// AUTOMATIC STATISTICS CALCULATION (Fixed)
 // ==========================================================
 window.calculateAndDisplayStatistics = function() {
-    if (!window.CiliAI || !window.CiliAI.masterData || !window.CiliAI.lookups.geneMap) {
-        console.warn("Data not ready for statistics calculation");
+    if (!window.CiliAI || !window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
+        console.warn("Stats Error: Data not ready yet.");
         return;
     }
 
-    // 1. Total Ciliary Genes
-    const totalGenes = window.CiliAI.masterData.length;
-    
-    // 2. Ciliopathy Diseases (only primary, motile, and atypical)
-    const ciliopathyDiseases = new Set();
-    const ciliopathyGenes = new Set();
-    
-    // Define categories to include (primary, motile, atypical)
+    // 1. Define User's Strict Categories
     const includedCategories = [
         'primary ciliopathy',
         'motile ciliopathy', 
-        'atypical ciliopathy',
         'Primary ciliopathy',
         'Motile ciliopathy',
         'Atypical ciliopathy'
     ];
-    
-    // Filter genes for ciliopathies
+
+    // Normalize for easier matching (lowercase)
+    const allowedLower = includedCategories.map(c => c.toLowerCase());
+
+    const uniqueDiseases = new Set();
+    const ciliopathyGenes = new Set();
+
     window.CiliAI.masterData.forEach(gene => {
-        if (gene.Ciliopathies || gene.Ciliopathy) {
-            let ciliopathyData = gene.Ciliopathies || gene.Ciliopathy;
+        // 2. Determine Classification
+        // We look at the gene's classification field first
+        const classification = gene.ciliopathy_classification || '';
+        
+        // Check if this gene belongs to an allowed category
+        // We use 'includes' to match "Primary Ciliopathies" with "primary ciliopathy"
+        const isAllowed = allowedLower.some(allowed => 
+            classification.toLowerCase().includes(allowed)
+        );
+
+        if (isAllowed) {
+            // 3. Add to Statistics
             
-            // Handle both array and string formats
-            if (typeof ciliopathyData === 'string') {
-                ciliopathyData = ciliopathyData.split(/[;,]/).map(s => s.trim());
-            }
-            
-            if (Array.isArray(ciliopathyData)) {
-                ciliopathyData.forEach(disease => {
-                    if (disease && disease.trim() !== '') {
-                        // Check if disease belongs to included categories
-                        const diseaseLower = disease.toLowerCase();
-                        if (includedCategories.some(cat => diseaseLower.includes(cat.toLowerCase()))) {
-                            ciliopathyDiseases.add(disease.trim());
-                            ciliopathyGenes.add(gene.Gene);
-                        }
+            // Add Gene
+            ciliopathyGenes.add(gene.Gene);
+
+            // Add Diseases (parse from string or array)
+            let rawDiseases = gene.Ciliopathies || gene.Ciliopathy;
+            if (rawDiseases) {
+                let list = [];
+                if (Array.isArray(rawDiseases)) list = rawDiseases;
+                else if (typeof rawDiseases === 'string') list = rawDiseases.split(/[;,]/).map(s => s.trim());
+                
+                list.forEach(d => {
+                    if (d && d.length > 2 && d.toUpperCase() !== 'N/A') {
+                        uniqueDiseases.add(d);
                     }
                 });
             }
         }
     });
-    
-    // Update the dashboard with calculated values
-    document.getElementById('stat-genes').textContent = totalGenes.toLocaleString();
-    document.getElementById('stat-ciliopathys').textContent = ciliopathyDiseases.size.toLocaleString();
-    document.getElementById('stat-ciliopathy-genes').textContent = ciliopathyGenes.size.toLocaleString();
-    
-    console.log(`Statistics calculated: ${totalGenes} genes, ${ciliopathyDiseases.size} ciliopathy diseases, ${ciliopathyGenes.size} ciliopathy genes`);
+
+    // 4. Update Dashboard UI
+    const elGenes = document.getElementById('stat-genes');
+    const elDiseases = document.getElementById('stat-ciliopathys');
+    const elCilGenes = document.getElementById('stat-ciliopathy-genes');
+
+    requestAnimationFrame(() => {
+        if (elGenes) elGenes.textContent = window.CiliAI.masterData.length.toLocaleString();
+        if (elDiseases) elDiseases.textContent = uniqueDiseases.size.toLocaleString();
+        if (elCilGenes) elCilGenes.textContent = ciliopathyGenes.size.toLocaleString();
+    });
+
+    console.log(`[Stats Updated] Included Categories: ${includedCategories.join(', ')}`);
+    console.log(`[Stats Result] ${uniqueDiseases.size} diseases, ${ciliopathyGenes.size} genes.`);
 };
 
 /* ============ DATA LOADING & PROCESSING ENGINE ============ */
@@ -2211,6 +2224,7 @@ window.initCiliAI = async function() {
 </script>
 </body>
 </html>
+
 
 
 
