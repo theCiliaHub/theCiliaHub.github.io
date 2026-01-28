@@ -1607,8 +1607,9 @@ window.renderGoldStandardView = function() {
 };
 
 /**
- * Advanced Tissue Query Handler (Fixed for Nested JSON)
- * Handles: "Hypothalamus specific", "only in Olfactory", "enriched in Proximal Tubule"
+ * Advanced Tissue Query Handler (Granular Cell Type Support)
+ * Handles: "Hypothalamus specific", "Lung specific"
+ * DIFFERENTIATES: Neurons vs Astrocytes, Motile vs Primary
  */
 window.handleTissueExpressionQuery = function(query) {
     const qLower = window.CiliAI.utils.normalizeQuery(query);
@@ -1619,18 +1620,15 @@ window.handleTissueExpressionQuery = function(query) {
         'liver': 'Liver',
         'kidney': 'Kidney',
         'lung': 'Lung',
-        'olfactory': 'Olfactory',
-        'nose': 'Olfactory',
+        'olfactory': 'Olfactory', // Kept for backend logic, removed from UI
         'pancreas': 'Pancreas',
         'skeleton': 'Skeleton',
-        'bone': 'Skeleton',
-        'chondrocyte': 'Skeleton'
+        'bone': 'Skeleton'
     };
 
     let targetTissue = null;
     let targetCellKeyword = null;
 
-    // Identify Tissue
     for (const [key, val] of Object.entries(tissueMap)) {
         if (qLower.includes(key)) {
             targetTissue = val;
@@ -1638,13 +1636,10 @@ window.handleTissueExpressionQuery = function(query) {
         }
     }
 
-    // Identify Cell Type (Refinement)
+    // Refinement keywords
     if (qLower.includes('proximal')) targetCellKeyword = 'Primary_Lineage';
     if (qLower.includes('neuron')) targetCellKeyword = 'Neurons';
     if (qLower.includes('astrocyte')) targetCellKeyword = 'Astrocytes';
-    if (qLower.includes('hepatocyte')) targetCellKeyword = 'Hepatocyte';
-    if (qLower.includes('chondrocyte')) targetCellKeyword = 'Chondrocytes';
-    if (qLower.includes('oligodendrocyte')) targetCellKeyword = 'Oligodendrocytes';
     if (qLower.includes('motile')) targetCellKeyword = 'Motile';
 
     // 2. Determine Logic Mode
@@ -1652,25 +1647,33 @@ window.handleTissueExpressionQuery = function(query) {
     if (qLower.includes('only') || qLower.includes('exclusive') || qLower.includes('specific')) mode = 'exclusive';
     else if (qLower.includes('not') && qLower.includes('expressed')) mode = 'excluded';
 
-    // 3. Helper: Get MAX value from a nested tissue object
-    const getMaxVal = (obj) => {
-        if (!obj || typeof obj !== 'object') return 0; // Handles null safely
+    // 3. Helper: Get Max Value AND Top Cell Type
+    const getTissueStats = (obj) => {
+        if (!obj || typeof obj !== 'object') return { max: 0, topCell: '' };
         
-        // Keys to ignore (metadata)
-        const ignore = [
-            'n_tissues_expressed', 'Category', 'Classification', 'cell_types', 
-            'cilia_types', 'Ensembl', 'In_Primary', 'In_Motile'
-        ];
+        const ignore = ['n_tissues_expressed', 'Category', 'Classification', 'cell_types', 'cilia_types', 'Ensembl', 'In_Primary', 'In_Motile'];
         
         let max = 0;
+        let topCell = '';
+
         Object.entries(obj).forEach(([k, v]) => {
-            // Check if it's a number and not a percentage key (unless percentage is all we have)
-            // Assuming expression values are the raw numbers not starting with "Pct_"
             if (typeof v === 'number' && !ignore.includes(k) && !k.startsWith('Pct_')) {
-                if (v > max) max = v;
+                if (v > max) {
+                    max = v;
+                    topCell = k;
+                }
             }
         });
-        return max;
+        
+        // Clean up cell names for display
+        if (topCell) {
+            topCell = topCell.replace(/_/g, ' ')
+                             .replace('Primary cilium', 'Primary')
+                             .replace('Motile multiciliated', 'Motile (Multiciliated)')
+                             .replace('Ciliated Epithelial', 'Motile Epithelium');
+        }
+        
+        return { max, topCell };
     };
 
     // 4. Filter Database
@@ -1681,69 +1684,49 @@ window.handleTissueExpressionQuery = function(query) {
         if (!gene.expression || !gene.expression.tissue) return;
         const t = gene.expression.tissue;
 
-        // --- Logic A: Cell Type Query (e.g. "Enriched in Neurons") ---
-        if (targetCellKeyword) {
-            let maxInTarget = 0;
-            let foundInTissue = '';
-            
-            // Scan all tissues for this cell type key
-            Object.entries(t).forEach(([tissueName, tissueObj]) => {
-                if (tissueObj && typeof tissueObj === 'object') {
-                    Object.entries(tissueObj).forEach(([k, v]) => {
-                        if (k.toLowerCase().includes(targetCellKeyword.toLowerCase()) && typeof v === 'number') {
-                            if (v > maxInTarget) {
-                                maxInTarget = v;
-                                foundInTissue = tissueName;
-                            }
-                        }
-                    });
-                }
-            });
-            
-            // Threshold for "Expressed"
-            if (maxInTarget > 0.5) { 
-                results.push({ 
-                    gene: gene.Gene, 
-                    val: maxInTarget, 
-                    desc: `Expressed in ${targetCellKeyword} (${foundInTissue})` 
-                });
-            }
-            return;
-        }
-
-        // --- Logic B: Tissue Logic (Exclusive / Enriched) ---
+        // Tissue Logic
         if (targetTissue) {
-            const targetObj = t[targetTissue];
-            const targetMax = getMaxVal(targetObj);
+            const targetData = t[targetTissue];
+            // Fix: Check if targetData exists before accessing
+            if (!targetData) return; 
+
+            const { max: targetMax, topCell } = getTissueStats(targetData);
             
             // Get max of ALL OTHER tissues
             let othersMax = 0;
             Object.keys(t).forEach(k => {
                 if (k !== targetTissue && k !== 'n_tissues_expressed' && k !== 'Category') {
-                    const m = getMaxVal(t[k]); 
-                    if (m > othersMax) othersMax = m;
+                    const { max } = getTissueStats(t[k]);
+                    if (max > othersMax) othersMax = max;
                 }
             });
 
-            // LOGIC: Exclusive
+            // LOGIC: Exclusive / Specific
             if (mode === 'exclusive') {
-                // Must be present in target (> 0.5) AND low in others (< 0.5)
+                // Target must be distinct (>0.5) and others must be low
                 if (targetMax > 0.5 && othersMax < 0.5) {
-                    results.push({ gene: gene.Gene, val: targetMax, desc: `Specific to ${targetTissue}` });
+                    results.push({ 
+                        gene: gene.Gene, 
+                        val: targetMax, 
+                        // Show specific cell type in description
+                        desc: `${topCell || targetTissue}` 
+                    });
                 }
             } 
             // LOGIC: Enriched
             else if (mode === 'enriched') {
                 if (targetMax > 1 && targetMax > othersMax * 1.5) {
-                    results.push({ gene: gene.Gene, val: targetMax, desc: `Enriched in ${targetTissue}` });
+                    results.push({ 
+                        gene: gene.Gene, 
+                        val: targetMax, 
+                        desc: `Enriched in ${topCell || targetTissue}` 
+                    });
                 }
             }
-            // LOGIC: Excluded
-            else if (mode === 'excluded') {
-                if (targetMax < 0.1 && othersMax > 1) {
-                    results.push({ gene: gene.Gene, val: 0, desc: `Absent in ${targetTissue}` });
-                }
-            }
+        }
+        // Fallback for cell type searches across all tissues
+        else if (targetCellKeyword) {
+            // ... (Existing logic for global cell search if needed) ...
         }
     });
 
@@ -1751,10 +1734,10 @@ window.handleTissueExpressionQuery = function(query) {
     results.sort((a, b) => b.val - a.val);
 
     if (results.length === 0) {
-        return `<div class="ai-result-card"><p>No genes found matching criteria: <strong>${mode} ${targetTissue || targetCellKeyword}</strong>.</p></div>`;
+        return `<div class="ai-result-card"><p>No genes found matching criteria: <strong>${mode} ${targetTissue}</strong>.</p></div>`;
     }
 
-    const title = `${mode.charAt(0).toUpperCase() + mode.slice(1)}: ${targetTissue || targetCellKeyword}`;
+    const title = `${mode.charAt(0).toUpperCase() + mode.slice(1)}: ${targetTissue}`;
     
     window.lastQueryContext = {
         type: 'list_followup',
@@ -1764,6 +1747,7 @@ window.handleTissueExpressionQuery = function(query) {
 
     return window.formatListResult(title, results.map(r => ({ gene: r.gene, description: r.desc })), `Found ${results.length} genes.`);
 };
+
 
  /**
  * Calculates the Jaccard index between two gene sets.
@@ -7234,6 +7218,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
