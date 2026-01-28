@@ -576,7 +576,7 @@
 
         <strong>Quick things you can try:</strong>
 
-       <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Gene & Expression
         </div>
 
@@ -587,13 +587,18 @@
           </span>
           
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Hypothalamus specific genes')">
-            Hypothalamus specific
+                onclick="window.handleAIQuery('Show genes only expressed in the Olfactory system')">
+            Olfactory-specific genes
           </span>
 
           <span class="gene-badge"
                 onclick="window.handleAIQuery('Show genes enriched in Proximal Tubule cells')">
             Proximal Tubule enriched
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Display ciliary genes only expressed in Hypothalamus')">
+            Hypothalamus specific
           </span>
 
           <span class="gene-badge"
@@ -606,29 +611,29 @@
             Show pan-ciliary genes
           </span>
         </div>
-          
+
         <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Ciliopathies & Diseases
         </div>
 
         <div class="suggested-chips" style="margin-bottom:20px;">
           <span class="gene-badge"
-                onclick="window.handleAIQuery('List genes for Joubert syndrome')">
+                onclick="window.handleAIQuery('Display Joubert syndrome genes')">
             Display Joubert syndrome genes
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Genes in Primary Ciliary Dyskinesia')">
+                onclick="window.handleAIQuery('List Primary Ciliary Dyskinesia genes')">
             List Primary Ciliary Dyskinesia genes
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Bardet-Biedl syndrome genes')">
+                onclick="window.handleAIQuery('Display Bardet–Biedl genes')">
             Display Bardet–Biedl genes
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('How many unique ciliopathy genes are there?')">
+                onclick="window.handleAIQuery('Total ciliopathy genes')">
             Total ciliopathy genes
           </span>
         </div>
@@ -639,7 +644,7 @@
 
         <div class="suggested-chips">
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Where is PCM1 localized?')">
+                onclick="window.handleAIQuery('PCM1 localization')">
             PCM1 localization
           </span>
 
@@ -649,7 +654,7 @@
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Transition zone genes')">
+                onclick="window.handleAIQuery('Display transition zone genes')">
             Display transition zone genes
           </span>
         </div>
@@ -660,31 +665,27 @@
 
         <div class="suggested-chips" style="margin-bottom:20px;">
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Evolution of BBS1')">
+                onclick="window.handleAIQuery('Show BBS1 evolution')">
             Show BBS1 evolution
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Loss-of-function phenotype of IFT88')">
-         Tell me about IFT88 screen
+                onclick="window.handleAIQuery('Tell me about IFT88 screen')">
+            Tell me about IFT88 screen
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Mouse ortholog of ARL13B')">
+                onclick="window.handleAIQuery('Display ARL13B mouse ortholog')">
             Display ARL13B mouse ortholog
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Protein domains of WDR31')">
+                onclick="window.handleAIQuery('WDR31 domains')">
             WDR31 domains
           </span>
         </div>
 
-        <div style="margin-top:20px; font-size:13px; color:#6b7280;">
-          Just type a question — or click any chip above to begin.
-        </div>
-
-      </div>
+      </div>    
     </div>
   </div>
 </div>
@@ -2229,6 +2230,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
