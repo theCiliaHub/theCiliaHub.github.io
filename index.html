@@ -1780,16 +1780,21 @@ window.loadCiliAIData = async function() {
         };
 
         // ---------------- MASTER DATA REGISTRATION ----------------
+       // ---------------- MASTER DATA REGISTRATION ----------------
         window.CiliAI.masterData = mainRes?.masterData || [];
         window.CiliAI.lookups = lookupsRes?.lookups || { geneMap: {} };
 
         if (expressionData && typeof expressionData === 'object') {
             window.CiliAI.expressionAtlas = expressionData;
+            
+            // Map the new complex JSON structure to the gene map
             Object.entries(expressionData).forEach(([gene, exprObj]) => {
                 const upperGene = gene.toUpperCase();
                 window.CiliAI.lookups.geneMap[upperGene] = window.CiliAI.lookups.geneMap[upperGene] || { Gene: upperGene };
+                
+                // Store the full complex object
                 window.CiliAI.lookups.geneMap[upperGene].expression = {
-                    tissue: exprObj,
+                    tissue: exprObj, // Now contains nested objects (Hypothalamus -> {CellTypes...})
                     n_tissues: exprObj.n_tissues_expressed || 0,
                     category: exprObj.Category || 'Unknown'
                 };
@@ -2224,6 +2229,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
