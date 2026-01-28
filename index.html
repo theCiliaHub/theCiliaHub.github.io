@@ -576,7 +576,7 @@
 
         <strong>Quick things you can try:</strong>
 
-        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+       <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Gene & Expression
         </div>
 
@@ -585,15 +585,19 @@
                 onclick="window.renderGoldStandardView()">
             ⭐ Show Gold Standard ciliary genes
           </span>
-            
-        <div class="suggested-chips" style="margin-bottom:20px;">
+          
           <span class="gene-badge"
-                onclick="window.handleAIQuery('IFT88 details')">
-            IFT88 Data Details
+                onclick="window.handleAIQuery('Show genes only expressed in the Olfactory system')">
+            Olfactory-specific genes
           </span>
 
           <span class="gene-badge"
-                onclick="window.handleAIQuery('Plot ARL13B expression')">
+                onclick="window.handleAIQuery('Show genes enriched in Proximal Tubule cells')">
+            Proximal Tubule enriched
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Display ARL13B scRNA-seq expression')">
             Display ARL13B scRNA-seq expression
           </span>
 
@@ -606,6 +610,7 @@
                 onclick="window.handleAIQuery('Show pan-ciliary genes')">
             Show pan-ciliary genes
           </span>
+        </div>
 
         <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
           Ciliopathies & Diseases
@@ -2229,6 +2234,7 @@ window.handleUserSend = function() {
 </script>
 </body>
 </html>
+
 
 
 
