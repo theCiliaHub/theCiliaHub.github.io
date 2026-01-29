@@ -956,8 +956,8 @@ window.SpatialManager = SpatialManager;
         return SpatialManager.highlight(locTerm, gene);
 };
 
-    /* ==============================================================
- * MODULE: HYBRID CILIUM RENDERER (Classic Structure + Magical IFT)
+/* ==============================================================
+ * MODULE: ADVANCED HYBRID CILIUM (Multi-Component Transport)
  * ============================================================== */
 window.generateAndInjectSVG = function() {
     const container = document.getElementById('cilia-svg');
@@ -965,36 +965,56 @@ window.generateAndInjectSVG = function() {
 
     // Set Title
     const titleEl = document.getElementById('current-viz-title');
-    if(titleEl) titleEl.textContent = "Diagram: Live Ciliary Dynamics";
+    if(titleEl) titleEl.textContent = "Diagram: Live IFT Transport Dynamics";
 
-    // 1. Inject Styles (Animations adapted for Classic Coordinates)
+    // 1. Inject Styles (Complex Animations)
     const styleId = 'cilia-hybrid-styles';
     if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
         style.id = styleId;
         style.innerHTML = `
-            /* --- IFT Animations (Calibrated for Classic Axoneme Length) --- */
-            @keyframes iftMoveUp {
+            /* --- Anterograde (Base -> Tip) --- */
+            @keyframes moveUp {
                 0% { transform: translateY(0); opacity: 0; }
                 10% { opacity: 1; }
                 90% { opacity: 1; }
-                100% { transform: translateY(-125px); opacity: 0; } /* Moves from y=160 to y=35 */
+                100% { transform: translateY(-125px); opacity: 0; }
             }
-            @keyframes iftMoveDown {
+
+            /* --- Retrograde (Tip -> Base) --- */
+            @keyframes moveDown {
                 0% { transform: translateY(-125px); opacity: 0; }
                 10% { opacity: 1; }
                 90% { opacity: 1; }
                 100% { transform: translateY(0); opacity: 0; }
             }
-            
-            /* --- Interactive Elements --- */
-            .cilia-part { 
-                cursor: pointer; 
-                transition: all 0.3s ease; 
-                pointer-events: all;
-            }
-            
-            /* Active Highlight (Pulse Effect) */
+
+            /* --- Particle Styles --- */
+            .transport-particle { pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); }
+
+            /* KINESIN (Motor Up) - Green */
+            .kinesin { fill: #22c55e; animation: moveUp 4s linear infinite; }
+
+            /* IFT-B (Cargo Adapter Up) - Teal */
+            .ift-b { fill: #06b6d4; animation: moveUp 4s linear infinite; }
+
+            /* DYNEIN (Motor Down) - Red/Orange */
+            .dynein { fill: #f97316; animation: moveDown 4s linear infinite; }
+
+            /* IFT-A (Cargo Adapter Down) - Blue */
+            .ift-a { fill: #3b82f6; animation: moveDown 4s linear infinite; }
+
+            /* BBSome (Cargo Complex) - Gold */
+            .bbsome-up { fill: #eab308; animation: moveUp 4s linear infinite; }
+            .bbsome-down { fill: #eab308; animation: moveDown 4s linear infinite; }
+
+            /* Staggered Delays for continuous flow */
+            .d-0 { animation-delay: 0s; }
+            .d-1 { animation-delay: 1.3s; }
+            .d-2 { animation-delay: 2.6s; }
+
+            /* Interactive Elements */
+            .cilia-part { cursor: pointer; transition: all 0.3s ease; }
             .cilia-part.active-highlight {
                 opacity: 1 !important;
                 filter: drop-shadow(0 0 8px rgba(246, 224, 94, 0.9)) !important;
@@ -1002,36 +1022,25 @@ window.generateAndInjectSVG = function() {
                 stroke-width: 2px !important;
                 z-index: 100;
             }
-
-            /* IFT Trains */
-            .ift-train { fill: #ffffff; filter: drop-shadow(0 0 2px rgba(0,0,0,0.3)); pointer-events: none; }
-            .ift-up { animation: iftMoveUp 3.5s linear infinite; fill: #10b981; }   /* Green Up */
-            .ift-down { animation: iftMoveDown 3.5s linear infinite; fill: #f59e0b; } /* Orange Down */
             
-            /* Delays for continuous traffic */
-            .delay-1 { animation-delay: 0s; }
-            .delay-2 { animation-delay: 1.2s; }
-            .delay-3 { animation-delay: 2.4s; }
-
-            /* Tooltip */
             #cilium-tooltip {
                 position: absolute;
-                background: rgba(0, 0, 0, 0.85);
+                background: rgba(15, 23, 42, 0.9);
                 color: white;
-                padding: 4px 10px;
-                border-radius: 4px;
+                padding: 6px 10px;
+                border-radius: 6px;
                 font-size: 11px;
                 pointer-events: none;
                 opacity: 0;
                 transition: opacity 0.2s;
                 z-index: 1000;
-                transform: translate(10px, 10px);
+                border: 1px solid #334155;
             }
         `;
         document.head.appendChild(style);
     }
 
-    // 2. Generate the Hybrid SVG (Classic Geometry + IFT Group)
+    // 2. Generate SVG
     container.innerHTML = `
         <div class="cilia-container" style="position:relative; width:100%; height:100%; display:flex; justify-content:center; align-items:center;">
             <div id="cilium-tooltip"></div>
@@ -1056,11 +1065,6 @@ window.generateAndInjectSVG = function() {
                     </linearGradient>
                     <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" style="stop-color:#2563eb;" /> <stop offset="100%" style="stop-color:#1d4ed8;" />
-                    </linearGradient>
-                    <linearGradient id="heatmapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#00ff00" stop-opacity="0.2" />
-                        <stop offset="50%" stop-color="#ffff00" stop-opacity="0.5" />
-                        <stop offset="100%" stop-color="#ff0000" stop-opacity="0.8" />
                     </linearGradient>
                 </defs>
 
@@ -1090,20 +1094,34 @@ window.generateAndInjectSVG = function() {
                           fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
                           d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
 
-                    <g id="ift-system" style="pointer-events:none;">
-                        <circle class="ift-train ift-up delay-1" cx="136" cy="160" r="2.5" />
-                        <circle class="ift-train ift-up delay-2" cx="136" cy="160" r="2.5" />
-                        <circle class="ift-train ift-up delay-3" cx="136" cy="160" r="2.5" />
+                    <g id="transport-system">
+                        <circle class="transport-particle kinesin d-0" cx="134" cy="160" r="2" />
+                        <circle class="transport-particle kinesin d-1" cx="134" cy="160" r="2" />
+                        <circle class="transport-particle kinesin d-2" cx="134" cy="160" r="2" />
+
+                        <rect class="transport-particle ift-b d-0" x="132" y="163" width="4" height="4" />
+                        <rect class="transport-particle ift-b d-1" x="132" y="163" width="4" height="4" />
+                        <rect class="transport-particle ift-b d-2" x="132" y="163" width="4" height="4" />
                         
-                        <circle class="ift-train ift-down delay-1" cx="144" cy="160" r="2.5" />
-                        <circle class="ift-train ift-down delay-2" cx="144" cy="160" r="2.5" />
+                        <circle class="transport-particle bbsome-up d-1" cx="134" cy="168" r="1.5" />
+
+
+                        <circle class="transport-particle dynein d-0" cx="146" cy="160" r="2.5" />
+                        <circle class="transport-particle dynein d-1" cx="146" cy="160" r="2.5" />
+                        <circle class="transport-particle dynein d-2" cx="146" cy="160" r="2.5" />
+
+                        <rect class="transport-particle ift-a d-0" x="144" y="163" width="4" height="4" />
+                        <rect class="transport-particle ift-a d-1" x="144" y="163" width="4" height="4" />
+                        <rect class="transport-particle ift-a d-2" x="144" y="163" width="4" height="4" />
+                        
+                        <circle class="transport-particle bbsome-down d-2" cx="146" cy="168" r="1.5" />
                     </g>
 
                     <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
-                        <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">PCM1</text>
-                        <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">TMEM17</text>
-                        <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">ARL13B</text>
-                        <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">β2-tubulin</text>
+                        <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">Basal Body</text>
+                        <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">Transition Zone</text>
+                        <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">Membrane</text>
+                        <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">Axoneme</text>
                     </g>
 
                 </g>
@@ -1111,13 +1129,23 @@ window.generateAndInjectSVG = function() {
         </div>
     `;
 
-    // 3. Attach Logic (Hover & Click)
+    // 3. Attach Logic (Hover, Tooltips, Clicks)
     const tooltip = document.getElementById('cilium-tooltip');
     
-    // Hover: Show Tooltip
+    // Component Map for Tooltips
+    const compNames = {
+        'basal-body': 'Basal Body (PCM1)',
+        'transition-zone': 'Transition Zone (NPHP/MKS)',
+        'axoneme': 'Axoneme (Tubulin)',
+        'ciliary-membrane': 'Ciliary Membrane (ARL13B)',
+        'nucleus': 'Nucleus',
+        'cell-body': 'Cell Body'
+    };
+
     container.querySelectorAll('.cilia-part').forEach(part => {
+        // Hover
         part.addEventListener('mousemove', (e) => {
-            const name = part.id.replace(/-/g, ' ').toUpperCase();
+            const name = compNames[part.id] || part.id;
             if (tooltip) {
                 tooltip.textContent = name;
                 tooltip.style.left = (e.offsetX + 10) + 'px';
@@ -1129,17 +1157,16 @@ window.generateAndInjectSVG = function() {
             if(tooltip) tooltip.style.opacity = '0';
         });
         
-        // Click: Zoom & Context
+        // Click
         part.addEventListener('click', (e) => {
             e.stopPropagation();
             if(window.SpatialManager && window.SpatialManager.zoomTo) {
                 window.SpatialManager.zoomTo(part);
             }
-            // Highlight interaction
             document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
             part.classList.add('active-highlight');
             
-            // Labels
+            // Show Labels
             const labels = container.querySelector('.cilia-labels');
             if(labels) labels.style.opacity = '1';
         });
@@ -1154,6 +1181,9 @@ window.generateAndInjectSVG = function() {
         }
     });
 };
+
+
+    
     
         // 4. Helper Functions
         window.addChatMessage = function(html, isUser = false) {
@@ -2152,6 +2182,7 @@ window.initCiliAI();
 </script>
 </body>
 </html>
+
 
 
 
