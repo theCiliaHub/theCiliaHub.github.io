@@ -3634,69 +3634,87 @@ window.terminologyQueries = {
 };
 
 /* ==============================================================
- * MODULE: scRNA-seq DOT PLOT ENGINE
- * ============================================================== */
-
-/* ==============================================================
- * MODULE: scRNA-seq DOT PLOT ENGINE (Robust Version)
+ * MODULE: scRNA-seq DOT PLOT ENGINE (Fixed Data Retrieval)
  * ============================================================== */
 window.calculateDotPlotData = function(genes, datasetKey) {
+    // 1. Get Dataset & Map
     const dataset = window.CiliAI.datasets[datasetKey];
     if (!dataset || !dataset.umap) {
-        console.error(`[DotPlot] Dataset ${datasetKey} not found.`);
+        console.error(`[DotPlot] Dataset ${datasetKey} invalid.`);
         return null;
     }
 
-    // 1. Group every cell by its cell_type label
+    // 2. Map Cell Types to Indices
+    // We create a map: { "Ciliated Cell": [0, 5, 12...], "Basal Cell": [1, 3...] }
     const cellsByType = {};
     dataset.umap.forEach((p, index) => {
         const cType = p.cell_type || 'Unknown';
         if (!cellsByType[cType]) cellsByType[cType] = [];
-        cellsByType[cType].push({
-            index: index,
-            id: p.cell_id || p.id // Needed for cell-centric lookup
-        });
+        cellsByType[cType].push(index); 
     });
 
     const uniqueCellTypes = Object.keys(cellsByType).sort();
     const x = [], y = [], size = [], color = [];
 
-    // 2. Iterate through each requested gene
+    // 3. Process Genes
     genes.forEach(gene => {
         const geneUpper = gene.toUpperCase();
-        
-        // Use the shared helper to get the expression array for the whole dataset
-        const result = window.extractExpressionForGene(geneUpper, dataset, dataset.umap);
-        const exprArray = result.exprArray;
+        let exprArray = null;
 
-        uniqueCellTypes.forEach(cType => {
-            const cellGroup = cellsByType[cType];
-            let sum = 0;
-            let nonZeroCount = 0;
+        // --- ATTEMPT 1: Use the Helper (Best Practice) ---
+        if (typeof window.extractExpressionForGene === 'function') {
+            const result = window.extractExpressionForGene(geneUpper, dataset, dataset.umap);
+            if (result.found) exprArray = result.exprArray;
+        }
+
+        // --- ATTEMPT 2: Direct Global Cache Lookup (Backup) ---
+        // (This catches cases where data was loaded lazily for UMAP)
+        if (!exprArray && window.CiliAI.cellDataCache && window.CiliAI.cellDataCache[geneUpper]) {
+            console.log(`[DotPlot] Found ${geneUpper} in cellDataCache`);
+            // Convert the sparse/object cache to a dense array matching UMAP order
+            const cached = window.CiliAI.cellDataCache[geneUpper];
+            exprArray = new Float32Array(dataset.umap.length);
             
-            cellGroup.forEach(cell => {
-                const val = exprArray[cell.index];
-                if (val > 0) {
-                    sum += val;
-                    nonZeroCount++;
-                }
+            // If cache is { "Ciliated Cell": 5.2, ... } (Cell-type averaged)
+            if (typeof cached === 'object' && !Array.isArray(cached) && !cached.cells) {
+                dataset.umap.forEach((p, i) => {
+                    exprArray[i] = cached[p.cell_type] || 0;
+                });
+            }
+        }
+
+        // If still no data, log warning and skip logic (will result in 0s)
+        if (!exprArray) {
+            console.warn(`[DotPlot] No data found for ${geneUpper}`);
+            exprArray = new Float32Array(dataset.umap.length).fill(0);
+        }
+
+        // 4. Calculate Stats for this Gene
+        uniqueCellTypes.forEach(cType => {
+            const indices = cellsByType[cType];
+            let sum = 0;
+            let countNonZero = 0;
+            
+            indices.forEach(idx => {
+                const val = exprArray[idx];
+                sum += val;
+                if (val > 0) countNonZero++;
             });
 
-            // Calculate Stats for this Gene/CellType pair
-            const avgExpr = cellGroup.length > 0 ? (sum / cellGroup.length) : 0;
-            const pctExpr = cellGroup.length > 0 ? (nonZeroCount / cellGroup.length) * 100 : 0;
+            // Math: Avoid division by zero
+            const avg = indices.length ? (sum / indices.length) : 0;
+            const pct = indices.length ? (countNonZero / indices.length) * 100 : 0;
 
-            // Only add to plot if there is at least some expression (optional)
-            // Or add everything to keep the grid consistent
             x.push(geneUpper);
             y.push(cType);
-            size.push(pctExpr); 
-            color.push(avgExpr);
+            size.push(pct);
+            color.push(avg);
         });
     });
 
     return { x, y, size, color, cellTypes: uniqueCellTypes };
 };
+
 
 // 2. THE RENDERER (Draws the plot & Sends "Chat Link")
 window.renderDotPlot = function(geneList) {
@@ -7468,6 +7486,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
