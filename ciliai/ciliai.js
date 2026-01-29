@@ -3633,6 +3633,128 @@ window.terminologyQueries = {
     "what does idio-ciliary mean": "<b>Idio-ciliary</b> (from Greek 'idios', meaning own/private) refers to genes with expression restricted to specific ciliary subtypes, indicating specialized rather than general functions."
 };
 
+/* ==============================================================
+ * MODULE: scRNA-seq DOT PLOT ENGINE
+ * ============================================================== */
+
+/**
+ * Calculates Dot Plot statistics (Avg Expression & % Expressed)
+ */
+window.calculateDotPlotData = function(genes, datasetKey) {
+    const dataset = window.CiliAI.datasets[datasetKey];
+    if (!dataset || !dataset.umap) return null;
+
+    // 1. Group Cells by Type
+    const cellsByType = {};
+    dataset.umap.forEach((p, index) => {
+        const cType = p.cell_type || 'Unknown';
+        if (!cellsByType[cType]) cellsByType[cType] = [];
+        cellsByType[cType].push(index); 
+    });
+
+    const uniqueCellTypes = Object.keys(cellsByType).sort();
+    const x = [], y = [], size = [], color = [];
+
+    // 2. Process Each Gene
+    genes.forEach(gene => {
+        // Use existing robust extractor
+        const { exprArray } = window.extractExpressionForGene(gene, dataset, dataset.umap);
+        
+        uniqueCellTypes.forEach(cType => {
+            const indices = cellsByType[cType];
+            let sum = 0;
+            let nonZeroCount = 0;
+            
+            indices.forEach(idx => {
+                const val = exprArray[idx];
+                sum += val;
+                if (val > 0) nonZeroCount++;
+            });
+
+            const avgExpr = indices.length > 0 ? (sum / indices.length) : 0;
+            const pctExpr = indices.length > 0 ? (nonZeroCount / indices.length) * 100 : 0;
+
+            // Add Data Point
+            x.push(gene);
+            y.push(cType);
+            
+            // Size: Mapped to % Expressed (0-100)
+            size.push(pctExpr); 
+
+            // Color: Average Expression
+            color.push(avgExpr);
+        });
+    });
+
+    return { x, y, size, color, cellTypes: uniqueCellTypes };
+};
+
+/**
+ * Renders the Dot Plot in the main Plotly container.
+ */
+window.renderDotPlot = function(geneList) {
+    window.switchView('plot');
+    const container = document.getElementById('plotly-container');
+    const datasetKey = window.CiliAI.activeDataset || 'lung';
+    const datasetName = window.CiliAI.datasets[datasetKey].name;
+
+    // Handle input string vs array
+    const genes = Array.isArray(geneList) ? geneList : geneList.split(',').filter(g => g);
+
+    if (genes.length === 0) return;
+
+    const stats = window.calculateDotPlotData(genes, datasetKey);
+    if (!stats) {
+        window.addChatMessage("Error: Could not calculate statistics for current dataset.", false);
+        return;
+    }
+
+    // Define Plotly Trace
+    const trace = {
+        x: stats.x,
+        y: stats.y,
+        mode: 'markers',
+        marker: {
+            symbol: 'circle',
+            sizemode: 'area', 
+            sizeref: 2.5, // Scaling factor for dots
+            size: stats.size, // Size = % Expressed
+            color: stats.color, // Color = Avg Expression
+            colorscale: 'Blues',
+            showscale: true,
+            colorbar: { title: 'Avg Exp', thickness: 15, len: 0.5 },
+            line: { color: '#cbd5e0', width: 1 }
+        },
+        hovertemplate: 
+            '<b>%{y}</b><br>' +
+            'Gene: %{x}<br>' +
+            '% Expressed: %{marker.size:.1f}%<br>' +
+            'Avg Expr: %{marker.color:.2f}<extra></extra>'
+    };
+
+    const layout = {
+        title: { text: `<b>Dot Plot: ${datasetName}</b>`, font: { size: 16 } },
+        xaxis: { title: '', tickangle: -45, automargin: true, type: 'category' },
+        yaxis: { title: '', automargin: true, type: 'category', categoryorder: 'category ascending' },
+        margin: { l: 150, r: 50, t: 60, b: 80 }, 
+        paper_bgcolor: 'white',
+        plot_bgcolor: 'white',
+        showlegend: false
+    };
+
+    Plotly.newPlot(container, [trace], layout, { responsive: true });
+    
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>📊 Dot Plot Generated</h4>
+            <p>Comparing <strong>${genes.length} genes</strong> in <strong>${datasetName}</strong>.</p>
+            <ul style="font-size:11px; color:#666;">
+                <li><strong>Dot Size:</strong> % of cells expressing the gene.</li>
+                <li><strong>Dot Color:</strong> Average expression level.</li>
+            </ul>
+        </div>
+    `, false);
+};
 // ==========================================================
 // 4G. Main "Brain" (Query Routers) - FINAL EXPOSED FUNCTION
 // ==========================================================
@@ -5665,7 +5787,6 @@ const intentHandlers = [
         }
     },
 
-// Expression / UMAP Plot (Single Gene or Complex)
 {
     priority: 58,
     matcher: (qLower) =>
@@ -5673,6 +5794,8 @@ const intentHandlers = [
          qLower.includes('display') ||
          qLower.includes('heatmap') ||
          qLower.includes('umap') ||
+         qLower.includes('dot plot') ||  // Added explicit matcher
+         qLower.includes('dotplot') ||
          qLower.includes('scrna') ||
          qLower.includes('expression')) &&
         !qLower.includes('compare') &&
@@ -5682,7 +5805,8 @@ const intentHandlers = [
     handler: async (query) => {
         const qLower = window.CiliAI.utils.normalizeQuery(query);
 
-        /* ---------- Dataset detection (UNCHANGED) ---------- */
+        /* ---------- 1. Dataset detection (UNCHANGED) ---------- */
+        // Detects if user said "in kidney", "in lung", etc.
         const availableDatasets = Object.keys(window.CiliAI.datasets).sort((a, b) => b.length - a.length);
         let detectedDS = null;
 
@@ -5698,14 +5822,16 @@ const intentHandlers = [
 
         if (detectedDS) window.CiliAI.activeDataset = detectedDS;
 
-        /* ---------- Gene / complex detection ---------- */
+        /* ---------- 2. Gene Extraction ---------- */
         let genes = window.CiliAI.utils.extractGenes(query);
+        
+        // Handle Complexes (e.g. "Plot BBSome")
         let finalTargetTerm = null;
         let isComplex = false;
-
+        
         if (genes.length === 0) {
             let cleanQuery = qLower
-                .replace(/plot|display|show|visualize|umap|heatmap|scrna|expression/g, '')
+                .replace(/plot|display|show|visualize|umap|heatmap|scrna|expression|dot plot|dotplot/g, '')
                 .replace(/in|for|of|from/g, '')
                 .trim();
 
@@ -5723,11 +5849,19 @@ const intentHandlers = [
         const finalGenes = genes.length ? genes : ['WDR31'];
         const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
 
-        /* ---------- Zoom ---------- */
+        /* ---------- 3. DOT PLOT BRANCH (NEW) ---------- */
+        if (qLower.includes('dot plot') || qLower.includes('dotplot')) {
+            if (finalGenes.length === 0) {
+                return `<div class="ai-result-card"><p>Please specify genes for the dot plot.</p></div>`;
+            }
+            window.renderDotPlot(finalGenes);
+            return null; // Response handled by render function
+        }
+
+        /* ---------- 4. Standard UMAP/Grid Logic ---------- */
         const zoomMatch = qLower.match(/zoom to\s+([\w\s\-\(\)]+?)(?:\s+(?:in|for)|$)/i);
         const zoomToCellType = zoomMatch ? zoomMatch[1].trim() : null;
 
-        /* ---------- 🔑 NEW RENDER LOGIC (FIXED) ---------- */
         if (!isComplex && finalGenes.length > 1) {
             // Multi-gene: Use Grid
             await window.renderUMAPGrid({
@@ -5736,14 +5870,12 @@ const intentHandlers = [
                 containerId: 'plotly-container'
             });
         } else {
-            // Single gene or Complex: Use Standard Plot (enables side controls)
-            // ERROR WAS HERE: 'validGenes' changed to 'finalGenes'
-            // LOGIC FIX: Changed renderUMAPGrid back to renderUMAPPlot for single view
+            // Single gene or Complex: Use Standard Plot
             window.switchView('plot');
             await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
         }
 
-        /* ---------- UI card (UNCHANGED) ---------- */
+        /* ---------- UI card ---------- */
         const currentDS = window.CiliAI.activeDataset;
         const currentName = window.CiliAI.datasets[currentDS].name;
 
@@ -7325,5 +7457,6 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
