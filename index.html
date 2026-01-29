@@ -845,207 +845,106 @@ Object.assign(window.CiliAI, {
 });
 
 // =======================================================
-// (2) SPATIAL INTELLIGENCE MANAGER
+// (2) SPATIAL INTELLIGENCE MANAGER (v2.0)
 // =======================================================
-const SpatialManager = {
-    // Location normalization map (user → SVG IDs)
+window.SpatialManager = {
+    // Normalization Map (User Terms -> New SVG IDs)
     locMap: {
-        "transition zone": "transition-zone", "tz": "transition-zone",
-        "axoneme": "axoneme", "axonemal": "axoneme",
-        "basal body": "basal-body", "centriole": "basal-body",
-        "ciliary tip": "ciliary-tip",
-        "membrane": "ciliary-membrane", "ciliary membrane": "ciliary-membrane",
-        "cell body": "cell-body", "cytosol": "cell-body",
-        "nucleus": "nucleus"
+        "transition zone": "transition-zone", "tz": "transition-zone", "gate": "transition-zone",
+        "axoneme": "axoneme", "microtubule": "axoneme", "doublet": "axoneme",
+        "basal body": "basal-body", "centriole": "basal-body", "mother centriole": "basal-body",
+        "ciliary tip": "ciliary-tip", "tip": "ciliary-tip", "cap": "ciliary-tip",
+        "membrane": "ciliary-membrane", "sheath": "ciliary-membrane",
+        "distal appendage": "distal-appendage", "fiber": "distal-appendage",
+        "nucleus": "nucleus",
+        "cytosol": "cell-body", "cell body": "cell-body"
     },
 
-    // Gene-aware highlighting with persistence
-    highlight: function (locTerm, gene = null) {
+    // 1. Highlight Logic
+    highlight: function(locTerm, gene = null) {
         if (!locTerm) return false;
-        const container = document.getElementById('cilia-svg');
-        if (!container) return false;
-
-        // Force visibility of diagram
-        container.style.display = 'flex';
-        if (document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
-        if (document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
         
-        const titleEl = document.getElementById('current-viz-title');
-        if (titleEl) titleEl.textContent = "Diagram: Spatial Intelligence";
-
-        // Ensure SVG exists (if it was cleared)
-        if (!container.querySelector('svg')) {
-            if (window.generateAndInjectSVG) window.generateAndInjectSVG();
-        }
-
+        // Ensure Diagram is Visible
+        window.switchView('diagram');
+        
+        // Normalize Term
         const normalized = locTerm.toLowerCase().trim();
-
-        // Map broad terms like "cilia" to specific SVG parts if needed
         let targetId = this.locMap[normalized];
-        if (!targetId && normalized.includes('cilia')) targetId = 'axoneme'; // Fallback
+        
+        // Fallback for broad terms
+        if (!targetId && normalized.includes('cilia')) targetId = 'ciliary-membrane';
 
-        // Clear previous highlights
-        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
-
-        if (!targetId) return false;
-        const element = document.getElementById(targetId);
-        if (!element) return false;
-
-        // Highlight + zoom
-        element.classList.add('active-highlight');
-        this.zoomTo(element);
-
-        // Persist gene → spatial context
-        if (gene) {
-            window.CiliAI.zoomStateByGene[gene] = locTerm;
-            window.CiliAI.activeGeneContext = gene;
+        if (!targetId) {
+            console.warn(`SpatialManager: No map for "${locTerm}"`);
+            return false;
         }
+
+        const el = document.getElementById(targetId);
+        if (!el) {
+            // If SVG isn't ready, retry once
+            window.generateAndInjectSVG();
+            return setTimeout(() => this.highlight(locTerm, gene), 100);
+        }
+
+        // Apply "Active Highlight" Class
+        document.querySelectorAll('.cilia-part').forEach(p => p.classList.remove('active-highlight'));
+        el.classList.add('active-highlight');
+
+        // Zoom to it
+        this.zoomTo(el);
+
+        // Update Tooltip to show what we found
+        const tooltip = document.getElementById('cilium-tooltip');
+        if(tooltip) {
+            tooltip.textContent = `${gene || 'Structure'}: ${locTerm}`;
+            tooltip.style.opacity = 1;
+            setTimeout(() => tooltip.style.opacity = 0, 3000);
+        }
+
         return true;
     },
 
-    // Smooth zoom animation to target structure
-    zoomTo: function (element) {
+    // 2. Cinematic Zoom
+    zoomTo: function(element) {
         const viewport = document.getElementById('viewport-group');
         if (!viewport || !element.getBBox) return;
-        
+
         try {
             const box = element.getBBox();
-            const centerX = box.x + box.width / 2;
-            const centerY = box.y + box.height / 2;
-            const dx = 150 - centerX;
-            const dy = 200 - centerY;
-            viewport.style.transformOrigin = `${centerX}px ${centerY}px`;
-            viewport.style.transition = "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
-            viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
+            // Center of the target element
+            const cx = box.x + box.width / 2;
+            const cy = box.y + box.height / 2;
+            
+            // Center of the SVG viewport (approx 150, 250 based on viewBox 0 0 300 500)
+            // Shift to target
+            const dx = 150 - cx;
+            const dy = 250 - cy;
+
+            viewport.style.transition = "transform 1s cubic-bezier(0.2, 0.8, 0.2, 1)"; // Ease-out "pop"
+            viewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.8)`; // 1.8x Zoom
+            
         } catch(e) {
-            console.warn("Zoom calculation failed", e);
+            console.warn("Zoom error:", e);
         }
     },
 
-    // Smooth animated reset
-    resetZoom: function () {
+    // 3. Reset
+    resetZoom: function() {
         const viewport = document.getElementById('viewport-group');
         if (viewport) {
             viewport.style.transition = "transform 0.6s cubic-bezier(0.4,0,0.2,1)";
             viewport.style.transform = "translate(0,0) scale(1)";
         }
-        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+        document.querySelectorAll('.cilia-part').forEach(p => p.classList.remove('active-highlight'));
     },
 
-    // Utility: restore spatial context by gene
-    restoreByGene: function (gene) {
-        if (!gene) return false;
-        const loc = window.CiliAI?.zoomStateByGene?.[gene];
-        if (!loc) return false;
-        return this.highlight(loc, gene);
-    },
-
-    // New: Apply GO Heatmap
-    applyHeatmap: function (goTerm) {
-        const svg = document.getElementById('cilia-diagram');
-        if (!svg) return;
-
-        // Remove existing overlays
-        document.querySelectorAll('.heatmap-overlay').forEach(el => el.remove());
-
-        // Get genes for GO
-        const genes = window.CiliAI.lookups.goMap[goTerm.toUpperCase()] || [];
-        if (!genes.length) return;
-
-        // Group by location
-        const locCounts = {};
-        genes.forEach(geneSymbol => {
-            const gene = window.CiliAI.lookups.geneMap[geneSymbol];
-            if (gene && gene.Localization) {
-                const loc = gene.Localization.toLowerCase();
-                locCounts[loc] = (locCounts[loc] || 0) + 1;
-            }
-        });
-
-        const maxCount = Math.max(...Object.values(locCounts), 1);
-
-        // Add overlays
-        let overlayGroup = svg.querySelector('#heatmap-group');
-        if (!overlayGroup) {
-            overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            overlayGroup.id = 'heatmap-group';
-            // Ensure viewport group exists
-            const viewport = svg.querySelector('#viewport-group');
-            if (viewport) viewport.appendChild(overlayGroup);
-        }
-
-        Object.entries(locCounts).forEach(([loc, count]) => {
-            const svgId = this.locMap[loc];
-            if (!svgId) return;
-            const element = document.getElementById(svgId);
-            if (!element) return;
-
-            const clone = element.cloneNode(true);
-            clone.id = '';
-            clone.classList.add('heatmap-overlay');
-            clone.removeAttribute('tabindex');
-            clone.style.fill = 'url(#heatmapGrad)';
-            // Fallback fill if gradient missing
-            if(!document.getElementById('heatmapGrad')) clone.style.fill = '#ff0000';
-            
-            clone.style.opacity = (count / maxCount) * 0.7;
-            overlayGroup.appendChild(clone);
-        });
-
-        if(window.showDiagram) window.showDiagram();
-        this.resetZoom(); // FIX: Calls local resetZoom, not the missing global one
-    },
-
-    // New: Apply Multi-Gene Overlay
-    applyMultiOverlay: function (genes) {
-        const svg = document.getElementById('cilia-diagram');
-        if (!svg) return;
-
-        // Remove existing overlays
-        document.querySelectorAll('.multi-overlay').forEach(el => el.remove());
-
-        let overlayGroup = svg.querySelector('#multi-group');
-        if (!overlayGroup) {
-            overlayGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            overlayGroup.id = 'multi-group';
-            overlayGroup.style.mixBlendMode = 'multiply';
-            const viewport = svg.querySelector('#viewport-group');
-            if (viewport) viewport.appendChild(overlayGroup);
-        }
-
-        genes.forEach((geneSymbol, index) => {
-            const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
-            if (!gene || !gene.Localization) return;
-
-            const loc = gene.Localization.toLowerCase();
-            const svgId = this.locMap[loc];
-
-            if (!svgId) return;
-            const element = document.getElementById(svgId);
-            if (!element) return;
-
-            const clone = element.cloneNode(true);
-            clone.id = '';
-            clone.classList.add('multi-overlay');
-            clone.removeAttribute('tabindex');
-
-            // Cycle colors for distinction
-            const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
-            clone.style.fill = colors[index % colors.length];
-            
-            overlayGroup.appendChild(clone);
-        });
-
-        if(window.showDiagram) window.showDiagram();
-        this.resetZoom(); // FIX: Calls local resetZoom, not the missing global one
-    },
-
-    // New: Clear Overlays
-    clearOverlays: function () {
-        document.querySelectorAll('#heatmap-group, #multi-group').forEach(el => el.remove());
+    // 4. Clear Overlays (Cleanup for Heatmaps)
+    clearOverlays: function() {
+        document.querySelectorAll('.heatmap-overlay, .multi-overlay').forEach(el => el.remove());
+        this.resetZoom();
     }
 };
-
+    
 // Attach to window for global access
 window.SpatialManager = SpatialManager;
     
@@ -1056,185 +955,230 @@ window.SpatialManager = SpatialManager;
         window.highlightCiliumLocation = function(locTerm, gene = null) {
         return SpatialManager.highlight(locTerm, gene);
 };
-        // 3. SVG GENERATION FUNCTION (UPDATED WITH NEW DEFS)
-        window.generateAndInjectSVG = function() {
-            const container = document.getElementById('cilia-svg');
-            document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
-            container.innerHTML = `
-                <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
-                    <defs>
-                        <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#F8FAFC;" />
-                            <stop offset="100%" style="stop-color:#F1F5F9;" />
-                        </linearGradient>
-                        <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
-                            <stop offset="0%" style="stop-color:#E2E8F0;" />
-                            <stop offset="100%" style="stop-color:#CBD5E1;" />
-                        </radialGradient>
-                        
-                        <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#5b21b6;" /> <stop offset="100%" style="stop-color:#4c1d95;" />
-                        </linearGradient>
-                        
-                        <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#475569;" /> <stop offset="100%" style="stop-color:#334155;" />
-                        </linearGradient>
-                        
-                        <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#0891b2;" /> <stop offset="100%" style="stop-color:#0e7490;" />
-                        </linearGradient>
-                        
-                        <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#2563eb;" /> <stop offset="100%" style="stop-color:#1d4ed8;" />
-                        </linearGradient>
-                        <linearGradient id="heatmapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#00ff00" stop-opacity="0.2" />
-                            <stop offset="50%" stop-color="#ffff00" stop-opacity="0.5" />
-                            <stop offset="100%" stop-color="#ff0000" stop-opacity="0.8" />
-                        </linearGradient>
-                        <filter id="heatmapFilter">
-                            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
-                            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0 0 2 0 0 0 0 0 3 0 0 0 0 0 19 -9" result="heatmap" />
-                            <feComposite in="SourceGraphic" in2="heatmap" operator="atop" />
-                        </filter>
-                    </defs>
+/* ==============================================================
+ * MODULE: MAGICAL CILIUM RENDERER (v2.0)
+ * ============================================================== */
+window.generateAndInjectSVG = function() {
+    const container = document.getElementById('cilia-svg');
+    if (!container) return;
+
+    // Set Title
+    const titleEl = document.getElementById('current-viz-title');
+    if(titleEl) titleEl.textContent = "Diagram: Live Ciliary Dynamics";
+
+    // 1. Inject Styles (Animations & 3D Effects)
+    const styleId = 'cilia-magic-styles';
+    if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.innerHTML = `
+            /* --- Animations --- */
+            @keyframes membraneSway {
+                0%, 100% { transform: rotate(0deg); }
+                50% { transform: rotate(1deg); } /* Subtle sway */
+            }
+            @keyframes iftMoveUp {
+                0% { transform: translateY(0); opacity: 0; }
+                10% { opacity: 1; }
+                90% { opacity: 1; }
+                100% { transform: translateY(-220px); opacity: 0; }
+            }
+            @keyframes iftMoveDown {
+                0% { transform: translateY(-220px); opacity: 0; }
+                10% { opacity: 1; }
+                90% { opacity: 1; }
+                100% { transform: translateY(0); opacity: 0; }
+            }
+            @keyframes pulseGlow {
+                0% { filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5)); }
+                50% { filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8)); }
+                100% { filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5)); }
+            }
+
+            /* --- Structural Styles --- */
+            #cilia-diagram { overflow: visible; }
+            .cilium-body { 
+                transform-origin: 150px 300px; 
+                animation: membraneSway 6s ease-in-out infinite; 
+            }
+            
+            /* Interactive Parts */
+            .cilia-part { 
+                cursor: pointer; 
+                transition: all 0.3s ease; 
+                pointer-events: all;
+            }
+            
+            /* X-Ray Mode: When hovering container, dim everything... */
+            .cilia-container:hover .cilia-part { opacity: 0.3; filter: grayscale(80%); }
+            /* ...Except the specific part being hovered */
+            .cilia-container .cilia-part:hover { 
+                opacity: 1; 
+                filter: none; 
+                stroke: #FFD700;
+                stroke-width: 3px;
+                filter: drop-shadow(0 0 10px rgba(0,0,0,0.3));
+            }
+            
+            /* Active Highlight (Search Result) */
+            .cilia-part.active-highlight {
+                opacity: 1 !important;
+                fill: url(#goldGradient) !important;
+                stroke: #B7791F !important;
+                stroke-width: 3px;
+                animation: pulseGlow 2s infinite;
+                z-index: 100;
+            }
+
+            /* IFT Trains */
+            .ift-train { fill: #fff; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); }
+            .ift-up { animation: iftMoveUp 4s linear infinite; }
+            .ift-down { animation: iftMoveDown 4s linear infinite; animation-delay: 2s; }
+            
+            /* Tooltip */
+            #cilium-tooltip {
+                position: absolute;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.2s;
+                z-index: 1000;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // 2. Generate the "Magical" SVG
+    container.innerHTML = `
+        <div class="cilia-container" style="position:relative; width:100%; height:100%; display:flex; justify-content:center; align-items:center;">
+            <div id="cilium-tooltip"></div>
+            <svg id="cilia-diagram" viewBox="0 0 300 500" xmlns="http://www.w3.org/2000/svg" style="height:90%;">
+                <defs>
+                    <radialGradient id="cytosol3D" cx="50%" cy="50%" r="70%">
+                        <stop offset="0%" style="stop-color:#f1f5f9" />
+                        <stop offset="100%" style="stop-color:#cbd5e1" />
+                    </radialGradient>
+                    <linearGradient id="membrane3D" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#93c5fd" /> <stop offset="50%" style="stop-color:#e0f2fe" /> <stop offset="100%" style="stop-color:#60a5fa" /> </linearGradient>
+                    <linearGradient id="axoneme3D" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#1e40af" />
+                        <stop offset="50%" style="stop-color:#60a5fa" />
+                        <stop offset="100%" style="stop-color:#1e3a8a" />
+                    </linearGradient>
+                    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#fefcbf" />
+                        <stop offset="100%" style="stop-color:#d69e2e" />
+                    </linearGradient>
                     
-                    <g id="viewport-group" transform="translate(0, 0)">
-                        <path id="cell-body" class="cilia-part" tabindex="0"
-                              fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"
-                              d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"/>
+                    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+                        <feOffset dx="2" dy="2" result="offsetblur"/>
+                        <feComponentTransfer>
+                            <feFuncA type="linear" slope="0.3"/>
+                        </feComponentTransfer>
+                        <feMerge> 
+                            <feMergeNode/>
+                            <feMergeNode in="SourceGraphic"/> 
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                <g id="viewport-group">
+                    
+                    <path id="cell-body" class="cilia-part" 
+                          d="M -50,450 Q 150,380 350,450 L 350,550 L -50,550 Z" 
+                          fill="url(#cytosol3D)" stroke="#94a3b8" />
+
+                    <circle id="nucleus" class="cilia-part" cx="150" cy="480" r="40" 
+                            fill="#e2e8f0" stroke="#cbd5e0" filter="url(#softShadow)" />
+
+                    <g class="cilium-body">
                         
-                        <circle id="nucleus" class="cilia-part" tabindex="0"
-                                fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"
-                                cx="140" cy="290" r="35"/>
+                        <rect id="basal-body" class="cilia-part" x="135" y="360" width="30" height="50" rx="4"
+                              fill="#475569" filter="url(#softShadow)" />
                         
-                        <rect id="basal-body" class="cilia-part" tabindex="0"
-                              fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"
-                              x="130" y="165" width="20" height="15" rx="2"/>
-                        
-                        <path id="transition-zone" class="cilia-part" tabindex="0"
-                              fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"
-                              d="M 132,165 L 128,150 L 152,150 L 148,165 Z"/>
-                        
-                        <path id="ciliary-membrane" class="cilia-part" tabindex="0"
-                              fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"
-                              d="M 128,150 L 135,30 L 145,30 L 152,150 Z"/>
-                        
-                        <path id="axoneme" class="cilia-part" tabindex="0"
-                              fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"
-                              d="M 135,150 L 138,35 L 142,35 L 145,150 Z"/>
-                        
-                        <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
-                            <text x="140" y="188" text-anchor="middle" font-size="12" font-weight="700" fill="#5b21b6">
-                                PCM1
-                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>
-                            </text>
+                        <path id="distal-appendage" class="cilia-part" d="M 135,370 L 110,380 M 165,370 L 190,380" 
+                              stroke="#64748b" stroke-width="3" stroke-linecap="round" />
+
+                        <path id="ciliary-membrane" class="cilia-part" 
+                              d="M 125,360 
+                                 C 120,300 120,100 150,80 
+                                 C 180,100 180,300 175,360" 
+                              fill="url(#membrane3D)" opacity="0.6" stroke="#3b82f6" stroke-width="1.5" />
+
+                        <rect id="transition-zone" class="cilia-part" x="140" y="340" width="20" height="20" 
+                              fill="#334155" opacity="0.9" />
+
+                        <path id="axoneme" class="cilia-part" 
+                              d="M 146,340 L 146,100 M 154,340 L 154,100" 
+                              stroke="url(#axoneme3D)" stroke-width="4" stroke-dasharray="8,2" />
+
+                        <circle id="ciliary-tip" class="cilia-part" cx="150" cy="90" r="8" fill="#ef4444" />
+
+                        <g id="ift-system">
+                            <circle class="ift-train ift-up" cx="142" cy="330" r="4" fill="#10b981" />
+                            <circle class="ift-train ift-up" cx="142" cy="330" r="4" fill="#10b981" style="animation-delay: 2s;" />
                             
-                            <text x="140" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">
-                                TMEM17
-                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="0.5s"/>
-                            </text>
-                            
-                            <text x="140" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#0891b2">
-                                ARL13B
-                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1s"/>
-                            </text>
-                            
-                            <text x="140" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb">
-                                β2-tubulin
-                                <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="1.5s"/>
-                            </text>
+                            <circle class="ift-train ift-down" cx="158" cy="330" r="4" fill="#f59e0b" />
+                            <circle class="ift-train ift-down" cx="158" cy="330" r="4" fill="#f59e0b" style="animation-delay: 3s;" />
                         </g>
-                        
-                        <circle cx="140" cy="172.5" r="3" fill="#5b21b6" opacity="0.6" style="pointer-events: none;">
-                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/>
-                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
-                        </circle>
-                        
-                        <circle cx="140" cy="157.5" r="3" fill="#475569" opacity="0.6" style="pointer-events: none;">
-                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.3s"/>
-                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.3s"/>
-                        </circle>
-                        
-                        <circle cx="140" cy="90" r="3" fill="#0891b2" opacity="0.6" style="pointer-events: none;">
-                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.6s"/>
-                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.6s"/>
-                        </circle>
-                        
-                        <circle cx="140" cy="42.5" r="3" fill="#2563eb" opacity="0.6" style="pointer-events: none;">
-                            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" begin="0.9s"/>
-                            <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite" begin="0.9s"/>
-                        </circle>
-                    </g>
-                </svg>
-            `;
+
+                    </g> </g>
+            </svg>
+        </div>
+    `;
+
+    // 3. Attach Dynamic Interactions
+    const tooltip = document.getElementById('cilium-tooltip');
+    
+    document.querySelectorAll('.cilia-part').forEach(part => {
+        // Smart Hover
+        part.addEventListener('mousemove', (e) => {
+            const name = part.id.replace(/-/g, ' ').toUpperCase();
+            tooltip.textContent = name;
+            tooltip.style.left = (e.offsetX + 15) + 'px';
+            tooltip.style.top = (e.offsetY + 15) + 'px';
+            tooltip.style.opacity = '1';
+        });
+
+        part.addEventListener('mouseleave', () => {
+            tooltip.style.opacity = '0';
+        });
+
+        // Click to Zoom & Search
+        part.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.SpatialManager.zoomTo(part);
             
-            container.onmouseenter = () => {
-                const labels = container.querySelector('.cilia-labels');
-                if (labels) labels.style.opacity = '1';
+            // Map ID to Gene search
+            const geneMap = {
+                'basal-body': 'PCM1',
+                'transition-zone': 'NPHP1',
+                'axoneme': 'DNAH5',
+                'ciliary-tip': 'KIF7',
+                'ciliary-membrane': 'ARL13B',
+                'nucleus': 'CILK1'
             };
-            
-            container.onmouseleave = () => {
-                const labels = container.querySelector('.cilia-labels');
-                if (labels) labels.style.opacity = '0';
-            };
-            
-            const ciliaParts = container.querySelectorAll('.cilia-part');
-            ciliaParts.forEach(part => {
-                part.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
-                    part.classList.add('active-highlight');
-                    
-                    const labels = container.querySelector('.cilia-labels');
-                    if (labels) {
-                        labels.style.opacity = '1';
-                        const partId = part.id;
-                        const geneMap = {
-                            'basal-body': 'PCM1',
-                            'transition-zone': 'TMEM17',
-                            'ciliary-membrane': 'ARL13B',
-                            'axoneme': 'β2-tubulin'
-                        };
-                        
-                        labels.querySelectorAll('text').forEach(text => {
-                            text.style.fontWeight = '700';
-                            text.style.fontSize = '12px';
-                        });
-                        
-                         geneName = geneMap[partId];
-                        if (geneName) {
-                            labels.querySelectorAll('text').forEach(text => {
-                                if (text.textContent.includes(geneName)) {
-                                    text.style.fontWeight = '900';
-                                    text.style.fontSize = '14px';
-                                    text.style.fill = '#ff6b6b';
-                                }
-                            });
-                        }
-                    }
-                    SpatialManager.zoomTo(part);
-                });
-            });
-            
-            container.onclick = (e) => {
-                if(e.target.id === 'cilia-diagram' || e.target.id === 'cilia-svg') {
-                    SpatialManager.resetZoom();
-                     labels = container.querySelector('.cilia-labels');
-                    if (labels) {
-                        labels.style.opacity = '0';
-                        labels.querySelectorAll('text').forEach(text => {
-                            text.style.fontWeight = '700';
-                            text.style.fontSize = '12px';
-                            if (text.textContent.includes('PCM1')) text.style.fill = '#5b21b6';
-                            else if (text.textContent.includes('TMEM17')) text.style.fill = '#475569';
-                            else if (text.textContent.includes('ARL13B')) text.style.fill = '#0891b2';
-                            else if (text.textContent.includes('β2-tubulin')) text.style.fill = '#2563eb';
-                        });
-                    }
-                }
-            };
-        };
+            const gene = geneMap[part.id];
+            if(gene) {
+                window.addChatMessage(`<i>Exploring <b>${part.id}</b>... (Example gene: ${gene})</i>`, false);
+            }
+        });
+    });
+
+    // Background Click = Reset
+    container.querySelector('svg').addEventListener('click', (e) => {
+        if(e.target.id === 'cilia-diagram' || e.target.id === 'viewport-group') {
+            window.SpatialManager.resetZoom();
+        }
+    });
+};
+    
         // 4. Helper Functions
         window.addChatMessage = function(html, isUser = false) {
              messages = document.getElementById('messages');
@@ -2232,6 +2176,7 @@ window.initCiliAI();
 </script>
 </body>
 </html>
+
 
 
 
