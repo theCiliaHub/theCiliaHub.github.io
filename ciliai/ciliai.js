@@ -5166,48 +5166,69 @@ const intentHandlers = [
         }
     },
 
-    // Total unique genes in ciliopathies
+  // Total unique genes in ciliopathies (FIXED: Matches Dashboard Logic)
     {
         priority: 78,
         matcher: (qLower) => {
             const patterns = [
                 'how many unique genes.*ciliopathies',
                 'how many unique.*ciliopathy genes',
-                'how many.*unique genes.*ciliopathies',
                 'total unique genes.*ciliopathies',
                 'total.*unique.*ciliopathy genes',
                 'number of unique genes.*ciliopathies',
-                'unique genes in ciliopathies',
-                'ciliopathies unique genes count',
-                'how many genes are in ciliopathies'
+                'total ciliopathy genes', // Added direct match for the chip
+                'unique genes in ciliopathies'
             ];
-            return patterns.some(p => new RegExp(p, 'i').test(qLower)) || (qLower.includes('how many') && qLower.includes('unique') && qLower.includes('genes') && qLower.includes('ciliopathies'));
+            return patterns.some(p => new RegExp(p, 'i').test(qLower));
         },
         handler: async (query) => {
-            const includedClasses = ['Primary Ciliopathies', 'Motile Ciliopathies', 'Atypical Ciliopathies'];
-            const classificationMap = getDiseaseClassificationMap();
-            let allUniqueGenes = new Set();
-            includedClasses.forEach(className => {
-                const diseases = classificationMap[className] || [];
-                diseases.forEach(disease => {
-                    const normKey = window.CiliAI.utils.normalizeTerm(disease);
-                    const genes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
-                    genes.forEach(g => allUniqueGenes.add(g));
+            // Use the same logic as calculateAndDisplayStatistics to ensure consistency
+            if (!window.CiliAI || !window.CiliAI.masterData) return "Data not loaded.";
+
+            const allUniqueGenes = new Set();
+            const diseasesFound = new Set();
+
+            window.CiliAI.masterData.forEach(gene => {
+                // Check both keys
+                let rawData = gene.Ciliopathies || gene.Ciliopathy;
+                if (!rawData) return;
+
+                // Normalize to array
+                let list = [];
+                if (Array.isArray(rawData)) {
+                    list = rawData;
+                } else if (typeof rawData === 'string') {
+                    list = rawData.split(/[;,]/).map(s => s.trim());
+                }
+
+                // Check for validity
+                let isValid = false;
+                list.forEach(d => {
+                    if (d && d.length > 2 && 
+                        d.toUpperCase() !== 'NONE' && 
+                        d.toUpperCase() !== 'N/A' && 
+                        d.toUpperCase() !== 'UNKNOWN') {
+                        isValid = true;
+                        diseasesFound.add(d);
+                    }
                 });
+
+                if (isValid) {
+                    allUniqueGenes.add(gene.Gene);
+                }
             });
+
             const totalCount = allUniqueGenes.size;
+            
             return `<div class="ai-result-card">
-                <h4>Total Unique Genes in Ciliopathies</h4>
-                <p>Across <strong>Primary, Motile, and Atypical Ciliopathies</strong>:</p>
+                <h4>Total Unique Ciliopathy Genes</h4>
                 <p style="font-size:22px; font-weight:bold; color:#2b6cb0; margin:20px 0;">
-                    <strong>${totalCount}</strong> unique genes
+                    <strong>${totalCount.toLocaleString()}</strong> unique genes
                 </p>
-                <p>This count includes all known causative and associated genes from the three core ciliopathy classes.</p>
-                <p><em>(Secondary diseases are excluded from this total.)</em></p>
+                <p>These genes are associated with <strong>${diseasesFound.size}</strong> distinct ciliopathy disorders in the database.</p>
             </div>`;
         }
     },
-
     // "How many genes are in [disease/classification]?"
     {
         priority: 77,
@@ -7304,14 +7325,5 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
-
-
-
-
 
 
