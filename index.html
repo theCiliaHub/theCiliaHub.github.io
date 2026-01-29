@@ -963,233 +963,146 @@ window.SpatialManager = SpatialManager;
 };
 
 /* ==============================================================
- * MODULE: ROBUST TRANSPORT ANIMATION (Fixed Visibility)
+ * MODULE: HIGH-FIDELITY IFT DYNAMICS SIMULATOR (v3.0)
  * ============================================================== */
 window.generateAndInjectSVG = function() {
     const container = document.getElementById('cilia-svg');
     if (!container) return;
 
-    // Set Title
     const titleEl = document.getElementById('current-viz-title');
-    if(titleEl) titleEl.textContent = "Diagram: Active IFT Transport";
+    if(titleEl) titleEl.textContent = "Diagram: IFT Assembly & Recycling Dynamics";
 
-    // 1. FORCE RESET ANIMATION STYLES
-    // (We remove the old tag to force the browser to re-read the keyframes)
-    const styleId = 'cilia-transport-styles';
+    // 1. Inject Styles: The Biological Engine
+    const styleId = 'cilia-dynamics-styles';
     const oldStyle = document.getElementById(styleId);
     if (oldStyle) oldStyle.remove();
 
     const style = document.createElement('style');
     style.id = styleId;
     style.innerHTML = `
-        /* --- ANTEROGRADE (Base -> Tip) --- */
-        /* Moves from Y=0 to Y=-115px (relative to start) */
-        @keyframes driveUp {
+        /* --- ANTEROGRADE ENGINE (Base -> Tip) --- */
+        @keyframes anterogradeStream {
             0% { transform: translateY(0); opacity: 0; }
-            10% { opacity: 1; }
+            5% { opacity: 1; } /* 1. Assembly at Basal Body */
+            10% { transform: translateY(-10px); } /* 2. Entry into Cilium */
+            80% { transform: translateY(-250px); opacity: 1; } /* Moving along Axoneme */
+            85% { transform: translateY(-260px); opacity: 0.8; } /* 3. Delivery of Cargo to Membrane */
+            92% { transform: translateY(-265px); opacity: 0.4; } /* 4. Disassembly at Tip */
+            100% { transform: translateY(-270px); opacity: 0; }
+        }
+
+        /* --- RETROGRADE ENGINE (Tip -> Base) --- */
+        @keyframes retrogradeStream {
+            0% { transform: translateY(-265px); opacity: 0; }
+            10% { opacity: 1; } /* 5. Dynein takes over at Tip */
             90% { opacity: 1; }
-            100% { transform: translateY(-120px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 0; } /* Recycling at Base */
         }
 
-        /* --- RETROGRADE (Tip -> Base) --- */
-        /* Moves from Y=-120px to Y=0 (relative to start) */
-        @keyframes driveDown {
-            0% { transform: translateY(-120px); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(0); opacity: 0; }
-        }
+        /* --- Component Colors --- */
+        .kinesin-motor { fill: #22c55e; }   /* Step 1/2 Power */
+        .dynein-motor  { fill: #ef4444; }   /* Step 5 Power */
+        .ift-b-complex { fill: #06b6d4; }   /* Anterograde Scaffold */
+        .ift-a-complex { fill: #3b82f6; }   /* Retrograde Scaffold */
+        .bbsome-unit   { fill: #eab308; }   /* Adapter */
+        .cargo-load    { fill: #a855f7; }   /* Functional Cargo */
 
-        /* --- Particle Classes --- */
-        .transport-group { pointer-events: none; }
+        /* Animation Assignments */
+        .ift-train { pointer-events: none; }
+        .moving-up { animation: anterogradeStream 5s linear infinite; }
+        .moving-down { animation: retrogradeStream 4s linear infinite; }
+
+        /* Staggering for continuous traffic */
+        .t1 { animation-delay: 0s; }
+        .t2 { animation-delay: 1.6s; }
+        .t3 { animation-delay: 3.2s; }
+
+        /* Structure Styles */
+        .cilia-part { cursor: pointer; transition: all 0.2s; }
+        .active-highlight { stroke: #fbbf24 !important; stroke-width: 3px !important; filter: drop-shadow(0 0 5px #fbbf24); }
         
-        .motor-kinesin { fill: #4ade80; animation: driveUp 4s linear infinite; } /* Bright Green */
-        .cargo-ift-b   { fill: #22d3ee; animation: driveUp 4s linear infinite; } /* Cyan */
-        .cargo-bbsome-up { fill: #facc15; animation: driveUp 4s linear infinite; } /* Yellow */
-
-        .motor-dynein  { fill: #fb923c; animation: driveDown 4s linear infinite; } /* Orange */
-        .cargo-ift-a   { fill: #60a5fa; animation: driveDown 4s linear infinite; } /* Blue */
-        .cargo-bbsome-down { fill: #facc15; animation: driveDown 4s linear infinite; }
-
-        /* Staggered Delays for Continuous Flow */
-        .delay-0 { animation-delay: 0s; }
-        .delay-1 { animation-delay: 1.33s; }
-        .delay-2 { animation-delay: 2.66s; }
-
-        /* Hover Effects */
-        .cilia-part { cursor: pointer; transition: all 0.2s ease; }
-        .cilia-part:hover { filter: brightness(1.1); stroke: #2b6cb0; }
-        
-        .cilia-part.active-highlight {
-            opacity: 1 !important;
-            stroke: #d97706 !important;
-            stroke-width: 3px !important;
-            filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.8));
-            z-index: 100;
-        }
-
-        /* Tooltip */
         #cilium-tooltip {
-            position: absolute;
-            background: rgba(15, 23, 42, 0.95);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-size: 11px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s;
-            z-index: 2000;
-            border: 1px solid #475569;
-            white-space: nowrap;
+            position: absolute; background: rgba(15, 23, 42, 0.9); color: white;
+            padding: 8px 12px; border-radius: 6px; font-size: 11px;
+            pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 2000;
         }
     `;
     document.head.appendChild(style);
 
-    // 2. Generate SVG (Particles moved to END for Z-Index visibility)
+    // 2. Generate SVG Template
     container.innerHTML = `
         <div class="cilia-container" style="position:relative; width:100%; height:100%; display:flex; justify-content:center; align-items:center;">
             <div id="cilium-tooltip"></div>
-            <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="height:100%; width:100%;">
+            <svg id="cilia-diagram" viewBox="0 0 300 450" xmlns="http://www.w3.org/2000/svg" style="height:100%; width:100%;">
                 <defs>
-                    <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#F8FAFC;" /> <stop offset="100%" style="stop-color:#F1F5F9;" />
-                    </linearGradient>
-                    <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" style="stop-color:#E2E8F0;" /> <stop offset="100%" style="stop-color:#CBD5E1;" />
-                    </radialGradient>
-                    <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#5b21b6;" /> <stop offset="100%" style="stop-color:#4c1d95;" />
-                    </linearGradient>
-                    <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#475569;" /> <stop offset="100%" style="stop-color:#334155;" />
-                    </linearGradient>
-                    <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#0891b2;" /> <stop offset="100%" style="stop-color:#0e7490;" />
-                    </linearGradient>
-                    <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#2563eb;" /> <stop offset="100%" style="stop-color:#1d4ed8;" />
+                    <linearGradient id="axonemeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#1e3a8a"/><stop offset="50%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#1e3a8a"/>
                     </linearGradient>
                 </defs>
 
-                <g id="viewport-group" transform="translate(0, 0)">
-                    
-                    <path id="cell-body" class="cilia-part" d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z"
-                          fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2" />
-                    
-                    <circle id="nucleus" class="cilia-part" cx="140" cy="290" r="35"
-                            fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2" />
+                <g id="viewport-group">
+                    <path id="cell-body" class="cilia-part" d="M 40,380 C -30,300 10,200 140,200 C 270,200 310,300 240,380 Z" fill="#f8fafc" stroke="#e2e8f0" />
+                    <circle id="nucleus" class="cilia-part" cx="140" cy="320" r="35" fill="#cbd5e1" stroke="#94a3b8" />
+                    <rect id="basal-body" class="cilia-part" x="130" y="195" width="20" height="15" rx="2" fill="#5b21b6" />
+                    <path id="transition-zone" class="cilia-part" d="M 132,195 L 128,180 L 152,180 L 148,195 Z" fill="#475569" />
+                    <path id="ciliary-membrane" class="cilia-part" d="M 128,180 L 135,30 L 145,30 L 152,180 Z" fill="none" stroke="#0891b2" stroke-width="2" stroke-dasharray="4,2" opacity="0.4" />
+                    <path id="axoneme" class="cilia-part" d="M 135,180 L 138,35 L 142,35 L 145,180 Z" fill="none" stroke="url(#axonemeGrad)" stroke-width="2.5" />
 
-                    <rect id="basal-body" class="cilia-part" x="130" y="165" width="20" height="15" rx="2"
-                          fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5" />
-                    
-                    <path id="transition-zone" class="cilia-part" d="M 132,165 L 128,150 L 152,150 L 148,165 Z"
-                          fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5" />
-
-                    <path id="ciliary-membrane" class="cilia-part" d="M 128,150 L 135,30 L 145,30 L 152,150 Z"
-                          fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4" />
-                    
-                    <path id="axoneme" class="cilia-part" d="M 135,150 L 138,35 L 142,35 L 145,150 Z"
-                          fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5" />
-
-                    <g id="transport-system" class="transport-group">
+                    <g transform="translate(0, 190)">
                         
-                        <g transform="translate(0, 160)">
-                            <circle class="motor-kinesin delay-0" cx="132" cy="0" r="2.5" />
-                            <rect class="cargo-ift-b delay-0" x="130" y="3" width="4" height="6" />
-                            <circle class="cargo-bbsome-up delay-0" cx="132" cy="11" r="2" />
+                        ${[0, 1.6, 3.2].map((delay, i) => `
+                            <g class="ift-train moving-up t${i+1}" style="animation-delay: ${delay}s">
+                                <circle class="kinesin-motor" cx="134" cy="-12" r="2.5" /> <rect class="ift-b-complex" x="132" y="-9" width="4" height="6" /> <rect class="ift-a-complex" x="132" y="-3" width="4" height="6" /> <circle class="bbsome-unit" cx="134" cy="5" r="2" /> <circle class="cargo-load" cx="134" cy="9" r="1.5" /> </g>
+                        `).join('')}
 
-                            <circle class="motor-kinesin delay-1" cx="132" cy="0" r="2.5" />
-                            <rect class="cargo-ift-b delay-1" x="130" y="3" width="4" height="6" />
-                            <circle class="cargo-bbsome-up delay-1" cx="132" cy="11" r="2" />
+                        ${[0, 1.6, 3.2].map((delay, i) => `
+                            <g class="ift-train moving-down t${i+1}" style="animation-delay: ${delay + 0.8}s">
+                                <circle class="bbsome-unit" cx="146" cy="-12" r="2" /> <rect class="ift-a-complex" x="144" y="-10" width="4" height="6" /> <rect class="ift-b-complex" x="144" y="-4" width="4" height="6" /> <circle class="dynein-motor" cx="146" cy="4" r="3" /> </g>
+                        `).join('')}
 
-                            <circle class="motor-kinesin delay-2" cx="132" cy="0" r="2.5" />
-                            <rect class="cargo-ift-b delay-2" x="130" y="3" width="4" height="6" />
-                            <circle class="cargo-bbsome-up delay-2" cx="132" cy="11" r="2" />
-                        </g>
-
-                        <g transform="translate(0, 160)"> 
-                            <circle class="cargo-bbsome-down delay-0" cx="148" cy="-11" r="2" />
-                            <rect class="cargo-ift-a delay-0" x="146" y="-9" width="4" height="6" />
-                            <circle class="motor-dynein delay-0" cx="148" cy="0" r="3" />
-
-                            <circle class="cargo-bbsome-down delay-1" cx="148" cy="-11" r="2" />
-                            <rect class="cargo-ift-a delay-1" x="146" y="-9" width="4" height="6" />
-                            <circle class="motor-dynein delay-1" cx="148" cy="0" r="3" />
-
-                            <circle class="cargo-bbsome-down delay-2" cx="148" cy="-11" r="2" />
-                            <rect class="cargo-ift-a delay-2" x="146" y="-9" width="4" height="6" />
-                            <circle class="motor-dynein delay-2" cx="148" cy="0" r="3" />
-                        </g>
                     </g>
 
-                    <g class="cilia-labels" style="pointer-events: none; opacity: 0; transition: opacity 0.3s ease;">
-                        <text x="140" y="195" text-anchor="middle" font-size="11" font-weight="700" fill="#5b21b6">Basal Body (PCM1)</text>
-                        <text x="140" y="160" text-anchor="middle" font-size="11" font-weight="700" fill="#475569">Transition Zone</text>
-                        <text x="165" y="85" text-anchor="start" font-size="11" font-weight="700" fill="#0891b2">Membrane</text>
-                        <text x="115" y="55" text-anchor="end" font-size="11" font-weight="700" fill="#2563eb">Axoneme</text>
+                    <g class="cilia-labels" style="pointer-events:none; opacity:0; transition: 0.3s;">
+                        <text x="10" y="220" font-size="9" fill="#22c55e">● Kinesin II</text>
+                        <text x="10" y="235" font-size="9" fill="#06b6d4">■ IFT-B</text>
+                        <text x="10" y="250" font-size="9" fill="#3b82f6">■ IFT-A</text>
+                        <text x="10" y="265" font-size="9" fill="#eab308">● BBSome</text>
+                        <text x="10" y="280" font-size="9" fill="#ef4444">● Dynein</text>
+                        <text x="10" y="295" font-size="9" fill="#a855f7">● Cargo</text>
                     </g>
                 </g>
             </svg>
         </div>
     `;
 
-    // 3. Attach Interactivity
+    // 3. Logic & Interactions
     const tooltip = document.getElementById('cilium-tooltip');
     
-    // Structure Names
-    const compNames = {
-        'basal-body': 'Basal Body (Mother Centriole)',
-        'transition-zone': 'Transition Zone (Gatekeeper)',
-        'axoneme': 'Axoneme (Microtubule Core)',
-        'ciliary-membrane': 'Ciliary Membrane',
-        'nucleus': 'Nucleus',
-        'cell-body': 'Cytoplasm'
-    };
-
     container.querySelectorAll('.cilia-part').forEach(part => {
-        // Tooltip
         part.addEventListener('mousemove', (e) => {
-            if (tooltip) {
-                tooltip.textContent = compNames[part.id] || part.id;
-                tooltip.style.left = (e.offsetX + 10) + 'px';
-                tooltip.style.top = (e.offsetY + 10) + 'px';
-                tooltip.style.opacity = '1';
-            }
+            tooltip.textContent = part.id.replace(/-/g, ' ').toUpperCase();
+            tooltip.style.left = (e.offsetX + 15) + 'px';
+            tooltip.style.top = (e.offsetY + 15) + 'px';
+            tooltip.style.opacity = '1';
         });
-        part.addEventListener('mouseleave', () => {
-            if (tooltip) tooltip.style.opacity = '0';
-        });
-
-        // Click / Zoom
+        part.addEventListener('mouseleave', () => tooltip.style.opacity = '0');
         part.addEventListener('click', (e) => {
             e.stopPropagation();
-            if(window.SpatialManager && window.SpatialManager.zoomTo) {
-                window.SpatialManager.zoomTo(part);
-            }
-            // Highlight
-            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active-highlight'));
+            window.SpatialManager.zoomTo(part);
+            document.querySelectorAll('.cilia-part').forEach(p => p.classList.remove('active-highlight'));
             part.classList.add('active-highlight');
-            
-            // Show Labels
-            const labels = container.querySelector('.cilia-labels');
-            if(labels) labels.style.opacity = '1';
-
-            // Optional: Notify Chat
-            // window.addChatMessage(`Selected: ${compNames[part.id]}`, false);
+            container.querySelector('.cilia-labels').style.opacity = '1';
         });
     });
 
-    // Reset on background click
-    container.querySelector('svg').addEventListener('click', (e) => {
-        if(e.target.id === 'cilia-diagram' || e.target.id === 'viewport-group') {
-            if(window.SpatialManager && window.SpatialManager.resetZoom) window.SpatialManager.resetZoom();
-            const labels = container.querySelector('.cilia-labels');
-            if(labels) labels.style.opacity = '0';
+    container.querySelector('svg').onclick = (e) => {
+        if(e.target.id === 'cilia-diagram') {
+            window.SpatialManager.resetZoom();
+            container.querySelector('.cilia-labels').style.opacity = '0';
         }
-    });
+    };
 };
-
+    
       
         // 4. Helper Functions
         window.addChatMessage = function(html, isUser = false) {
@@ -2188,6 +2101,7 @@ window.initCiliAI();
 </script>
 </body>
 </html>
+
 
 
 
