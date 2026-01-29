@@ -3634,76 +3634,135 @@ window.terminologyQueries = {
 };
 
 /* ==============================================================
+ * MODULE: DATA EXTRACTION HELPER (The "Missing Link")
+ * ============================================================== */
+window.extractExpressionForGene = function(geneUpper, dataset, sourceData) {
+    const n = sourceData.length;
+    let arr = new Float32Array(n).fill(0);
+    let maxVal = 0;
+    let nonZeroCount = 0;
+    let foundAnyData = false;
+
+    // 1. Define where to look for data
+    const sources = [
+        dataset.expression,                     // Primary dataset expression object
+        window.CiliAI.cellDataCache,            // Global cache (lazy loaded data)
+        dataset.expressionMatrix                // Alternative format
+    ];
+
+    for (const src of sources) {
+        if (!src) continue;
+
+        // CHECK 1: Is data nested under the gene key? (e.g. src["IFT88"])
+        const geneData = src[geneUpper];
+        if (!geneData) continue;
+
+        // CASE A: Cell-Centric Object (e.g. { "cell_1": 5.2, "cell_2": 0.0 ... })
+        if (typeof geneData === 'object' && !Array.isArray(geneData) && !geneData.cells) {
+            sourceData.forEach((p, i) => {
+                // Try matching by ID first, then cell type if aggregated
+                const id = p.cell_id || p.id; 
+                const type = p.cell_type;
+                
+                let val = 0;
+                if (geneData[id] !== undefined) val = geneData[id];
+                else if (geneData[type] !== undefined) val = geneData[type]; // Fallback to type avg
+
+                if (val > 0) {
+                    arr[i] = val;
+                    if (val > maxVal) maxVal = val;
+                    nonZeroCount++;
+                }
+            });
+            foundAnyData = true;
+            break; 
+        }
+
+        // CASE B: Sparse Format (e.g. { cells: [0, 5, 20], expression: [2.1, 4.5, 1.2] })
+        if (geneData.cells && geneData.expression) {
+            for (let k = 0; k < geneData.cells.length; k++) {
+                const idx = geneData.cells[k];
+                if (idx < n) {
+                    const val = geneData.expression[k];
+                    arr[idx] = val;
+                    if (val > maxVal) maxVal = val;
+                    if (val > 0) nonZeroCount++;
+                }
+            }
+            foundAnyData = true;
+            break;
+        }
+
+        // CASE C: Direct Array (e.g. [0, 0, 2.1, 0 ...])
+        if (Array.isArray(geneData) && geneData.length === n) {
+            arr = new Float32Array(geneData); // Copy it
+            maxVal = Math.max(...geneData);
+            nonZeroCount = geneData.filter(v => v > 0).length;
+            foundAnyData = true;
+            break;
+        }
+    }
+
+    return { 
+        exprArray: arr, 
+        maxExpr: maxVal, 
+        anyNonZero: nonZeroCount > 0, 
+        found: foundAnyData 
+    };
+};
+
+
+/* ==============================================================
  * MODULE: scRNA-seq DOT PLOT ENGINE (Fixed Data Retrieval)
  * ============================================================== */
 window.calculateDotPlotData = function(genes, datasetKey) {
-    // 1. Get Dataset & Map
     const dataset = window.CiliAI.datasets[datasetKey];
     if (!dataset || !dataset.umap) {
-        console.error(`[DotPlot] Dataset ${datasetKey} invalid.`);
+        console.warn(`[DotPlot] Dataset ${datasetKey} is missing or has no UMAP data.`);
         return null;
     }
 
-    // 2. Map Cell Types to Indices
-    // We create a map: { "Ciliated Cell": [0, 5, 12...], "Basal Cell": [1, 3...] }
+    // 1. Group Cells (Map cell types to indices)
     const cellsByType = {};
     dataset.umap.forEach((p, index) => {
         const cType = p.cell_type || 'Unknown';
         if (!cellsByType[cType]) cellsByType[cType] = [];
-        cellsByType[cType].push(index); 
+        cellsByType[cType].push(index);
     });
 
     const uniqueCellTypes = Object.keys(cellsByType).sort();
     const x = [], y = [], size = [], color = [];
+    let hasAnyData = false;
 
-    // 3. Process Genes
+    // 2. Process Genes
     genes.forEach(gene => {
         const geneUpper = gene.toUpperCase();
-        let exprArray = null;
-
-        // --- ATTEMPT 1: Use the Helper (Best Practice) ---
-        if (typeof window.extractExpressionForGene === 'function') {
-            const result = window.extractExpressionForGene(geneUpper, dataset, dataset.umap);
-            if (result.found) exprArray = result.exprArray;
+        
+        // Call our new robust extractor
+        const result = window.extractExpressionForGene(geneUpper, dataset, dataset.umap);
+        
+        if (!result.found) {
+            console.warn(`[DotPlot] No data found for ${geneUpper} in ${datasetKey}`);
+        } else {
+            hasAnyData = true;
         }
 
-        // --- ATTEMPT 2: Direct Global Cache Lookup (Backup) ---
-        // (This catches cases where data was loaded lazily for UMAP)
-        if (!exprArray && window.CiliAI.cellDataCache && window.CiliAI.cellDataCache[geneUpper]) {
-            console.log(`[DotPlot] Found ${geneUpper} in cellDataCache`);
-            // Convert the sparse/object cache to a dense array matching UMAP order
-            const cached = window.CiliAI.cellDataCache[geneUpper];
-            exprArray = new Float32Array(dataset.umap.length);
-            
-            // If cache is { "Ciliated Cell": 5.2, ... } (Cell-type averaged)
-            if (typeof cached === 'object' && !Array.isArray(cached) && !cached.cells) {
-                dataset.umap.forEach((p, i) => {
-                    exprArray[i] = cached[p.cell_type] || 0;
-                });
-            }
-        }
+        const exprArray = result.exprArray;
 
-        // If still no data, log warning and skip logic (will result in 0s)
-        if (!exprArray) {
-            console.warn(`[DotPlot] No data found for ${geneUpper}`);
-            exprArray = new Float32Array(dataset.umap.length).fill(0);
-        }
-
-        // 4. Calculate Stats for this Gene
         uniqueCellTypes.forEach(cType => {
             const indices = cellsByType[cType];
             let sum = 0;
-            let countNonZero = 0;
-            
+            let nonZero = 0;
+
             indices.forEach(idx => {
                 const val = exprArray[idx];
                 sum += val;
-                if (val > 0) countNonZero++;
+                if (val > 0) nonZero++;
             });
 
-            // Math: Avoid division by zero
-            const avg = indices.length ? (sum / indices.length) : 0;
-            const pct = indices.length ? (countNonZero / indices.length) * 100 : 0;
+            // Prevent division by zero
+            const avg = indices.length > 0 ? sum / indices.length : 0;
+            const pct = indices.length > 0 ? (nonZero / indices.length) * 100 : 0;
 
             x.push(geneUpper);
             y.push(cType);
@@ -3711,6 +3770,11 @@ window.calculateDotPlotData = function(genes, datasetKey) {
             color.push(avg);
         });
     });
+
+    // Prevent Plotly crash on empty data
+    if (!hasAnyData && size.every(s => s === 0)) {
+        return null; 
+    }
 
     return { x, y, size, color, cellTypes: uniqueCellTypes };
 };
@@ -3726,46 +3790,49 @@ window.renderDotPlot = function(geneList) {
 
     if (genes.length === 0) return;
 
-    window.updateStatus('Calculating dot plot...', 'loading');
-    
-    // *** LINK: Here is where calculateDotPlotData is called ***
+    window.updateStatus('Calculating...', 'loading');
     const stats = window.calculateDotPlotData(genes, datasetKey);
-    
     window.updateStatus('Ready', 'ready');
 
-    if (!stats) return;
+    if (!stats) {
+        container.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#666;">
+                <div style="font-size:24px; margin-bottom:10px;">📉</div>
+                <p>No expression data found for <strong>${genes.join(', ')}</strong></p>
+                <p style="font-size:12px">Try switching datasets (e.g. Lung vs Kidney)</p>
+            </div>`;
+        return;
+    }
 
     const trace = {
         x: stats.x, y: stats.y, mode: 'markers',
         marker: {
-            symbol: 'circle', sizemode: 'area', sizeref: 2.5,
-            size: stats.size, color: stats.color,
+            symbol: 'circle',
+            sizemode: 'area', sizeref: 2.5, // Dot scaling
+            size: stats.size, 
+            color: stats.color,
             colorscale: 'Blues', showscale: true,
             colorbar: { title: 'Avg Exp', thickness: 15, len: 0.5 },
             line: { color: '#cbd5e0', width: 1 }
         },
-        hovertemplate: '<b>%{y}</b><br>Gene: %{x}<br>% Expressed: %{marker.size:.1f}%<br>Avg Expr: %{marker.color:.2f}<extra></extra>'
+        hovertemplate: '<b>%{y}</b><br>%{x}<br>% Expressed: %{marker.size:.1f}%<br>Avg: %{marker.color:.2f}<extra></extra>'
     };
 
     const layout = {
-        title: { text: `<b>Dot Plot: ${datasetName}</b>`, font: { size: 16 } },
+        title: { text: `<b>${datasetName}</b>`, font: { size: 14 } },
         xaxis: { title: '', tickangle: -45, automargin: true, type: 'category' },
-        yaxis: { title: '', automargin: true, type: 'category', categoryorder: 'category ascending' },
-        margin: { l: 150, r: 50, t: 60, b: 80 },
-        paper_bgcolor: 'white', plot_bgcolor: 'white', showlegend: false
+        yaxis: { title: '', automargin: true, type: 'category' },
+        margin: { l: 150, r: 50, t: 50, b: 80 },
+        height: Math.max(400, stats.cellTypes.length * 20 + 100) // Dynamic height
     };
 
     Plotly.newPlot(container, [trace], layout, { responsive: true });
     
-    // *** CHAT LINK: This sends the confirmation card to the chat ***
+    // Send Chat Confirmation
     window.addChatMessage(`
         <div class="ai-result-card">
             <h4>📊 Dot Plot Generated</h4>
             <p>Comparing <strong>${genes.length} genes</strong> in <strong>${datasetName}</strong>.</p>
-            <ul style="font-size:11px; color:#666;">
-                <li><strong>Dot Size:</strong> % of cells expressing the gene.</li>
-                <li><strong>Dot Color:</strong> Average expression level.</li>
-            </ul>
         </div>
     `, false);
 };
@@ -7486,6 +7553,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
