@@ -5794,7 +5794,7 @@ const intentHandlers = [
          qLower.includes('display') ||
          qLower.includes('heatmap') ||
          qLower.includes('umap') ||
-         qLower.includes('dot plot') ||  // Added explicit matcher
+         qLower.includes('dot plot') || 
          qLower.includes('dotplot') ||
          qLower.includes('scrna') ||
          qLower.includes('expression')) &&
@@ -5805,90 +5805,54 @@ const intentHandlers = [
     handler: async (query) => {
         const qLower = window.CiliAI.utils.normalizeQuery(query);
 
-        /* ---------- 1. Dataset detection (UNCHANGED) ---------- */
-        // Detects if user said "in kidney", "in lung", etc.
+        /* --- 1. Dataset detection --- */
         const availableDatasets = Object.keys(window.CiliAI.datasets).sort((a, b) => b.length - a.length);
         let detectedDS = null;
-
         for (const dsKey of availableDatasets) {
             let isMatch = qLower.includes(dsKey);
             if (dsKey === 'olfactory' && (qLower.includes('nose') || qLower.includes('smell'))) isMatch = true;
             if (dsKey === 'hypothalamus' && (qLower.includes('brain') || qLower.includes('neuron'))) isMatch = true;
-            if (dsKey === 'chondrocyte' && (qLower.includes('cartilage') || qLower.includes('disc'))) isMatch = true;
-            if (dsKey === 'kidney' && qLower.includes('renal')) isMatch = true;
-            if (dsKey === 'liver' && qLower.includes('hepatic')) isMatch = true;
             if (isMatch) { detectedDS = dsKey; break; }
         }
-
         if (detectedDS) window.CiliAI.activeDataset = detectedDS;
 
-        /* ---------- 2. Gene Extraction ---------- */
+        /* --- 2. Gene/Complex Extraction --- */
         let genes = window.CiliAI.utils.extractGenes(query);
-        
-        // Handle Complexes (e.g. "Plot BBSome")
         let finalTargetTerm = null;
         let isComplex = false;
-        
-        if (genes.length === 0) {
-            let cleanQuery = qLower
-                .replace(/plot|display|show|visualize|umap|heatmap|scrna|expression|dot plot|dotplot/g, '')
-                .replace(/in|for|of|from/g, '')
-                .trim();
 
+        if (genes.length === 0) {
+            let cleanQuery = qLower.replace(/plot|display|show|visualize|umap|heatmap|scrna|expression|dot plot|dotplot/g, '').trim();
             const complexName = window.extractComplexIntent?.(cleanQuery);
             if (complexName) {
                 const complexGenes = window.getGenesByComplex?.(complexName).map(g => g.gene) || [];
-                if (complexGenes.length) {
-                    genes = complexGenes;
-                    finalTargetTerm = complexName;
-                    isComplex = true;
-                }
+                if (complexGenes.length) { genes = complexGenes; finalTargetTerm = complexName; isComplex = true; }
             }
         }
 
         const finalGenes = genes.length ? genes : ['WDR31'];
         const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
 
-        /* ---------- 3. DOT PLOT BRANCH (NEW) ---------- */
+        /* --- 3. THE FIX: Explicit Dot Plot vs UMAP Branching --- */
         if (qLower.includes('dot plot') || qLower.includes('dotplot')) {
-            if (finalGenes.length === 0) {
-                return `<div class="ai-result-card"><p>Please specify genes for the dot plot.</p></div>`;
-            }
             window.renderDotPlot(finalGenes);
-            return null; // Response handled by render function
+            return null; // Return immediately so UMAP doesn't run
         }
 
-        /* ---------- 4. Standard UMAP/Grid Logic ---------- */
+        /* --- 4. Standard UMAP/Grid Logic --- */
         const zoomMatch = qLower.match(/zoom to\s+([\w\s\-\(\)]+?)(?:\s+(?:in|for)|$)/i);
         const zoomToCellType = zoomMatch ? zoomMatch[1].trim() : null;
 
         if (!isComplex && finalGenes.length > 1) {
-            // Multi-gene: Use Grid
-            await window.renderUMAPGrid({
-                genes: finalGenes,
-                datasetKey: window.CiliAI.activeDataset,
-                containerId: 'plotly-container'
-            });
+            await window.renderUMAPGrid({ genes: finalGenes, datasetKey: window.CiliAI.activeDataset });
         } else {
-            // Single gene or Complex: Use Standard Plot
             window.switchView('plot');
             await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
         }
 
-        /* ---------- UI card ---------- */
         const currentDS = window.CiliAI.activeDataset;
         const currentName = window.CiliAI.datasets[currentDS].name;
-
-        return `
-            <div class="ai-result-card">
-                <p><strong>${isComplex ? geneSymbol + ' complex' : finalGenes.join(', ')}</strong></p>
-                <p>${finalGenes.length > 1 && !isComplex
-                    ? 'Shown as individual UMAP panels (grid view).'
-                    : 'Expression visualized on UMAP.'}
-                </p>
-                <p style="font-size:12px;color:#666;">Dataset: ${currentName}</p>
-            </div>
-        `;
+        return `<div class="ai-result-card"><p><strong>${isComplex ? geneSymbol + ' complex' : finalGenes.join(', ')}</strong> expression visualized in <strong>${currentName}</strong>.</p></div>`;
     }
 },
     
@@ -7457,6 +7421,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
