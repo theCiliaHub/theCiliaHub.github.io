@@ -963,75 +963,76 @@ window.SpatialManager = SpatialManager;
 };
 
 /* ==============================================================
- * MODULE: HIGH-FIDELITY IFT DYNAMICS SIMULATOR (v3.0)
+ * MODULE: IFT SIMULATOR v4.0 (Boundary Locked & Checkpoint Aware)
  * ============================================================== */
 window.generateAndInjectSVG = function() {
     const container = document.getElementById('cilia-svg');
     if (!container) return;
 
     const titleEl = document.getElementById('current-viz-title');
-    if(titleEl) titleEl.textContent = "Diagram: IFT Assembly & Recycling Dynamics";
+    if(titleEl) titleEl.textContent = "Diagram: IFT Assembly & Recycling Checkpoints";
 
-    // 1. Inject Styles: The Biological Engine
-    const styleId = 'cilia-dynamics-styles';
+    // 1. Precise Physics Engine
+    const styleId = 'cilia-physics-styles';
     const oldStyle = document.getElementById(styleId);
     if (oldStyle) oldStyle.remove();
 
     const style = document.createElement('style');
     style.id = styleId;
     style.innerHTML = `
-        /* --- ANTEROGRADE ENGINE (Base -> Tip) --- */
-        @keyframes anterogradeStream {
-            0% { transform: translateY(0); opacity: 0; }
-            5% { opacity: 1; } /* 1. Assembly at Basal Body */
-            10% { transform: translateY(-10px); } /* 2. Entry into Cilium */
-            80% { transform: translateY(-250px); opacity: 1; } /* Moving along Axoneme */
-            85% { transform: translateY(-260px); opacity: 0.8; } /* 3. Delivery of Cargo to Membrane */
-            92% { transform: translateY(-265px); opacity: 0.4; } /* 4. Disassembly at Tip */
-            100% { transform: translateY(-270px); opacity: 0; }
+        /* --- ANTEROGRADE (Base -> Tip) --- */
+        /* Start: Y=200 (Inside Basal Body) | End: Y=40 (Inside Tip) */
+        @keyframes assemblyAndEntry {
+            0% { transform: translateY(200px); opacity: 0; }
+            5% { transform: translateY(200px); opacity: 1; } /* 1. Assembly inside Basal Body */
+            15% { transform: translateY(180px); }           /* 2. Entry via TZ */
+            85% { transform: translateY(45px); opacity: 1; } /* Moving up Axoneme */
+            90% { transform: translateY(40px); opacity: 0.7; } /* 3. Delivery & 4. Disassembly at Tip */
+            100% { transform: translateY(40px); opacity: 0; }
         }
 
-        /* --- RETROGRADE ENGINE (Tip -> Base) --- */
-        @keyframes retrogradeStream {
-            0% { transform: translateY(-265px); opacity: 0; }
-            10% { opacity: 1; } /* 5. Dynein takes over at Tip */
-            90% { opacity: 1; }
-            100% { transform: translateY(0); opacity: 0; } /* Recycling at Base */
+        /* --- RETROGRADE (Tip -> Base) --- */
+        /* Start: Y=40 (Inside Tip) | End: Y=200 (Inside Basal Body) */
+        @keyframes retrogradeReturn {
+            0% { transform: translateY(40px); opacity: 0; }
+            10% { transform: translateY(45px); opacity: 1; } /* 5. Dynein pickup at Tip */
+            90% { transform: translateY(190px); opacity: 1; }
+            100% { transform: translateY(200px); opacity: 0; } /* Recycling at Base */
         }
 
-        /* --- Component Colors --- */
-        .kinesin-motor { fill: #22c55e; }   /* Step 1/2 Power */
-        .dynein-motor  { fill: #ef4444; }   /* Step 5 Power */
+        /* --- Component Coloring --- */
+        .kinesin-motor { fill: #22c55e; }   /* Anterograde Motor */
+        .dynein-motor  { fill: #ef4444; }   /* Retrograde Motor */
         .ift-b-complex { fill: #06b6d4; }   /* Anterograde Scaffold */
         .ift-a-complex { fill: #3b82f6; }   /* Retrograde Scaffold */
-        .bbsome-unit   { fill: #eab308; }   /* Adapter */
-        .cargo-load    { fill: #a855f7; }   /* Functional Cargo */
+        .bbsome-unit   { fill: #eab308; }   /* Transport Adapter */
+        .cargo-load    { fill: #a855f7; }   /* Cargo */
 
-        /* Animation Assignments */
         .ift-train { pointer-events: none; }
-        .moving-up { animation: anterogradeStream 5s linear infinite; }
-        .moving-down { animation: retrogradeStream 4s linear infinite; }
+        .moving-up { animation: assemblyAndEntry 5s linear infinite; }
+        .moving-down { animation: retrogradeReturn 4s linear infinite; }
 
-        /* Staggering for continuous traffic */
+        /* Staggering */
         .t1 { animation-delay: 0s; }
         .t2 { animation-delay: 1.6s; }
         .t3 { animation-delay: 3.2s; }
 
-        /* Structure Styles */
-        .cilia-part { cursor: pointer; transition: all 0.2s; }
+        /* Interactive Parts */
+        .cilia-part { cursor: pointer; transition: all 0.2s; outline: none; }
         .active-highlight { stroke: #fbbf24 !important; stroke-width: 3px !important; filter: drop-shadow(0 0 5px #fbbf24); }
         
         #cilium-tooltip {
             position: absolute; background: rgba(15, 23, 42, 0.9); color: white;
             padding: 8px 12px; border-radius: 6px; font-size: 11px;
             pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 2000;
+            border-left: 3px solid #3b82f6;
         }
     `;
     document.head.appendChild(style);
 
-    // 2. Generate SVG Template
+    // 2. Structural SVG Generation
     container.innerHTML = `
-        <div class="cilia-container" style="position:relative; width:100%; height:100%; display:flex; justify-content:center; align-items:center;">
+        <div class="cilia-container" style="position:relative; width:100%; height:100%; display:flex; justify-content:center; align-items:center; background:white;">
             <div id="cilium-tooltip"></div>
             <svg id="cilia-diagram" viewBox="0 0 300 450" xmlns="http://www.w3.org/2000/svg" style="height:100%; width:100%;">
                 <defs>
@@ -1043,52 +1044,62 @@ window.generateAndInjectSVG = function() {
                 <g id="viewport-group">
                     <path id="cell-body" class="cilia-part" d="M 40,380 C -30,300 10,200 140,200 C 270,200 310,300 240,380 Z" fill="#f8fafc" stroke="#e2e8f0" />
                     <circle id="nucleus" class="cilia-part" cx="140" cy="320" r="35" fill="#cbd5e1" stroke="#94a3b8" />
-                    <rect id="basal-body" class="cilia-part" x="130" y="195" width="20" height="15" rx="2" fill="#5b21b6" />
+                    
+                    <rect id="basal-body" class="cilia-part" x="130" y="195" width="20" height="20" rx="2" fill="#5b21b6" />
                     <path id="transition-zone" class="cilia-part" d="M 132,195 L 128,180 L 152,180 L 148,195 Z" fill="#475569" />
+                    
                     <path id="ciliary-membrane" class="cilia-part" d="M 128,180 L 135,30 L 145,30 L 152,180 Z" fill="none" stroke="#0891b2" stroke-width="2" stroke-dasharray="4,2" opacity="0.4" />
                     <path id="axoneme" class="cilia-part" d="M 135,180 L 138,35 L 142,35 L 145,180 Z" fill="none" stroke="url(#axonemeGrad)" stroke-width="2.5" />
+                    
+                    <circle id="ciliary-tip" class="cilia-part" cx="140" cy="32" r="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1"/>
 
-                    <g transform="translate(0, 190)">
-                        
-                        ${[0, 1.6, 3.2].map((delay, i) => `
-                            <g class="ift-train moving-up t${i+1}" style="animation-delay: ${delay}s">
-                                <circle class="kinesin-motor" cx="134" cy="-12" r="2.5" /> <rect class="ift-b-complex" x="132" y="-9" width="4" height="6" /> <rect class="ift-a-complex" x="132" y="-3" width="4" height="6" /> <circle class="bbsome-unit" cx="134" cy="5" r="2" /> <circle class="cargo-load" cx="134" cy="9" r="1.5" /> </g>
-                        `).join('')}
+                    ${[0, 1.6, 3.2].map((delay, i) => `
+                        <g class="ift-train moving-up t${i+1}" style="animation-delay: ${delay}s">
+                            <circle class="kinesin-motor" cx="135" cy="0" r="2" />
+                            <rect class="ift-b-complex" x="133.5" y="3" width="3" height="5" />
+                            <circle class="bbsome-unit" cx="135" cy="11" r="1.5" />
+                            <circle class="cargo-load" cx="135" cy="14" r="1" />
+                        </g>
+                    `).join('')}
 
-                        ${[0, 1.6, 3.2].map((delay, i) => `
-                            <g class="ift-train moving-down t${i+1}" style="animation-delay: ${delay + 0.8}s">
-                                <circle class="bbsome-unit" cx="146" cy="-12" r="2" /> <rect class="ift-a-complex" x="144" y="-10" width="4" height="6" /> <rect class="ift-b-complex" x="144" y="-4" width="4" height="6" /> <circle class="dynein-motor" cx="146" cy="4" r="3" /> </g>
-                        `).join('')}
-
-                    </g>
+                    ${[0, 1.6, 3.2].map((delay, i) => `
+                        <g class="ift-train moving-down t${i+1}" style="animation-delay: ${delay + 0.8}s">
+                            <circle class="dynein-motor" cx="145" cy="0" r="2.5" />
+                            <rect class="ift-a-complex" x="143.5" y="-6" width="3" height="5" />
+                            <circle class="bbsome-unit" cx="145" cy="-9" r="1.5" />
+                        </g>
+                    `).join('')}
 
                     <g class="cilia-labels" style="pointer-events:none; opacity:0; transition: 0.3s;">
-                        <text x="10" y="220" font-size="9" fill="#22c55e">● Kinesin II</text>
-                        <text x="10" y="235" font-size="9" fill="#06b6d4">■ IFT-B</text>
-                        <text x="10" y="250" font-size="9" fill="#3b82f6">■ IFT-A</text>
-                        <text x="10" y="265" font-size="9" fill="#eab308">● BBSome</text>
-                        <text x="10" y="280" font-size="9" fill="#ef4444">● Dynein</text>
-                        <text x="10" y="295" font-size="9" fill="#a855f7">● Cargo</text>
+                        <rect x="5" y="210" width="80" height="100" fill="white" fill-opacity="0.8" rx="5"/>
+                        <text x="10" y="225" font-size="9" font-weight="bold" fill="#22c55e">● Kinesin II</text>
+                        <text x="10" y="240" font-size="9" font-weight="bold" fill="#06b6d4">■ IFT-B</text>
+                        <text x="10" y="255" font-size="9" font-weight="bold" fill="#3b82f6">■ IFT-A</text>
+                        <text x="10" y="270" font-size="9" font-weight="bold" fill="#eab308">● BBSome</text>
+                        <text x="10" y="285" font-size="9" font-weight="bold" fill="#ef4444">● Dynein</text>
+                        <text x="10" y="300" font-size="9" font-weight="bold" fill="#a855f7">● Cargo</text>
                     </g>
                 </g>
             </svg>
         </div>
     `;
 
-    // 3. Logic & Interactions
+    // 3. Precision Interactions
     const tooltip = document.getElementById('cilium-tooltip');
     
     container.querySelectorAll('.cilia-part').forEach(part => {
         part.addEventListener('mousemove', (e) => {
-            tooltip.textContent = part.id.replace(/-/g, ' ').toUpperCase();
+            const name = part.id.replace(/-/g, ' ').toUpperCase();
+            tooltip.textContent = name;
             tooltip.style.left = (e.offsetX + 15) + 'px';
             tooltip.style.top = (e.offsetY + 15) + 'px';
             tooltip.style.opacity = '1';
         });
         part.addEventListener('mouseleave', () => tooltip.style.opacity = '0');
+        
         part.addEventListener('click', (e) => {
             e.stopPropagation();
-            window.SpatialManager.zoomTo(part);
+            if (window.SpatialManager) window.SpatialManager.zoomTo(part);
             document.querySelectorAll('.cilia-part').forEach(p => p.classList.remove('active-highlight'));
             part.classList.add('active-highlight');
             container.querySelector('.cilia-labels').style.opacity = '1';
@@ -1097,7 +1108,7 @@ window.generateAndInjectSVG = function() {
 
     container.querySelector('svg').onclick = (e) => {
         if(e.target.id === 'cilia-diagram') {
-            window.SpatialManager.resetZoom();
+            if (window.SpatialManager) window.SpatialManager.resetZoom();
             container.querySelector('.cilia-labels').style.opacity = '0';
         }
     };
@@ -2101,6 +2112,7 @@ window.initCiliAI();
 </script>
 </body>
 </html>
+
 
 
 
