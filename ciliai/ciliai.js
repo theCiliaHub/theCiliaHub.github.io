@@ -3637,38 +3637,61 @@ window.terminologyQueries = {
  * MODULE: scRNA-seq DOT PLOT ENGINE
  * ============================================================== */
 
-// 1. THE MATH ENGINE (Calculates size/color for the dots)
+/* ==============================================================
+ * MODULE: scRNA-seq DOT PLOT ENGINE (Robust Version)
+ * ============================================================== */
 window.calculateDotPlotData = function(genes, datasetKey) {
     const dataset = window.CiliAI.datasets[datasetKey];
-    if (!dataset || !dataset.umap) return null;
+    if (!dataset || !dataset.umap) {
+        console.error(`[DotPlot] Dataset ${datasetKey} not found.`);
+        return null;
+    }
 
+    // 1. Group every cell by its cell_type label
     const cellsByType = {};
     dataset.umap.forEach((p, index) => {
         const cType = p.cell_type || 'Unknown';
         if (!cellsByType[cType]) cellsByType[cType] = [];
-        cellsByType[cType].push(index); 
+        cellsByType[cType].push({
+            index: index,
+            id: p.cell_id || p.id // Needed for cell-centric lookup
+        });
     });
 
     const uniqueCellTypes = Object.keys(cellsByType).sort();
     const x = [], y = [], size = [], color = [];
 
+    // 2. Iterate through each requested gene
     genes.forEach(gene => {
-        const { exprArray } = window.extractExpressionForGene(gene, dataset, dataset.umap);
-        uniqueCellTypes.forEach(cType => {
-            const indices = cellsByType[cType];
-            let sum = 0, nonZero = 0;
-            indices.forEach(idx => {
-                const val = exprArray[idx];
-                sum += val;
-                if (val > 0) nonZero++;
-            });
-            const avg = indices.length ? sum / indices.length : 0;
-            const pct = indices.length ? (nonZero / indices.length) * 100 : 0;
+        const geneUpper = gene.toUpperCase();
+        
+        // Use the shared helper to get the expression array for the whole dataset
+        const result = window.extractExpressionForGene(geneUpper, dataset, dataset.umap);
+        const exprArray = result.exprArray;
 
-            x.push(gene);
+        uniqueCellTypes.forEach(cType => {
+            const cellGroup = cellsByType[cType];
+            let sum = 0;
+            let nonZeroCount = 0;
+            
+            cellGroup.forEach(cell => {
+                const val = exprArray[cell.index];
+                if (val > 0) {
+                    sum += val;
+                    nonZeroCount++;
+                }
+            });
+
+            // Calculate Stats for this Gene/CellType pair
+            const avgExpr = cellGroup.length > 0 ? (sum / cellGroup.length) : 0;
+            const pctExpr = cellGroup.length > 0 ? (nonZeroCount / cellGroup.length) * 100 : 0;
+
+            // Only add to plot if there is at least some expression (optional)
+            // Or add everything to keep the grid consistent
+            x.push(geneUpper);
             y.push(cType);
-            size.push(pct);
-            color.push(avg);
+            size.push(pctExpr); 
+            color.push(avgExpr);
         });
     });
 
@@ -7445,6 +7468,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
