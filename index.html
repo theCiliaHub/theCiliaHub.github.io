@@ -2100,7 +2100,7 @@ if (chatInput) {
 // Start the App
 window.initCiliAI();
 /* ==============================================================
- * MODULE: PERFORMANCE & UTILITY ADD-ONS
+ * MODULE: PERFORMANCE & UTILITY ADD-ONS (Professional v2.0)
  * ============================================================== */
 
 // --- 1. LOCAL DATA CACHE (IndexedDB Wrapper) ---
@@ -2164,11 +2164,11 @@ window.Toast = {
         
         el.style.cssText = `
             background: white; border-left: 4px solid ${colors[type] || colors.info};
-            padding: 12px 16px; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 12px 16px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             font-family: 'Inter', sans-serif; font-size: 13px; color: #2d3748;
-            min-width: 250px; opacity: 0; transform: translateX(20px); transition: all 0.3s ease;
+            min-width: 280px; opacity: 0; transform: translateX(20px); transition: all 0.3s ease;
         `;
-        el.innerHTML = `<strong>${type.toUpperCase()}:</strong> ${message}`;
+        el.innerHTML = `<strong style="text-transform:uppercase; font-size:11px; margin-right:5px;">${type}</strong> ${message}`;
         
         container.appendChild(el);
         
@@ -2187,6 +2187,113 @@ window.Toast = {
     }
 };
 
+// --- 3. PROFESSIONAL REPORT EXPORTER (Scientific Layout) ---
+window.exportAnalysisReport = async function() {
+    window.updateStatus('Generating Report...', 'loading');
+
+    // A. Capture High-Res Visualization
+    let plotImage = '';
+    const plotDiv = document.getElementById('plotly-container');
+    const svgDiv = document.getElementById('cilia-diagram');
+    
+    if (window.CiliAI.currentPlot && plotDiv && plotDiv.style.display !== 'none') {
+        try {
+            // Capture Plotly as PNG (Scale 2x for retina quality)
+            const dataUrl = await Plotly.toImage(plotDiv, {format: 'png', width: 1000, height: 700, scale: 2});
+            plotImage = `<div class="figure"><img src="${dataUrl}" style="width:100%; border-radius:4px;"><p class="caption"><strong>Figure 1:</strong> Data visualization snapshot.</p></div>`;
+        } catch (e) { console.warn("Plot capture failed", e); }
+    } else if (svgDiv && svgDiv.parentElement.style.display !== 'none') {
+        // Capture Diagram State
+        const svgData = new XMLSerializer().serializeToString(svgDiv);
+        plotImage = `<div class="figure"><div style="width:100%;">${svgData}</div><p class="caption"><strong>Figure 1:</strong> Ciliary localization diagram.</p></div>`;
+    }
+
+    // B. Clean Chat Log
+    const chatContainer = document.getElementById('messages');
+    let chatContent = '<p>No conversation history.</p>';
+    if (chatContainer) {
+        const clone = chatContainer.cloneNode(true);
+        // Remove interactive buttons and inputs
+        clone.querySelectorAll('button, .quick-action-chips, .ciliai-reaction-buttons, .input-area').forEach(e => e.remove());
+        // Flatten text
+        chatContent = clone.innerHTML;
+    }
+
+    // C. Construct HTML Document
+    const reportHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>CiliAI Research Report</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+            body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #1a202c; background: #f7fafc; padding: 40px; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-radius: 8px; }
+            .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .title { font-size: 28px; font-weight: 800; color: #005b96; margin: 0; }
+            .meta { font-size: 12px; color: #718096; text-align: right; }
+            h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-top: 40px; color: #4a5568; }
+            
+            /* Chat Styling */
+            .ciliai-message { margin-bottom: 20px; }
+            .ciliai-message.user .ciliai-message-content { background: #ebf8ff; color: #2b6cb0; padding: 10px 15px; border-radius: 6px; font-weight: 600; display: inline-block; }
+            .ciliai-message.assistant .ciliai-message-content { color: #2d3748; padding: 5px 0; }
+            .cilia-badge { display: inline-block; padding: 2px 8px; background: #edf2f7; border-radius: 12px; font-size: 11px; margin: 2px; border: 1px solid #e2e8f0; }
+            
+            /* Figure Styling */
+            .figure { margin: 30px 0; padding: 20px; background: #fff; border: 1px solid #e2e8f0; text-align: center; }
+            .caption { font-size: 12px; color: #718096; margin-top: 10px; font-style: italic; }
+            
+            /* Table Styling */
+            table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 15px 0; }
+            th { text-align: left; border-bottom: 2px solid #e2e8f0; padding: 8px; background: #f7fafc; }
+            td { border-bottom: 1px solid #e2e8f0; padding: 8px; }
+            
+            @media print { body { background: white; padding: 0; } .container { box-shadow: none; padding: 20px; } }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div>
+                    <div class="title">CiliAI Research Report</div>
+                    <div style="font-size:14px; color:#4a5568;">Computational Biology Analysis</div>
+                </div>
+                <div class="meta">
+                    Generated: ${new Date().toLocaleDateString()}<br>
+                    Time: ${new Date().toLocaleTimeString()}<br>
+                    Session ID: ${Math.random().toString(36).substr(2, 9).toUpperCase()}
+                </div>
+            </div>
+
+            ${plotImage ? `<h2>Active Visualization</h2>${plotImage}` : ''}
+
+            <h2>Transcript & Analysis</h2>
+            <div class="transcript">
+                ${chatContent}
+            </div>
+
+            <div style="margin-top: 60px; font-size: 11px; color: #a0aec0; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+                Generated by CiliAI • Rare Disease and Developmental Genetics Lab
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    // D. Trigger Download
+    const blob = new Blob([reportHTML], {type: 'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CiliAI_Report_${new Date().toISOString().slice(0,10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    window.updateStatus('Ready', 'ready');
+    window.Toast.show("Report downloaded successfully", "success");
+};
 
 // --- 4. INTEGRATE CACHING INTO FETCH (Monkey Patch) ---
 // This wraps your existing logic to try Cache first
@@ -2198,7 +2305,6 @@ window.smartFetch = async function(url) {
     // 1. Try Cache
     const cached = await window.DataCache.get(cacheKey);
     if (cached) {
-        // console.log(`[Cache Hit] ${cacheKey}`);
         return cached;
     }
     
@@ -2217,18 +2323,9 @@ window.smartFetch = async function(url) {
     }
 };
 
-// Add Export Button to Navbar (Dynamically)
-(function addExportButton() {
-    const nav = document.querySelector('.nav-links');
-    if (nav) {
-        const li = document.createElement('li');
-        li.innerHTML = `<a href="#" onclick="window.exportAnalysisReport()" style="background:#ecc94b; color:#744210;">💾 Report</a>`;
-        nav.appendChild(li);
-    }
-})();
 
 console.log("CiliAI Professional Modules Loaded.");
-    
 </script>
 </body>
 </html>
+
