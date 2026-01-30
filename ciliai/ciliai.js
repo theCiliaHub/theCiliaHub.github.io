@@ -7836,7 +7836,7 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. RENDER MAP (With "Nuclear" String Matching)
+// 2. RENDER MAP (Fixed Variable Name)
 window.renderVariantMap = async function(geneSymbol) {
     window.switchView('plot'); 
     const container = document.getElementById('plotly-container');
@@ -7854,8 +7854,7 @@ window.renderVariantMap = async function(geneSymbol) {
         return;
     }
 
-    // --- DEFINITIVE FILTERING ---
-    // We convert the object to a string to catch "pathogenic" regardless of API structure
+    // --- FILTERING ---
     const isPathogenic = (v) => {
         const rawString = JSON.stringify(v).toLowerCase();
         return rawString.includes("pathogenic"); 
@@ -7866,19 +7865,18 @@ window.renderVariantMap = async function(geneSymbol) {
 
     console.log(`[CiliAI Debug] Total: ${data.variants.length}, Patho: ${allPathogenic.length}, Others: ${allOthers.length}`);
 
-    // Smart Sampling: Prioritize Pathogenic, fill rest with Others
+    // --- SAMPLING ---
     const MAX_POINTS = 60;
-    const pathoToShow = allPathogenic.slice(0, 30); // Show max 30 pathogenic
+    const pathoToShow = allPathogenic.slice(0, 30); 
     const remainingSlots = MAX_POINTS - pathoToShow.length;
     
-    // Shuffle "Others" to show a random distribution, not just the N-terminus
     const othersToShow = allOthers
         .sort(() => 0.5 - Math.random()) 
         .slice(0, remainingSlots);
 
     const displayVariants = [...pathoToShow, ...othersToShow];
 
-    // --- SVG RENDER ---
+    // --- SVG SETUP ---
     const w = container.clientWidth - 80;
     const h = 450;
     const pad = 40;
@@ -7892,7 +7890,8 @@ window.renderVariantMap = async function(geneSymbol) {
         return '#8b5cf6'; 
     };
 
-    const svg = `
+    // --- FIXED VARIABLE NAME HERE (svgContent) ---
+    const svgContent = `
         <svg width="100%" height="100%" viewBox="0 0 ${w + 80} ${h}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Inter', sans-serif;">
             
             <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Landscape</text>
@@ -7936,7 +7935,6 @@ window.renderVariantMap = async function(geneSymbol) {
 
     container.innerHTML = svgContent;
 
-    // Chat Feedback (Note: Title updated to 'Advanced' to verify update)
     window.addChatMessage(`
         <div class="ai-result-card">
             <h4>🧬 Advanced Variant Map: ${data.gene}</h4>
@@ -7947,9 +7945,9 @@ window.renderVariantMap = async function(geneSymbol) {
     `, false);
 };
 
-
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
