@@ -7783,62 +7783,172 @@ window.downloadCurrentVisualization = function() {
 /* ==============================================================
  * MODULE: LIVE VARIANT & DOMAIN MAPPER (Optimized)
  * ============================================================== */
+/* ==============================================================
+ * MODULE: LIVE VARIANT MAPPER (Robust Catch-All Logic)
+ * ============================================================== */
 
-// 1. FETCH LIVE DATA (Variants + Domains)
+// 1. FETCH LIVE DATA
 window.fetchVariantDataLive = async function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
     
     try {
-        // Step A: Get Canonical UniProt ID
+        // Step A: Get Canonical UniProt ID (Swiss-Prot Priority)
         const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
-        if (!mgRes.ok) throw new Error("MyGene.info API unavailable");
+        if (!mgRes.ok) throw new Error("MyGene API Error");
         const mgData = await mgRes.json();
         const hit = mgData.hits?.[0];
         
         if (!hit || !hit.uniprot) throw new Error(`UniProt ID not found for ${gene}`);
 
-        // Prefer Swiss-Prot (Reviewed)
+        // Prefer Swiss-Prot (Reviewed) > TrEMBL (Unreviewed)
         let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
         const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
-        if (!uniprotID) throw new Error(`No valid UniProt ID extracted for ${gene}`);
+        console.log(`[CiliAI] Using UniProt ID: ${uniprotID}`);
 
-        // Step B: Parallel Fetch (Variation + Features)
-        // 1. Variation Data (Mutations)
-        // 2. Features Data (Domains, Regions)
+        // Step B: Fetch Variants & Features
         const [varRes, featRes] = await Promise.all([
             fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
             fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
         ]);
 
-        if (!varRes.ok) throw new Error(`EBI Variation API Error: ${varRes.status}`);
+        if (!varRes.ok) throw new Error(`EBI API Error: ${varRes.status}`);
         
         const varData = await varRes.json();
-        const featData = featRes.ok ? await featRes.json() : { features: [] }; // Fallback if features fail
+        const featData = featRes.ok ? await featRes.json() : { features: [] };
 
         // Step C: Process Data
         const length = varData.sequence.length;
-        
-        // Filter Variants: Keep only point mutations (skip large deletions for map clarity)
         const variants = varData.features.filter(f => f.type === 'VARIANT');
 
-        // Extract Domains (PFAM, SMART, etc. mapped to UniProt features)
-        // We look for specific structural types
-        const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION'];
-        const domains = featData.features.filter(f => domainTypes.includes(f.type)).map(d => ({
-            name: d.description || d.type,
-            start: parseInt(d.begin),
-            end: parseInt(d.end),
-            type: d.type
-        }));
+        // Broaden Domain Types to catch more features
+        const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
+        const domains = featData.features
+            .filter(f => domainTypes.includes(f.type))
+            .map(d => ({
+                name: d.description || d.type,
+                start: parseInt(d.begin),
+                end: parseInt(d.end),
+                type: d.type
+            }));
 
         return { gene, uniprotID, length, variants, domains };
 
     } catch (e) {
-        console.error("Fetch Error:", e);
+        console.error("Variant Fetch Error:", e);
         return { error: e.message };
     }
 };
+
+// 2. RENDER MAP (With Catch-All Filtering)
+window.renderVariantMap = async function(geneSymbol) {
+    window.switchView('plot'); 
+    const container = document.getElementById('plotly-container');
+    
+    container.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
+            <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
+            <p>Scanning global databases for <strong>${geneSymbol}</strong>...</p>
+        </div>`;
+
+    const data = await window.fetchVariantDataLive(geneSymbol);
+
+    if (data.error) {
+        container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Error: ${data.error}</div>`;
+        return;
+    }
+
+    // --- ROBUST FILTERING ---
+    // Convert entire object to string to catch "Pathogenic" anywhere (nested or not)
+    const isPathogenic = (v) => {
+        const str = JSON.stringify(v).toLowerCase();
+        return str.includes('"pathogenic"') || str.includes('pathogenic'); 
+    };
+
+    const allPathogenic = data.variants.filter(isPathogenic);
+    const allOthers = data.variants.filter(v => !isPathogenic(v));
+
+    console.log(`[CiliAI] Found ${allPathogenic.length} Pathogenic, ${allOthers.length} Others`);
+
+    // Smart Sampling: Show up to 20 Pathogenic + 30 Random Others
+    const pathoToShow = allPathogenic.slice(0, 20); 
+    const othersToShow = allOthers
+        .sort(() => 0.5 - Math.random()) // Shuffle
+        .slice(0, 50 - pathoToShow.length);
+
+    const displayVariants = [...pathoToShow, ...othersToShow];
+
+    // --- SVG SETUP ---
+    const w = container.clientWidth - 80;
+    const h = 450;
+    const pad = 40;
+    const trackY = 300;
+    const xScale = (pos) => pad + (pos / data.length) * w;
+
+    // Helper: Dynamic Colors
+    const getDomainColor = (name) => {
+        if(name.includes('WD40')) return '#3b82f6';
+        if(name.includes('Coiled')) return '#10b981'; 
+        if(name.includes('Kinase')) return '#ef4444';
+        return '#8b5cf6'; 
+    };
+
+    const svg = `
+        <svg width="100%" height="100%" viewBox="0 0 ${w + 80} ${h}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Inter', sans-serif;">
+            
+            <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Landscape</text>
+            <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | Showing subset of ${data.variants.length} variants</text>
+
+            <rect x="${pad}" y="${trackY - 6}" width="${w}" height="12" rx="6" fill="#e2e8f0" />
+            ${data.domains.map(d => {
+                const x = xScale(d.start);
+                const width = Math.max(xScale(d.end) - x, 3);
+                return `
+                    <rect x="${x}" y="${trackY - 10}" width="${width}" height="20" rx="4" fill="${getDomainColor(d.name)}" opacity="0.8" stroke="white" stroke-width="1">
+                        <title>${d.name} (${d.start}-${d.end})</title>
+                    </rect>`;
+            }).join('')}
+
+            ${displayVariants.map(v => {
+                const isPatho = isPathogenic(v);
+                const x = xScale(v.begin);
+                const color = isPatho ? '#dc2626' : '#94a3b8';
+                const height = 15 + Math.random() * 85; 
+                const yHead = trackY - height;
+                
+                // Safe Description Extraction
+                const desc = v.descriptions?.[0]?.value || v.mutatedType || "Variant";
+
+                return `
+                    <g>
+                        <line x1="${x}" y1="${trackY - 10}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="1" opacity="0.6" />
+                        <circle cx="${x}" cy="${yHead}" r="${isPatho ? 5 : 3}" fill="${color}" stroke="white" stroke-width="1" style="cursor:pointer">
+                            <title>${desc} (Pos: ${v.begin})</title>
+                        </circle>
+                    </g>`;
+            }).join('')}
+
+            <g transform="translate(${pad}, ${h - 30})">
+                <circle cx="0" cy="0" r="4" fill="#dc2626" />
+                <text x="10" y="4" font-size="11" fill="#334155">Pathogenic (${allPathogenic.length} total)</text>
+                <rect x="150" y="-5" width="10" height="10" rx="2" fill="#3b82f6" opacity="0.8"/>
+                <text x="165" y="4" font-size="11" fill="#334155">Domains (${data.domains.length})</text>
+            </g>
+        </svg>
+    `;
+
+    container.innerHTML = svgContent;
+
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>🧬 Variant Map: ${data.gene}</h4>
+            <p>Found <strong>${allPathogenic.length} pathogenic</strong> variants and ${allOthers.length} others.</p>
+            <p style="font-size:11px; color:#666;">Displaying a representative sample + all domains.</p>
+            
+        </div>
+    `, false);
+};
+
 
 // 2. RENDER LOLLIPOP PLOT (With Domains & Sampling)
 window.renderVariantMap = async function(geneSymbol) {
@@ -8065,6 +8175,7 @@ window.renderVariantMap = async function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
