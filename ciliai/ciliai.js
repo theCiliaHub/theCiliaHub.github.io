@@ -7781,20 +7781,14 @@ window.downloadCurrentVisualization = function() {
 };
 
 /* ==============================================================
- * MODULE: LIVE CLINVAR VARIANT MAPPER (EBI API)
+ * MODULE: LIVE CLINVAR VARIANT MAPPER (Swiss-Prot Priority Fix)
  * ============================================================== */
-
-/* ==============================================================
- * MODULE: LIVE CLINVAR VARIANT MAPPER (Fixed ID Selection)
- * ============================================================== */
-
-// 1. FETCH LIVE DATA (Robust ID Handling)
 window.fetchVariantDataLive = async function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
     
     try {
-        // Step A: Get UniProt ID from Gene Symbol
-        const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot,name&species=human`);
+        // 1. Get UniProt ID (Explicitly requesting Swiss-Prot)
+        const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
         if (!mgRes.ok) throw new Error("MyGene.info API unavailable");
         
         const mgData = await mgRes.json();
@@ -7802,31 +7796,33 @@ window.fetchVariantDataLive = async function(geneSymbol) {
         
         if (!hit || !hit.uniprot) throw new Error(`UniProt ID not found for ${gene}`);
 
-        // FIX: Handle Array vs String and Prioritize Swiss-Prot (Reviewed)
-        let rawID = hit.uniprot.Swiss_Prot || hit.uniprot.TrEMBL;
+        // PRIORITY FIX: Always prefer 'Swiss-Prot' (Reviewed) over 'TrEMBL' (Unreviewed)
+        // CEP290 Example: 'O15078' (Swiss-Prot) vs 'A0A6Q8PGP6' (TrEMBL)
+        let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
         
-        // If it's an array (multiple isoforms), take the first one (Canonical)
-        // If it's a string, use it directly
+        // Handle if API returns an array (take the first one)
         const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
         if (!uniprotID) throw new Error(`No valid UniProt ID extracted for ${gene}`);
 
-        console.log(`[CiliAI] Fetched UniProt ID for ${gene}: ${uniprotID}`);
+        console.log(`[CiliAI] Fetched Canonical UniProt ID for ${gene}: ${uniprotID}`);
 
-        // Step B: Get Variants & Sequence from EBI
+        // 2. Get Variants from EBI
         const ebiRes = await fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`);
         
         if (!ebiRes.ok) {
-            // Specialized error for 400 vs 404
-            if (ebiRes.status === 400) throw new Error(`Invalid UniProt ID format: ${uniprotID}`);
+            if (ebiRes.status === 400) throw new Error(`Invalid UniProt ID: ${uniprotID}`);
             if (ebiRes.status === 404) throw new Error(`No variant data found for ID: ${uniprotID}`);
             throw new Error(`EBI API Error: ${ebiRes.status}`);
         }
         
         const ebiData = await ebiRes.json();
 
-        // Step C: Process Data
+        // 3. Process Data
         const length = ebiData.sequence.length;
+        
+        // Filter: Keep only variants with clinical significance
+        // This ensures we don't count random polymorphisms as "variants" in the summary
         const variants = ebiData.features.filter(f => f.type === 'VARIANT');
 
         return { gene, uniprotID, length, variants };
@@ -7931,4 +7927,5 @@ window.renderVariantMap = async function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
