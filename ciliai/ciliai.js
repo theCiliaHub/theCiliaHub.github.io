@@ -7781,57 +7781,195 @@ window.downloadCurrentVisualization = function() {
 };
 
 /* ==============================================================
- * MODULE: LIVE CLINVAR VARIANT MAPPER (Swiss-Prot Priority Fix)
+ * MODULE: LIVE VARIANT & DOMAIN MAPPER (Optimized)
  * ============================================================== */
+
+// 1. FETCH LIVE DATA (Variants + Domains)
 window.fetchVariantDataLive = async function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
     
     try {
-        // 1. Get UniProt ID (Explicitly requesting Swiss-Prot)
+        // Step A: Get Canonical UniProt ID
         const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
         if (!mgRes.ok) throw new Error("MyGene.info API unavailable");
-        
         const mgData = await mgRes.json();
         const hit = mgData.hits?.[0];
         
         if (!hit || !hit.uniprot) throw new Error(`UniProt ID not found for ${gene}`);
 
-        // PRIORITY FIX: Always prefer 'Swiss-Prot' (Reviewed) over 'TrEMBL' (Unreviewed)
-        // CEP290 Example: 'O15078' (Swiss-Prot) vs 'A0A6Q8PGP6' (TrEMBL)
+        // Prefer Swiss-Prot (Reviewed)
         let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
-        
-        // Handle if API returns an array (take the first one)
         const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
         if (!uniprotID) throw new Error(`No valid UniProt ID extracted for ${gene}`);
 
-        console.log(`[CiliAI] Fetched Canonical UniProt ID for ${gene}: ${uniprotID}`);
+        // Step B: Parallel Fetch (Variation + Features)
+        // 1. Variation Data (Mutations)
+        // 2. Features Data (Domains, Regions)
+        const [varRes, featRes] = await Promise.all([
+            fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
+            fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
+        ]);
 
-        // 2. Get Variants from EBI
-        const ebiRes = await fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`);
+        if (!varRes.ok) throw new Error(`EBI Variation API Error: ${varRes.status}`);
         
-        if (!ebiRes.ok) {
-            if (ebiRes.status === 400) throw new Error(`Invalid UniProt ID: ${uniprotID}`);
-            if (ebiRes.status === 404) throw new Error(`No variant data found for ID: ${uniprotID}`);
-            throw new Error(`EBI API Error: ${ebiRes.status}`);
-        }
-        
-        const ebiData = await ebiRes.json();
+        const varData = await varRes.json();
+        const featData = featRes.ok ? await featRes.json() : { features: [] }; // Fallback if features fail
 
-        // 3. Process Data
-        const length = ebiData.sequence.length;
+        // Step C: Process Data
+        const length = varData.sequence.length;
         
-        // Filter: Keep only variants with clinical significance
-        // This ensures we don't count random polymorphisms as "variants" in the summary
-        const variants = ebiData.features.filter(f => f.type === 'VARIANT');
+        // Filter Variants: Keep only point mutations (skip large deletions for map clarity)
+        const variants = varData.features.filter(f => f.type === 'VARIANT');
 
-        return { gene, uniprotID, length, variants };
+        // Extract Domains (PFAM, SMART, etc. mapped to UniProt features)
+        // We look for specific structural types
+        const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION'];
+        const domains = featData.features.filter(f => domainTypes.includes(f.type)).map(d => ({
+            name: d.description || d.type,
+            start: parseInt(d.begin),
+            end: parseInt(d.end),
+            type: d.type
+        }));
+
+        return { gene, uniprotID, length, variants, domains };
 
     } catch (e) {
-        console.error("Variant Fetch Error:", e);
+        console.error("Fetch Error:", e);
         return { error: e.message };
     }
 };
+
+// 2. RENDER LOLLIPOP PLOT (With Domains & Sampling)
+window.renderVariantMap = async function(geneSymbol) {
+    window.switchView('plot'); 
+    const container = document.getElementById('plotly-container');
+    
+    // UI Loading
+    container.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
+            <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
+            <p>Fetching <strong>${geneSymbol}</strong> domains & variants...</p>
+        </div>`;
+
+    const data = await window.fetchVariantDataLive(geneSymbol);
+
+    if (data.error) {
+        container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Error: ${data.error}</div>`;
+        return;
+    }
+
+    // --- SMART SAMPLING LOGIC ---
+    // 1. Separate Pathogenic vs Others
+    // Note: EBI API field is often 'clinicalSignificances' (plural) or inside 'association'
+    const isPathogenic = (v) => {
+        const sig = v.clinicalSignificance || (v.association && v.association[0]?.name) || "";
+        return sig.toLowerCase().includes('pathogenic');
+    };
+
+    const allPathogenic = data.variants.filter(isPathogenic);
+    const allOthers = data.variants.filter(v => !isPathogenic(v));
+
+    // 2. Select up to 50 variants total
+    // Always keep Pathogenic (up to 20), fill rest with random Others
+    const MAX_SHOW = 50;
+    const pathoToShow = allPathogenic.slice(0, 20); // Cap pathogenic to avoid crowding if huge
+    const remainingSlots = MAX_SHOW - pathoToShow.length;
+    
+    // Random Shuffle & Slice for others
+    const othersToShow = allOthers
+        .sort(() => 0.5 - Math.random())
+        .slice(0, remainingSlots);
+
+    const displayVariants = [...pathoToShow, ...othersToShow];
+
+    // --- RENDERING SVG ---
+    const w = container.clientWidth - 80;
+    const h = 450;
+    const pad = 40;
+    const trackY = 300;
+    const xScale = (pos) => pad + (pos / data.length) * w;
+
+    // Domain Colors
+    const getDomainColor = (name) => {
+        if(name.includes('WD40')) return '#3b82f6'; // Blue
+        if(name.includes('Coiled')) return '#10b981'; // Green
+        if(name.includes('Kinase')) return '#ef4444'; // Red
+        if(name.includes('TPR')) return '#f59e0b'; // Orange
+        return '#8b5cf6'; // Purple default
+    };
+
+    const svg = `
+        <svg width="100%" height="100%" viewBox="0 0 ${w + 80} ${h}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Inter', sans-serif;">
+            
+            <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Protein Architecture</text>
+            <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | Showing ${displayVariants.length} sample variants</text>
+
+            <rect x="${pad}" y="${trackY - 6}" width="${w}" height="12" rx="6" fill="#e2e8f0" />
+            
+            ${data.domains.map(d => {
+                const startX = xScale(d.start);
+                const width = xScale(d.end) - startX;
+                const col = getDomainColor(d.name);
+                return `
+                    <rect x="${startX}" y="${trackY - 10}" width="${Math.max(width, 2)}" height="20" rx="4" fill="${col}" opacity="0.8" stroke="white" stroke-width="1">
+                        <title>${d.name} (${d.start}-${d.end})</title>
+                    </rect>
+                    ${width > 40 ? `<text x="${startX + width/2}" y="${trackY + 35}" text-anchor="middle" font-size="10" fill="${col}" font-weight="bold">${d.name.split(' ')[0]}</text>` : ''}
+                `;
+            }).join('')}
+
+            ${displayVariants.map(v => {
+                const isPatho = isPathogenic(v);
+                const x = xScale(v.begin);
+                const color = isPatho ? '#dc2626' : '#94a3b8'; // Red or Gray
+                const radius = isPatho ? 5 : 3;
+                
+                // Randomize height to prevent stacking (15px to 100px)
+                const stemHeight = 15 + Math.random() * 85; 
+                const yHead = trackY - stemHeight;
+                
+                const label = `p.${v.wildType}${v.begin}${v.mutatedType}`;
+                const sig = v.clinicalSignificance || "Uncertain";
+
+                return `
+                    <g class="variant-group">
+                        <line x1="${x}" y1="${trackY - 10}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="1" opacity="0.6" />
+                        <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1" style="cursor:pointer;">
+                            <title>${label}\n${sig}</title>
+                        </circle>
+                    </g>
+                `;
+            }).join('')}
+
+            <text x="${pad}" y="${trackY + 20}" font-size="10" fill="#94a3b8" text-anchor="middle">1</text>
+            <text x="${pad + w}" y="${trackY + 20}" font-size="10" fill="#94a3b8" text-anchor="middle">${data.length}</text>
+
+            <g transform="translate(${pad}, ${h - 30})">
+                <circle cx="0" cy="0" r="4" fill="#dc2626" />
+                <text x="10" y="4" font-size="11" fill="#334155">Pathogenic (Sampled)</text>
+                
+                <circle cx="130" cy="0" r="3" fill="#94a3b8" />
+                <text x="140" y="4" font-size="11" fill="#334155">VUS / Other (Random 50)</text>
+
+                <rect x="280" y="-5" width="10" height="10" rx="2" fill="#3b82f6" opacity="0.8"/>
+                <text x="295" y="4" font-size="11" fill="#334155">Domains</text>
+            </g>
+        </svg>
+    `;
+
+    container.innerHTML = svgContent;
+
+    // Chat Confirmation
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>🧬 Variant & Domain Map</h4>
+            <p>Mapped <strong>${data.domains.length} domains</strong> and a random sample of <strong>50 variants</strong> (out of ${data.variants.length} total) for <strong>${data.gene}</strong>.</p>
+            
+        </div>
+    `, false);
+};
+
 
 // 2. RENDER LOLLIPOP PLOT
 window.renderVariantMap = async function(geneSymbol) {
@@ -7927,5 +8065,6 @@ window.renderVariantMap = async function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
