@@ -441,7 +441,27 @@
             stroke-width: 2.5;
             filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8));
         }
-        
+
+        /* Add to index.html style section Mobile Optimization*/
+@media (max-width: 768px) {
+    .app-container {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+    
+    .right-panel {
+        position: fixed;
+        top: 64px;
+        right: 0;
+        width: 100%;
+        height: 40vh;
+        z-index: 1000;
+    }
+    
+    .messages-area {
+        max-height: 30vh;
+    }
+}
         /* DASHBOARD */
         .landing-dashboard {
             display: grid;
@@ -542,6 +562,30 @@
                     <div id="vizActiveDescription" style="display:none"></div>
                 </div>
             </div>
+            <!-- Add to index.html in viz-controls section -->
+<div class="advanced-filters" style="display: none;" id="advancedFilters">
+    <div class="filter-group">
+        <label>Expression Range:</label>
+        <input type="range" id="exprMin" min="0" max="100" value="0">
+        <span id="exprValue">0</span> TPM min
+    </div>
+    <div class="filter-group">
+        <label>Localization:</label>
+        <select id="locFilter" multiple>
+            <option value="transition-zone">Transition Zone</option>
+            <option value="basal-body">Basal Body</option>
+            <option value="axoneme">Axoneme</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Ciliopathy:</label>
+        <select id="diseaseFilter">
+            <option value="">All</option>
+            <option value="joubert">Joubert Syndrome</option>
+            <option value="bbs">Bardet-Biedl</option>
+        </select>
+    </div>
+</div>
             <div class="landing-dashboard">
                 <div class="stat-item">
                     <div class="stat-value" id="stat-genes">...</div>
@@ -2328,4 +2372,5 @@ console.log("CiliAI Professional Modules Loaded.");
 </script>
 </body>
 </html>
+
 
