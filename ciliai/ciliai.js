@@ -5586,6 +5586,8 @@ const intentHandlers = [
             </div>`;
         }
     },
+
+    
     // "How many genes are in [disease/classification]?"
     {
         priority: 77,
@@ -5636,6 +5638,8 @@ const intentHandlers = [
         }
     },
 
+
+    
     // Disease implicated by a gene
     {
         priority: 76,
@@ -6230,17 +6234,90 @@ const intentHandlers = [
         return responseHtml;
     }
 },
-    // Variants
+   // 1. NEW: Live Variant Handler (Priority 77)
+    // Handles: "Variants in CEP290", "Show mutations for IFT88"
     {
-        priority: 56,
-        matcher: (qLower) => qLower.includes('variant') || qLower.includes('mutation'),
+        priority: 77,
+        matcher: (qLower) => qLower.includes('variant') || qLower.includes('mutation') || qLower.includes('clinvar'),
         handler: async (query) => {
             const genes = window.CiliAI.utils.extractGenes(query);
-            if (genes.length === 0) return null;
-            return await window.fetchVariantData(genes[0]);
+            if (genes.length === 0) {
+                return "Please specify a gene to search for variants (e.g., 'Variants in CEP290').";
+            }
+            
+            // Trigger the new renderer (Visual Lollipop Plot)
+            if (window.renderVariantMap) {
+                window.renderVariantMap(genes[0]);
+                return `<div class="ai-result-card"><p>🔍 Querying ClinVar & UniProt for <strong>${genes[0]}</strong> variants...</p></div>`;
+            } else {
+                return "Error: Variant module not loaded.";
+            }
         }
     },
 
+    // 2. UPDATED: Disease Association Handler (Priority 56)
+    // Handles: "Diseases associated with CEP290"
+    // Update: Now includes a button to jump to the Variant View
+    {
+        priority: 56,
+        matcher: (qLower) => (qLower.includes('disease') || qLower.includes('ciliopathy')) && (qLower.includes('implicated') || qLower.includes('associated') || qLower.includes('linked') || qLower.includes('cause')) && qLower.includes('with'),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return null;
+            
+            const geneSymbol = genes[0];
+            const geneData = window.CiliAI.lookups.geneMap[geneSymbol];
+            
+            if (!geneData) {
+                return `<div class="ai-result-card"><p>Gene <strong>${geneSymbol}</strong> not found in the database.</p></div>`;
+            }
+
+            // Find associated diseases
+            let associatedDiseases = [];
+            Object.keys(window.CiliAI.lookups.byCiliopathy).forEach(normKey => {
+                const diseaseGenes = window.CiliAI.lookups.byCiliopathy[normKey] || [];
+                if (diseaseGenes.includes(geneSymbol)) {
+                    // Find nice name
+                    let foundName = normKey;
+                    const classificationMap = getDiseaseClassificationMap();
+                    Object.values(classificationMap).flat().forEach(d => {
+                        if (window.CiliAI.utils.normalizeTerm(d) === normKey) foundName = d;
+                    });
+                    associatedDiseases.push(foundName);
+                }
+            });
+
+            // Fallback to CSV column
+            if (associatedDiseases.length === 0 && geneData.Ciliopathies) {
+                associatedDiseases = window.CiliAI.utils.ensureArray(geneData.Ciliopathies);
+            }
+
+            // Button to trigger the Variant View
+            const variantBtn = `
+                <button class="ciliai-button" style="margin-top:12px; width:100%; justify-content:center; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;" 
+                        onclick="window.renderVariantMap('${geneSymbol}')">
+                    🧬 View ClinVar Variants
+                </button>`;
+
+            if (associatedDiseases.length === 0) {
+                return `<div class="ai-result-card">
+                    <p><strong>${geneSymbol}</strong> is a known ciliary gene but not yet directly linked to a specific ciliopathy in the current database.</p>
+                    <p>It localizes to the <strong>${geneData.Localization || 'cilium'}</strong>.</p>
+                    ${variantBtn}
+                </div>`;
+            } else {
+                return `<div class="ai-result-card">
+                    <h4>Disease Associations: ${geneSymbol}</h4>
+                    <p><strong>${geneSymbol}</strong> is implicated in:</p>
+                    <ul>
+                        ${associatedDiseases.map(d => `<li><strong>${d}</strong></li>`).join('')}
+                    </ul>
+                    ${variantBtn}
+                </div>`;
+            }
+        }
+    },
+    
     // Batch Query
     {
         priority: 55,
@@ -7703,16 +7780,132 @@ window.downloadCurrentVisualization = function() {
     }
 };
 
+/* ==============================================================
+ * MODULE: LIVE CLINVAR VARIANT MAPPER (EBI API)
+ * ============================================================== */
+
+// 1. FETCH LIVE DATA (Protein Length + Variants)
+window.fetchVariantDataLive = async function(geneSymbol) {
+    const gene = geneSymbol.toUpperCase();
+    
+    try {
+        // Step A: Get UniProt ID from Gene Symbol (using MyGene.info)
+        const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot,name&species=human`);
+        const mgData = await mgRes.json();
+        const hit = mgData.hits?.[0];
+        const uniprotID = hit?.uniprot?.Swiss_Prot || hit?.uniprot?.TrEMBL; // Prefer Swiss-Prot
+
+        if (!uniprotID) throw new Error(`UniProt ID not found for ${gene}`);
+
+        // Step B: Get Variants & Sequence Info from EBI Proteins API
+        // This gives us the exact length and mapped variants
+        const ebiRes = await fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`);
+        if (!ebiRes.ok) throw new Error("EBI Variation API unavailable");
+        const ebiData = await ebiRes.json();
+
+        // Step C: Process Data
+        const length = ebiData.sequence.length;
+        const variants = ebiData.features.filter(f => f.type === 'VARIANT');
+
+        return { gene, uniprotID, length, variants };
+
+    } catch (e) {
+        console.error("Variant Fetch Error:", e);
+        return { error: e.message };
+    }
+};
+
+// 2. RENDER LOLLIPOP PLOT
+window.renderVariantMap = async function(geneSymbol) {
+    window.switchView('plot'); // Use the plot container area
+    const container = document.getElementById('plotly-container');
+    
+    // UI Loading State
+    container.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
+            <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
+            <p>Fetching live ClinVar data for <strong>${geneSymbol}</strong>...</p>
+            <p style="font-size:11px;">Connecting to EBI Proteins API...</p>
+        </div>`;
+
+    const data = await window.fetchVariantDataLive(geneSymbol);
+
+    if (data.error) {
+        container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Error loading variants: ${data.error}</div>`;
+        return;
+    }
+
+    // Filter for Clinical Significance
+    const patho = data.variants.filter(v => v.clinicalSignificance && v.clinicalSignificance.toLowerCase().includes('pathogenic'));
+    const vus = data.variants.filter(v => v.clinicalSignificance && v.clinicalSignificance.toLowerCase().includes('uncertain'));
+    
+    // Setup SVG Canvas
+    const w = container.clientWidth - 100;
+    const h = 400;
+    const padding = 50;
+    const trackY = 250;
+    
+    // Scaling function
+    const xScale = (pos) => padding + (pos / data.length) * w;
+
+    // SVG Template
+    const svgContent = `
+        <svg width="100%" height="100%" viewBox="0 0 ${w + 100} ${h}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Inter', sans-serif;">
+            
+            <text x="${padding}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Variant Landscape</text>
+            <text x="${padding}" y="65" font-size="12" fill="#64748b">Length: ${data.length} aa | UniProt: ${data.uniprotID}</text>
+            
+            <g transform="translate(${w - 150}, 30)">
+                <circle cx="0" cy="0" r="4" fill="#ef4444" />
+                <text x="10" y="4" font-size="11" fill="#334155">Pathogenic (${patho.length})</text>
+                <circle cx="0" cy="20" r="4" fill="#f59e0b" />
+                <text x="10" y="24" font-size="11" fill="#334155">VUS (${vus.length})</text>
+            </g>
+
+            <rect x="${padding}" y="${trackY - 5}" width="${w}" height="10" rx="5" fill="#e2e8f0" />
+            
+            <text x="${padding}" y="${trackY + 25}" font-size="10" fill="#94a3b8" text-anchor="middle">1</text>
+            <text x="${padding + w}" y="${trackY + 25}" font-size="10" fill="#94a3b8" text-anchor="middle">${data.length}</text>
+
+            ${vus.map(v => {
+                const x = xScale(v.begin);
+                const desc = v.descriptions?.[0]?.value || v.mutatedType || 'VUS';
+                return `<circle cx="${x}" cy="${trackY}" r="3" fill="#f59e0b" opacity="0.6">
+                            <title>VUS: p.${v.wildType}${v.begin}${v.mutatedType}\n${desc}</title>
+                        </circle>`;
+            }).join('')}
+
+            ${patho.map(v => {
+                const x = xScale(v.begin);
+                const height = 20 + Math.random() * 80; // Stagger heights to reduce overlap
+                const yHead = trackY - height;
+                const desc = v.descriptions?.[0]?.value || 'Pathogenic Variant';
+                return `
+                    <line x1="${x}" y1="${trackY}" x2="${x}" y2="${yHead}" stroke="#ef4444" stroke-width="1" opacity="0.6" />
+                    <circle cx="${x}" cy="${yHead}" r="4" fill="#ef4444" stroke="white" stroke-width="1" class="variant-pop">
+                        <title>Pathogenic: p.${v.wildType}${v.begin}${v.mutatedType}\n${desc}</title>
+                    </circle>
+                `;
+            }).join('')}
+
+        </svg>
+    `;
+
+    container.innerHTML = svgContent;
+    
+    // Chat Confirmation
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>🧬 Live Variant Map: ${geneSymbol}</h4>
+            <p>Fetched <strong>${data.variants.length}</strong> variants from EBI/ClinVar.</p>
+            <ul style="font-size:11px; margin-top:5px; color:#4b5563;">
+                <li style="color:#dc2626;"><strong>${patho.length}</strong> Pathogenic (Red Sticks)</li>
+                <li style="color:#d97706;"><strong>${vus.length}</strong> Uncertain (Yellow Dots)</li>
+            </ul>
+            <p style="font-size:10px; color:#94a3b8; margin-top:8px;">Hover over points for mutation details.</p>
+        </div>
+    `, false);
+};
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
-
-
-
-
-
