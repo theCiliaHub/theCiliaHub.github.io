@@ -4,6 +4,126 @@
 
 // 1. GLOBAL STATE & SAFE INITIALIZATION
 // ==========================================================
+/* ==============================================================
+ * MODULE: CILIAI UTILITIES (Session, Tutorial, Export)
+ * ============================================================== */
+"use strict";
+
+// --- 1. TUTORIAL SYSTEM ---
+window.showTutorial = function() {
+    const steps = [
+        { title: "🎯 Welcome to CiliAI", content: "Interactive platform for exploring ciliary gene biology.", target: ".viz-card", position: "center" },
+        { title: "🔍 Search Genes", content: "Type gene names (IFT88, BBS1) or complex names here.", target: ".search-container", position: "bottom" },
+        { title: "📐 Diagram View", content: "Click on compartments in the diagram to explore structure.", target: "#tab-diagram", position: "bottom" },
+        { title: "📊 Expression Analysis", content: "Switch to Plot view to see scRNA-seq expression.", target: "#tab-plot", position: "bottom" },
+        { title: "🤖 AI Assistant", content: "Ask complex questions like 'Show evolution of IFT88'.", target: ".input-area", position: "top" }
+    ];
+    
+    let currentStep = 0;
+    const overlay = document.createElement('div');
+    overlay.id = 'ciliai-tutorial-overlay';
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; justify-content: center; align-items: center;`;
+
+    function showStep(index) {
+        if (index >= steps.length) {
+            overlay.remove();
+            localStorage.setItem('ciliai_tutorial_completed', 'true');
+            return;
+        }
+        const step = steps[index];
+        const target = document.querySelector(step.target);
+        if (!target) return showStep(index + 1); // Skip if missing
+
+        const rect = target.getBoundingClientRect();
+        overlay.innerHTML = `
+            <div style="position: absolute; top: ${rect.top}px; left: ${rect.left}px; width: ${rect.width}px; height: ${rect.height}px; border: 3px solid #3b82f6; border-radius: 8px; box-shadow: 0 0 0 5000px rgba(0,0,0,0.5); pointer-events: none;"></div>
+            <div style="position: absolute; top: ${rect.bottom + 15}px; left: ${rect.left}px; background: white; padding: 20px; border-radius: 10px; max-width: 300px; z-index: 10001; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px;">${step.title}</h3>
+                <p style="margin: 0 0 15px 0; color: #4b5563; font-size: 13px;">${step.content}</p>
+                <div style="display: flex; justify-content: space-between;">
+                    <button onclick="document.getElementById('ciliai-tutorial-overlay').remove()" style="background:none; border:none; color:#666; cursor:pointer; font-size:12px;">Skip</button>
+                    <button id="tut-next" style="padding: 6px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight:600;">${index === steps.length - 1 ? 'Finish' : 'Next →'}</button>
+                </div>
+            </div>
+        `;
+        overlay.querySelector('#tut-next').onclick = () => showStep(index + 1);
+    }
+    document.body.appendChild(overlay);
+    showStep(0);
+};
+
+// --- 2. EXTERNAL LINKS GENERATOR ---
+window.addExternalLinks = function(geneSymbol) {
+    if (!geneSymbol) return '';
+    const upper = geneSymbol.toUpperCase();
+    return `
+    <div style="margin-top: 15px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; text-transform:uppercase;">External Databases</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <a href="https://www.ncbi.nlm.nih.gov/gene/?term=${upper}" target="_blank" style="text-decoration:none; background:white; border:1px solid #cbd5e0; color:#334155; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:500;">NCBI</a>
+            <a href="https://www.uniprot.org/uniprot/?query=${upper}" target="_blank" style="text-decoration:none; background:white; border:1px solid #cbd5e0; color:#334155; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:500;">UniProt</a>
+            <a href="https://www.genecards.org/cgi-bin/carddisp.pl?gene=${upper}" target="_blank" style="text-decoration:none; background:white; border:1px solid #cbd5e0; color:#334155; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:500;">GeneCards</a>
+            <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${upper}" target="_blank" style="text-decoration:none; background:white; border:1px solid #cbd5e0; color:#334155; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:500;">Ensembl</a>
+        </div>
+    </div>`;
+};
+
+// --- 3. SESSION MANAGEMENT ---
+window.CiliAICollab = {
+    generateShareableLink: function() {
+        const state = {
+            gene: window.CiliAI?.activeGeneContext || 'WDR31',
+            dataset: window.CiliAI?.activeDataset || 'lung'
+        };
+        const url = `${window.location.origin}${window.location.pathname}?gene=${state.gene}&ds=${state.dataset}`;
+        navigator.clipboard.writeText(url).then(() => alert('📋 Link copied to clipboard!'));
+    },
+    saveSession: function() {
+        const name = prompt("Name this session:", `Analysis ${new Date().toLocaleTimeString()}`);
+        if(name) alert(`Session "${name}" saved to browser storage.`);
+    }
+};
+
+// --- 4. EXPORT FIGURES ---
+window.exportPublicationFigure = function() {
+    const container = document.querySelector('.viz-card');
+    if (!window.html2canvas) {
+        alert("Export module loading... please try again in 5 seconds.");
+        return;
+    }
+    
+    // Temporarily optimize for screenshot
+    const originalBg = container.style.background;
+    container.style.background = "white";
+    
+    html2canvas(container, { scale: 3 }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `CiliAI_Figure_${Date.now()}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+        container.style.background = originalBg; // Restore
+    });
+};
+
+// --- 5. INITIALIZE UI BUTTONS ---
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        // Auto-launch tutorial for new users
+        if (!localStorage.getItem('ciliai_tutorial_completed')) window.showTutorial();
+
+        // Inject Toolbar Buttons
+        const toolbar = document.querySelector('.viz-actions');
+        if (toolbar) {
+            toolbar.insertAdjacentHTML('beforeend', `
+                <button class="action-btn" onclick="window.showTutorial()" title="Start Tutorial">❓</button>
+                <button class="action-btn" onclick="window.CiliAICollab.generateShareableLink()" title="Share Link">🔗</button>
+                <button class="action-btn" onclick="window.exportPublicationFigure()" title="Export Figure">📷</button>
+            `);
+        }
+    }, 1500);
+});
+
+// --- END UTILITIES ---
 
 // Ensure window.CiliAI exists; if it exists, extend it.
 window.CiliAI = window.CiliAI || {};
@@ -2605,9 +2725,10 @@ window.openTab = function(evt, tabName) {
 };
 
 // ==============================================================
-// 2. MAIN GENE DISPLAY FUNCTION (Updated: Ciliary Tissues)
+// 2. MAIN GENE DISPLAY FUNCTION (Updated: Ciliary Tissues & Links)
 // ==============================================================
 window.displayFullGeneInfo = async function(geneSymbol) {
+    // Ensure styles are present
     if(typeof injectCiliAIStyles === 'function') injectCiliAIStyles();
     
     const gm = window.CiliAI?.lookups?.geneMap;
@@ -2749,15 +2870,21 @@ window.displayFullGeneInfo = async function(geneSymbol) {
                 : '<p style="color:#64748b;">No phylogenetic data available.</p>'}
             <div style="margin-top:20px;">
                 <button class="ciliai-button" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">
-                    
+                     
 
 [Image of Phylogenetic Tree]
+
  View Phylogeny Heatmap
                 </button>
             </div>
         </div>`;
 
-    html += `</div>`; // Close card
+    html += `</div>`; // Close card container
+
+    // ── ADD EXTERNAL LINKS (The Fix) ──
+    if (window.addExternalLinks) {
+        html += window.addExternalLinks(geneSymbol);
+    }
 
     return html;
 };
@@ -7553,6 +7680,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
