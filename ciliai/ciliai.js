@@ -7779,12 +7779,8 @@ window.downloadCurrentVisualization = function() {
         }
     }
 };
-
 /* ==============================================================
- * MODULE: LIVE VARIANT & DOMAIN MAPPER (Optimized)
- * ============================================================== */
-/* ==============================================================
- * MODULE: LIVE VARIANT MAPPER (Robust Catch-All Logic)
+ * MODULE: LIVE VARIANT MAPPER (Definitive String-Match Fix)
  * ============================================================== */
 
 // 1. FETCH LIVE DATA
@@ -7792,7 +7788,7 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
     
     try {
-        // Step A: Get Canonical UniProt ID (Swiss-Prot Priority)
+        // Step A: Get Canonical UniProt ID (Swiss-Prot)
         const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
         if (!mgRes.ok) throw new Error("MyGene API Error");
         const mgData = await mgRes.json();
@@ -7800,13 +7796,13 @@ window.fetchVariantDataLive = async function(geneSymbol) {
         
         if (!hit || !hit.uniprot) throw new Error(`UniProt ID not found for ${gene}`);
 
-        // Prefer Swiss-Prot (Reviewed) > TrEMBL (Unreviewed)
+        // Priority: Swiss-Prot (Reviewed) > TrEMBL (Unreviewed)
         let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
         const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
         console.log(`[CiliAI] Using UniProt ID: ${uniprotID}`);
 
-        // Step B: Fetch Variants & Features
+        // Step B: Fetch Variants & Features from EBI
         const [varRes, featRes] = await Promise.all([
             fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
             fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
@@ -7821,7 +7817,7 @@ window.fetchVariantDataLive = async function(geneSymbol) {
         const length = varData.sequence.length;
         const variants = varData.features.filter(f => f.type === 'VARIANT');
 
-        // Broaden Domain Types to catch more features
+        // Capture Domains (Broad List)
         const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
         const domains = featData.features
             .filter(f => domainTypes.includes(f.type))
@@ -7838,6 +7834,117 @@ window.fetchVariantDataLive = async function(geneSymbol) {
         console.error("Variant Fetch Error:", e);
         return { error: e.message };
     }
+};
+
+// 2. RENDER MAP (With "Nuclear" String Matching)
+window.renderVariantMap = async function(geneSymbol) {
+    window.switchView('plot'); 
+    const container = document.getElementById('plotly-container');
+    
+    container.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
+            <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
+            <p>Scanning global databases for <strong>${geneSymbol}</strong>...</p>
+        </div>`;
+
+    const data = await window.fetchVariantDataLive(geneSymbol);
+
+    if (data.error) {
+        container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Error: ${data.error}</div>`;
+        return;
+    }
+
+    // --- DEFINITIVE FILTERING ---
+    // We convert the object to a string to catch "pathogenic" regardless of API structure
+    const isPathogenic = (v) => {
+        const rawString = JSON.stringify(v).toLowerCase();
+        return rawString.includes("pathogenic"); 
+    };
+
+    const allPathogenic = data.variants.filter(isPathogenic);
+    const allOthers = data.variants.filter(v => !isPathogenic(v));
+
+    console.log(`[CiliAI Debug] Total: ${data.variants.length}, Patho: ${allPathogenic.length}, Others: ${allOthers.length}`);
+
+    // Smart Sampling: Prioritize Pathogenic, fill rest with Others
+    const MAX_POINTS = 60;
+    const pathoToShow = allPathogenic.slice(0, 30); // Show max 30 pathogenic
+    const remainingSlots = MAX_POINTS - pathoToShow.length;
+    
+    // Shuffle "Others" to show a random distribution, not just the N-terminus
+    const othersToShow = allOthers
+        .sort(() => 0.5 - Math.random()) 
+        .slice(0, remainingSlots);
+
+    const displayVariants = [...pathoToShow, ...othersToShow];
+
+    // --- SVG RENDER ---
+    const w = container.clientWidth - 80;
+    const h = 450;
+    const pad = 40;
+    const trackY = 300;
+    const xScale = (pos) => pad + (pos / data.length) * w;
+
+    const getDomainColor = (name) => {
+        if(name.includes('WD40')) return '#3b82f6';
+        if(name.includes('Coiled')) return '#10b981'; 
+        if(name.includes('Kinase')) return '#ef4444';
+        return '#8b5cf6'; 
+    };
+
+    const svg = `
+        <svg width="100%" height="100%" viewBox="0 0 ${w + 80} ${h}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Inter', sans-serif;">
+            
+            <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Landscape</text>
+            <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | Showing ${displayVariants.length} / ${data.variants.length} variants</text>
+
+            <rect x="${pad}" y="${trackY - 6}" width="${w}" height="12" rx="6" fill="#e2e8f0" />
+            ${data.domains.map(d => {
+                const x = xScale(d.start);
+                const width = Math.max(xScale(d.end) - x, 3);
+                return `<rect x="${x}" y="${trackY - 10}" width="${width}" height="20" rx="4" fill="${getDomainColor(d.name)}" opacity="0.8" stroke="white" stroke-width="1"><title>${d.name} (${d.start}-${d.end})</title></rect>`;
+            }).join('')}
+
+            ${displayVariants.map(v => {
+                const isPatho = isPathogenic(v);
+                const x = xScale(v.begin);
+                const color = isPatho ? '#dc2626' : '#94a3b8'; // Red vs Gray
+                const radius = isPatho ? 5 : 3;
+                const height = 15 + Math.random() * 85; 
+                const yHead = trackY - height;
+                const desc = v.descriptions?.[0]?.value || v.mutatedType || "Variant";
+
+                return `
+                    <g>
+                        <line x1="${x}" y1="${trackY - 10}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="1" opacity="0.6" />
+                        <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1" style="cursor:pointer">
+                            <title>${desc} (Pos: ${v.begin})\n${isPatho ? 'Pathogenic' : 'VUS/Other'}</title>
+                        </circle>
+                    </g>`;
+            }).join('')}
+
+            <g transform="translate(${pad}, ${h - 30})">
+                <circle cx="0" cy="0" r="4" fill="#dc2626" />
+                <text x="10" y="4" font-size="11" fill="#334155">Pathogenic (Red)</text>
+                <circle cx="120" cy="0" r="3" fill="#94a3b8" />
+                <text x="130" y="4" font-size="11" fill="#334155">VUS / Other (Gray)</text>
+                <rect x="240" y="-5" width="10" height="10" rx="2" fill="#3b82f6" opacity="0.8"/>
+                <text x="255" y="4" font-size="11" fill="#334155">Protein Domains</text>
+            </g>
+        </svg>
+    `;
+
+    container.innerHTML = svgContent;
+
+    // Chat Feedback (Note: Title updated to 'Advanced' to verify update)
+    window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>🧬 Advanced Variant Map: ${data.gene}</h4>
+            <p>Found <strong>${allPathogenic.length} pathogenic</strong> variants and ${allOthers.length} others.</p>
+            <p style="font-size:11px; color:#666;">Displaying a sampled distribution + protein domains.</p>
+            
+        </div>
+    `, false);
 };
 
 // 2. RENDER MAP (With Catch-All Filtering)
@@ -8175,6 +8282,7 @@ window.renderVariantMap = async function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
