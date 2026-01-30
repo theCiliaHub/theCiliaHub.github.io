@@ -8,8 +8,7 @@
  * MODULE: CILIAI UTILITIES (Session, Tutorial, Export)
  * ============================================================== */
 "use strict";
-
-// --- 1. TUTORIAL SYSTEM ---
+// --- 1. TUTORIAL SYSTEM (Fixed: Easy Skip) ---
 window.showTutorial = function() {
     const steps = [
         { title: "🎯 Welcome to CiliAI", content: "Interactive platform for exploring ciliary gene biology.", target: ".viz-card", position: "center" },
@@ -19,35 +18,62 @@ window.showTutorial = function() {
         { title: "🤖 AI Assistant", content: "Ask complex questions like 'Show evolution of IFT88'.", target: ".input-area", position: "top" }
     ];
     
-    let currentStep = 0;
+    // Prevent multiple overlays
+    if(document.getElementById('ciliai-tutorial-overlay')) return;
+
     const overlay = document.createElement('div');
     overlay.id = 'ciliai-tutorial-overlay';
-    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; justify-content: center; align-items: center;`;
+    // Add cursor:pointer to background to indicate it's clickable
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; justify-content: center; align-items: center; cursor: pointer;`;
+
+    // --- CLOSING LOGIC ---
+    const closeTutorial = () => {
+        overlay.remove();
+        localStorage.setItem('ciliai_tutorial_completed', 'true'); // Remembers your choice
+    };
+
+    // Click background to close
+    overlay.onclick = (e) => {
+        if(e.target === overlay) closeTutorial();
+    };
 
     function showStep(index) {
         if (index >= steps.length) {
-            overlay.remove();
-            localStorage.setItem('ciliai_tutorial_completed', 'true');
+            closeTutorial();
             return;
         }
         const step = steps[index];
         const target = document.querySelector(step.target);
-        if (!target) return showStep(index + 1); // Skip if missing
+        // If target is missing (e.g. mobile view), skip to next step
+        if (!target || target.offsetParent === null) return showStep(index + 1); 
 
         const rect = target.getBoundingClientRect();
+        
+        // Inner HTML with stopPropagation on the modal so clicking text doesn't close it
         overlay.innerHTML = `
             <div style="position: absolute; top: ${rect.top}px; left: ${rect.left}px; width: ${rect.width}px; height: ${rect.height}px; border: 3px solid #3b82f6; border-radius: 8px; box-shadow: 0 0 0 5000px rgba(0,0,0,0.5); pointer-events: none;"></div>
-            <div style="position: absolute; top: ${rect.bottom + 15}px; left: ${rect.left}px; background: white; padding: 20px; border-radius: 10px; max-width: 300px; z-index: 10001; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <div class="tut-modal" style="position: absolute; top: ${rect.bottom + 15}px; left: ${rect.left}px; background: white; padding: 20px; border-radius: 10px; max-width: 300px; z-index: 10001; box-shadow: 0 10px 25px rgba(0,0,0,0.2); cursor: default;">
                 <h3 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px;">${step.title}</h3>
                 <p style="margin: 0 0 15px 0; color: #4b5563; font-size: 13px;">${step.content}</p>
-                <div style="display: flex; justify-content: space-between;">
-                    <button onclick="document.getElementById('ciliai-tutorial-overlay').remove()" style="background:none; border:none; color:#666; cursor:pointer; font-size:12px;">Skip</button>
-                    <button id="tut-next" style="padding: 6px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight:600;">${index === steps.length - 1 ? 'Finish' : 'Next →'}</button>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button id="tut-skip" style="background:none; border:none; color:#9ca3af; cursor:pointer; font-size:12px; font-weight:600; padding:0;">Skip Tutorial</button>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <span style="font-size:11px; color:#ccc;">${index+1}/${steps.length}</span>
+                        <button id="tut-next" style="padding: 6px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight:600;">${index === steps.length - 1 ? 'Finish' : 'Next →'}</button>
+                    </div>
                 </div>
             </div>
         `;
+
+        // Prevent closing when clicking the white box
+        const modal = overlay.querySelector('.tut-modal');
+        if(modal) modal.onclick = (e) => e.stopPropagation();
+
+        // Attach Button Handlers
         overlay.querySelector('#tut-next').onclick = () => showStep(index + 1);
+        overlay.querySelector('#tut-skip').onclick = closeTutorial;
     }
+
     document.body.appendChild(overlay);
     showStep(0);
 };
@@ -7680,6 +7706,7 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
