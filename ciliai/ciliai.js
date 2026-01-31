@@ -7956,34 +7956,36 @@ window.drawVariantWorkspace = function() {
 };
 
 
-// 4. INTERACTION HELPERS (Click Logic)
+// 4. INTERACTION HELPERS (Updated with 3D Button)
 window.openVariantPanel = function(title, pos, desc, gene) {
     const panel = document.getElementById('var-panel');
     document.getElementById('vp-title').textContent = title;
-    document.getElementById('vp-desc').textContent = desc.length > 100 ? desc.substring(0, 100) + '...' : desc;
     
-    // Wire up the Conservation Button
-    const btn = document.getElementById('vp-action');
-    btn.onclick = () => window.checkConservation(gene, parseInt(pos), title);
+    // Clean description text
+    const cleanDesc = desc.replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+    document.getElementById('vp-desc').textContent = cleanDesc.length > 150 ? cleanDesc.substring(0, 150) + '...' : cleanDesc;
+    
+    // 1. Configure Conservation Button
+    const consBtn = document.getElementById('vp-action');
+    consBtn.onclick = () => window.checkConservation(gene, parseInt(pos), title);
+
+    // 2. Configure/Create 3D Structure Button
+    let structBtn = document.getElementById('btn-3d');
+    
+    // If button doesn't exist yet (first run), inject it
+    if (!structBtn) {
+        structBtn = document.createElement('button');
+        structBtn.id = 'btn-3d';
+        structBtn.style.cssText = "width:100%; padding:8px; background:#8b5cf6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600; margin-top:8px;";
+        structBtn.innerText = "🧊 View 3D Structure";
+        consBtn.parentNode.insertBefore(structBtn, consBtn.nextSibling);
+    }
+    
+    // Reset button text & bind click
+    structBtn.innerText = "🧊 View 3D Structure";
+    structBtn.onclick = () => window.showStructureViewer(gene, parseInt(pos), title);
     
     panel.style.display = 'block';
-};
-
-window.addUserVariant = function() {
-    const input = document.getElementById('custom-var-input').value;
-    const sig = document.getElementById('custom-var-sig').value;
-    const match = input.match(/(\d+)/);
-    if(!match) { alert("Please include position."); return; }
-    
-    window.CiliAI.activeVariantData.customVariants.push({
-        begin: parseInt(match[1]),
-        wildType: input.charAt(0) || '?',
-        mutatedType: input.slice(-1) || '?',
-        significance: sig,
-        descriptions: [{value: "User added"}],
-        isCustom: true
-    });
-    window.drawVariantWorkspace();
 };
 
 window.downloadVariantCSV = function() {
@@ -8238,8 +8240,109 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
     const btn = document.getElementById('cons-btn');
     if(btn) btn.innerText = "Check Conservation";
 };
+
+/* ==============================================================
+ * MODULE: 3D STRUCTURE VIEWER (AlphaFold & Mol*)
+ * ============================================================== */
+
+// 1. LAZY LOAD DEPENDENCIES
+window.loadMolStar = function() {
+    return new Promise((resolve, reject) => {
+        if (customElements.get('pdbe-molstar-plugin')) return resolve(); // Already loaded
+
+        // Load CSS
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-light.css';
+        document.head.appendChild(link);
+
+        // Load JS
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-component.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+};
+
+// 2. RENDER 3D MODAL
+window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+    const btn = document.getElementById('btn-3d');
+    if(btn) btn.innerText = "⏳ Loading 3D Engine...";
+
+    try {
+        await window.loadMolStar();
+
+        // Get UniProt ID (Required for AlphaFold)
+        const data = await window.fetchVariantDataLive(geneSymbol);
+        if (data.error) throw new Error("Could not resolve UniProt ID.");
+        const uniprotID = data.uniprotID;
+
+        // Create Modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; display:flex; justify-content:center; align-items:center; backdrop-filter:blur(4px);`;
+        
+        // Define Highlight Data (JSON format for Mol*)
+        // This highlights the specific residue in Magenta
+        const highlightData = variantPos ? [{
+            entity_id: "1", 
+            residue_number: parseInt(variantPos), 
+            color: {r: 255, g: 0, b: 255}, // Magenta
+            focus: true
+        }] : [];
+
+        // Inner HTML with the Web Component
+        modal.innerHTML = `
+            <div style="width:800px; height:600px; background:white; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,0.5);">
+                
+                <div style="padding:15px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h3 style="margin:0; color:#1e293b; font-size:18px;">${geneSymbol} Structure (AlphaFold)</h3>
+                        <div style="font-size:12px; color:#64748b;">
+                            ${variantPos ? `Highlighting variant <strong>${variantAA}${variantPos}</strong> (Magenta)` : 'Showing full protein prediction'}
+                        </div>
+                    </div>
+                    <button id="close-3d" style="background:none; border:none; font-size:24px; cursor:pointer; color:#64748b;">&times;</button>
+                </div>
+
+                <div style="flex:1; position:relative; background:#000;">
+                    <pdbe-molstar-plugin 
+                        id="molstar-target" 
+                        molecule-id="${uniprotID}" 
+                        alphafold-view="true" 
+                        bgcolor="{r:255,g:255,b:255}" 
+                        hide-controls="true"
+                        highlight-data='${JSON.stringify(highlightData)}'>
+                    </pdbe-molstar-plugin>
+                </div>
+
+                <div style="padding:10px 20px; background:white; border-top:1px solid #e2e8f0; display:flex; gap:15px; font-size:11px; color:#475569;">
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High Confidence (pLDDT > 90)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (90 > pLDDT > 70)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (70 > pLDDT > 50)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered</span>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close Handler
+        modal.querySelector('#close-3d').onclick = () => {
+            modal.remove();
+            if(btn) btn.innerText = "🧊 View 3D Structure";
+        };
+
+    } catch (e) {
+        console.error(e);
+        alert("3D Viewer Error: " + e.message);
+        if(btn) btn.innerText = "🧊 View 3D Structure";
+    }
+};
+
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
