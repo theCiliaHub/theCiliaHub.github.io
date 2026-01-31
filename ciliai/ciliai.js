@@ -8269,129 +8269,120 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 };
 
 /* ==============================================================
- * MODULE: 3D STRUCTURE VIEWER (AlphaFold & Mol*)
- * ============================================================== */
-/* ==============================================================
- * MODULE: 3D STRUCTURE VIEWER (Fixed CDN & Loading)
+ * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (AlphaFold, Fullscreen)
  * ============================================================== */
 
-// 1. LAZY LOAD DEPENDENCIES (Updated to v3.2.0)
+// 1. LAZY LOAD DEPENDENCIES (v3.2.0)
 window.loadMolStar = function() {
     return new Promise((resolve, reject) => {
         if (customElements.get('pdbe-molstar-plugin')) return resolve(); 
 
-        // Load CSS (Standard Light Theme)
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
         document.head.appendChild(link);
 
-        // Load JS (Plugin Bundle)
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-plugin.js';
-        script.onload = () => {
-            console.log("[CiliAI] 3D Engine Loaded.");
-            resolve();
-        };
-        script.onerror = (e) => {
-            console.error("[CiliAI] 3D Engine Load Failed:", e);
-            reject(new Error("Failed to download 3D viewer scripts. Check internet connection."));
-        };
+        script.onload = () => { console.log("[CiliAI] 3D Engine Loaded."); resolve(); };
+        script.onerror = (e) => reject(new Error("Failed to load 3D engine."));
         document.head.appendChild(script);
     });
 };
 
-/* ==============================================================
- * MODULE: 3D STRUCTURE VIEWER (Fixed Layout)
- * ============================================================== */
-
-window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+// 2. MAIN VIEWER FUNCTION
+window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('btn-3d');
-    if(btn) btn.innerText = "⏳ Loading 3D Engine...";
+    if (btn) btn.innerText = "⏳ Loading 3D Engine...";
 
     try {
         await window.loadMolStar();
 
-        // Get UniProt ID
+        // A. Resolve UniProt ID
         const data = await window.fetchVariantDataLive(geneSymbol);
         if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
         const uniprotID = data.uniprotID;
 
-        // Create Modal Wrapper
-        const modal = document.createElement('div');
-        modal.id = 'molstar-modal';
-        // Force high Z-Index to sit on top of everything
-        modal.style.cssText = `position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:200000; display:flex; justify-content:center; align-items:center; backdrop-filter:blur(5px);`;
-        
+        // B. Configure Highlights (Magenta for Variant)
         const highlightData = variantPos ? [{
-            entity_id: "1", 
-            residue_number: parseInt(variantPos), 
-            color: {r: 255, g: 0, b: 255}, 
+            entity_id: "1", // Safe default for AlphaFold
+            residue_number: parseInt(variantPos, 10),
+            color: { r: 255, g: 0, b: 255 },
             focus: true
         }] : [];
 
+        // C. Create Modal (Fullscreen & Z-Index Fixed)
+        const modal = document.createElement('div');
+        modal.id = 'molstar-modal';
+        modal.style.cssText = `
+            position: fixed; inset: 0;
+            width: 100vw; height: 100dvh; /* dvh fixes mobile address bar jump */
+            background: rgba(0,0,0,0.92);
+            z-index: 200000;
+            display: flex; flex-direction: column;
+        `;
+
         modal.innerHTML = `
-            <div style="width:90%; height:90%; background:white; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; position:relative; box-shadow:0 0 50px rgba(0,0,0,0.5);">
-                
-                <div style="padding:15px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; z-index:10;">
-                    <div>
-                        <h3 style="margin:0; color:#1e293b; font-size:18px;">${geneSymbol} Structure (AlphaFold)</h3>
-                        <div style="font-size:12px; color:#64748b;">
-                            ${variantPos ? `Highlighting <strong>${variantAA}${variantPos}</strong> (Magenta)` : 'Showing full structure'}
-                        </div>
+            <div style="padding:14px 18px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; z-index:10;">
+                <div>
+                    <div style="font-size:18px; font-weight:600; color:#0f172a;">
+                        ${geneSymbol} – AlphaFold Structure
                     </div>
-                    <button id="close-3d" style="background:#e2e8f0; border:none; width:32px; height:32px; border-radius:50%; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+                    <div style="font-size:12px; color:#64748b;">
+                        ${variantPos ? `Highlighting <strong>${variantAA}${variantPos}</strong> (Magenta)` : `Full structure view`} | UniProt: ${uniprotID}
+                    </div>
                 </div>
+                <button id="close-3d" style="background:#e2e8f0; border:none; width:34px; height:34px; border-radius:50%; font-size:18px; cursor:pointer; font-weight:bold; color:#475569;">✕</button>
+            </div>
 
-                <div style="flex:1; position:relative; width:100%; height:100%; background:#f0f0f0; overflow:hidden;">
-                    <pdbe-molstar-plugin 
-                        id="molstar-target" 
-                        molecule-id="${uniprotID}" 
-                        alphafold-view="true" 
-                        bgcolor="{r:255,g:255,b:255}" 
-                        hide-controls="true"
-                        highlight-data='${JSON.stringify(highlightData)}'
-                        style="position:absolute; top:0; left:0; width:100%; height:100%; display:block;">
-                    </pdbe-molstar-plugin>
-                </div>
+            <div style="position:relative; flex:1; background:#ffffff; overflow:hidden;">
+                <pdbe-molstar-plugin 
+                    id="molstar-target" 
+                    molecule-id="${uniprotID}" 
+                    alphafold-view="true" 
+                    hide-controls="true" 
+                    bgcolor="{r:255,g:255,b:255}" 
+                    highlight-data='${JSON.stringify(highlightData)}'
+                    style="position:absolute; inset:0; width:100%; height:100%; display:block;">
+                </pdbe-molstar-plugin>
+            </div>
 
-                <div style="padding:12px; background:white; border-top:1px solid #eee; display:flex; gap:15px; font-size:11px; color:#555; z-index:10; flex-wrap:wrap;">
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; margin-right:5px; border-radius:50%;"></span>Very High (pLDDT > 90)</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; margin-right:5px; border-radius:50%;"></span>High</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; margin-right:5px; border-radius:50%;"></span>Low</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; margin-right:5px; border-radius:50%;"></span>Disordered</span>
-                    <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; margin-right:5px; border-radius:50%;"></span>Variant Location</span>
-                </div>
+            <div style="padding:10px 16px; background:#ffffff; border-top:1px solid #e5e7eb; display:flex; gap:16px; font-size:11px; color:#475569; flex-wrap:wrap;">
+                <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High (pLDDT > 90)</span>
+                <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High</span>
+                <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low</span>
+                <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered</span>
+                <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; border-radius:50%; margin-right:5px;"></span>Variant Location</span>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        // Close logic
-        const closer = () => { document.body.removeChild(modal); if(btn) btn.innerText = "🧊 View 3D Structure"; };
-        modal.querySelector('#close-3d').onclick = closer;
-        
-        if(btn) btn.innerText = "🧊 View 3D Structure";
+        /* ----------------------------------------------------------
+         * INTERACTION LOGIC (Escape Key + Cleanup)
+         * ---------------------------------------------------------- */
+        const closeViewer = () => {
+            window.removeEventListener('keydown', escHandler); // Prevent memory leaks
+            modal.remove();
+            if (btn) btn.innerText = "🧊 View 3D Structure";
+        };
+
+        const escHandler = (e) => {
+            if (e.key === 'Escape') closeViewer();
+        };
+
+        modal.querySelector('#close-3d').onclick = closeViewer;
+        window.addEventListener('keydown', escHandler);
+
+        // Reset button immediately (modal handles state now)
+        if (btn) btn.innerText = "🧊 View 3D Structure";
 
     } catch (e) {
         console.error(e);
         alert("3D Viewer Error: " + e.message);
-        if(btn) btn.innerText = "🧊 View 3D Structure";
+        if (btn) btn.innerText = "🧊 View 3D Structure";
     }
 };
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
-
-
-
-
-
-
-
-
