@@ -8002,13 +8002,17 @@ window.downloadVariantCSV = function() {
  * MODULE: EVOLUTIONARY CONSERVATION ALIGNER (Live Orthologs)
  * ============================================================== */
 
-// 1. FETCH ORTHOLOGS & SEQUENCES (Fixed: CORS-Safe Method)
+/* ==============================================================
+ * MODULE: EVOLUTIONARY CONSERVATION ALIGNER (Expanded Species)
+ * ============================================================== */
+
+// 1. FETCH ORTHOLOGS & SEQUENCES
 window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
     const btn = document.getElementById('cons-btn');
-    if(btn) btn.innerText = "⏳ Aligning...";
+    if(btn) btn.innerText = "⏳ Scanning species...";
 
     try {
-        // A. Get Human Sequence First (Reference)
+        // A. Get Human Sequence (Reference)
         const humanRes = await window.fetchVariantDataLive(geneSymbol);
         if(humanRes.error) throw new Error("Could not fetch human reference.");
         
@@ -8017,7 +8021,7 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
         const seqData = await seqRes.json();
         const humanSeq = seqData.sequence.sequence;
 
-        // B. Get Homologene ID (The "Group Key")
+        // B. Get Homologene ID
         const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
         const orthoData = await orthoRes.json();
         const hit = orthoData.hits?.[0];
@@ -8026,29 +8030,31 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
 
         const hID = hit.homologene.id;
         
-        // --- CORS FIX IS HERE ---
-        // OLD: fetch(`https://mygene.info/v3/homologene/${hID}`) -> BLOCKED
-        // NEW: Search for all genes with this ID using the safe /query endpoint
-        const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=50`);
+        // C. Fetch Ortholog Group (CORS-Safe)
+        const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=100`);
         const groupData = await groupRes.json();
         const orthologs = groupData.hits || [];
 
-        // Map Species ID to Common Name
+        // --- EXPANDED SPECIES MAP ---
         const speciesMap = {
-            10090: { name: 'Mouse', icon: '🐭' },
+            9544:  { name: 'Macaque', icon: '🐵' }, // Primate
+            10090: { name: 'Mouse',   icon: '🐭' },
+            10116: { name: 'Rat',     icon: '🐀' }, // Rodent
+            8364:  { name: 'Xenopus', icon: '🐸' }, // Amphibian
             7955:  { name: 'Zebrafish', icon: '🐟' },
-            6239:  { name: 'C. elegans', icon: '🪱' }
+            7227:  { name: 'Drosophila', icon: '🪰' }, // Insect
+            6239:  { name: 'C. elegans', icon: '🪱' }  // Nematode
         };
 
-        // C. Fetch Sequences for Target Species
+        // D. Fetch & Align Sequences
         const alignments = [];
+        let conservedCount = 0;
+        let totalAligned = 0;
         
         for (const [taxID, info] of Object.entries(speciesMap)) {
-            // Find the gene in the group that matches the taxID
             const orthoGene = orthologs.find(g => g.taxid == taxID);
             
             if (orthoGene) {
-                // Get UniProt ID (prefer Swiss-Prot)
                 let uID = orthoGene.uniprot?.Swiss_Prot || orthoGene.uniprot?.TrEMBL;
                 const finalUID = Array.isArray(uID) ? uID[0] : uID;
 
@@ -8058,37 +8064,44 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
                         const sData = await sRes.json();
                         const seq = sData.sequence.sequence;
                         
-                        // D. "Smart Align": Find best matching window
-                        // We search for the 5-mer context around the variant
+                        // "Smart Align": Search for 5-mer context
                         const anchor = humanSeq.substring(humanPos - 3, humanPos + 2);
                         let matchIdx = seq.indexOf(anchor);
                         
-                        // Fallback: Ratio mapping if exact anchor fails
+                        // Fallback: Ratio mapping
                         if (matchIdx === -1) {
                             const ratio = humanPos / humanSeq.length;
                             matchIdx = Math.floor(ratio * seq.length);
                         }
 
-                        // Extract aligned window (5 AA before, 5 AA after)
+                        // Extract Window
                         const oStart = Math.max(0, matchIdx - 5);
                         const oEnd = Math.min(seq.length, matchIdx + 6);
                         const segment = seq.substring(oStart, oEnd);
                         
+                        // Calculate Conservation Score
+                        // We check if the central residue matches the Human Reference
+                        const isMatch = segment.includes(humanSeq[humanPos-1]);
+                        if(isMatch) conservedCount++;
+                        totalAligned++;
+
                         alignments.push({
                             species: info.name,
                             icon: info.icon,
                             symbol: orthoGene.symbol,
                             seq: segment,
-                            // Check if the central residue matches
-                            isConserved: segment.includes(humanSeq[humanPos-1]) 
+                            isConserved: isMatch
                         });
                     }
                 }
             }
         }
 
-        // D. Render Results
-        window.showConservationPopup(geneSymbol, humanPos, aaChange, humanSeq, alignments);
+        // Calculate Score
+        const score = totalAligned > 0 ? Math.round((conservedCount / totalAligned) * 100) : 0;
+
+        // E. Render Results
+        window.showConservationPopup(geneSymbol, humanPos, aaChange, humanSeq, alignments, score);
 
     } catch (e) {
         console.error(e);
@@ -8097,33 +8110,44 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
     }
 };
 
-// 2. RENDER POPUP
-window.showConservationPopup = function(gene, pos, change, fullSeq, alignments) {
-    // Extract Human Window
+// 2. RENDER POPUP (Updated with Score)
+window.showConservationPopup = function(gene, pos, change, fullSeq, alignments, score) {
     const hStart = Math.max(0, pos - 6);
     const hEnd = Math.min(fullSeq.length, pos + 5);
     const hWindow = fullSeq.substring(hStart, hEnd);
-    const refAA = fullSeq[pos-1]; // 0-indexed
+    const refAA = fullSeq[pos-1]; 
 
-    // Create Modal
+    // Score Color Logic
+    let scoreColor = '#ef4444'; // Red (Low)
+    if(score > 50) scoreColor = '#f59e0b'; // Orange (Med)
+    if(score > 80) scoreColor = '#22c55e'; // Green (High)
+
     const modal = document.createElement('div');
-    modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px; box-shadow:0 25px 50px rgba(0,0,0,0.5); z-index:10000; width:400px; font-family:'Inter', sans-serif;`;
+    modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px; box-shadow:0 25px 50px rgba(0,0,0,0.5); z-index:10000; width:450px; font-family:'Inter', sans-serif;`;
     
     let html = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h3 style="margin:0; font-size:16px;">Evolutionary Alignment: ${gene}</h3>
             <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:none; cursor:pointer; font-size:16px;">✕</button>
         </div>
-        <div style="font-size:12px; color:#64748b; margin-bottom:10px;">
-            Variant <strong>${change}</strong> at position <strong>${pos}</strong>.
+        
+        <div style="background:#f8fafc; padding:10px; border-radius:6px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; border:1px solid #e2e8f0;">
+            <div>
+                <div style="font-size:11px; color:#64748b;">POSITION</div>
+                <div style="font-weight:bold; font-size:14px;">${pos} (${refAA})</div>
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:11px; color:#64748b;">CONSERVATION SCORE</div>
+                <div style="font-weight:bold; font-size:14px; color:${scoreColor};">${score}% Conserved</div>
+            </div>
         </div>
         
-        <div style="background:#f1f5f9; padding:10px; border-radius:6px; font-family:monospace; font-size:13px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #cbd5e0; padding-bottom:5px;">
+        <div style="background:#f1f5f9; padding:10px; border-radius:6px; font-family:monospace; font-size:13px; max-height:300px; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:2px solid #cbd5e0; padding-bottom:5px;">
                 <span>👤 Human</span>
                 <span>
                     ${hWindow.split('').map((char, i) => 
-                        (i === 5) ? `<span style="background:#ef4444; color:white; padding:0 2px; border-radius:2px;">${char}</span>` : char
+                        (i === 5) ? `<span style="background:#3b82f6; color:white; padding:0 3px; border-radius:2px;">${char}</span>` : char
                     ).join('')}
                 </span>
             </div>
@@ -8133,7 +8157,7 @@ window.showConservationPopup = function(gene, pos, change, fullSeq, alignments) 
                     <span title="${a.symbol}">${a.icon} ${a.species}</span>
                     <span style="color:#334155;">
                         ${a.seq.split('').map(char => 
-                            (char === refAA) ? `<span style="color:#16a34a; font-weight:bold;">${char}</span>` : char
+                            (char === refAA) ? `<span style="color:#22c55e; font-weight:900;">${char}</span>` : `<span style="opacity:0.6">${char}</span>`
                         ).join('')}
                     </span>
                 </div>
@@ -8141,18 +8165,18 @@ window.showConservationPopup = function(gene, pos, change, fullSeq, alignments) 
         </div>
 
         <div style="margin-top:10px; font-size:11px; color:#64748b; line-height:1.4;">
-            <span style="color:#16a34a; font-weight:bold;">Green</span> matches Human reference.<br>
-            If the residue is green across species, it is <strong>highly conserved</strong> and likely functional.
+            <span style="color:#22c55e; font-weight:bold;">Green</span> indicates the amino acid matches Human.
+            High conservation suggests this residue is critical for protein function.
         </div>
     `;
 
     modal.innerHTML = html;
     document.body.appendChild(modal);
     
-    // Reset button text
     const btn = document.getElementById('cons-btn');
     if(btn) btn.innerText = "Check Conservation";
 };
+
 window.showVarTooltip = function(e, title, subtitle, desc) {
     const tip = document.getElementById('var-tooltip');
     if(!tip) return;
@@ -8196,6 +8220,7 @@ window.showVarTooltip = function(e, title, subtitle, desc) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
