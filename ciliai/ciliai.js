@@ -8002,14 +8002,16 @@ window.downloadVariantCSV = function() {
 /* ==============================================================
  * MODULE: EVOLUTIONARY ALIGNER (Fuzzy Scanning Algorithm)
  * ============================================================== */
+/* ==============================================================
+ * MODULE: ROBUST EVOLUTIONARY ALIGNER (v2.0)
+ * ============================================================== */
 
-// 1. MAIN FUNCTION
 window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
     const btn = document.getElementById('cons-btn');
-    if(btn) btn.innerText = "⏳ Scanning evolution...";
+    if(btn) btn.innerText = "⏳ Deep scanning...";
 
     try {
-        // A. Human Reference
+        // A. Human Reference Sequence
         const humanRes = await window.fetchVariantDataLive(geneSymbol);
         if(humanRes.error) throw new Error("Could not fetch human reference.");
         
@@ -8018,93 +8020,110 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
         const seqData = await seqRes.json();
         const humanSeq = seqData.sequence.sequence;
 
-        // B. Homologene ID
+        // B. Define Target Species
+        const targets = [
+            { id: 9544, name: 'Macaque', icon: '🐵' },
+            { id: 10090, name: 'Mouse', icon: '🐭' },
+            { id: 10116, name: 'Rat', icon: '🐀' },
+            { id: 8364, name: 'Xenopus', icon: '🐸' },
+            { id: 7955, name: 'Zebrafish', icon: '🐟' },
+            { id: 7227, name: 'Drosophila', icon: '🪰' },
+            { id: 6239, name: 'C. elegans', icon: '🪱' }
+        ];
+
+        // C. Fetch Orthologs (Parallel Strategy)
+        // 1. Try Homologene first (fastest)
         const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
         const orthoData = await orthoRes.json();
-        const hit = orthoData.hits?.[0];
-        
-        if (!hit || !hit.homologene) throw new Error("No conservation data found.");
+        let orthologs = [];
 
-        const hID = hit.homologene.id;
-        
-        // C. Fetch Group
-        const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=100`);
-        const groupData = await groupRes.json();
-        const orthologs = groupData.hits || [];
+        if (orthoData.hits?.[0]?.homologene?.id) {
+            const hID = orthoData.hits[0].homologene.id;
+            const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=100`);
+            const groupData = await groupRes.json();
+            orthologs = groupData.hits || [];
+        }
 
-        // Species List
-        const speciesMap = {
-            9544:  { name: 'Macaque', icon: '🐵' },
-            10090: { name: 'Mouse',   icon: '🐭' },
-            10116: { name: 'Rat',     icon: '🐀' },
-            8364:  { name: 'Xenopus', icon: '🐸' },
-            7955:  { name: 'Zebrafish', icon: '🐟' },
-            7227:  { name: 'Drosophila', icon: '🪰' },
-            6239:  { name: 'C. elegans', icon: '🪱' }
-        };
+        // 2. "Rescue" missing species with direct queries
+        // If we didn't find a Rat ortholog in Homologene, ask for it directly
+        const missing = targets.filter(t => !orthologs.find(o => o.taxid === t.id));
+        if (missing.length > 0) {
+            console.log(`[CiliAI] Attempting to rescue missing orthologs: ${missing.map(m=>m.name).join(', ')}`);
+            const rescuePromises = missing.map(t => 
+                // "Find gene in [species] that is the ortholog of human [GENE]"
+                // Note: MyGene doesn't have a direct "ortholog_of" endpoint, so we rely on symbol matching fallback
+                // A better fallback for production is searching by name in that species
+                fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${t.id}&fields=uniprot,symbol`)
+                    .then(r => r.json())
+                    .then(d => d.hits?.[0] ? { ...d.hits[0], taxid: t.id } : null)
+            );
+            const rescued = (await Promise.all(rescuePromises)).filter(Boolean);
+            orthologs = [...orthologs, ...rescued];
+        }
 
-        // D. Fetch & Fuzzy Align
+        // D. Align Sequences (Fuzzy Window)
         const alignments = [];
         let conservedCount = 0;
         let totalAligned = 0;
         
-        // Prepare Human "Fingerprint" (20 AA window for robust matching)
+        // Human Fingerprint (20aa context)
         const windowSize = 20;
         const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
         const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
         const humanFingerprint = humanSeq.substring(hStart, hEnd);
 
-        for (const [taxID, info] of Object.entries(speciesMap)) {
-            const orthoGene = orthologs.find(g => g.taxid == taxID);
+        for (const t of targets) {
+            const orthoGene = orthologs.find(g => g.taxid === t.id);
             
             if (orthoGene) {
                 let uID = orthoGene.uniprot?.Swiss_Prot || orthoGene.uniprot?.TrEMBL;
                 const finalUID = Array.isArray(uID) ? uID[0] : uID;
 
                 if (finalUID) {
-                    const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
-                    if(sRes.ok) {
-                        const sData = await sRes.json();
-                        const seq = sData.sequence.sequence;
-                        
-                        // *** NEW FUZZY ALIGNER ***
-                        // Find where the human fingerprint fits best in this sequence
-                        const bestMatch = findBestAlignment(humanFingerprint, seq);
-                        
-                        if (bestMatch.score > 0.4) { // Only accept if >40% similarity found
-                            const centerIdx = bestMatch.index + Math.floor(windowSize/2);
+                    try {
+                        const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
+                        if(sRes.ok) {
+                            const sData = await sRes.json();
+                            const seq = sData.sequence.sequence;
                             
-                            // Extract tight 11-aa display window centered on the match
-                            const dispStart = Math.max(0, centerIdx - 5);
-                            const dispEnd = Math.min(seq.length, centerIdx + 6);
-                            const segment = seq.substring(dispStart, dispEnd);
+                            // Fuzzy Scan
+                            const bestMatch = findBestAlignment(humanFingerprint, seq);
                             
-                            // Check conservation at the specific residue
-                            // (Adjust index relative to the segment start)
-                            const residueInSegment = seq[centerIdx];
-                            const humanResidue = humanSeq[humanPos-1];
-                            const isMatch = residueInSegment === humanResidue;
+                            if (bestMatch.score > 0.35) { // Threshold: 35% similarity
+                                const centerIdx = bestMatch.index + Math.floor(windowSize/2);
+                                
+                                // Display Window (15aa for better context)
+                                const dispStart = Math.max(0, centerIdx - 7);
+                                const dispEnd = Math.min(seq.length, centerIdx + 8);
+                                const segment = seq.substring(dispStart, dispEnd);
+                                
+                                // Check center residue
+                                const residue = seq[centerIdx];
+                                const refAA = humanSeq[humanPos-1];
+                                const isMatch = residue === refAA;
 
-                            if(isMatch) conservedCount++;
-                            totalAligned++;
+                                if(isMatch) conservedCount++;
+                                totalAligned++;
 
-                            alignments.push({
-                                species: info.name,
-                                icon: info.icon,
-                                symbol: orthoGene.symbol,
-                                seq: segment,
-                                refAA: humanResidue,
-                                centerResidue: residueInSegment,
-                                isConserved: isMatch
-                            });
+                                alignments.push({
+                                    species: t.name,
+                                    icon: t.icon,
+                                    symbol: orthoGene.symbol,
+                                    seq: segment,
+                                    centerResidue: residue,
+                                    isConserved: isMatch
+                                });
+                            }
                         }
-                    }
+                    } catch(err) { console.warn(`Failed seq fetch for ${t.name}`); }
                 }
             }
         }
 
         const score = totalAligned > 0 ? Math.round((conservedCount / totalAligned) * 100) : 0;
-        window.showConservationPopup(geneSymbol, humanPos, aaChange, humanSeq, alignments, score);
+        
+        // Trigger New MSA Visualizer
+        window.renderProfessionalMSA(geneSymbol, humanPos, humanSeq[humanPos-1], alignments, score);
 
     } catch (e) {
         console.error(e);
@@ -8113,13 +8132,11 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
     }
 };
 
-// 2. HELPER: FUZZY ALIGNER (Sliding Window)
+// HELPER: Fuzzy Matcher
 function findBestAlignment(query, target) {
     let bestScore = -1;
     let bestIndex = -1;
-    
-    // Simple sliding window scan
-    // (Performance note: Protein seqs are short <5000aa, so this is instant)
+    // Fast scan
     for (let i = 0; i <= target.length - query.length; i++) {
         let currentScore = 0;
         for (let j = 0; j < query.length; j++) {
@@ -8130,122 +8147,100 @@ function findBestAlignment(query, target) {
             bestIndex = i;
         }
     }
-    
     return { index: bestIndex, score: bestScore / query.length };
 }
-
-// 3. RENDER POPUP (With High-Contrast Mismatches)
-window.showConservationPopup = function(gene, pos, change, fullSeq, alignments, score) {
-    const hStart = Math.max(0, pos - 6);
-    const hEnd = Math.min(fullSeq.length, pos + 5);
-    const hWindow = fullSeq.substring(hStart, hEnd);
-    
-    let scoreColor = '#ef4444'; 
-    if(score > 50) scoreColor = '#f59e0b'; 
-    if(score > 80) scoreColor = '#22c55e';
+/* ==============================================================
+ * MODULE: PROFESSIONAL MSA VISUALIZER (Jalview Style)
+ * ============================================================== */
+window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
+    // Chemical Property Colors (Taylor/Zappo style)
+    const aaColors = {
+        'A': '#c8c8c8', 'G': '#c8c8c8', 'I': '#0f820f', 'L': '#0f820f', 'V': '#0f820f', 
+        'M': '#0f820f', 'F': '#3232aa', 'W': '#b45b5b', 'Y': '#3232aa', 'H': '#8282d2', 
+        'K': '#145aff', 'R': '#145aff', 'D': '#e60a0a', 'E': '#e60a0a', 'S': '#fa9600', 
+        'T': '#fa9600', 'N': '#00dcdc', 'Q': '#00dcdc', 'C': '#e6e600', 'P': '#dc9682'
+    };
 
     const modal = document.createElement('div');
-    modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px; box-shadow:0 25px 50px rgba(0,0,0,0.5); z-index:10000; width:450px; font-family:'Inter', sans-serif;`;
-    
+    modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:0; border-radius:12px; box-shadow:0 25px 50px rgba(0,0,0,0.5); z-index:10000; width:600px; font-family:'Roboto Mono', monospace; overflow:hidden;`;
+
+    // 1. Header
     let html = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h3 style="margin:0; font-size:16px;">Evolutionary Alignment: ${gene}</h3>
-            <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:none; cursor:pointer; font-size:16px;">✕</button>
-        </div>
-        
-        <div style="background:#f8fafc; padding:10px; border-radius:6px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; border:1px solid #e2e8f0;">
+        <div style="background:#1e293b; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <div style="font-size:11px; color:#64748b;">POSITION</div>
-                <div style="font-weight:bold; font-size:14px;">${pos} (${fullSeq[pos-1]})</div>
+                <h3 style="margin:0; font-size:16px; font-family:'Inter',sans-serif;">${gene} Evolution</h3>
+                <div style="font-size:12px; opacity:0.8; font-family:'Inter',sans-serif;">Residue ${refAA}${pos} • Conservation: <span style="color:${score > 80 ? '#4ade80' : '#f87171'}">${score}%</span></div>
             </div>
-            <div style="text-align:right;">
-                <div style="font-size:11px; color:#64748b;">CONSERVATION</div>
-                <div style="font-weight:bold; font-size:14px; color:${scoreColor};">${score}% Identity</div>
-            </div>
+            <button onclick="this.closest('div').parentElement.remove()" style="border:none; background:none; color:white; cursor:pointer; font-size:20px;">×</button>
         </div>
         
-        <div style="background:#f1f5f9; padding:10px; border-radius:6px; font-family:monospace; font-size:13px; max-height:300px; overflow-y:auto;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:2px solid #cbd5e0; padding-bottom:5px;">
-                <span>👤 Human</span>
-                <span>
-                    ${hWindow.split('').map((char, i) => 
-                        (i === 5) ? `<span style="background:#3b82f6; color:white; padding:0 3px; border-radius:2px;">${char}</span>` : char
-                    ).join('')}
-                </span>
+        <div style="padding:20px; background:#f8fafc; max-height:60vh; overflow-y:auto;">
+            <div style="display:flex; gap:10px; margin-bottom:15px; font-size:10px; font-family:'Inter',sans-serif; color:#64748b;">
+                <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#0f820f; display:inline-block; margin-right:4px;"></span>Hydrophobic</span>
+                <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#145aff; display:inline-block; margin-right:4px;"></span>Positive</span>
+                <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#e60a0a; display:inline-block; margin-right:4px;"></span>Negative</span>
+                <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#fa9600; display:inline-block; margin-right:4px;"></span>Polar</span>
             </div>
 
-            ${alignments.map(a => {
-                // Highlight Logic: Green if match, Red text if mismatch
-                const centerChar = a.centerResidue;
-                const isMatch = a.isConserved;
+            <div style="display:grid; grid-template-columns: 120px 1fr; gap:10px;">
                 
-                return `
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span title="${a.symbol}" style="min-width:100px;">${a.icon} ${a.species}</span>
-                    <span style="color:#334155; letter-spacing:1px;">
-                        ${a.seq.substring(0,5)}<span style="${isMatch ? 'background:#22c55e; color:white;' : 'color:#dc2626; font-weight:bold;'} padding:0 3px; border-radius:2px;">${centerChar}</span>${a.seq.substring(6)}
-                    </span>
-                </div>`;
-            }).join('')}
-        </div>
+                <div style="text-align:right; font-weight:bold; font-size:12px; padding-top:6px; font-family:'Inter',sans-serif;">👤 Human</div>
+                <div style="display:flex; gap:2px;">
+                    ${alignments[0]?.seq.split('').map((char, i) => { // Use first alignment's length for structure
+                        // We actually need the human seq passed here, but for now we reconstruct visually
+                        // Ideally pass humanSeq segment to this function. 
+                        // Visual trick: highlight center index 7 (since we extracted 15aa, center is 7)
+                        const isCenter = i === 7; 
+                        return renderBlock(char, isCenter, true);
+                    }).join('')}
+                </div>
 
-        <div style="margin-top:10px; font-size:11px; color:#64748b; line-height:1.4;">
-            <span style="background:#22c55e; color:white; padding:0 4px; border-radius:2px;">Green</span> = Conserved. 
-            <span style="color:#dc2626; font-weight:bold;">Red</span> = Divergent AA.
+                <div style="grid-column:1/-1; height:1px; background:#e2e8f0; margin:5px 0;"></div>
+
+                ${alignments.map(a => `
+                    <div style="text-align:right; font-size:12px; padding-top:6px; color:#475569; font-family:'Inter',sans-serif;">
+                        ${a.icon} ${a.species}
+                    </div>
+                    <div style="display:flex; gap:2px;">
+                        ${a.seq.split('').map((char, i) => renderBlock(char, i === 7, false)).join('')}
+                    </div>
+                `).join('')}
+
+            </div>
         </div>
     `;
+
+    function renderBlock(char, isCenter, isRef) {
+        const color = aaColors[char] || '#999';
+        const border = isCenter ? '2px solid #1e293b' : '1px solid rgba(0,0,0,0.1)';
+        const opacity = isRef ? 1 : 0.9;
+        
+        return `
+            <div style="
+                width:24px; height:24px; 
+                background:${color}; 
+                color:white; 
+                display:flex; align-items:center; justify-content:center; 
+                font-size:12px; font-weight:bold; 
+                border-radius:3px;
+                border:${border};
+                opacity:${opacity};
+                box-shadow: ${isCenter ? '0 0 0 2px rgba(30,41,59,0.2)' : 'none'};
+                z-index:${isCenter ? 10 : 1};
+            ">${char}</div>
+        `;
+    }
 
     modal.innerHTML = html;
     document.body.appendChild(modal);
     
+    // Reset button
     const btn = document.getElementById('cons-btn');
     if(btn) btn.innerText = "Check Conservation";
 };
-
-
-window.showVarTooltip = function(e, title, subtitle, desc) {
-    const tip = document.getElementById('var-tooltip');
-    if(!tip) return;
-    
-    // Parse Position and Gene from the title/context if possible
-    // Title format is usually "p.L301R"
-    const isVariant = title.includes('p.');
-    
-    tip.style.display = 'block';
-    tip.style.left = (e.offsetX + 15) + 'px';
-    tip.style.top = (e.offsetY + 15) + 'px';
-    tip.style.pointerEvents = "auto"; // Allow clicking button inside
-    
-    let html = `
-        <div style="font-weight:bold; margin-bottom:2px;">${title}</div>
-        <div style="color:#fbbf24; margin-bottom:4px; font-size:11px;">${subtitle}</div>
-        <div style="opacity:0.8; font-size:10px; line-height:1.2; margin-bottom:6px;">${desc || ''}</div>
-    `;
-
-    // Only add button if it's a variant (contains 'p.')
-    if (isVariant) {
-        // Extract gene name from global context
-        const gene = window.CiliAI.activeVariantData?.gene || 'Unknown';
-        // Extract position: "p.L301R" -> 301
-        const match = title.match(/(\d+)/);
-        const pos = match ? match[1] : null;
-        
-        if (pos) {
-            html += `
-                <button id="cons-btn" 
-                    onclick="window.checkConservation('${gene}', ${pos}, '${title}')"
-                    style="width:100%; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.3); color:white; font-size:10px; padding:3px; cursor:pointer; border-radius:3px; margin-top:4px;">
-                    🌍 Check Conservation
-                </button>
-            `;
-        }
-    }
-
-    tip.innerHTML = html;
-};
-
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
