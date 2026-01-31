@@ -8193,8 +8193,49 @@ window.showConservationPopup = function(gene, pos, change, fullSeq, alignments) 
     const btn = document.getElementById('cons-btn');
     if(btn) btn.innerText = "Check Conservation";
 };
+window.showVarTooltip = function(e, title, subtitle, desc) {
+    const tip = document.getElementById('var-tooltip');
+    if(!tip) return;
+    
+    // Parse Position and Gene from the title/context if possible
+    // Title format is usually "p.L301R"
+    const isVariant = title.includes('p.');
+    
+    tip.style.display = 'block';
+    tip.style.left = (e.offsetX + 15) + 'px';
+    tip.style.top = (e.offsetY + 15) + 'px';
+    tip.style.pointerEvents = "auto"; // Allow clicking button inside
+    
+    let html = `
+        <div style="font-weight:bold; margin-bottom:2px;">${title}</div>
+        <div style="color:#fbbf24; margin-bottom:4px; font-size:11px;">${subtitle}</div>
+        <div style="opacity:0.8; font-size:10px; line-height:1.2; margin-bottom:6px;">${desc || ''}</div>
+    `;
+
+    // Only add button if it's a variant (contains 'p.')
+    if (isVariant) {
+        // Extract gene name from global context
+        const gene = window.CiliAI.activeVariantData?.gene || 'Unknown';
+        // Extract position: "p.L301R" -> 301
+        const match = title.match(/(\d+)/);
+        const pos = match ? match[1] : null;
+        
+        if (pos) {
+            html += `
+                <button id="cons-btn" 
+                    onclick="window.checkConservation('${gene}', ${pos}, '${title}')"
+                    style="width:100%; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.3); color:white; font-size:10px; padding:3px; cursor:pointer; border-radius:3px; margin-top:4px;">
+                    🌍 Check Conservation
+                </button>
+            `;
+        }
+    }
+
+    tip.innerHTML = html;
+};
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
