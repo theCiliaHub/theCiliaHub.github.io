@@ -7780,44 +7780,33 @@ window.downloadCurrentVisualization = function() {
     }
 };
 /* ==============================================================
- * MODULE: LIVE VARIANT MAPPER (Definitive String-Match Fix)
+ * MODULE: LIVE VARIANT WORKSPACE (Interactive & Custom)
  * ============================================================== */
 
-// 1. FETCH LIVE DATA
+// 1. FETCH DATA (Same as before, but robust)
 window.fetchVariantDataLive = async function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
-    
     try {
-        // Step A: Get Canonical UniProt ID (Swiss-Prot)
         const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
-        if (!mgRes.ok) throw new Error("MyGene API Error");
         const mgData = await mgRes.json();
         const hit = mgData.hits?.[0];
-        
         if (!hit || !hit.uniprot) throw new Error(`UniProt ID not found for ${gene}`);
 
-        // Priority: Swiss-Prot (Reviewed) > TrEMBL (Unreviewed)
         let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
         const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
-        console.log(`[CiliAI] Using UniProt ID: ${uniprotID}`);
-
-        // Step B: Fetch Variants & Features from EBI
         const [varRes, featRes] = await Promise.all([
             fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
             fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
         ]);
 
         if (!varRes.ok) throw new Error(`EBI API Error: ${varRes.status}`);
-        
         const varData = await varRes.json();
         const featData = featRes.ok ? await featRes.json() : { features: [] };
 
-        // Step C: Process Data
         const length = varData.sequence.length;
         const variants = varData.features.filter(f => f.type === 'VARIANT');
-
-        // Capture Domains (Broad List)
+        
         const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
         const domains = featData.features
             .filter(f => domainTypes.includes(f.type))
@@ -7828,7 +7817,7 @@ window.fetchVariantDataLive = async function(geneSymbol) {
                 type: d.type
             }));
 
-        return { gene, uniprotID, length, variants, domains };
+        return { gene, uniprotID, length, variants, domains, customVariants: [] };
 
     } catch (e) {
         console.error("Variant Fetch Error:", e);
@@ -7836,11 +7825,12 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. RENDER MAP (Fixed Variable Name)
+// 2. MAIN RENDER ENTRY POINT
 window.renderVariantMap = async function(geneSymbol) {
     window.switchView('plot'); 
     const container = document.getElementById('plotly-container');
     
+    // UI: Loading State
     container.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
             <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
@@ -7854,103 +7844,183 @@ window.renderVariantMap = async function(geneSymbol) {
         return;
     }
 
-    // --- FILTERING ---
-    const isPathogenic = (v) => {
-        const rawString = JSON.stringify(v).toLowerCase();
-        return rawString.includes("pathogenic"); 
-    };
+    // Store data globally so we can add variants/download later without re-fetching
+    window.CiliAI.activeVariantData = data;
+    
+    // Initial Draw
+    window.drawVariantWorkspace();
+};
 
+// 3. DRAWING ENGINE (Handles SVG + Tooltips + Forms)
+window.drawVariantWorkspace = function() {
+    const data = window.CiliAI.activeVariantData;
+    const container = document.getElementById('plotly-container');
+
+    // --- FILTERING & SAMPLING ---
+    const isPathogenic = (v) => JSON.stringify(v).toLowerCase().includes("pathogenic");
+    
     const allPathogenic = data.variants.filter(isPathogenic);
     const allOthers = data.variants.filter(v => !isPathogenic(v));
 
-    console.log(`[CiliAI Debug] Total: ${data.variants.length}, Patho: ${allPathogenic.length}, Others: ${allOthers.length}`);
-
-    // --- SAMPLING ---
+    // Sample data to keep performance high
     const MAX_POINTS = 60;
-    const pathoToShow = allPathogenic.slice(0, 30); 
-    const remainingSlots = MAX_POINTS - pathoToShow.length;
-    
-    const othersToShow = allOthers
-        .sort(() => 0.5 - Math.random()) 
-        .slice(0, remainingSlots);
+    const displayVariants = [
+        ...allPathogenic.slice(0, 30), // Top 30 Pathogenic
+        ...allOthers.sort(() => 0.5 - Math.random()).slice(0, 30), // Random 30 Others
+        ...data.customVariants // ALWAYS show user added ones
+    ];
 
-    const displayVariants = [...pathoToShow, ...othersToShow];
-
-    // --- SVG SETUP ---
-    const w = container.clientWidth - 80;
-    const h = 450;
-    const pad = 40;
-    const trackY = 300;
-    const xScale = (pos) => pad + (pos / data.length) * w;
-
-    const getDomainColor = (name) => {
-        if(name.includes('WD40')) return '#3b82f6';
-        if(name.includes('Coiled')) return '#10b981'; 
-        if(name.includes('Kinase')) return '#ef4444';
-        return '#8b5cf6'; 
+    // --- COLORS ---
+    const getDomainColor = (name, i) => {
+        if(name.includes('WD40')) return '#3b82f6'; // Blue
+        if(name.includes('Coiled')) return '#10b981'; // Green
+        if(name.includes('Kinase')) return '#ef4444'; // Red
+        if(name.includes('TPR')) return '#f59e0b'; // Orange
+        if(name.includes('IQ')) return '#8b5cf6'; // Purple
+        if(name.includes('PH domain')) return '#ec4899'; // Pink
+        const palette = ['#6366f1', '#14b8a6', '#f97316', '#84cc16'];
+        return palette[i % palette.length];
     };
 
-    // --- FIXED VARIABLE NAME HERE (svgContent) ---
+    // --- SVG CALCULATIONS ---
+    const w = container.clientWidth - 40;
+    const h = 400;
+    const pad = 40;
+    const trackY = 250;
+    const xScale = (pos) => pad + (pos / data.length) * (w - 2 * pad);
+
     const svgContent = `
-        <svg width="100%" height="100%" viewBox="0 0 ${w + 80} ${h}" xmlns="http://www.w3.org/2000/svg" style="font-family:'Inter', sans-serif;">
+        <div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column;">
             
-            <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Landscape</text>
-            <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | Showing ${displayVariants.length} / ${data.variants.length} variants</text>
+            <div id="var-tooltip" style="position:absolute; display:none; background:rgba(15,23,42,0.95); color:white; padding:8px 12px; border-radius:6px; font-size:12px; pointer-events:none; z-index:100; max-width:250px; box-shadow:0 10px 15px rgba(0,0,0,0.3);"></div>
 
-            <rect x="${pad}" y="${trackY - 6}" width="${w}" height="12" rx="6" fill="#e2e8f0" />
-            ${data.domains.map(d => {
-                const x = xScale(d.start);
-                const width = Math.max(xScale(d.end) - x, 3);
-                return `<rect x="${x}" y="${trackY - 10}" width="${width}" height="20" rx="4" fill="${getDomainColor(d.name)}" opacity="0.8" stroke="white" stroke-width="1"><title>${d.name} (${d.start}-${d.end})</title></rect>`;
-            }).join('')}
+            <div style="flex:1; overflow:hidden;">
+                <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}">
+                    <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Landscape</text>
+                    <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | ${displayVariants.length} Variants Shown</text>
 
-            ${displayVariants.map(v => {
-                const isPatho = isPathogenic(v);
-                const x = xScale(v.begin);
-                const color = isPatho ? '#dc2626' : '#94a3b8'; // Red vs Gray
-                const radius = isPatho ? 5 : 3;
-                const height = 15 + Math.random() * 85; 
-                const yHead = trackY - height;
-                const desc = v.descriptions?.[0]?.value || v.mutatedType || "Variant";
+                    <rect x="${pad}" y="${trackY - 6}" width="${w - 2 * pad}" height="12" rx="6" fill="#e2e8f0" />
+                    ${data.domains.map((d, i) => {
+                        const x = xScale(d.start);
+                        const width = Math.max(xScale(d.end) - x, 4);
+                        const col = getDomainColor(d.name, i);
+                        return `<rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${col}" opacity="0.8" stroke="white" stroke-width="1"
+                                onmouseenter="window.showVarTooltip(event, '${d.name}', '${d.start}-${d.end}', '${d.type}')"
+                                onmouseleave="window.hideVarTooltip()"></rect>`;
+                    }).join('')}
 
-                return `
-                    <g>
-                        <line x1="${x}" y1="${trackY - 10}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="1" opacity="0.6" />
-                        <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1" style="cursor:pointer">
-                            <title>${desc} (Pos: ${v.begin})\n${isPatho ? 'Pathogenic' : 'VUS/Other'}</title>
-                        </circle>
-                    </g>`;
-            }).join('')}
+                    ${displayVariants.map(v => {
+                        const isCustom = v.isCustom;
+                        const isPatho = isCustom ? (v.significance === 'Pathogenic') : isPathogenic(v);
+                        const x = xScale(v.begin);
+                        
+                        // Custom variants are Purple, Pathogenic Red, VUS Gray
+                        const color = isCustom ? '#a855f7' : (isPatho ? '#dc2626' : '#94a3b8'); 
+                        const radius = isCustom ? 7 : (isPatho ? 5 : 3);
+                        const height = 20 + (v.begin % 100); // Deterministic "random" height
+                        const yHead = trackY - height;
+                        
+                        const desc = v.descriptions?.[0]?.value || v.mutatedType || "Variant";
+                        const sig = v.clinicalSignificance || v.significance || "Uncertain";
 
-            <g transform="translate(${pad}, ${h - 30})">
-                <circle cx="0" cy="0" r="4" fill="#dc2626" />
-                <text x="10" y="4" font-size="11" fill="#334155">Pathogenic (Red)</text>
-                <circle cx="120" cy="0" r="3" fill="#94a3b8" />
-                <text x="130" y="4" font-size="11" fill="#334155">VUS / Other (Gray)</text>
-                <rect x="240" y="-5" width="10" height="10" rx="2" fill="#3b82f6" opacity="0.8"/>
-                <text x="255" y="4" font-size="11" fill="#334155">Protein Domains</text>
-            </g>
-        </svg>
+                        return `
+                            <g onmouseenter="window.showVarTooltip(event, 'p.${v.wildType}${v.begin}${v.mutatedType}', '${sig}', '${desc.replace(/'/g, "")}')"
+                               onmouseleave="window.hideVarTooltip()">
+                                <line x1="${x}" y1="${trackY - 12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="${isCustom ? 2 : 1}" opacity="0.6" />
+                                <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1" style="cursor:pointer" />
+                            </g>`;
+                    }).join('')}
+
+                    <g transform="translate(${pad}, ${h - 30})">
+                        <circle cx="0" cy="0" r="4" fill="#dc2626" /><text x="10" y="4" font-size="11" fill="#334155">Pathogenic</text>
+                        <circle cx="80" cy="0" r="4" fill="#94a3b8" /><text x="90" y="4" font-size="11" fill="#334155">VUS</text>
+                        <circle cx="140" cy="0" r="5" fill="#a855f7" /><text x="150" y="4" font-size="11" fill="#334155">User Added</text>
+                        <rect x="220" y="-5" width="10" height="10" rx="2" fill="#10b981" opacity="0.8"/><text x="235" y="4" font-size="11" fill="#334155">Domains</text>
+                    </g>
+                </svg>
+            </div>
+
+            <div style="padding:10px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <input id="custom-var-input" type="text" placeholder="Add Variant (e.g. p.L301R)" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:140px;">
+                <select id="custom-var-sig" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
+                    <option value="VUS">Uncertain (VUS)</option>
+                    <option value="Pathogenic">Pathogenic</option>
+                </select>
+                <button onclick="window.addUserVariant()" style="padding:6px 12px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">+ Add Plot</button>
+                <div style="flex:1;"></div>
+                <button onclick="window.downloadVariantCSV()" style="padding:6px 12px; background:white; border:1px solid #cbd5e0; color:#334155; border-radius:4px; cursor:pointer; font-size:12px;">📥 Download CSV</button>
+            </div>
+        </div>
     `;
 
     container.innerHTML = svgContent;
+    
+    // Chat update
+    window.updateStatus(`Displayed ${displayVariants.length} variants on ${data.gene}.`, 'ready');
+};
 
-    window.addChatMessage(`
-        <div class="ai-result-card">
-            <h4>🧬 Advanced Variant Map: ${data.gene}</h4>
-            <p>Found <strong>${allPathogenic.length} pathogenic</strong> variants and ${allOthers.length} others.</p>
-            <p style="font-size:11px; color:#666;">Displaying a sampled distribution + protein domains.</p>
-            
-        </div>
-    `, false);
+// 4. INTERACTIVITY HELPERS
+window.showVarTooltip = function(e, title, subtitle, desc) {
+    const tip = document.getElementById('var-tooltip');
+    if(!tip) return;
+    tip.style.display = 'block';
+    tip.style.left = (e.offsetX + 15) + 'px';
+    tip.style.top = (e.offsetY + 15) + 'px';
+    tip.innerHTML = `
+        <div style="font-weight:bold; margin-bottom:2px;">${title}</div>
+        <div style="color:#fbbf24; margin-bottom:4px;">${subtitle}</div>
+        <div style="opacity:0.8; font-size:10px; line-height:1.2;">${desc || ''}</div>
+    `;
+};
+
+window.hideVarTooltip = function() {
+    const tip = document.getElementById('var-tooltip');
+    if(tip) tip.style.display = 'none';
+};
+
+window.addUserVariant = function() {
+    const input = document.getElementById('custom-var-input').value;
+    const sig = document.getElementById('custom-var-sig').value;
+    
+    // Parse "p.L301R" or "L301R"
+    const match = input.match(/(\d+)/);
+    if(!match) { alert("Please include the position number (e.g. 301)."); return; }
+    
+    const pos = parseInt(match[1]);
+    
+    window.CiliAI.activeVariantData.customVariants.push({
+        begin: pos,
+        wildType: input.charAt(0) || '?',
+        mutatedType: input.slice(-1) || '?',
+        significance: sig,
+        descriptions: [{value: "User added custom variant"}],
+        isCustom: true
+    });
+    
+    window.drawVariantWorkspace(); // Re-render instantly
+};
+
+window.downloadVariantCSV = function() {
+    const data = window.CiliAI.activeVariantData;
+    let csv = "Gene,Position,Change,Significance,Description\n";
+    
+    // Combine fetched + custom
+    const all = [...data.variants, ...data.customVariants];
+    
+    all.forEach(v => {
+        const desc = v.descriptions?.[0]?.value || "";
+        const sig = v.clinicalSignificance || v.significance || "Uncertain";
+        // Clean text for CSV
+        csv += `${data.gene},${v.begin},p.${v.wildType}${v.begin}${v.mutatedType},"${sig}","${desc.replace(/"/g, '""')}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.gene}_Variants_CiliAI.csv`;
+    a.click();
 };
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
-
-
