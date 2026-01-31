@@ -7783,7 +7783,11 @@ window.downloadCurrentVisualization = function() {
  * MODULE: LIVE VARIANT WORKSPACE (Interactive & Custom)
  * ============================================================== */
 
-// 1. FETCH DATA (Same as before, but robust)
+/* ==============================================================
+ * MODULE: LIVE VARIANT WORKSPACE (Nature Colors + Customization)
+ * ============================================================== */
+
+// 1. FETCH DATA
 window.fetchVariantDataLive = async function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
     try {
@@ -7808,13 +7812,19 @@ window.fetchVariantDataLive = async function(geneSymbol) {
         const variants = varData.features.filter(f => f.type === 'VARIANT');
         
         const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
+        
+        // Nature Journal Palette (NPG Style)
+        const naturePalette = ['#E64B35', '#4DBBD5', '#00A087', '#3C5488', '#F39B7F', '#8491B4', '#91D1C2', '#DC0000'];
+
+        let colorIdx = 0;
         const domains = featData.features
             .filter(f => domainTypes.includes(f.type))
             .map(d => ({
                 name: d.description || d.type,
                 start: parseInt(d.begin),
                 end: parseInt(d.end),
-                type: d.type
+                type: d.type,
+                color: naturePalette[colorIdx++ % naturePalette.length] // Assign initial color
             }));
 
         return { gene, uniprotID, length, variants, domains, customVariants: [] };
@@ -7825,12 +7835,19 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. MAIN RENDER ENTRY POINT
+// 2. MAIN RENDERER
 window.renderVariantMap = async function(geneSymbol) {
     window.switchView('plot'); 
+    
+    // --- BUG FIX: HIDE UMAP SIDEBAR ---
+    // We hide the standard controls so "WDR31..." doesn't show up.
+    const sidebar = document.querySelector('.layout-sidebar') || document.getElementById('viz-sidebar');
+    if(sidebar) sidebar.style.display = 'none'; // Hide UMAP controls
+    
+    // Use the main container
     const container = document.getElementById('plotly-container');
     
-    // UI: Loading State
+    // Loading State
     container.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
             <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
@@ -7844,47 +7861,30 @@ window.renderVariantMap = async function(geneSymbol) {
         return;
     }
 
-    // Store data globally so we can add variants/download later without re-fetching
     window.CiliAI.activeVariantData = data;
-    
-    // Initial Draw
     window.drawVariantWorkspace();
 };
 
-// 3. DRAWING ENGINE (Handles SVG + Tooltips + Forms)
+// 3. DRAWING ENGINE (SVG + Controls)
 window.drawVariantWorkspace = function() {
     const data = window.CiliAI.activeVariantData;
     const container = document.getElementById('plotly-container');
 
-    // --- FILTERING & SAMPLING ---
+    // Filter Logic
     const isPathogenic = (v) => JSON.stringify(v).toLowerCase().includes("pathogenic");
-    
     const allPathogenic = data.variants.filter(isPathogenic);
     const allOthers = data.variants.filter(v => !isPathogenic(v));
 
-    // Sample data to keep performance high
-    const MAX_POINTS = 60;
+    // Sampling (Max 60 points)
     const displayVariants = [
-        ...allPathogenic.slice(0, 30), // Top 30 Pathogenic
-        ...allOthers.sort(() => 0.5 - Math.random()).slice(0, 30), // Random 30 Others
-        ...data.customVariants // ALWAYS show user added ones
+        ...allPathogenic.slice(0, 30),
+        ...allOthers.sort(() => 0.5 - Math.random()).slice(0, 30),
+        ...data.customVariants
     ];
 
-    // --- COLORS ---
-    const getDomainColor = (name, i) => {
-        if(name.includes('WD40')) return '#3b82f6'; // Blue
-        if(name.includes('Coiled')) return '#10b981'; // Green
-        if(name.includes('Kinase')) return '#ef4444'; // Red
-        if(name.includes('TPR')) return '#f59e0b'; // Orange
-        if(name.includes('IQ')) return '#8b5cf6'; // Purple
-        if(name.includes('PH domain')) return '#ec4899'; // Pink
-        const palette = ['#6366f1', '#14b8a6', '#f97316', '#84cc16'];
-        return palette[i % palette.length];
-    };
-
-    // --- SVG CALCULATIONS ---
+    // SVG Dimensions
     const w = container.clientWidth - 40;
-    const h = 400;
+    const h = 450;
     const pad = 40;
     const trackY = 250;
     const xScale = (pos) => pad + (pos / data.length) * (w - 2 * pad);
@@ -7903,9 +7903,9 @@ window.drawVariantWorkspace = function() {
                     ${data.domains.map((d, i) => {
                         const x = xScale(d.start);
                         const width = Math.max(xScale(d.end) - x, 4);
-                        const col = getDomainColor(d.name, i);
-                        return `<rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${col}" opacity="0.8" stroke="white" stroke-width="1"
-                                onmouseenter="window.showVarTooltip(event, '${d.name}', '${d.start}-${d.end}', '${d.type}')"
+                        return `<rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${d.color}" opacity="0.85" stroke="white" stroke-width="1"
+                                style="cursor:pointer; transition: opacity 0.2s;"
+                                onmouseenter="window.showVarTooltip(event, '${d.name}', '${d.start}-${d.end}', 'Click color box in legend to change')"
                                 onmouseleave="window.hideVarTooltip()"></rect>`;
                     }).join('')}
 
@@ -7913,13 +7913,10 @@ window.drawVariantWorkspace = function() {
                         const isCustom = v.isCustom;
                         const isPatho = isCustom ? (v.significance === 'Pathogenic') : isPathogenic(v);
                         const x = xScale(v.begin);
-                        
-                        // Custom variants are Purple, Pathogenic Red, VUS Gray
-                        const color = isCustom ? '#a855f7' : (isPatho ? '#dc2626' : '#94a3b8'); 
+                        const color = isCustom ? '#9b59b6' : (isPatho ? '#e74c3c' : '#95a5a6'); 
                         const radius = isCustom ? 7 : (isPatho ? 5 : 3);
-                        const height = 20 + (v.begin % 100); // Deterministic "random" height
+                        const height = 20 + (v.begin % 100); 
                         const yHead = trackY - height;
-                        
                         const desc = v.descriptions?.[0]?.value || v.mutatedType || "Variant";
                         const sig = v.clinicalSignificance || v.significance || "Uncertain";
 
@@ -7930,47 +7927,55 @@ window.drawVariantWorkspace = function() {
                                 <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1" style="cursor:pointer" />
                             </g>`;
                     }).join('')}
-
-                    <g transform="translate(${pad}, ${h - 30})">
-                        <circle cx="0" cy="0" r="4" fill="#dc2626" /><text x="10" y="4" font-size="11" fill="#334155">Pathogenic</text>
-                        <circle cx="80" cy="0" r="4" fill="#94a3b8" /><text x="90" y="4" font-size="11" fill="#334155">VUS</text>
-                        <circle cx="140" cy="0" r="5" fill="#a855f7" /><text x="150" y="4" font-size="11" fill="#334155">User Added</text>
-                        <rect x="220" y="-5" width="10" height="10" rx="2" fill="#10b981" opacity="0.8"/><text x="235" y="4" font-size="11" fill="#334155">Domains</text>
-                    </g>
                 </svg>
             </div>
 
-            <div style="padding:10px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <input id="custom-var-input" type="text" placeholder="Add Variant (e.g. p.L301R)" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:140px;">
-                <select id="custom-var-sig" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
-                    <option value="VUS">Uncertain (VUS)</option>
-                    <option value="Pathogenic">Pathogenic</option>
-                </select>
-                <button onclick="window.addUserVariant()" style="padding:6px 12px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">+ Add Plot</button>
-                <div style="flex:1;"></div>
-                <button onclick="window.downloadVariantCSV()" style="padding:6px 12px; background:white; border:1px solid #cbd5e0; color:#334155; border-radius:4px; cursor:pointer; font-size:12px;">📥 Download CSV</button>
+            <div style="padding:15px; background:#f8fafc; border-top:1px solid #e2e8f0;">
+                
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; align-items:center;">
+                    <span style="font-size:11px; font-weight:bold; color:#64748b;">DOMAINS:</span>
+                    ${data.domains.map((d, i) => `
+                        <div style="display:flex; align-items:center; gap:4px; font-size:11px; background:white; padding:2px 6px; border-radius:4px; border:1px solid #e2e8f0;">
+                            <input type="color" value="${d.color}" 
+                                   onchange="window.updateDomainColor(${i}, this.value)"
+                                   style="width:16px; height:16px; border:none; padding:0; cursor:pointer;">
+                            <span>${d.name.split(' ')[0]}</span>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input id="custom-var-input" type="text" placeholder="Add p.L301R" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:100px;">
+                    <select id="custom-var-sig" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
+                        <option value="Pathogenic">Pathogenic</option>
+                        <option value="VUS">VUS</option>
+                    </select>
+                    <button onclick="window.addUserVariant()" style="padding:6px 12px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">+ Plot</button>
+                    <div style="flex:1;"></div>
+                    <button onclick="window.downloadVariantCSV()" style="padding:6px 12px; background:white; border:1px solid #cbd5e0; color:#334155; border-radius:4px; cursor:pointer; font-size:12px;">📥 Save CSV</button>
+                </div>
             </div>
         </div>
     `;
 
     container.innerHTML = svgContent;
-    
-    // Chat update
-    window.updateStatus(`Displayed ${displayVariants.length} variants on ${data.gene}.`, 'ready');
+    window.updateStatus(`Visualizing ${data.gene}`, 'ready');
 };
 
 // 4. INTERACTIVITY HELPERS
+window.updateDomainColor = function(index, newColor) {
+    // Live update the color in memory and redraw
+    window.CiliAI.activeVariantData.domains[index].color = newColor;
+    window.drawVariantWorkspace();
+};
+
 window.showVarTooltip = function(e, title, subtitle, desc) {
     const tip = document.getElementById('var-tooltip');
     if(!tip) return;
     tip.style.display = 'block';
     tip.style.left = (e.offsetX + 15) + 'px';
     tip.style.top = (e.offsetY + 15) + 'px';
-    tip.innerHTML = `
-        <div style="font-weight:bold; margin-bottom:2px;">${title}</div>
-        <div style="color:#fbbf24; margin-bottom:4px;">${subtitle}</div>
-        <div style="opacity:0.8; font-size:10px; line-height:1.2;">${desc || ''}</div>
-    `;
+    tip.innerHTML = `<div style="font-weight:bold;">${title}</div><div style="color:#fbbf24; font-size:11px;">${subtitle}</div><div style="opacity:0.8; font-size:10px;">${desc}</div>`;
 };
 
 window.hideVarTooltip = function() {
@@ -7981,46 +7986,35 @@ window.hideVarTooltip = function() {
 window.addUserVariant = function() {
     const input = document.getElementById('custom-var-input').value;
     const sig = document.getElementById('custom-var-sig').value;
-    
-    // Parse "p.L301R" or "L301R"
     const match = input.match(/(\d+)/);
-    if(!match) { alert("Please include the position number (e.g. 301)."); return; }
-    
-    const pos = parseInt(match[1]);
+    if(!match) { alert("Please include position (e.g. 301)."); return; }
     
     window.CiliAI.activeVariantData.customVariants.push({
-        begin: pos,
+        begin: parseInt(match[1]),
         wildType: input.charAt(0) || '?',
         mutatedType: input.slice(-1) || '?',
         significance: sig,
-        descriptions: [{value: "User added custom variant"}],
+        descriptions: [{value: "User added"}],
         isCustom: true
     });
-    
-    window.drawVariantWorkspace(); // Re-render instantly
+    window.drawVariantWorkspace();
 };
 
 window.downloadVariantCSV = function() {
     const data = window.CiliAI.activeVariantData;
     let csv = "Gene,Position,Change,Significance,Description\n";
-    
-    // Combine fetched + custom
-    const all = [...data.variants, ...data.customVariants];
-    
-    all.forEach(v => {
+    [...data.variants, ...data.customVariants].forEach(v => {
         const desc = v.descriptions?.[0]?.value || "";
         const sig = v.clinicalSignificance || v.significance || "Uncertain";
-        // Clean text for CSV
         csv += `${data.gene},${v.begin},p.${v.wildType}${v.begin}${v.mutatedType},"${sig}","${desc.replace(/"/g, '""')}"\n`;
     });
-    
     const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `${data.gene}_Variants_CiliAI.csv`;
+    a.href = window.URL.createObjectURL(blob);
+    a.download = `${data.gene}_Variants.csv`;
     a.click();
 };
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
