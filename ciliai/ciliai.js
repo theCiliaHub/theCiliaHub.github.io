@@ -8269,35 +8269,38 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 };
 
 /* ==============================================================
- * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Zero-Height Fix)
+ * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Force Load Fix)
  * ============================================================== */
 
-// 1. ROBUST LOADER (Waits for Web Component Registration)
+// 1. ROBUST LOADER (With Safety Timeout)
 window.loadMolStar = async function() {
-    // If already registered, return immediately
     if (customElements.get('pdbe-molstar-plugin')) return;
 
     return new Promise((resolve, reject) => {
-        // Load CSS
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
         document.head.appendChild(link);
 
-        // Load JS
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-plugin.js';
         
+        // Safety Valve: If not ready in 3s, assume loaded and proceed
+        const safetyTimer = setTimeout(() => {
+            console.warn("[CiliAI] 3D Load Timeout - Forcing render...");
+            resolve(); 
+        }, 3000);
+
         script.onload = () => {
-            console.log("[CiliAI] Script loaded. Waiting for component registration...");
-            // Wait for the browser to register the <pdbe-molstar-plugin> tag
+            // Wait for registry, but resolve immediately if taking too long
             customElements.whenDefined('pdbe-molstar-plugin').then(() => {
-                console.log("[CiliAI] 3D Component Ready.");
+                clearTimeout(safetyTimer);
+                console.log("[CiliAI] 3D Component Registered.");
                 resolve();
             });
         };
         
-        script.onerror = () => reject(new Error("Failed to load PDBe Mol* scripts."));
+        script.onerror = () => reject(new Error("Failed to load 3D library."));
         document.head.appendChild(script);
     });
 };
@@ -8305,7 +8308,7 @@ window.loadMolStar = async function() {
 // 2. MAIN VIEWER FUNCTION
 window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('btn-3d');
-    if (btn) btn.innerText = "⏳ Initializing 3D...";
+    if (btn) btn.innerText = "⏳ Loading...";
 
     try {
         await window.loadMolStar();
@@ -8315,7 +8318,7 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
         if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
         const uniprotID = data.uniprotID;
 
-        // B. Configure Highlights (Magenta for Variant)
+        // B. Configure Highlights
         const highlightData = variantPos ? [{
             entity_id: "1", 
             residue_number: parseInt(variantPos, 10),
@@ -8334,7 +8337,6 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
 
         modal.innerHTML = `
             <div style="width: 90%; height: 90%; background: white; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.5);">
-                
                 <div style="padding: 12px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <span style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} Structure</span>
@@ -8342,7 +8344,6 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
                     </div>
                     <button id="close-3d" style="font-size: 20px; cursor: pointer; border: none; background: none; color: #64748b;">✕</button>
                 </div>
-
                 <div id="molstar-wrapper" style="position: relative; flex: 1; width: 100%; min-height: 0; background: #fff;">
                     <pdbe-molstar-plugin 
                         id="molstar-target" 
@@ -8354,35 +8355,21 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
                         style="position: absolute; top: 0; left: 0; right: 0; bottom: 0;">
                     </pdbe-molstar-plugin>
                 </div>
-
-                <div style="padding: 10px 20px; background: #fff; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; gap: 15px;">
-                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#0053D6; border-radius:50%; margin-right:4px;"></span>Very High (pLDDT > 90)</span>
-                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#65CBF3; border-radius:50%; margin-right:4px;"></span>High</span>
-                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#FFDB13; border-radius:50%; margin-right:4px;"></span>Low</span>
-                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#FF7D45; border-radius:50%; margin-right:4px;"></span>Disordered</span>
-                </div>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        /* ----------------------------------------------------------
-         * CRITICAL FIX: Force Resize Event
-         * ---------------------------------------------------------- */
-        // We trigger a resize event to force the canvas to detect its container size
-        setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
-        }, 100);
+        // CRITICAL FIX: Wake up the canvas
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 500); // Second trigger to be safe
 
-        /* ----------------------------------------------------------
-         * CLOSE LOGIC
-         * ---------------------------------------------------------- */
+        // Close Logic
         const closeViewer = () => {
             window.removeEventListener('keydown', escHandler);
             modal.remove();
             if (btn) btn.innerText = "🧊 View 3D Structure";
         };
-
         const escHandler = (e) => { if (e.key === 'Escape') closeViewer(); };
         window.addEventListener('keydown', escHandler);
         modal.querySelector('#close-3d').onclick = closeViewer;
@@ -8392,10 +8379,11 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
     } catch (e) {
         console.error(e);
         alert("3D Viewer Error: " + e.message);
-        if(btn) btn.innerText = "🧊 View 3D Structure";
+        if (btn) btn.innerText = "🧊 View 3D Structure";
     }
 };
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
