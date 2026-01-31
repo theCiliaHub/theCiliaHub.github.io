@@ -8269,38 +8269,42 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 };
 
 /* ==============================================================
- * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Force Load Fix)
+ * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Fixed Script URL)
  * ============================================================== */
 
-// 1. ROBUST LOADER (With Safety Timeout)
+// 1. LOADER (Corrected URL to 'component.js')
 window.loadMolStar = async function() {
     if (customElements.get('pdbe-molstar-plugin')) return;
 
     return new Promise((resolve, reject) => {
+        // Load CSS
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
         document.head.appendChild(link);
 
+        // Load JS (MUST BE 'component.js' for the HTML tag to work)
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-plugin.js';
+        script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js';
         
-        // Safety Valve: If not ready in 3s, assume loaded and proceed
-        const safetyTimer = setTimeout(() => {
-            console.warn("[CiliAI] 3D Load Timeout - Forcing render...");
-            resolve(); 
-        }, 3000);
-
-        script.onload = () => {
-            // Wait for registry, but resolve immediately if taking too long
-            customElements.whenDefined('pdbe-molstar-plugin').then(() => {
+        // Safety: Polling check for the custom element
+        const checkInterval = setInterval(() => {
+            if (customElements.get('pdbe-molstar-plugin')) {
+                clearInterval(checkInterval);
                 clearTimeout(safetyTimer);
                 console.log("[CiliAI] 3D Component Registered.");
                 resolve();
-            });
-        };
+            }
+        }, 100);
+
+        // Safety: Timeout after 5s
+        const safetyTimer = setTimeout(() => {
+            clearInterval(checkInterval);
+            console.warn("[CiliAI] 3D Load Timeout - Forcing render...");
+            resolve(); // Try anyway
+        }, 5000);
         
-        script.onerror = () => reject(new Error("Failed to load 3D library."));
+        script.onerror = () => reject(new Error("Failed to download 3D library."));
         document.head.appendChild(script);
     });
 };
@@ -8308,7 +8312,7 @@ window.loadMolStar = async function() {
 // 2. MAIN VIEWER FUNCTION
 window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('btn-3d');
-    if (btn) btn.innerText = "⏳ Loading...";
+    if (btn) btn.innerText = "⏳ Initializing...";
 
     try {
         await window.loadMolStar();
@@ -8326,17 +8330,18 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
             focus: true
         }] : [];
 
-        // C. Create Modal (Fullscreen Z-Index 200,000)
+        // C. Create Modal (Fullscreen)
         const modal = document.createElement('div');
         modal.id = 'molstar-modal';
         modal.style.cssText = `
-            position: fixed; inset: 0; width: 100vw; height: 100vh;
+            position: fixed; inset: 0; width: 100vw; height: 100dvh;
             background: rgba(0,0,0,0.95); z-index: 200000;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
         `;
 
         modal.innerHTML = `
             <div style="width: 90%; height: 90%; background: white; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.5);">
+                
                 <div style="padding: 12px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <span style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} Structure</span>
@@ -8344,6 +8349,7 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
                     </div>
                     <button id="close-3d" style="font-size: 20px; cursor: pointer; border: none; background: none; color: #64748b;">✕</button>
                 </div>
+
                 <div id="molstar-wrapper" style="position: relative; flex: 1; width: 100%; min-height: 0; background: #fff;">
                     <pdbe-molstar-plugin 
                         id="molstar-target" 
@@ -8352,17 +8358,24 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
                         hide-controls="true" 
                         bgcolor="{r:255,g:255,b:255}" 
                         highlight-data='${JSON.stringify(highlightData)}'
-                        style="position: absolute; top: 0; left: 0; right: 0; bottom: 0;">
+                        style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: block;">
                     </pdbe-molstar-plugin>
+                </div>
+
+                <div style="padding: 10px 20px; background: #fff; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; gap: 15px; flex-wrap: wrap;">
+                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#0053D6; border-radius:50%; margin-right:4px;"></span>Very High (>90)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#65CBF3; border-radius:50%; margin-right:4px;"></span>High (90-70)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#FFDB13; border-radius:50%; margin-right:4px;"></span>Low (70-50)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#FF7D45; border-radius:50%; margin-right:4px;"></span>Disordered</span>
                 </div>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        // CRITICAL FIX: Wake up the canvas
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 500); // Second trigger to be safe
+        // Force resize events to wake up the canvas
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 1000);
 
         // Close Logic
         const closeViewer = () => {
@@ -8385,5 +8398,6 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
