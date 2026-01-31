@@ -7844,10 +7844,19 @@ window.renderVariantMap = async function(geneSymbol) {
     sidebars.forEach(el => el.style.display = 'none');
 
     // 3. Loading State
+    // 3. Loading State (Updated Text)
     container.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
-            <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
-            <p>Scanning global databases for <strong>${geneSymbol}</strong>...</p>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b; padding:20px; text-align:center;">
+            <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
+            <p style="font-size:16px; margin:0 0 8px 0; color:#1e293b;">
+                🔍 Querying ClinVar & UniProt for <strong>${geneSymbol}</strong> variants...
+            </p>
+            <p style="font-size:13px; color:#475569; max-width:400px; line-height:1.5;">
+                Users can view variants, check conservation across species, and visualize variants of choice on the 3D protein structure.
+            </p>
+            <p style="font-size:11px; color:#94a3b8; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:10px;">
+                Note: Only significant variants are pre-loaded. You can add your own custom variants using the panel below.
+            </p>
         </div>`;
 
     // 4. Fetch Data
@@ -8274,21 +8283,26 @@ window.loadMolStar = function() {
     });
 };
 
-// 2. RENDER 3D MODAL
+// 2. RENDER 3D MODAL (Fixed Visibility)
 window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('btn-3d');
     if(btn) btn.innerText = "⏳ Loading 3D Engine...";
 
     try {
-        // Step A: Load the Library
         await window.loadMolStar();
 
-        // Step B: Get UniProt ID
+        // Get UniProt ID
         const data = await window.fetchVariantDataLive(geneSymbol);
-        if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID for structure.");
+        if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
         const uniprotID = data.uniprotID;
 
-        // Step C: Highlight Data (Magenta for variant)
+        // Create Modal Wrapper
+        const modal = document.createElement('div');
+        modal.id = 'molstar-modal';
+        // z-index: 100000 forces it above everything else
+        modal.style.cssText = `position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:100000; display:flex; justify-content:center; align-items:center; backdrop-filter:blur(5px);`;
+        
+        // Highlight Config
         const highlightData = variantPos ? [{
             entity_id: "1", 
             residue_number: parseInt(variantPos), 
@@ -8296,23 +8310,21 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
             focus: true
         }] : [];
 
-        // Step D: Create Modal
-        const modal = document.createElement('div');
-        modal.style.cssText = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; display:flex; justify-content:center; align-items:center; backdrop-filter:blur(4px);`;
-        
+        // Inner Content
         modal.innerHTML = `
-            <div style="width:900px; height:700px; background:white; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,0.5);">
-                <div style="padding:15px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="width:90%; height:90%; background:white; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 0 50px rgba(0,0,0,0.8); position:relative;">
+                
+                <div style="padding:15px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <h3 style="margin:0; color:#1e293b; font-size:18px;">${geneSymbol} Structure (AlphaFold)</h3>
                         <div style="font-size:12px; color:#64748b;">
-                            ${variantPos ? `Highlighting variant <strong>${variantAA}${variantPos}</strong> (Magenta)` : 'Showing full prediction'} | UniProt: ${uniprotID}
+                            ${variantPos ? `Highlighting <strong>${variantAA}${variantPos}</strong> (Magenta)` : 'Showing full structure'} | UniProt: ${uniprotID}
                         </div>
                     </div>
-                    <button id="close-3d" style="background:none; border:none; font-size:24px; cursor:pointer; color:#64748b;">&times;</button>
+                    <button id="close-3d" style="background:#e2e8f0; border:none; width:30px; height:30px; border-radius:50%; font-size:16px; cursor:pointer; font-weight:bold;">✕</button>
                 </div>
-                
-                <div style="flex:1; position:relative; background:#f0f0f0;">
+
+                <div style="flex:1; position:relative; overflow:hidden; background:#fff;">
                     <pdbe-molstar-plugin 
                         id="molstar-target" 
                         molecule-id="${uniprotID}" 
@@ -8320,37 +8332,38 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
                         bgcolor="{r:255,g:255,b:255}" 
                         hide-controls="true"
                         highlight-data='${JSON.stringify(highlightData)}'
-                        style="width:100%; height:100%; display:block;">
+                        style="position:absolute; top:0; left:0; width:100%; height:100%;">
                     </pdbe-molstar-plugin>
                 </div>
 
-                <div style="padding:10px 20px; background:white; border-top:1px solid #e2e8f0; display:flex; flex-wrap:wrap; gap:15px; font-size:11px; color:#475569;">
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High (pLDDT > 90)</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (90 > 70)</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (70 > 50)</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered</span>
-                    <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; border-radius:50%; margin-right:5px;"></span>Variant Location</span>
+                <div style="padding:10px; background:#fff; border-top:1px solid #eee; display:flex; gap:15px; font-size:11px; flex-wrap:wrap; color:#555;">
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; margin-right:5px;"></span>Very High (pLDDT > 90)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; margin-right:5px;"></span>High</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; margin-right:5px;"></span>Low</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; margin-right:5px;"></span>Disordered</span>
+                    <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; margin-right:5px;"></span>Variant Location</span>
                 </div>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        modal.querySelector('#close-3d').onclick = () => {
-            modal.remove();
-            if(btn) btn.innerText = "🧊 View 3D Structure";
-        };
-
+        // Close logic
+        const closer = () => { document.body.removeChild(modal); if(btn) btn.innerText = "🧊 View 3D Structure"; };
+        modal.querySelector('#close-3d').onclick = closer;
+        
         if(btn) btn.innerText = "🧊 View 3D Structure";
 
     } catch (e) {
         console.error(e);
-        alert("3D Engine Error: " + e.message);
+        alert("3D Viewer Error: " + e.message);
         if(btn) btn.innerText = "🧊 View 3D Structure";
     }
 };
+
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
