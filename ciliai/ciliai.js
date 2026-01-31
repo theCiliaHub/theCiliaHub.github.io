@@ -8244,23 +8244,32 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 /* ==============================================================
  * MODULE: 3D STRUCTURE VIEWER (AlphaFold & Mol*)
  * ============================================================== */
+/* ==============================================================
+ * MODULE: 3D STRUCTURE VIEWER (Fixed CDN & Loading)
+ * ============================================================== */
 
-// 1. LAZY LOAD DEPENDENCIES
+// 1. LAZY LOAD DEPENDENCIES (Updated to v3.2.0)
 window.loadMolStar = function() {
     return new Promise((resolve, reject) => {
-        if (customElements.get('pdbe-molstar-plugin')) return resolve(); // Already loaded
+        if (customElements.get('pdbe-molstar-plugin')) return resolve(); 
 
-        // Load CSS
+        // Load CSS (Standard Light Theme)
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-light.css';
+        link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
         document.head.appendChild(link);
 
-        // Load JS
+        // Load JS (Plugin Bundle)
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-component.js';
-        script.onload = resolve;
-        script.onerror = reject;
+        script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-plugin.js';
+        script.onload = () => {
+            console.log("[CiliAI] 3D Engine Loaded.");
+            resolve();
+        };
+        script.onerror = (e) => {
+            console.error("[CiliAI] 3D Engine Load Failed:", e);
+            reject(new Error("Failed to download 3D viewer scripts. Check internet connection."));
+        };
         document.head.appendChild(script);
     });
 };
@@ -8271,77 +8280,78 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
     if(btn) btn.innerText = "⏳ Loading 3D Engine...";
 
     try {
+        // Step A: Load the Library
         await window.loadMolStar();
 
-        // Get UniProt ID (Required for AlphaFold)
+        // Step B: Get UniProt ID
         const data = await window.fetchVariantDataLive(geneSymbol);
-        if (data.error) throw new Error("Could not resolve UniProt ID.");
+        if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID for structure.");
         const uniprotID = data.uniprotID;
 
-        // Create Modal
-        const modal = document.createElement('div');
-        modal.style.cssText = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; display:flex; justify-content:center; align-items:center; backdrop-filter:blur(4px);`;
-        
-        // Define Highlight Data (JSON format for Mol*)
-        // This highlights the specific residue in Magenta
+        // Step C: Highlight Data (Magenta for variant)
         const highlightData = variantPos ? [{
             entity_id: "1", 
             residue_number: parseInt(variantPos), 
-            color: {r: 255, g: 0, b: 255}, // Magenta
+            color: {r: 255, g: 0, b: 255}, 
             focus: true
         }] : [];
 
-        // Inner HTML with the Web Component
+        // Step D: Create Modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; display:flex; justify-content:center; align-items:center; backdrop-filter:blur(4px);`;
+        
         modal.innerHTML = `
-            <div style="width:800px; height:600px; background:white; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,0.5);">
-                
+            <div style="width:900px; height:700px; background:white; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,0.5);">
                 <div style="padding:15px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <h3 style="margin:0; color:#1e293b; font-size:18px;">${geneSymbol} Structure (AlphaFold)</h3>
                         <div style="font-size:12px; color:#64748b;">
-                            ${variantPos ? `Highlighting variant <strong>${variantAA}${variantPos}</strong> (Magenta)` : 'Showing full protein prediction'}
+                            ${variantPos ? `Highlighting variant <strong>${variantAA}${variantPos}</strong> (Magenta)` : 'Showing full prediction'} | UniProt: ${uniprotID}
                         </div>
                     </div>
                     <button id="close-3d" style="background:none; border:none; font-size:24px; cursor:pointer; color:#64748b;">&times;</button>
                 </div>
-
-                <div style="flex:1; position:relative; background:#000;">
+                
+                <div style="flex:1; position:relative; background:#f0f0f0;">
                     <pdbe-molstar-plugin 
                         id="molstar-target" 
                         molecule-id="${uniprotID}" 
                         alphafold-view="true" 
                         bgcolor="{r:255,g:255,b:255}" 
                         hide-controls="true"
-                        highlight-data='${JSON.stringify(highlightData)}'>
+                        highlight-data='${JSON.stringify(highlightData)}'
+                        style="width:100%; height:100%; display:block;">
                     </pdbe-molstar-plugin>
                 </div>
 
-                <div style="padding:10px 20px; background:white; border-top:1px solid #e2e8f0; display:flex; gap:15px; font-size:11px; color:#475569;">
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High Confidence (pLDDT > 90)</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (90 > pLDDT > 70)</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (70 > pLDDT > 50)</span>
+                <div style="padding:10px 20px; background:white; border-top:1px solid #e2e8f0; display:flex; flex-wrap:wrap; gap:15px; font-size:11px; color:#475569;">
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High (pLDDT > 90)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (90 > 70)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (70 > 50)</span>
                     <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered</span>
+                    <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; border-radius:50%; margin-right:5px;"></span>Variant Location</span>
                 </div>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        // Close Handler
         modal.querySelector('#close-3d').onclick = () => {
             modal.remove();
             if(btn) btn.innerText = "🧊 View 3D Structure";
         };
 
+        if(btn) btn.innerText = "🧊 View 3D Structure";
+
     } catch (e) {
         console.error(e);
-        alert("3D Viewer Error: " + e.message);
+        alert("3D Engine Error: " + e.message);
         if(btn) btn.innerText = "🧊 View 3D Structure";
     }
 };
-
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
