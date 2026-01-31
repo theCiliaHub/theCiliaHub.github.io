@@ -5712,6 +5712,8 @@ const intentHandlers = [
         }
     },
 
+    
+
     // Greetings
     {
         priority: 70,
@@ -6234,8 +6236,7 @@ const intentHandlers = [
         return responseHtml;
     }
 },
-   // 1. NEW: Live Variant Handler (Priority 77)
-    // Handles: "Variants in CEP290", "Show mutations for IFT88"
+  // 1. NEW: Live Variant Handler (Priority 77)
     {
         priority: 77,
         matcher: (qLower) => qLower.includes('variant') || qLower.includes('mutation') || qLower.includes('clinvar'),
@@ -6245,10 +6246,27 @@ const intentHandlers = [
                 return "Please specify a gene to search for variants (e.g., 'Variants in CEP290').";
             }
             
-            // Trigger the new renderer (Visual Lollipop Plot)
+            // Trigger the renderer
             if (window.renderVariantMap) {
                 window.renderVariantMap(genes[0]);
-                return `<div class="ai-result-card"><p>🔍 Querying ClinVar & UniProt for <strong>${genes[0]}</strong> variants...</p></div>`;
+                
+                // --- NEW EXPLANATION MESSAGE ---
+                return `
+                <div class="ai-result-card">
+                    <h4 style="margin-top:0; color:#2563eb;">🧬 Variant Analysis: ${genes[0]}</h4>
+                    <p style="margin-bottom:10px;">I am querying ClinVar & UniProt for variants. Here is what you can do:</p>
+                    
+                    <ul style="font-size:13px; color:#475569; padding-left:20px; line-height:1.6;">
+                        <li><strong>Visualize Variants:</strong> See Pathogenic (Red) and Uncertain (Gray) variants mapped to protein domains.</li>
+                        <li><strong>Check Conservation:</strong> Click any variant, then click <strong>"Check Conservation"</strong> to compare across 7 species (Human, Mouse, Zebrafish, <em>C. elegans</em>, etc.).</li>
+                        <li><strong>3D Structure:</strong> Click <strong>"View 3D Structure"</strong> to see where the mutation sits on the AlphaFold protein model.</li>
+                        <li><strong>Custom Variants:</strong> Add your own mutation (e.g., <em>p.L301R</em>) using the "Add" panel at the bottom.</li>
+                    </ul>
+                    
+                    <p style="font-size:11px; color:#94a3b8; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:8px;">
+                        <em>Note: To keep the view fast, only a representative subset of variants is displayed initially. You can add specific ones manually.</em>
+                    </p>
+                </div>`;
             } else {
                 return "Error: Variant module not loaded.";
             }
@@ -8283,7 +8301,10 @@ window.loadMolStar = function() {
     });
 };
 
-// 2. RENDER 3D MODAL (Fixed Visibility)
+/* ==============================================================
+ * MODULE: 3D STRUCTURE VIEWER (Fixed Layout)
+ * ============================================================== */
+
 window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('btn-3d');
     if(btn) btn.innerText = "⏳ Loading 3D Engine...";
@@ -8299,10 +8320,9 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
         // Create Modal Wrapper
         const modal = document.createElement('div');
         modal.id = 'molstar-modal';
-        // z-index: 100000 forces it above everything else
-        modal.style.cssText = `position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:100000; display:flex; justify-content:center; align-items:center; backdrop-filter:blur(5px);`;
+        // Force high Z-Index to sit on top of everything
+        modal.style.cssText = `position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:200000; display:flex; justify-content:center; align-items:center; backdrop-filter:blur(5px);`;
         
-        // Highlight Config
         const highlightData = variantPos ? [{
             entity_id: "1", 
             residue_number: parseInt(variantPos), 
@@ -8310,21 +8330,20 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
             focus: true
         }] : [];
 
-        // Inner Content
         modal.innerHTML = `
-            <div style="width:90%; height:90%; background:white; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 0 50px rgba(0,0,0,0.8); position:relative;">
+            <div style="width:90%; height:90%; background:white; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; position:relative; box-shadow:0 0 50px rgba(0,0,0,0.5);">
                 
-                <div style="padding:15px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <div style="padding:15px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; z-index:10;">
                     <div>
                         <h3 style="margin:0; color:#1e293b; font-size:18px;">${geneSymbol} Structure (AlphaFold)</h3>
                         <div style="font-size:12px; color:#64748b;">
-                            ${variantPos ? `Highlighting <strong>${variantAA}${variantPos}</strong> (Magenta)` : 'Showing full structure'} | UniProt: ${uniprotID}
+                            ${variantPos ? `Highlighting <strong>${variantAA}${variantPos}</strong> (Magenta)` : 'Showing full structure'}
                         </div>
                     </div>
-                    <button id="close-3d" style="background:#e2e8f0; border:none; width:30px; height:30px; border-radius:50%; font-size:16px; cursor:pointer; font-weight:bold;">✕</button>
+                    <button id="close-3d" style="background:#e2e8f0; border:none; width:32px; height:32px; border-radius:50%; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
                 </div>
 
-                <div style="flex:1; position:relative; overflow:hidden; background:#fff;">
+                <div style="flex:1; position:relative; width:100%; height:100%; background:#f0f0f0; overflow:hidden;">
                     <pdbe-molstar-plugin 
                         id="molstar-target" 
                         molecule-id="${uniprotID}" 
@@ -8332,16 +8351,16 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
                         bgcolor="{r:255,g:255,b:255}" 
                         hide-controls="true"
                         highlight-data='${JSON.stringify(highlightData)}'
-                        style="position:absolute; top:0; left:0; width:100%; height:100%;">
+                        style="position:absolute; top:0; left:0; width:100%; height:100%; display:block;">
                     </pdbe-molstar-plugin>
                 </div>
 
-                <div style="padding:10px; background:#fff; border-top:1px solid #eee; display:flex; gap:15px; font-size:11px; flex-wrap:wrap; color:#555;">
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; margin-right:5px;"></span>Very High (pLDDT > 90)</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; margin-right:5px;"></span>High</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; margin-right:5px;"></span>Low</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; margin-right:5px;"></span>Disordered</span>
-                    <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; margin-right:5px;"></span>Variant Location</span>
+                <div style="padding:12px; background:white; border-top:1px solid #eee; display:flex; gap:15px; font-size:11px; color:#555; z-index:10; flex-wrap:wrap;">
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; margin-right:5px; border-radius:50%;"></span>Very High (pLDDT > 90)</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; margin-right:5px; border-radius:50%;"></span>High</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; margin-right:5px; border-radius:50%;"></span>Low</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; margin-right:5px; border-radius:50%;"></span>Disordered</span>
+                    <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; margin-right:5px; border-radius:50%;"></span>Variant Location</span>
                 </div>
             </div>
         `;
@@ -8363,6 +8382,7 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
