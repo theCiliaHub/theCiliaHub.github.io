@@ -8002,7 +8002,7 @@ window.downloadVariantCSV = function() {
  * MODULE: EVOLUTIONARY CONSERVATION ALIGNER (Live Orthologs)
  * ============================================================== */
 
-// 1. FETCH ORTHOLOGS & SEQUENCES
+// 1. FETCH ORTHOLOGS & SEQUENCES (Fixed: CORS-Safe Method)
 window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
     const btn = document.getElementById('cons-btn');
     if(btn) btn.innerText = "⏳ Aligning...";
@@ -8012,92 +8012,78 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
         const humanRes = await window.fetchVariantDataLive(geneSymbol);
         if(humanRes.error) throw new Error("Could not fetch human reference.");
         
-        // Get the full sequence string from EBI (we need the letters, not just length)
         const seqRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${humanRes.uniprotID}`);
+        if(!seqRes.ok) throw new Error("Human sequence not found.");
         const seqData = await seqRes.json();
         const humanSeq = seqData.sequence.sequence;
 
-        // B. Find Orthologs via MyGene.info (The "Translator")
-        // We request homologene data for: Mouse (10090), Zebrafish (7955), C. elegans (6239)
-        const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene,name`);
+        // B. Get Homologene ID (The "Group Key")
+        const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
         const orthoData = await orthoRes.json();
         const hit = orthoData.hits?.[0];
         
-        if (!hit || !hit.homologene) throw new Error("No orthologs found in Homologene DB.");
+        if (!hit || !hit.homologene) throw new Error("No conservation data found (Homologene ID missing).");
 
         const hID = hit.homologene.id;
         
-        // Fetch the Homologene Group to get specific gene IDs for other species
-        const groupRes = await fetch(`https://mygene.info/v3/homologene/${hID}`);
+        // --- CORS FIX IS HERE ---
+        // OLD: fetch(`https://mygene.info/v3/homologene/${hID}`) -> BLOCKED
+        // NEW: Search for all genes with this ID using the safe /query endpoint
+        const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=50`);
         const groupData = await groupRes.json();
-        
+        const orthologs = groupData.hits || [];
+
         // Map Species ID to Common Name
         const speciesMap = {
             10090: { name: 'Mouse', icon: '🐭' },
             7955:  { name: 'Zebrafish', icon: '🐟' },
             6239:  { name: 'C. elegans', icon: '🪱' }
-            // Chlamydomonas is often missing from MyGene, usually requires specialized DB
         };
 
-        const targets = [];
-        
-        // For each relevant species, get the gene ID -> Uniprot -> Sequence
-        for (const [taxID, info] of Object.entries(speciesMap)) {
-            const ortholog = groupData.genes.find(g => g.taxid == taxID);
-            if (ortholog) {
-                targets.push({
-                    species: info.name,
-                    icon: info.icon,
-                    geneID: ortholog.gene_id,
-                    symbol: ortholog.symbol
-                });
-            }
-        }
-
-        // C. Fetch Sequences for Orthologs
+        // C. Fetch Sequences for Target Species
         const alignments = [];
         
-        for (const t of targets) {
-            // Get Uniprot for this ortholog gene ID
-            const uRes = await fetch(`https://mygene.info/v3/gene/${t.geneID}?fields=uniprot`);
-            const uData = await uRes.json();
-            const uID = uData.uniprot?.Swiss_Prot || uData.uniprot?.TrEMBL;
-            const finalUID = Array.isArray(uID) ? uID[0] : uID;
+        for (const [taxID, info] of Object.entries(speciesMap)) {
+            // Find the gene in the group that matches the taxID
+            const orthoGene = orthologs.find(g => g.taxid == taxID);
+            
+            if (orthoGene) {
+                // Get UniProt ID (prefer Swiss-Prot)
+                let uID = orthoGene.uniprot?.Swiss_Prot || orthoGene.uniprot?.TrEMBL;
+                const finalUID = Array.isArray(uID) ? uID[0] : uID;
 
-            if (finalUID) {
-                const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
-                const sData = await sRes.json();
-                const seq = sData.sequence.sequence;
-                
-                // D. "Smart Align": Find best matching window
-                // We extract 10 AA around the human variant
-                const start = Math.max(0, humanPos - 6);
-                const end = Math.min(humanSeq.length, humanPos + 5);
-                const motif = humanSeq.substring(start, end); // The "fingerprint"
-                
-                // Find this fingerprint in the ortholog (fuzzy match)
-                // Simplified: We search for the 5-mer context to anchor
-                const anchor = humanSeq.substring(humanPos - 3, humanPos + 2);
-                let matchIdx = seq.indexOf(anchor);
-                
-                // If exact anchor not found, simple ratio mapping (fallback)
-                if (matchIdx === -1) {
-                    const ratio = humanPos / humanSeq.length;
-                    matchIdx = Math.floor(ratio * seq.length);
+                if (finalUID) {
+                    const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
+                    if(sRes.ok) {
+                        const sData = await sRes.json();
+                        const seq = sData.sequence.sequence;
+                        
+                        // D. "Smart Align": Find best matching window
+                        // We search for the 5-mer context around the variant
+                        const anchor = humanSeq.substring(humanPos - 3, humanPos + 2);
+                        let matchIdx = seq.indexOf(anchor);
+                        
+                        // Fallback: Ratio mapping if exact anchor fails
+                        if (matchIdx === -1) {
+                            const ratio = humanPos / humanSeq.length;
+                            matchIdx = Math.floor(ratio * seq.length);
+                        }
+
+                        // Extract aligned window (5 AA before, 5 AA after)
+                        const oStart = Math.max(0, matchIdx - 5);
+                        const oEnd = Math.min(seq.length, matchIdx + 6);
+                        const segment = seq.substring(oStart, oEnd);
+                        
+                        alignments.push({
+                            species: info.name,
+                            icon: info.icon,
+                            symbol: orthoGene.symbol,
+                            seq: segment,
+                            // Check if the central residue matches
+                            isConserved: segment.includes(humanSeq[humanPos-1]) 
+                        });
+                    }
                 }
-
-                // Extract aligned window
-                const oStart = Math.max(0, matchIdx - 5);
-                const oEnd = Math.min(seq.length, matchIdx + 6);
-                const segment = seq.substring(oStart, oEnd);
-                
-                alignments.push({
-                    species: t.species,
-                    icon: t.icon,
-                    symbol: t.symbol,
-                    seq: segment,
-                    isConserved: segment.includes(humanSeq[humanPos-1]) // Simple check
-                });
             }
         }
 
@@ -8105,6 +8091,7 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
         window.showConservationPopup(geneSymbol, humanPos, aaChange, humanSeq, alignments);
 
     } catch (e) {
+        console.error(e);
         alert("Alignment Error: " + e.message);
         if(btn) btn.innerText = "Check Conservation";
     }
@@ -8209,6 +8196,7 @@ window.showVarTooltip = function(e, title, subtitle, desc) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
