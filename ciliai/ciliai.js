@@ -7835,16 +7835,23 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. MAIN RENDERER
+// 2. MAIN RENDER ENTRY POINT (Fix: Hides UMAP Sidebar)
 window.renderVariantMap = async function(geneSymbol) {
     window.switchView('plot'); 
     
-    // --- BUG FIX: HIDE UMAP SIDEBAR ---
-    // We hide the standard controls so "WDR31..." doesn't show up.
-    const sidebar = document.querySelector('.layout-sidebar') || document.getElementById('viz-sidebar');
-    if(sidebar) sidebar.style.display = 'none'; // Hide UMAP controls
+    // --- UI FIX: Force hide the UMAP/Sidebar controls ---
+    // We try multiple common IDs/Classes to ensure we catch it
+    const sidebarIds = ['viz-sidebar', 'umap-controls', 'layout-sidebar'];
+    sidebarIds.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.style.display = 'none';
+    });
     
-    // Use the main container
+    // Also hide by class if ID fails
+    document.querySelectorAll('.viz-sidebar, .layout-sidebar').forEach(el => {
+        el.style.display = 'none';
+    });
+
     const container = document.getElementById('plotly-container');
     
     // Loading State
@@ -7861,7 +7868,10 @@ window.renderVariantMap = async function(geneSymbol) {
         return;
     }
 
+    // Store data globally
     window.CiliAI.activeVariantData = data;
+    
+    // Initial Draw
     window.drawVariantWorkspace();
 };
 
@@ -8015,6 +8025,176 @@ window.downloadVariantCSV = function() {
     a.click();
 };
 
+/* ==============================================================
+ * MODULE: EVOLUTIONARY CONSERVATION ALIGNER (Live Orthologs)
+ * ============================================================== */
+
+// 1. FETCH ORTHOLOGS & SEQUENCES
+window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
+    const btn = document.getElementById('cons-btn');
+    if(btn) btn.innerText = "⏳ Aligning...";
+
+    try {
+        // A. Get Human Sequence First (Reference)
+        const humanRes = await window.fetchVariantDataLive(geneSymbol);
+        if(humanRes.error) throw new Error("Could not fetch human reference.");
+        
+        // Get the full sequence string from EBI (we need the letters, not just length)
+        const seqRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${humanRes.uniprotID}`);
+        const seqData = await seqRes.json();
+        const humanSeq = seqData.sequence.sequence;
+
+        // B. Find Orthologs via MyGene.info (The "Translator")
+        // We request homologene data for: Mouse (10090), Zebrafish (7955), C. elegans (6239)
+        const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene,name`);
+        const orthoData = await orthoRes.json();
+        const hit = orthoData.hits?.[0];
+        
+        if (!hit || !hit.homologene) throw new Error("No orthologs found in Homologene DB.");
+
+        const hID = hit.homologene.id;
+        
+        // Fetch the Homologene Group to get specific gene IDs for other species
+        const groupRes = await fetch(`https://mygene.info/v3/homologene/${hID}`);
+        const groupData = await groupRes.json();
+        
+        // Map Species ID to Common Name
+        const speciesMap = {
+            10090: { name: 'Mouse', icon: '🐭' },
+            7955:  { name: 'Zebrafish', icon: '🐟' },
+            6239:  { name: 'C. elegans', icon: '🪱' }
+            // Chlamydomonas is often missing from MyGene, usually requires specialized DB
+        };
+
+        const targets = [];
+        
+        // For each relevant species, get the gene ID -> Uniprot -> Sequence
+        for (const [taxID, info] of Object.entries(speciesMap)) {
+            const ortholog = groupData.genes.find(g => g.taxid == taxID);
+            if (ortholog) {
+                targets.push({
+                    species: info.name,
+                    icon: info.icon,
+                    geneID: ortholog.gene_id,
+                    symbol: ortholog.symbol
+                });
+            }
+        }
+
+        // C. Fetch Sequences for Orthologs
+        const alignments = [];
+        
+        for (const t of targets) {
+            // Get Uniprot for this ortholog gene ID
+            const uRes = await fetch(`https://mygene.info/v3/gene/${t.geneID}?fields=uniprot`);
+            const uData = await uRes.json();
+            const uID = uData.uniprot?.Swiss_Prot || uData.uniprot?.TrEMBL;
+            const finalUID = Array.isArray(uID) ? uID[0] : uID;
+
+            if (finalUID) {
+                const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
+                const sData = await sRes.json();
+                const seq = sData.sequence.sequence;
+                
+                // D. "Smart Align": Find best matching window
+                // We extract 10 AA around the human variant
+                const start = Math.max(0, humanPos - 6);
+                const end = Math.min(humanSeq.length, humanPos + 5);
+                const motif = humanSeq.substring(start, end); // The "fingerprint"
+                
+                // Find this fingerprint in the ortholog (fuzzy match)
+                // Simplified: We search for the 5-mer context to anchor
+                const anchor = humanSeq.substring(humanPos - 3, humanPos + 2);
+                let matchIdx = seq.indexOf(anchor);
+                
+                // If exact anchor not found, simple ratio mapping (fallback)
+                if (matchIdx === -1) {
+                    const ratio = humanPos / humanSeq.length;
+                    matchIdx = Math.floor(ratio * seq.length);
+                }
+
+                // Extract aligned window
+                const oStart = Math.max(0, matchIdx - 5);
+                const oEnd = Math.min(seq.length, matchIdx + 6);
+                const segment = seq.substring(oStart, oEnd);
+                
+                alignments.push({
+                    species: t.species,
+                    icon: t.icon,
+                    symbol: t.symbol,
+                    seq: segment,
+                    isConserved: segment.includes(humanSeq[humanPos-1]) // Simple check
+                });
+            }
+        }
+
+        // D. Render Results
+        window.showConservationPopup(geneSymbol, humanPos, aaChange, humanSeq, alignments);
+
+    } catch (e) {
+        alert("Alignment Error: " + e.message);
+        if(btn) btn.innerText = "Check Conservation";
+    }
+};
+
+// 2. RENDER POPUP
+window.showConservationPopup = function(gene, pos, change, fullSeq, alignments) {
+    // Extract Human Window
+    const hStart = Math.max(0, pos - 6);
+    const hEnd = Math.min(fullSeq.length, pos + 5);
+    const hWindow = fullSeq.substring(hStart, hEnd);
+    const refAA = fullSeq[pos-1]; // 0-indexed
+
+    // Create Modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px; box-shadow:0 25px 50px rgba(0,0,0,0.5); z-index:10000; width:400px; font-family:'Inter', sans-serif;`;
+    
+    let html = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0; font-size:16px;">Evolutionary Alignment: ${gene}</h3>
+            <button onclick="this.parentElement.parentElement.remove()" style="border:none; background:none; cursor:pointer; font-size:16px;">✕</button>
+        </div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:10px;">
+            Variant <strong>${change}</strong> at position <strong>${pos}</strong>.
+        </div>
+        
+        <div style="background:#f1f5f9; padding:10px; border-radius:6px; font-family:monospace; font-size:13px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #cbd5e0; padding-bottom:5px;">
+                <span>👤 Human</span>
+                <span>
+                    ${hWindow.split('').map((char, i) => 
+                        (i === 5) ? `<span style="background:#ef4444; color:white; padding:0 2px; border-radius:2px;">${char}</span>` : char
+                    ).join('')}
+                </span>
+            </div>
+
+            ${alignments.map(a => `
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span title="${a.symbol}">${a.icon} ${a.species}</span>
+                    <span style="color:#334155;">
+                        ${a.seq.split('').map(char => 
+                            (char === refAA) ? `<span style="color:#16a34a; font-weight:bold;">${char}</span>` : char
+                        ).join('')}
+                    </span>
+                </div>
+            `).join('')}
+        </div>
+
+        <div style="margin-top:10px; font-size:11px; color:#64748b; line-height:1.4;">
+            <span style="color:#16a34a; font-weight:bold;">Green</span> matches Human reference.<br>
+            If the residue is green across species, it is <strong>highly conserved</strong> and likely functional.
+        </div>
+    `;
+
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+    
+    // Reset button text
+    const btn = document.getElementById('cons-btn');
+    if(btn) btn.innerText = "Check Conservation";
+};
+
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
