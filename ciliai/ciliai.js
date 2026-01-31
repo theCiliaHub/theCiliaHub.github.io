@@ -2728,7 +2728,7 @@ function performMultiCriteriaFilter(query, intents) {
 
 // --- 4F. Data Getter Helpers ---
 
-// --- Tab Switching Logic ---
+// --- Tab Switching Logic (Fixed: No Auto-Trigger) ---
 window.openTab = function(evt, tabName) {
     const tabContents = document.getElementsByClassName("cilia-tab-content");
     for (let i = 0; i < tabContents.length; i++) {
@@ -2738,16 +2738,16 @@ window.openTab = function(evt, tabName) {
     for (let i = 0; i < tabLinks.length; i++) {
         tabLinks[i].classList.remove("active");
     }
-    document.getElementById(`tab-${tabName}`).classList.add("active");
-    evt.currentTarget.classList.add("active");
     
-    // Auto-trigger UMAP if switching to Expression tab
-    if (tabName === 'expression') {
-        const geneName = document.getElementById('current-gene-name')?.textContent;
-        if (geneName && window.renderUMAPPlot) {
-            setTimeout(() => window.renderUMAPPlot(geneName, [geneName]), 100);
-        }
+    const targetTab = document.getElementById(`tab-${tabName}`);
+    if (targetTab) targetTab.classList.add("active");
+    
+    if (evt && evt.currentTarget) {
+        evt.currentTarget.classList.add("active");
     }
+    
+    // REMOVED: The setTimeout(() => window.renderUMAPPlot...) block
+    // This was the cause of the "WDR31" message appearing unexpectedly.
 };
 
 // ==============================================================
@@ -7829,25 +7829,28 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. RENDERER (Ghost Buster Included)
+// 2. RENDERER (Clean View Switch)
 window.renderVariantMap = async function(geneSymbol) {
-    window.switchView('plot'); 
+    // 1. Hide UMAP/Diagram Views Manually to prevent conflicts
+    if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
+    if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
     
-    // --- GHOST BUSTER: Aggressively hide UMAP sidebars ---
-    const style = document.createElement('style');
-    style.innerHTML = `
-        .viz-sidebar, .layout-sidebar, #umap-controls { display: none !important; }
-        #plotly-container { width: 100% !important; flex: 1; }
-    `;
-    document.getElementById('plotly-container').appendChild(style);
-
+    // 2. Prepare Plot Container
     const container = document.getElementById('plotly-container');
+    container.style.display = 'block';
+    
+    // Force-hide legacy sidebar controls if they exist
+    const sidebars = document.querySelectorAll('.viz-sidebar, .layout-sidebar');
+    sidebars.forEach(el => el.style.display = 'none');
+
+    // 3. Loading State
     container.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
             <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
             <p>Scanning global databases for <strong>${geneSymbol}</strong>...</p>
         </div>`;
 
+    // 4. Fetch Data
     const data = await window.fetchVariantDataLive(geneSymbol);
 
     if (data.error) {
@@ -7859,7 +7862,8 @@ window.renderVariantMap = async function(geneSymbol) {
     window.drawVariantWorkspace();
 };
 
-// 3. DRAWING ENGINE
+
+// 3. DRAWING ENGINE (Nature Colors + Stable Interaction)
 window.drawVariantWorkspace = function() {
     const data = window.CiliAI.activeVariantData;
     const container = document.getElementById('plotly-container');
@@ -7881,14 +7885,15 @@ window.drawVariantWorkspace = function() {
     const xScale = (pos) => pad + (pos / data.length) * (w - 2 * pad);
 
     const svgContent = `
-        <div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column;">
+        <div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; font-family:'Inter',sans-serif;">
+            
             
             <div id="var-panel" style="position:absolute; top:10px; right:10px; background:white; padding:15px; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:280px; display:none; z-index:50;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                     <strong id="vp-title" style="color:#1e293b;">Variant</strong>
                     <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none; background:none; cursor:pointer;">✕</button>
                 </div>
-                <div id="vp-desc" style="font-size:12px; color:#64748b; margin-bottom:12px;"></div>
+                <div id="vp-desc" style="font-size:12px; color:#64748b; margin-bottom:12px; max-height:100px; overflow-y:auto;"></div>
                 <button id="vp-action" style="width:100%; padding:8px; background:#3b82f6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">
                     🌍 Check Conservation
                 </button>
@@ -7897,14 +7902,14 @@ window.drawVariantWorkspace = function() {
             <div style="flex:1; overflow:hidden;">
                 <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}">
                     <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Landscape</text>
-                    <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${displayVariants.length} Variants Shown</text>
+                    <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | ${displayVariants.length} Variants Shown</text>
 
                     <rect x="${pad}" y="${trackY - 6}" width="${w - 2 * pad}" height="12" rx="6" fill="#e2e8f0" />
                     ${data.domains.map((d, i) => {
                         const x = xScale(d.start);
                         const width = Math.max(xScale(d.end) - x, 4);
-                        return `<rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${d.color}" opacity="0.8" stroke="white" stroke-width="1">
-                            <title>${d.name}</title>
+                        return `<rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${d.color}" opacity="0.85" stroke="white" stroke-width="1">
+                            <title>${d.name} (${d.start}-${d.end})</title>
                         </rect>`;
                     }).join('')}
 
@@ -7917,16 +7922,18 @@ window.drawVariantWorkspace = function() {
                         const height = 20 + (v.begin % 100); 
                         const yHead = trackY - height;
                         
-                        // Encoding data for click handler
+                        // Clean data for onclick
                         const title = `p.${v.wildType}${v.begin}${v.mutatedType}`;
-                        const desc = (v.descriptions?.[0]?.value || "Variant").replace(/'/g, "").replace(/"/g, "");
+                        const rawDesc = (v.descriptions?.[0]?.value || "Variant details unavailable");
+                        // Escape quotes for HTML attribute
+                        const descSafe = rawDesc.replace(/'/g, "&apos;").replace(/"/g, "&quot;");
                         
                         return `
                             <g style="cursor:pointer;" 
-                               onclick="window.openVariantPanel('${title}', '${v.begin}', '${desc}', '${data.gene}')">
+                               onclick="window.openVariantPanel('${title}', '${v.begin}', '${descSafe}', '${data.gene}')">
                                 <line x1="${x}" y1="${trackY - 12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="${isCustom ? 2 : 1}" opacity="0.6" />
                                 <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1">
-                                    <title>Click to analyze ${title}</title>
+                                    <title>${title} (Click for Conservation)</title>
                                 </circle>
                             </g>`;
                     }).join('')}
@@ -7947,6 +7954,7 @@ window.drawVariantWorkspace = function() {
 
     container.innerHTML = svgContent;
 };
+
 
 // 4. INTERACTION HELPERS (Click Logic)
 window.openVariantPanel = function(title, pos, desc, gene) {
@@ -8201,6 +8209,7 @@ window.showVarTooltip = function(e, title, subtitle, desc) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
