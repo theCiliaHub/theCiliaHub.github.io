@@ -7780,11 +7780,7 @@ window.downloadCurrentVisualization = function() {
     }
 };
 /* ==============================================================
- * MODULE: LIVE VARIANT WORKSPACE (Interactive & Custom)
- * ============================================================== */
-
-/* ==============================================================
- * MODULE: LIVE VARIANT WORKSPACE (Nature Colors + Customization)
+ * MODULE: LIVE VARIANT WORKSPACE (Stable Interaction)
  * ============================================================== */
 
 // 1. FETCH DATA
@@ -7812,11 +7808,9 @@ window.fetchVariantDataLive = async function(geneSymbol) {
         const variants = varData.features.filter(f => f.type === 'VARIANT');
         
         const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
-        
-        // Nature Journal Palette (NPG Style)
         const naturePalette = ['#E64B35', '#4DBBD5', '#00A087', '#3C5488', '#F39B7F', '#8491B4', '#91D1C2', '#DC0000'];
-
         let colorIdx = 0;
+
         const domains = featData.features
             .filter(f => domainTypes.includes(f.type))
             .map(d => ({
@@ -7824,37 +7818,30 @@ window.fetchVariantDataLive = async function(geneSymbol) {
                 start: parseInt(d.begin),
                 end: parseInt(d.end),
                 type: d.type,
-                color: naturePalette[colorIdx++ % naturePalette.length] // Assign initial color
+                color: naturePalette[colorIdx++ % naturePalette.length]
             }));
 
         return { gene, uniprotID, length, variants, domains, customVariants: [] };
 
     } catch (e) {
-        console.error("Variant Fetch Error:", e);
+        console.error("Fetch Error:", e);
         return { error: e.message };
     }
 };
 
-// 2. MAIN RENDER ENTRY POINT (Fix: Hides UMAP Sidebar)
+// 2. RENDERER (Ghost Buster Included)
 window.renderVariantMap = async function(geneSymbol) {
     window.switchView('plot'); 
     
-    // --- UI FIX: Force hide the UMAP/Sidebar controls ---
-    // We try multiple common IDs/Classes to ensure we catch it
-    const sidebarIds = ['viz-sidebar', 'umap-controls', 'layout-sidebar'];
-    sidebarIds.forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.style.display = 'none';
-    });
-    
-    // Also hide by class if ID fails
-    document.querySelectorAll('.viz-sidebar, .layout-sidebar').forEach(el => {
-        el.style.display = 'none';
-    });
+    // --- GHOST BUSTER: Aggressively hide UMAP sidebars ---
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .viz-sidebar, .layout-sidebar, #umap-controls { display: none !important; }
+        #plotly-container { width: 100% !important; flex: 1; }
+    `;
+    document.getElementById('plotly-container').appendChild(style);
 
     const container = document.getElementById('plotly-container');
-    
-    // Loading State
     container.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
             <div style="font-size:30px; animation:spin 1s infinite linear;">⚙️</div>
@@ -7868,31 +7855,25 @@ window.renderVariantMap = async function(geneSymbol) {
         return;
     }
 
-    // Store data globally
     window.CiliAI.activeVariantData = data;
-    
-    // Initial Draw
     window.drawVariantWorkspace();
 };
 
-// 3. DRAWING ENGINE (SVG + Controls)
+// 3. DRAWING ENGINE
 window.drawVariantWorkspace = function() {
     const data = window.CiliAI.activeVariantData;
     const container = document.getElementById('plotly-container');
 
-    // Filter Logic
     const isPathogenic = (v) => JSON.stringify(v).toLowerCase().includes("pathogenic");
     const allPathogenic = data.variants.filter(isPathogenic);
     const allOthers = data.variants.filter(v => !isPathogenic(v));
 
-    // Sampling (Max 60 points)
     const displayVariants = [
         ...allPathogenic.slice(0, 30),
         ...allOthers.sort(() => 0.5 - Math.random()).slice(0, 30),
         ...data.customVariants
     ];
 
-    // SVG Dimensions
     const w = container.clientWidth - 40;
     const h = 450;
     const pad = 40;
@@ -7902,21 +7883,29 @@ window.drawVariantWorkspace = function() {
     const svgContent = `
         <div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column;">
             
-            <div id="var-tooltip" style="position:absolute; display:none; background:rgba(15,23,42,0.95); color:white; padding:8px 12px; border-radius:6px; font-size:12px; pointer-events:none; z-index:100; max-width:250px; box-shadow:0 10px 15px rgba(0,0,0,0.3);"></div>
+            <div id="var-panel" style="position:absolute; top:10px; right:10px; background:white; padding:15px; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:280px; display:none; z-index:50;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <strong id="vp-title" style="color:#1e293b;">Variant</strong>
+                    <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none; background:none; cursor:pointer;">✕</button>
+                </div>
+                <div id="vp-desc" style="font-size:12px; color:#64748b; margin-bottom:12px;"></div>
+                <button id="vp-action" style="width:100%; padding:8px; background:#3b82f6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">
+                    🌍 Check Conservation
+                </button>
+            </div>
 
             <div style="flex:1; overflow:hidden;">
                 <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}">
                     <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Landscape</text>
-                    <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | ${displayVariants.length} Variants Shown</text>
+                    <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${displayVariants.length} Variants Shown</text>
 
                     <rect x="${pad}" y="${trackY - 6}" width="${w - 2 * pad}" height="12" rx="6" fill="#e2e8f0" />
                     ${data.domains.map((d, i) => {
                         const x = xScale(d.start);
                         const width = Math.max(xScale(d.end) - x, 4);
-                        return `<rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${d.color}" opacity="0.85" stroke="white" stroke-width="1"
-                                style="cursor:pointer; transition: opacity 0.2s;"
-                                onmouseenter="window.showVarTooltip(event, '${d.name}', '${d.start}-${d.end}', 'Click color box in legend to change')"
-                                onmouseleave="window.hideVarTooltip()"></rect>`;
+                        return `<rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${d.color}" opacity="0.8" stroke="white" stroke-width="1">
+                            <title>${d.name}</title>
+                        </rect>`;
                     }).join('')}
 
                     ${displayVariants.map(v => {
@@ -7927,77 +7916,56 @@ window.drawVariantWorkspace = function() {
                         const radius = isCustom ? 7 : (isPatho ? 5 : 3);
                         const height = 20 + (v.begin % 100); 
                         const yHead = trackY - height;
-                        const desc = v.descriptions?.[0]?.value || v.mutatedType || "Variant";
-                        const sig = v.clinicalSignificance || v.significance || "Uncertain";
-
+                        
+                        // Encoding data for click handler
+                        const title = `p.${v.wildType}${v.begin}${v.mutatedType}`;
+                        const desc = (v.descriptions?.[0]?.value || "Variant").replace(/'/g, "").replace(/"/g, "");
+                        
                         return `
-                            <g onmouseenter="window.showVarTooltip(event, 'p.${v.wildType}${v.begin}${v.mutatedType}', '${sig}', '${desc.replace(/'/g, "")}')"
-                               onmouseleave="window.hideVarTooltip()">
+                            <g style="cursor:pointer;" 
+                               onclick="window.openVariantPanel('${title}', '${v.begin}', '${desc}', '${data.gene}')">
                                 <line x1="${x}" y1="${trackY - 12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="${isCustom ? 2 : 1}" opacity="0.6" />
-                                <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1" style="cursor:pointer" />
+                                <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1">
+                                    <title>Click to analyze ${title}</title>
+                                </circle>
                             </g>`;
                     }).join('')}
                 </svg>
             </div>
 
-            <div style="padding:15px; background:#f8fafc; border-top:1px solid #e2e8f0;">
-                
-                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; align-items:center;">
-                    <span style="font-size:11px; font-weight:bold; color:#64748b;">DOMAINS:</span>
-                    ${data.domains.map((d, i) => `
-                        <div style="display:flex; align-items:center; gap:4px; font-size:11px; background:white; padding:2px 6px; border-radius:4px; border:1px solid #e2e8f0;">
-                            <input type="color" value="${d.color}" 
-                                   onchange="window.updateDomainColor(${i}, this.value)"
-                                   style="width:16px; height:16px; border:none; padding:0; cursor:pointer;">
-                            <span>${d.name.split(' ')[0]}</span>
-                        </div>
-                    `).join('')}
-                </div>
-
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <input id="custom-var-input" type="text" placeholder="Add p.L301R" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:100px;">
-                    <select id="custom-var-sig" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
-                        <option value="Pathogenic">Pathogenic</option>
-                        <option value="VUS">VUS</option>
-                    </select>
-                    <button onclick="window.addUserVariant()" style="padding:6px 12px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">+ Plot</button>
-                    <div style="flex:1;"></div>
-                    <button onclick="window.downloadVariantCSV()" style="padding:6px 12px; background:white; border:1px solid #cbd5e0; color:#334155; border-radius:4px; cursor:pointer; font-size:12px;">📥 Save CSV</button>
-                </div>
+            <div style="padding:15px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:10px; align-items:center;">
+                <input id="custom-var-input" type="text" placeholder="Add p.L301R" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:100px;">
+                <select id="custom-var-sig" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
+                    <option value="Pathogenic">Pathogenic</option>
+                    <option value="VUS">VUS</option>
+                </select>
+                <button onclick="window.addUserVariant()" style="padding:6px 12px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer;">+ Add</button>
+                <button onclick="window.downloadVariantCSV()" style="padding:6px 12px; background:white; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">📥 CSV</button>
             </div>
         </div>
     `;
 
     container.innerHTML = svgContent;
-    window.updateStatus(`Visualizing ${data.gene}`, 'ready');
 };
 
-// 4. INTERACTIVITY HELPERS
-window.updateDomainColor = function(index, newColor) {
-    // Live update the color in memory and redraw
-    window.CiliAI.activeVariantData.domains[index].color = newColor;
-    window.drawVariantWorkspace();
-};
-
-window.showVarTooltip = function(e, title, subtitle, desc) {
-    const tip = document.getElementById('var-tooltip');
-    if(!tip) return;
-    tip.style.display = 'block';
-    tip.style.left = (e.offsetX + 15) + 'px';
-    tip.style.top = (e.offsetY + 15) + 'px';
-    tip.innerHTML = `<div style="font-weight:bold;">${title}</div><div style="color:#fbbf24; font-size:11px;">${subtitle}</div><div style="opacity:0.8; font-size:10px;">${desc}</div>`;
-};
-
-window.hideVarTooltip = function() {
-    const tip = document.getElementById('var-tooltip');
-    if(tip) tip.style.display = 'none';
+// 4. INTERACTION HELPERS (Click Logic)
+window.openVariantPanel = function(title, pos, desc, gene) {
+    const panel = document.getElementById('var-panel');
+    document.getElementById('vp-title').textContent = title;
+    document.getElementById('vp-desc').textContent = desc.length > 100 ? desc.substring(0, 100) + '...' : desc;
+    
+    // Wire up the Conservation Button
+    const btn = document.getElementById('vp-action');
+    btn.onclick = () => window.checkConservation(gene, parseInt(pos), title);
+    
+    panel.style.display = 'block';
 };
 
 window.addUserVariant = function() {
     const input = document.getElementById('custom-var-input').value;
     const sig = document.getElementById('custom-var-sig').value;
     const match = input.match(/(\d+)/);
-    if(!match) { alert("Please include position (e.g. 301)."); return; }
+    if(!match) { alert("Please include position."); return; }
     
     window.CiliAI.activeVariantData.customVariants.push({
         begin: parseInt(match[1]),
@@ -8014,9 +7982,7 @@ window.downloadVariantCSV = function() {
     const data = window.CiliAI.activeVariantData;
     let csv = "Gene,Position,Change,Significance,Description\n";
     [...data.variants, ...data.customVariants].forEach(v => {
-        const desc = v.descriptions?.[0]?.value || "";
-        const sig = v.clinicalSignificance || v.significance || "Uncertain";
-        csv += `${data.gene},${v.begin},p.${v.wildType}${v.begin}${v.mutatedType},"${sig}","${desc.replace(/"/g, '""')}"\n`;
+        csv += `${data.gene},${v.begin},p.${v.wildType}${v.begin}${v.mutatedType},"${v.clinicalSignificance||v.significance}","${(v.descriptions?.[0]?.value||"").replace(/"/g, '""')}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
@@ -8024,7 +7990,6 @@ window.downloadVariantCSV = function() {
     a.download = `${data.gene}_Variants.csv`;
     a.click();
 };
-
 /* ==============================================================
  * MODULE: EVOLUTIONARY CONSERVATION ALIGNER (Live Orthologs)
  * ============================================================== */
@@ -8236,6 +8201,7 @@ window.showVarTooltip = function(e, title, subtitle, desc) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
