@@ -8269,19 +8269,17 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 };
 
 /* ==============================================================
- * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Web Component Method)
+ * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Fixed Tag Name)
  * ============================================================== */
-
 (function() {
     'use strict';
 
-    // 1. LOADER: Loads the Web Component script
+    // 1. LOADER: Loads 'component.js' and waits for <pdbe-molstar>
     window.loadMolStar = async function() {
-        // If the tag is already registered, we are ready
-        if (customElements.get('pdbe-molstar-plugin')) return true;
+        if (customElements.get('pdbe-molstar')) return true;
 
         return new Promise((resolve, reject) => {
-            console.log("[CiliAI] Loading 3D Web Component...");
+            console.log("[CiliAI] Downloading 3D Engine...");
 
             // CSS
             const link = document.createElement('link');
@@ -8289,14 +8287,14 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
             link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
             document.head.appendChild(link);
 
-            // JS (Must be the COMPONENT build)
+            // JS
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js';
             
             script.onload = () => {
-                // Wait for the browser to register the <pdbe-molstar-plugin> tag
-                customElements.whenDefined('pdbe-molstar-plugin').then(() => {
-                    console.log("[CiliAI] <pdbe-molstar-plugin> is ready.");
+                // Wait for the CORRECT tag name: 'pdbe-molstar'
+                customElements.whenDefined('pdbe-molstar').then(() => {
+                    console.log("[CiliAI] 3D Engine Ready (<pdbe-molstar> registered).");
                     resolve(true);
                 });
             };
@@ -8312,7 +8310,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
         const originalText = btn ? btn.innerText : "🧊 View 3D";
         
         if (btn) {
-            btn.innerText = "⏳ Loading...";
+            btn.innerText = "⏳ Opening...";
             btn.disabled = true;
         }
 
@@ -8320,13 +8318,12 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
             // A. Load Library
             await window.loadMolStar();
 
-            // B. Resolve UniProt ID
+            // B. Resolve UniProt
             const data = await window.fetchVariantDataLive(geneSymbol);
             if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
             const uniprotID = data.uniprotID;
 
-            // C. Prepare Highlight Data
-            // Note: We use chain 'A' which is standard for AlphaFold single-chain models
+            // C. Highlight Config
             const highlightData = variantPos ? [{
                 entity_id: "1",
                 residue_number: parseInt(variantPos, 10),
@@ -8334,17 +8331,16 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
                 focus: true
             }] : [];
 
-            // D. Create Modal (Fullscreen)
+            // D. Create Modal
             const modal = document.createElement('div');
             modal.id = 'molstar-modal';
             modal.style.cssText = `
-                position: fixed; inset: 0; width: 100vw; height: 100vh;
+                position: fixed; inset: 0; width: 100vw; height: 100dvh;
                 background: rgba(0,0,0,0.95); z-index: 200000;
                 display: flex; flex-direction: column; justify-content: center; align-items: center;
             `;
 
-            // E. Inject HTML with the Custom Element
-            // We use the <pdbe-molstar-plugin> tag directly. No 'new Class()' needed.
+            // E. Inject HTML (USING THE CORRECT TAG: <pdbe-molstar>)
             modal.innerHTML = `
                 <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
                     
@@ -8360,14 +8356,15 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
                     </div>
 
                     <div style="flex: 1; position: relative; background: #fff; overflow: hidden;">
-                        <pdbe-molstar-plugin 
+                        <pdbe-molstar 
+                            id="pdbe-molstar-target"
                             molecule-id="${uniprotID}"
                             alphafold-view="true"
                             hide-controls="true"
                             bg-color-r="255" bg-color-g="255" bg-color-b="255"
                             highlight-data='${JSON.stringify(highlightData)}'
                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"
-                        ></pdbe-molstar-plugin>
+                        ></pdbe-molstar>
                     </div>
 
                     <div style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; gap: 20px; flex-wrap: wrap; flex-shrink: 0;">
@@ -8389,7 +8386,6 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
             };
             modal.querySelector('#close-3d').onclick = close;
             
-            // Allow Esc key
             window.addEventListener('keydown', function escListener(e) {
                 if(e.key === 'Escape') {
                     close();
@@ -8406,8 +8402,9 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
         }
     };
 
-    console.log("[CiliAI] 3D Viewer module (Web Component) loaded.");
+    console.log("[CiliAI] 3D Viewer module loaded.");
 })();
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
