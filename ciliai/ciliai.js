@@ -8274,54 +8274,72 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
  * Enhanced diagnostics & user-visible retry
  * ============================================================== */
 
-window.loadMolStar = async function (forceEBI = false) {
+window.loadMolStar = async function (preferredSource = 'jsdelivr') {
     if (customElements.get('pdbe-molstar-plugin')) {
         console.log("[CiliAI] PDBe Mol* already registered.");
         return;
     }
 
     return new Promise((resolve, reject) => {
-        console.log("[CiliAI] Starting PDBe Mol* load (forceEBI=" + forceEBI + ")...");
+        console.log("[CiliAI] PDBe Mol* load attempt - source: " + preferredSource);
+
+        const sources = {
+            jsdelivr: {
+                css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@latest/build/pdbe-molstar.css',
+                js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@latest/build/pdbe-molstar-component.js'
+            },
+            unpkg: {
+                css: 'https://unpkg.com/pdbe-molstar@latest/build/pdbe-molstar.css',
+                js: 'https://unpkg.com/pdbe-molstar@latest/build/pdbe-molstar-component.js'
+            }
+        };
+
+        const src = sources[preferredSource] || sources.jsdelivr;
+        console.log("[CiliAI] Using CSS: " + src.css);
+        console.log("[CiliAI] Using JS: " + src.js);
 
         const cssLink = document.createElement('link');
         cssLink.rel = 'stylesheet';
-        cssLink.href = forceEBI 
-            ? 'https://www.ebi.ac.uk/pdbe/static/pdbe-molstar/pdbe-molstar.css'
-            : 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar.css';
+        cssLink.href = src.css;
         document.head.appendChild(cssLink);
 
         const script = document.createElement('script');
         script.async = true;
-        script.src = forceEBI 
-            ? 'https://www.ebi.ac.uk/pdbe/static/pdbe-molstar/pdbe-molstar-component.js'
-            : 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar-component.js';
-
-        console.log(`[CiliAI] Loading script from: ${script.src}`);
+        script.src = src.js;
 
         const checkInterval = setInterval(() => {
             if (customElements.get('pdbe-molstar-plugin')) {
                 clearInterval(checkInterval);
                 clearTimeout(safetyTimer);
-                console.log("[CiliAI] PDBe Mol* v3.10.0 registered OK!");
+                console.log("[CiliAI] SUCCESS: pdbe-molstar-plugin registered!");
                 resolve();
             }
-        }, 200);
+        }, 300);
 
         const safetyTimer = setTimeout(() => {
             clearInterval(checkInterval);
-            console.warn("[CiliAI] Registration timeout (12s) – proceed forced.");
-            resolve();
-        }, 12000);
+            console.warn("[CiliAI] Timeout after 15s - component not registered.");
+            resolve(); // force proceed to show error UI
+        }, 15000);
 
-        script.onload = () => console.log("[CiliAI] Script file loaded (onload fired).");
-        script.onerror = (err) => {
-            console.error("[CiliAI] Script load ERROR:", err);
-            reject(new Error("PDBe Mol* script fetch failed."));
+        script.onload = () => console.log("[CiliAI] Script LOADED via onload (size/content parsed OK?).");
+        script.onerror = (e) => {
+            console.error("[CiliAI] Script LOAD ERROR:", e);
+            reject(new Error("Failed to fetch PDBe Mol* script - check Network tab / extensions."));
         };
 
         document.head.appendChild(script);
     });
 };
+
+// In showStructureViewer: chain fallbacks
+await window.loadMolStar('jsdelivr').catch(() => {
+    console.warn("[CiliAI] jsDelivr failed - retrying unpkg...");
+    return window.loadMolStar('unpkg');
+}).catch(() => {
+    console.error("[CiliAI] All sources failed - likely blocked by extension/network.");
+    // You can show a custom alert or banner here
+});
 
 window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('btn-3d');
@@ -8435,6 +8453,7 @@ window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) 
 };
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
