@@ -8269,13 +8269,16 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 };
 
 /* ==============================================================
- * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Fixed Tag Name)
+ * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (AlphaFold FIXED)
  * ============================================================== */
-(function() {
+
+(function () {
     'use strict';
 
-    // 1. LOADER: Loads 'component.js' and waits for <pdbe-molstar>
-    window.loadMolStar = async function() {
+    /* --------------------------------------------------------------
+     * 1. LOADER: Load PDBe Mol* once and wait for <pdbe-molstar>
+     * -------------------------------------------------------------- */
+    window.loadMolStar = async function () {
         if (customElements.get('pdbe-molstar')) return true;
 
         return new Promise((resolve, reject) => {
@@ -8290,115 +8293,195 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
             // JS
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js';
-            
+
             script.onload = () => {
-                // Wait for the CORRECT tag name: 'pdbe-molstar'
                 customElements.whenDefined('pdbe-molstar').then(() => {
                     console.log("[CiliAI] 3D Engine Ready (<pdbe-molstar> registered).");
                     resolve(true);
                 });
             };
-            
-            script.onerror = () => reject(new Error("Failed to load PDBe Mol* script."));
+
+            script.onerror = () =>
+                reject(new Error("Failed to load PDBe Mol* script."));
+
             document.head.appendChild(script);
         });
     };
 
-    // 2. VIEWER RENDERER
-    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+    /* --------------------------------------------------------------
+     * 2. MAIN VIEWER FUNCTION
+     * -------------------------------------------------------------- */
+    window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) {
         const btn = document.getElementById('btn-3d');
         const originalText = btn ? btn.innerText : "🧊 View 3D";
-        
+
         if (btn) {
             btn.innerText = "⏳ Opening...";
             btn.disabled = true;
         }
 
         try {
-            // A. Load Library
+            /* A. Load Mol* */
             await window.loadMolStar();
 
-            // B. Resolve UniProt
+            /* B. Resolve UniProt ID */
             const data = await window.fetchVariantDataLive(geneSymbol);
-            if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
+            if (!data || data.error || !data.uniprotID) {
+                throw new Error("Could not resolve UniProt ID.");
+            }
+
             const uniprotID = data.uniprotID;
+            const structureId = `AF-${uniprotID}-F1`; // ✅ CORRECT AlphaFold ID
 
-            // C. Highlight Config
-            const highlightData = variantPos ? [{
-                entity_id: "1",
-                residue_number: parseInt(variantPos, 10),
-                color: { r: 255, g: 0, b: 255 }, // Magenta
-                focus: true
-            }] : [];
+            /* C. Variant Highlight */
+            const highlightData = variantPos
+                ? [{
+                    entity_id: "1",
+                    residue_number: parseInt(variantPos, 10),
+                    color: { r: 255, g: 0, b: 255 }, // Magenta
+                    focus: true
+                }]
+                : [];
 
-            // D. Create Modal
+            /* D. Modal Container */
             const modal = document.createElement('div');
             modal.id = 'molstar-modal';
             modal.style.cssText = `
-                position: fixed; inset: 0; width: 100vw; height: 100dvh;
-                background: rgba(0,0,0,0.95); z-index: 200000;
-                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                position: fixed;
+                inset: 0;
+                width: 100vw;
+                height: 100dvh;
+                background: rgba(0,0,0,0.95);
+                z-index: 200000;
+                display: flex;
+                justify-content: center;
+                align-items: center;
             `;
 
-            // E. Inject HTML (USING THE CORRECT TAG: <pdbe-molstar>)
+            /* E. Modal Content */
             modal.innerHTML = `
-                <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
-                    
-                    <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                <div style="
+                    width: 94vw;
+                    height: 92vh;
+                    max-width: 1400px;
+                    background: white;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+                ">
+
+                    <!-- Header -->
+                    <div style="
+                        padding: 15px 20px;
+                        background: #f8fafc;
+                        border-bottom: 1px solid #e2e8f0;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        flex-shrink: 0;
+                    ">
                         <div>
-                            <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} AlphaFold Structure</div>
-                            <div style="font-size: 13px; color: #64748b;">
-                                ${variantPos ? `Highlighting Variant: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>` : 'Full Protein View'} 
-                                <span style="margin: 0 8px; color: #cbd5e1;">|</span> UniProt: ${uniprotID}
+                            <div style="font-size:18px;font-weight:700;color:#1e293b;">
+                                ${geneSymbol} AlphaFold Structure
+                            </div>
+                            <div style="font-size:13px;color:#64748b;">
+                                ${variantPos
+                                    ? `Highlighting Variant: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>`
+                                    : 'Full Protein View'}
+                                <span style="margin:0 8px;color:#cbd5e1;">|</span>
+                                UniProt: ${uniprotID}
                             </div>
                         </div>
-                        <button id="close-3d" style="background: #e2e8f0; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; color: #475569; font-weight:bold;">✕</button>
+
+                        <button id="close-3d" style="
+                            background:#e2e8f0;
+                            border:none;
+                            width:32px;
+                            height:32px;
+                            border-radius:50%;
+                            font-size:18px;
+                            cursor:pointer;
+                            color:#475569;
+                            font-weight:bold;
+                        ">✕</button>
                     </div>
 
-                    <div style="flex: 1; position: relative; background: #fff; overflow: hidden;">
-                        <pdbe-molstar 
+                    <!-- Viewer -->
+                    <div style="flex:1; position:relative; background:#fff; overflow:hidden;">
+                        <pdbe-molstar
                             id="pdbe-molstar-target"
-                            molecule-id="${uniprotID}"
+                            structure-id="${structureId}"
                             alphafold-view="true"
                             hide-controls="true"
-                            bg-color-r="255" bg-color-g="255" bg-color-b="255"
+                            bg-color-r="255"
+                            bg-color-g="255"
+                            bg-color-b="255"
                             highlight-data='${JSON.stringify(highlightData)}'
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"
+                            style="
+                                position:absolute;
+                                inset:0;
+                                width:100%;
+                                height:100%;
+                                display:block;
+                            "
                         ></pdbe-molstar>
                     </div>
 
-                    <div style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; gap: 20px; flex-wrap: wrap; flex-shrink: 0;">
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High (>90)</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (90-70)</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (70-50)</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered</span>
-                        ${variantPos ? `<span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; border-radius:50%; margin-right:5px;"></span>Variant Location</span>` : ''}
+                    <!-- Legend -->
+                    <div style="
+                        padding:12px 20px;
+                        background:white;
+                        border-top:1px solid #e2e8f0;
+                        font-size:11px;
+                        color:#475569;
+                        display:flex;
+                        gap:20px;
+                        flex-wrap:wrap;
+                        flex-shrink:0;
+                    ">
+                        <span><span style="background:#0053D6;width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;"></span>Very High (>90)</span>
+                        <span><span style="background:#65CBF3;width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;"></span>High (90–70)</span>
+                        <span><span style="background:#FFDB13;width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;"></span>Low (70–50)</span>
+                        <span><span style="background:#FF7D45;width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;"></span>Disordered</span>
+                        ${variantPos ? `<span style="font-weight:bold;color:#d946ef;">● Variant Location</span>` : ''}
                     </div>
                 </div>
             `;
 
             document.body.appendChild(modal);
 
-            // F. Close Logic
+            /* F. Close Logic */
             const close = () => {
                 modal.remove();
-                if (btn) { btn.innerText = originalText; btn.disabled = false; }
+                if (btn) {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
             };
+
             modal.querySelector('#close-3d').onclick = close;
-            
-            window.addEventListener('keydown', function escListener(e) {
-                if(e.key === 'Escape') {
+
+            window.addEventListener('keydown', function esc(e) {
+                if (e.key === 'Escape') {
                     close();
-                    window.removeEventListener('keydown', escListener);
+                    window.removeEventListener('keydown', esc);
                 }
             });
 
-            if (btn) { btn.innerText = originalText; btn.disabled = false; }
+            if (btn) {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
 
-        } catch (e) {
-            console.error(e);
-            alert("3D Viewer Error: " + e.message);
-            if (btn) { btn.innerText = originalText; btn.disabled = false; }
+        } catch (err) {
+            console.error(err);
+            alert("3D Viewer Error: " + err.message);
+            if (btn) {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         }
     };
 
@@ -8407,4 +8490,5 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
