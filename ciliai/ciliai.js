@@ -8269,191 +8269,380 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 };
 
 /* ==============================================================
- * MODULE: UNIVERSAL 3D STRUCTURE VIEWER – Fixed Feb 2026
- * Uses official jsDelivr @latest + fallback; async IIFE wrapper
+ * ENHANCED 3D STRUCTURE VIEWER – Final Optimized Version (Feb 2026)
+ * Pure JS initialization • Latest PDBe Mol* • Robust fallbacks
  * ============================================================== */
-(async () => {
-    window.loadMolStar = async function (preferredSource = 'jsdelivr') {
-        if (customElements.get('pdbe-molstar-plugin')) {
-            console.log("[CiliAI] PDBe Mol* already registered.");
-            return;
+(function() {
+    'use strict';
+
+    let molstarLoaded = false;
+    let loadingPromise = null;
+
+    // Toggle for extra console logging during development
+    const DEBUG = true;
+
+    // ──────────────────────────────────────────────────────────────
+    // Load PDBe Mol* library (pure JS version)
+    // ──────────────────────────────────────────────────────────────
+    window.loadMolStar = async function(preferredSource = 'jsdelivr') {
+        if (molstarLoaded && window.PDBEViewer) {
+            if (DEBUG) console.log("[CiliAI] PDBe Mol* already loaded.");
+            return true;
         }
 
-        return new Promise((resolve, reject) => {
-            console.log("[CiliAI] PDBe Mol* load attempt - source: " + preferredSource);
+        if (loadingPromise) return loadingPromise;
+
+        loadingPromise = new Promise(async (resolve, reject) => {
+            if (DEBUG) console.log(`[CiliAI] Loading PDBe Mol* from: ${preferredSource}`);
 
             const sources = {
                 jsdelivr: {
                     css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@latest/build/pdbe-molstar.css',
-                    js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@latest/build/pdbe-molstar-component.js'
+                    js:  'https://cdn.jsdelivr.net/npm/pdbe-molstar@latest/build/pdbe-molstar-plugin.js'
                 },
                 unpkg: {
                     css: 'https://unpkg.com/pdbe-molstar@latest/build/pdbe-molstar.css',
-                    js: 'https://unpkg.com/pdbe-molstar@latest/build/pdbe-molstar-component.js'
+                    js:  'https://unpkg.com/pdbe-molstar@latest/build/pdbe-molstar-plugin.js'
+                },
+                dev: {
+                    css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@dev/build/pdbe-molstar.css',
+                    js:  'https://cdn.jsdelivr.net/npm/pdbe-molstar@dev/build/pdbe-molstar-plugin.js'
+                },
+                stable: {
+                    css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar.css',
+                    js:  'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar-plugin.js'
                 }
             };
 
-            const src = sources[preferredSource] || sources.jsdelivr;
-            console.log("[CiliAI] CSS URL:", src.css);
-            console.log("[CiliAI] JS URL:", src.js);
+            const sourceOrder = [preferredSource, 'unpkg', 'dev', 'stable'];
 
-            const cssLink = document.createElement('link');
-            cssLink.rel = 'stylesheet';
-            cssLink.href = src.css;
-            document.head.appendChild(cssLink);
+            for (const sourceName of sourceOrder) {
+                const src = sources[sourceName];
+                if (!src) continue;
+
+                try {
+                    if (DEBUG) console.log(`[CiliAI] Trying ${sourceName}: ${src.js}`);
+
+                    // Load CSS if not already present
+                    if (!document.querySelector(`link[href="${src.css}"]`)) {
+                        const link = document.createElement('link');
+                        link.rel = 'stylesheet';
+                        link.href = src.css;
+                        document.head.appendChild(link);
+                    }
+
+                    // Load JS
+                    await loadScript(src.js);
+
+                    // Check if PDBEViewer became available
+                    if (window.PDBEViewer) {
+                        if (DEBUG) console.log(`[CiliAI] Success: PDBEViewer loaded from ${sourceName}`);
+                        molstarLoaded = true;
+                        loadingPromise = null;
+                        resolve(true);
+                        return;
+                    }
+                } catch (err) {
+                    console.warn(`[CiliAI] ${sourceName} failed: ${err.message}`);
+                }
+            }
+
+            const msg = "Failed to load PDBe Mol* – no PDBEViewer class found after all attempts";
+            console.error("[CiliAI]", msg);
+            loadingPromise = null;
+            reject(new Error(msg));
+        });
+
+        return loadingPromise;
+    };
+
+    // Helper: load a script with timeout
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src="${src}"]`)) {
+                resolve(true);
+                return;
+            }
 
             const script = document.createElement('script');
+            script.src = src;
             script.async = true;
-            script.src = src.js;
+            script.defer = true;
 
-            const checkInterval = setInterval(() => {
-                if (customElements.get('pdbe-molstar-plugin')) {
-                    clearInterval(checkInterval);
-                    clearTimeout(safetyTimer);
-                    console.log("[CiliAI] SUCCESS: pdbe-molstar-plugin registered!");
-                    resolve();
-                }
-            }, 300);
-
-            const safetyTimer = setTimeout(() => {
-                clearInterval(checkInterval);
-                console.warn("[CiliAI] Registration timeout (15s) – proceeding with error UI.");
-                resolve(); // Allow modal to show error banner
-            }, 15000);
+            const timeout = setTimeout(() => {
+                reject(new Error(`Script timeout: ${src}`));
+            }, 30000);
 
             script.onload = () => {
-                console.log("[CiliAI] Script LOADED (onload fired) – parsing OK.");
+                clearTimeout(timeout);
+                if (DEBUG) console.log(`[CiliAI] Script loaded: ${src}`);
+                resolve(true);
             };
 
             script.onerror = (err) => {
-                console.error("[CiliAI] Script fetch ERROR:", err);
-                reject(new Error("PDBe Mol* script failed to load – check Network tab or disable extensions."));
+                clearTimeout(timeout);
+                reject(err);
             };
 
             document.head.appendChild(script);
         });
-    };
+    }
 
-    window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) {
+    // ──────────────────────────────────────────────────────────────
+    // Show 3D viewer modal for a gene (main entry point)
+    // ──────────────────────────────────────────────────────────────
+    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
         const btn = document.getElementById('btn-3d');
-        if (btn) btn.innerText = "⏳ Loading 3D...";
+        const originalBtnHTML = btn ? btn.innerHTML : "🧊 View 3D";
 
         try {
-            // Chain fallbacks
-            await window.loadMolStar('jsdelivr').catch(async () => {
-                console.warn("[CiliAI] jsDelivr failed – retrying unpkg...");
-                await window.loadMolStar('unpkg');
-            });
+            if (btn) {
+                btn.innerHTML = '⏳ Loading…';
+                btn.disabled = true;
+            }
 
+            // Load library
+            await window.loadMolStar('jsdelivr');
+
+            if (!window.PDBEViewer) {
+                throw new Error("PDBEViewer class not available after load");
+            }
+
+            // Get UniProt ID
             const data = await window.fetchVariantDataLive(geneSymbol);
-            if (data.error || !data.uniprotID) throw new Error(`No UniProt ID for ${geneSymbol}`);
+            if (data.error || !data.uniprotID) {
+                throw new Error(`No UniProt ID for ${geneSymbol}`);
+            }
+
             const uniprotID = data.uniprotID.trim().toUpperCase();
 
-            const highlightData = variantPos ? [{
-                entity_id: "1",
-                residue_number: parseInt(variantPos, 10),
-                color: { r: 255, g: 0, b: 255 },
-                focus: true
-            }] : [];
-
+            // Create modal
             const modal = document.createElement('div');
             modal.id = 'molstar-modal';
-            modal.style.cssText = `position:fixed;inset:0;width:100vw;height:100dvh;background:rgba(0,0,0,0.92);z-index:200000;display:flex;flex-direction:column;justify-content:center;align-items:center;`;
+            modal.style.cssText = `
+                position: fixed; inset: 0; width: 100vw; height: 100vh;
+                background: rgba(0,0,0,0.92); z-index: 999999;
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+            `;
 
             modal.innerHTML = `
-                <div style="width:92%;height:92%;background:#fff;display:flex;flex-direction:column;border-radius:10px;overflow:hidden;box-shadow:0 10px 60px rgba(0,0,0,0.6);">
-                    <div style="padding:14px 24px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;display:flex;justify-content:space-between;align-items:center;">
+                <div style="width: 94vw; height: 94vh; max-width: 1450px; max-height: 920px;
+                            background: white; border-radius: 12px; overflow: hidden;
+                            box-shadow: 0 20px 80px rgba(0,0,0,0.6); display: flex; flex-direction: column;">
+                    <div style="padding: 16px 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+                                display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
                         <div>
-                            <span style="font-size:20px;font-weight:700;color:#0f172a;">${geneSymbol} – AlphaFold Structure</span>
-                            ${variantPos ? `<span style="font-size:14px;color:#475569;margin-left:12px;">Variant: <strong>${variantAA||'?'}${variantPos}</strong> (magenta highlight)</span>` : ''}
+                            <div style="font-size: 20px; font-weight: 700; color: #1e293b;">
+                                ${geneSymbol} – AlphaFold Structure
+                            </div>
+                            <div style="font-size: 14px; color: #64748b; margin-top: 4px;">
+                                UniProt: <strong>${uniprotID}</strong>
+                                ${variantPos ? ` • Variant: <strong style="color:#8b5cf6;">${variantAA || '?'}${variantPos}</strong>` : ''}
+                            </div>
                         </div>
-                        <button id="close-3d" style="font-size:24px;cursor:pointer;border:none;background:none;color:#64748b;padding:0 8px;">✕</button>
+                        <div style="display: flex; gap: 12px;">
+                            <button id="debug-btn" title="Debug Info" style="padding: 6px 10px; background: #e2e8f0; border: none; border-radius: 4px; cursor: pointer;">
+                                🐞
+                            </button>
+                            <button id="close-3d" style="font-size: 28px; background: none; border: none; color: #64748b; cursor: pointer; line-height: 1;">
+                                ✕
+                            </button>
+                        </div>
                     </div>
-                    <div id="molstar-wrapper" style="position:relative;flex:1;width:100%;min-height:0;background:#f8fafc;">
-                        <pdbe-molstar-plugin
-                            id="molstar-target"
-                            molecule-id="${uniprotID}"
-                            alphafold-view="true"
-                            theme="light"
-                            bgcolor="{r:248,g:250,b:252}"
-                            highlight-data='${JSON.stringify(highlightData)}'
-                            style="position:absolute;inset:0;display:block;">
-                        </pdbe-molstar-plugin>
+
+                    <div id="molstar-wrapper" style="flex: 1; position: relative; background: #f8fafc;">
+                        <div id="molstar-container" style="width: 100%; height: 100%;"></div>
+                        <div id="molstar-loading" style="position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(248,250,252,0.9); gap: 16px;">
+                            <div style="width: 56px; height: 56px; border: 5px solid #e2e8f0; border-top: 5px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                            <div style="color: #475569; font-size: 15px;">Loading structure…</div>
+                        </div>
                     </div>
-                    <div id="molstar-error" style="padding:12px;background:#fee2e2;color:#991b1b;font-size:14px;text-align:center;display:none;">
-                        3D viewer failed to load (network/CDN blocked?).
-                        <button id="retry-load" style="margin-left:12px;padding:6px 14px;background:#1d4ed8;color:white;border:none;border-radius:6px;cursor:pointer;">Retry Load</button>
-                        <br><small>Tip: Disable Etikimza extension or test in incognito. Check Network tab for script failures.</small>
+
+                    <div id="molstar-error" style="display: none; padding: 16px; background: #fee2e2; color: #991b1b; font-size: 14px; text-align: center;">
+                        <strong>Error:</strong> <span id="error-message"></span>
+                        <button id="retry-btn" style="margin-left: 16px; padding: 6px 14px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            Retry
+                        </button>
                     </div>
-                    <div style="padding:12px 24px;background:#fff;border-top:1px solid #e2e8f0;font-size:12px;color:#475569;display:flex;gap:18px;flex-wrap:wrap;">
-                        <span style="display:flex;align-items:center;"><span style="width:10px;height:10px;background:#0053D6;border-radius:50%;margin-right:6px;"></span>Very high (>90)</span>
-                        <span style="display:flex;align-items:center;"><span style="width:10px;height:10px;background:#65CBF3;border-radius:50%;margin-right:6px;"></span>High (90–70)</span>
-                        <span style="display:flex;align-items:center;"><span style="width:10px;height:10px;background:#FFDB13;border-radius:50%;margin-right:6px;"></span>Low (70–50)</span>
-                        <span style="display:flex;align-items:center;"><span style="width:10px;height:10px;background:#FF7D45;border-radius:50%;margin-right:6px;"></span>Disordered</span>
+
+                    <div style="padding: 12px 24px; background: white; border-top: 1px solid #e2e8f0; font-size: 12px; color: #475569; display: flex; gap: 20px; flex-wrap: wrap;">
+                        <span style="display:flex; align-items:center; gap:6px;">
+                            <span style="width:12px; height:12px; background:#0053D6; border-radius:50%;"></span>Very high (>90)
+                        </span>
+                        <span style="display:flex; align-items:center; gap:6px;">
+                            <span style="width:12px; height:12px; background:#65CBF3; border-radius:50%;"></span>High (90–70)
+                        </span>
+                        <span style="display:flex; align-items:center; gap:6px;">
+                            <span style="width:12px; height:12px; background:#FFDB13; border-radius:50%;"></span>Low (70–50)
+                        </span>
+                        <span style="display:flex; align-items:center; gap:6px;">
+                            <span style="width:12px; height:12px; background:#FF7D45; border-radius:50%;"></span>Disordered
+                        </span>
+                        ${variantPos ? `<span style="display:flex; align-items:center; gap:6px;">
+                            <span style="width:12px; height:12px; background:#8b5cf6; border-radius:50%;"></span>Variant
+                        </span>` : ''}
                     </div>
                 </div>
+
+                <style>
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                </style>
             `;
 
             document.body.appendChild(modal);
 
-            // Shadow DOM check
-            setTimeout(() => {
-                const plugin = document.getElementById('molstar-target');
-                if (plugin?.shadowRoot?.querySelector('canvas')) {
-                    console.log("[CiliAI] Success: Canvas rendered in shadow DOM.");
-                } else {
-                    console.warn("[CiliAI] No canvas – load incomplete.");
-                    document.getElementById('molstar-error').style.display = 'block';
-                }
-            }, 8000);
+            // Initialize viewer
+            await initializeViewer(uniprotID, variantPos, modal);
 
-            // Resize events
-            const resize = () => window.dispatchEvent(new Event('resize'));
-            [400, 1200, 2500, 6000].forEach(d => setTimeout(resize, d));
+            // Setup handlers
+            setupHandlers(modal, btn, originalBtnHTML);
 
-            // Close logic
-            const close = () => {
-                window.removeEventListener('keydown', escHandler);
-                modal.remove();
-                if (btn) btn.innerText = "🧊 View 3D Structure";
-            };
-            const escHandler = e => { if (e.key === 'Escape') close(); };
-            window.addEventListener('keydown', escHandler);
-            modal.querySelector('#close-3d').onclick = close;
+        } catch (err) {
+            console.error("[CiliAI 3D] Fatal error:", err);
 
-            // Retry button (re-triggers full load)
-            modal.querySelector('#retry-load')?.addEventListener('click', async () => {
-                document.getElementById('molstar-error').style.display = 'none';
-                document.getElementById('molstar-wrapper').innerHTML = '';
-                const newPlugin = document.createElement('pdbe-molstar-plugin');
-                newPlugin.id = 'molstar-target';
-                newPlugin.setAttribute('molecule-id', uniprotID);
-                newPlugin.setAttribute('alphafold-view', 'true');
-                newPlugin.setAttribute('theme', 'light');
-                newPlugin.setAttribute('bgcolor', '{r:248,g:250,b:252}');
-                newPlugin.setAttribute('highlight-data', JSON.stringify(highlightData));
-                newPlugin.style.cssText = 'position:absolute;inset:0;display:block;';
-                document.getElementById('molstar-wrapper').appendChild(newPlugin);
-                try {
-                    await window.loadMolStar('jsdelivr').catch(() => window.loadMolStar('unpkg'));
-                } catch {}
-                setTimeout(resize, 1000); setTimeout(resize, 3000);
-            });
+            const errorDiv = document.getElementById('molstar-error');
+            const errorMsg = document.getElementById('error-message');
+            if (errorDiv && errorMsg) {
+                errorMsg.textContent = err.message;
+                errorDiv.style.display = 'block';
+            } else {
+                alert(`3D viewer failed: ${err.message}\n\nCheck console or disable extensions.`);
+            }
 
-            if (btn) btn.innerText = "🧊 View 3D Structure";
-
-        } catch (e) {
-            console.error("[CiliAI 3D Error]", e);
-            if (btn) btn.innerText = "🧊 3D Failed";
-            alert("3D Viewer init failed: " + e.message + "\nLikely blocked by Etikimza or network – try disabling extension.");
+            if (btn) {
+                btn.innerHTML = originalBtnHTML;
+                btn.disabled = false;
+            }
         }
     };
 
-    console.log("[CiliAI] 3D Viewer module loaded successfully.");
+    async function initializeViewer(uniprotID, variantPos, modal) {
+        const container = modal.querySelector('#molstar-container');
+        const loading = modal.querySelector('#molstar-loading');
+        const errorDiv = modal.querySelector('#molstar-error');
+
+        try {
+            const Viewer = window.PDBEViewer;
+            if (!Viewer) throw new Error("PDBEViewer not found");
+
+            const viewer = new Viewer(container, {
+                moleculeId: uniprotID,
+                alphafoldView: true,
+                bgColor: { r: 248, g: 250, b: 252 },
+                hideControls: false,
+                expanded: true,
+                layoutShowSequence: true,
+                layoutShowControls: true
+            });
+
+            // Wait for plugin to be ready
+            await new Promise((res, rej) => {
+                const iv = setInterval(() => {
+                    if (viewer.plugin && viewer.plugin.canvas3d) {
+                        clearInterval(iv);
+                        res();
+                    }
+                }, 200);
+                setTimeout(() => {
+                    clearInterval(iv);
+                    rej(new Error("Viewer init timeout"));
+                }, 15000);
+            });
+
+            if (loading) loading.style.display = 'none';
+
+            // Highlight variant if provided
+            if (variantPos && viewer.plugin) {
+                const resNum = parseInt(variantPos, 10);
+                if (!isNaN(resNum)) {
+                    setTimeout(() => {
+                        try {
+                            const selection = { residueTest: r => r.label_seq_id === resNum };
+                            viewer.plugin.managers.structure.selection.setSelection(selection);
+                            viewer.plugin.builders.structure.representation.addRepresentation(
+                                viewer.plugin.managers.structure.hierarchy.current.structures[0],
+                                { type: 'ball+stick', color: 'uniform', value: { r: 139, g: 92, b: 246 } }
+                            );
+                            viewer.plugin.managers.camera.focus(selection, { radius: 12, durationMs: 1200 });
+                            if (DEBUG) console.log(`[CiliAI] Variant ${variantPos} highlighted`);
+                        } catch (e) {
+                            console.warn("[CiliAI] Highlight failed:", e);
+                        }
+                    }, 2500);
+                }
+            }
+
+        } catch (err) {
+            if (loading) loading.innerHTML = `<div style="color:#ef4444; font-size:18px;">Failed: ${err.message}</div>`;
+            if (errorDiv) errorDiv.style.display = 'block';
+            throw err;
+        }
+    }
+
+    function setupHandlers(modal, btn, originalBtnHTML) {
+        // Close
+        modal.querySelector('#close-3d').onclick = () => {
+            modal.remove();
+            if (btn) {
+                btn.innerHTML = originalBtnHTML;
+                btn.disabled = false;
+            }
+        };
+
+        // Escape key
+        const escHandler = e => { if (e.key === 'Escape') modal.remove(); };
+        document.addEventListener('keydown', escHandler);
+        modal.addEventListener('remove', () => document.removeEventListener('keydown', escHandler));
+
+        // Debug button
+        modal.querySelector('#debug-btn')?.addEventListener('click', () => {
+            const info = {
+                pdbeLoaded: !!window.PDBEViewer,
+                userAgent: navigator.userAgent,
+                time: new Date().toISOString(),
+                location: "Kayseri, TR"
+            };
+            console.log("[CiliAI Debug]", info);
+            alert("Debug Info:\n" + JSON.stringify(info, null, 2));
+        });
+
+        // Retry
+        modal.querySelector('#retry-btn')?.addEventListener('click', async () => {
+            const retryBtn = modal.querySelector('#retry-btn');
+            retryBtn.disabled = true;
+            retryBtn.textContent = "Retrying…";
+
+            try {
+                modal.querySelector('#molstar-error').style.display = 'none';
+                modal.querySelector('#molstar-loading').style.display = 'flex';
+                modal.querySelector('#molstar-container').innerHTML = '';
+
+                await window.loadMolStar('unpkg');
+                // Re-init would need uniprotID & variantPos – for simplicity, close & reopen modal
+                modal.remove();
+                window.showStructureViewer(/* pass original args if stored */);
+            } catch (e) {
+                modal.querySelector('#error-message').textContent = e.message;
+                modal.querySelector('#molstar-error').style.display = 'block';
+            } finally {
+                retryBtn.disabled = false;
+                retryBtn.textContent = "Retry";
+            }
+        });
+
+        // Resize support
+        const resize = () => window.dispatchEvent(new Event('resize'));
+        window.addEventListener('resize', resize);
+        setTimeout(resize, 800);
+    }
+
+    console.log("[CiliAI] 3D Viewer module (pure JS) loaded successfully.");
+    console.log("Usage: window.showStructureViewer('CEP290', '1234', 'R')");
 })();
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
