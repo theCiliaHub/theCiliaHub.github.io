@@ -8284,8 +8284,16 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
             return null;
         }
     }
-    // 3. MAIN RENDERER
-  window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+// Helper to convert hex to RGB object (needed for Mol* selection)
+function hexToRgb(hex) {
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substring(0,2), 16);
+    const g = parseInt(hex.substring(2,4), 16);
+    const b = parseInt(hex.substring(4,6), 16);
+    return { r, g, b };
+}
+
+window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('btn-3d');
     const originalText = btn ? btn.innerText : "🧊 View 3D";
 
@@ -8295,32 +8303,28 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
     }
 
     try {
-        // A. Ensure Mol* library is loaded
         await window.loadMolStar();
 
-        // B. Fetch variant & sequence data to get UniProt ID
         const data = await window.fetchVariantDataLive(geneSymbol);
-        if (data.error || !data.uniprotID) {
-            throw new Error("Could not resolve UniProt ID.");
-        }
+        if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
         const uniprotID = data.uniprotID;
 
-        // C. Get AlphaFold model URL
         const afUrl = await getAlphaFoldUrl(uniprotID);
-        if (!afUrl) {
-            throw new Error(`No AlphaFold structure found for ${geneSymbol}.`);
-        }
+        if (!afUrl) throw new Error(`No AlphaFold structure found for ${geneSymbol}.`);
+
         window.currentAfUrl = afUrl;
 
-        // D. Initialize selection array (persistent across adds)
+        // Primary variant (pink/magenta)
         window.currentSelectData = variantPos ? [{
             entity_id: "1",
             residue_number: parseInt(variantPos, 10),
-            color: { r: 217, g: 70, b: 239 }, // #d946ef - magenta/pink for primary
+            color: { r: 217, g: 70, b: 239 }, // #d946ef
+            label: "Primary Variant",
             focus: true
         }] : [];
 
-        // E. Create modal
+        window.isGrayMode = false; // track if we already turned surface gray
+
         const modal = document.createElement('div');
         modal.id = 'molstar-modal';
         modal.style.cssText = `
@@ -8331,33 +8335,33 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
         modal.innerHTML = `
             <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
-                
+
                 <!-- Header -->
                 <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
                     <div>
                         <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} 3D Structure</div>
                         <div style="font-size: 13px; color: #64748b;" id="variant-status">
                             ${variantPos 
-                                ? `Primary variant: <strong style="color:#d946ef; background:#fdf4ff; padding:2px 6px; border-radius:4px; border:1px solid #f0abfc;">${variantAA}${variantPos}</strong>` 
-                                : 'Full Protein View'}
+                                ? `Primary: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>` 
+                                : 'Full view'}
                             <span id="extra-count" style="display:none; margin-left:12px; color:#ca8a04; font-weight:500;">
-                                (+<span id="extra-num">0</span> added highlights)
+                                (+<span id="extra-num">0</span> custom highlights)
                             </span>
                         </div>
                     </div>
                     <div style="display:flex; gap:12px; align-items:center;">
                         <button id="focus-btn" style="padding:6px 14px; background:#fff; border:1px solid #d946ef; color:#d946ef; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">
-                            🎯 Focus All Selected
+                            🎯 Focus All
                         </button>
-                        <button onclick="window.downloadStructure('${geneSymbol}')" style="padding:6px 14px; background:#fff; border:1px solid #cbd5e0; color:#475569; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">
-                            📥 Download CIF
+                        <button id="download-session-btn" style="padding:6px 14px; background:#fff; border:1px solid #16a34a; color:#166534; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">
+                            📥 Save Session
                         </button>
-                        <button id="close-3d" style="background: #e2e8f0; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; color: #475569; font-weight:bold;">✕</button>
+                        <button id="close-3d" style="background:#e2e8f0; border:none; width:36px; height:36px; border-radius:50%; font-size:20px; cursor:pointer; color:#475569; font-weight:bold;">✕</button>
                     </div>
                 </div>
 
-                <!-- Viewer Container -->
-                <div style="flex: 1; position: relative; background: #ffffff; overflow: hidden;">
+                <!-- 3D Viewer -->
+                <div style="flex:1; position:relative; background:#ffffff; overflow:hidden;">
                     <pdbe-molstar 
                         id="pdbe-molstar-target"
                         custom-data-url="${afUrl}"
@@ -8366,27 +8370,28 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
                         hide-controls="true"
                         bg-color-r="255" bg-color-g="255" bg-color-b="255"
                         selection-data='${JSON.stringify(window.currentSelectData)}'
-                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"
+                        style="position:absolute; top:0; left:0; width:100%; height:100%; display:block;"
                     ></pdbe-molstar>
                 </div>
 
-                <!-- Footer: Only variant highlight legend + add controls -->
-                <div style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 12px; color: #475569; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; flex-shrink: 0; gap: 15px;">
-                    <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+                <!-- Controls + Legend -->
+                <div style="padding:12px 20px; background:white; border-top:1px solid #e2e8f0; font-size:12px; color:#475569; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; flex-shrink:0;">
+                    <div style="display:flex; gap:24px; align-items:center;">
                         <span style="display:flex; align-items:center; font-weight:500;">
                             <span style="width:12px; height:12px; background:#d946ef; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>
                             Primary Variant
                         </span>
                         <span style="display:flex; align-items:center; font-weight:500;">
                             <span style="width:12px; height:12px; background:#ffd700; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>
-                            Added Highlights
+                            Custom Highlights
                         </span>
                     </div>
 
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input id="add-var-3d" type="number" min="1" placeholder="Residue #" style="width:110px; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:nowrap;">
+                        <input id="add-var-3d" type="number" min="1" placeholder="Residue #" style="width:100px; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
+                        <input type="color" id="custom-color-picker" value="#ffd700" title="Select highlight color" style="width:36px; height:32px; padding:0; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">
                         <button onclick="window.addVariantTo3D()" style="padding:6px 14px; background:#ca8a04; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500;">
-                            + Highlight
+                            + Add
                         </button>
                     </div>
                 </div>
@@ -8395,9 +8400,8 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
         document.body.appendChild(modal);
 
-        // Focus all selected residues
-        const focusBtn = document.getElementById('focus-btn');
-        focusBtn.onclick = () => {
+        // Focus logic
+        document.getElementById('focus-btn').onclick = () => {
             const plugin = document.getElementById('pdbe-molstar-target');
             if (plugin?.viewerInstance && window.currentSelectData.length > 0) {
                 const focusList = window.currentSelectData.map(s => ({
@@ -8408,11 +8412,41 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
             }
         };
 
-        // Close logic
+        // Download session (CIF + selections JSON)
+        document.getElementById('download-session-btn').onclick = () => {
+            // 1. Download CIF
+            const a = document.createElement('a');
+            a.href = window.currentAfUrl;
+            a.download = `${geneSymbol}_structure.cif`;
+            a.click();
+
+            // 2. Download selections as JSON
+            const sessionData = {
+                gene: geneSymbol,
+                uniprot: uniprotID,
+                primary: variantPos ? { pos: variantPos, aa: variantAA } : null,
+                highlights: window.currentSelectData.map(s => ({
+                    residue: s.residue_number,
+                    color: `#${s.color.r.toString(16).padStart(2,'0')}${s.color.g.toString(16).padStart(2,'0')}${s.color.b.toString(16).padStart(2,'0')}`,
+                    label: s.label || "Custom"
+                }))
+            };
+
+            const blob = new Blob([JSON.stringify(sessionData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const b = document.createElement('a');
+            b.href = url;
+            b.download = `${geneSymbol}_highlights.json`;
+            b.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // Close
         const close = () => {
             modal.remove();
             window.currentSelectData = [];
             window.currentAfUrl = null;
+            window.isGrayMode = false;
             if (btn) {
                 btn.innerText = originalText;
                 btn.disabled = false;
@@ -8420,11 +8454,8 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
         };
 
         document.getElementById('close-3d').onclick = close;
-        window.addEventListener('keydown', e => {
-            if (e.key === 'Escape') close();
-        }, { once: true });
+        window.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, {once: true});
 
-        // Reset loading button
         if (btn) {
             btn.innerText = originalText;
             btn.disabled = false;
@@ -8439,38 +8470,51 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
         }
     }
 };
-    
-// Updated add function with feedback
+
 window.addVariantTo3D = function() {
     const input = document.getElementById('add-var-3d');
+    const colorPicker = document.getElementById('custom-color-picker');
     const pos = parseInt(input.value.trim());
-    
+
     if (!isNaN(pos) && pos > 0) {
-        // Prevent duplicate
         if (window.currentSelectData.some(s => s.residue_number === pos)) {
             alert(`Residue ${pos} is already highlighted.`);
             return;
         }
 
+        const hexColor = colorPicker.value;
+        const rgb = hexToRgb(hexColor);
+
         window.currentSelectData.push({
             entity_id: "1",
             residue_number: pos,
-            color: { r: 255, g: 215, b: 0 }, // #ffd700 - gold/yellow
+            color: rgb,
+            label: `Custom ${pos}`,
             focus: false
         });
 
         const plugin = document.getElementById('pdbe-molstar-target');
-        if (plugin) {
-            plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
-            if (plugin.viewerInstance) {
-                plugin.viewerInstance.visual.select({ data: window.currentSelectData });
+        if (plugin && plugin.viewerInstance) {
+            // Turn surface gray on first custom addition
+            if (!window.isGrayMode && window.currentSelectData.length > 1) {
+                plugin.viewerInstance.visual.update({
+                    type: 'surface',
+                    params: {
+                        color: { r: 220, g: 220, b: 220 }, // light gray
+                        opacity: 0.7
+                    }
+                });
+                window.isGrayMode = true;
             }
+
+            plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
+            plugin.viewerInstance.visual.select({ data: window.currentSelectData });
         }
 
         // Update counter
         const extraNum = document.getElementById('extra-num');
         const extraCount = document.getElementById('extra-count');
-        const count = window.currentSelectData.length - 1; // subtract primary
+        const count = window.currentSelectData.length - (window.currentSelectData[0]?.label === "Primary Variant" ? 1 : 0);
         if (extraNum && extraCount) {
             extraNum.textContent = count;
             extraCount.style.display = count > 0 ? 'inline' : 'none';
@@ -8494,6 +8538,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
