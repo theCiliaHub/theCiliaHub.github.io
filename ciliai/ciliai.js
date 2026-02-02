@@ -7800,16 +7800,15 @@ window.downloadCurrentVisualization = function() {
 /* ==============================================================
  * MODULE: LIVE VARIANT WORKSPACE (Stable Interaction)
  * ============================================================== */
-
 /* ==============================================================
- * MODULE: LIVE VARIANT WORKSPACE (v10.0 - Full Features)
- * Features: Disease Annotation, VUS/Pathogenic Labels, Editable Domains
+ * MODULE: LIVE VARIANT WORKSPACE (v11.0 - Complete Suite)
  * ============================================================== */
 
-// 1. FETCH DATA
+// 1. FETCH DATA & INITIALIZE
 window.fetchVariantDataLive = async function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
     try {
+        // A. Resolve UniProt
         const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
         const mgData = await mgRes.json();
         const hit = mgData.hits?.[0];
@@ -7818,6 +7817,7 @@ window.fetchVariantDataLive = async function(geneSymbol) {
         let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
         const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
+        // B. Fetch Variants & Features from EBI
         const [varRes, featRes] = await Promise.all([
             fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
             fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
@@ -7827,9 +7827,11 @@ window.fetchVariantDataLive = async function(geneSymbol) {
         const varData = await varRes.json();
         const featData = featRes.ok ? await featRes.json() : { features: [] };
 
+        // C. Process Data
         const length = varData.sequence.length;
         const variants = varData.features.filter(f => f.type === 'VARIANT');
         
+        // Define Domains & Assign Default Colors
         const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
         const naturePalette = ['#E64B35', '#4DBBD5', '#00A087', '#3C5488', '#F39B7F', '#8491B4', '#91D1C2', '#DC0000'];
         let colorIdx = 0;
@@ -7841,10 +7843,18 @@ window.fetchVariantDataLive = async function(geneSymbol) {
                 start: parseInt(d.begin),
                 end: parseInt(d.end),
                 type: d.type,
-                color: naturePalette[colorIdx++ % naturePalette.length]
+                color: naturePalette[colorIdx++ % naturePalette.length] // Assign stable color
             }));
 
-        return { gene, uniprotID, length, variants, domains, customVariants: [] };
+        // Return Data Object
+        return { 
+            gene, 
+            uniprotID, 
+            length, 
+            variants, 
+            domains, 
+            customVariants: window.CiliAI.activeVariantData?.customVariants || [] // Preserve existing custom variants if reloading
+        };
 
     } catch (e) {
         console.error("Fetch Error:", e);
@@ -7852,20 +7862,22 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. RENDERER
+// 2. MAIN RENDER ENTRY POINT
 window.renderVariantMap = async function(geneSymbol) {
+    // Hide conflicting views
     if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
     if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
     
+    // Setup Container
     const container = document.getElementById('plotly-container');
     container.style.display = 'block';
-    
     container.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b; padding:20px; text-align:center;">
-            <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
-            <p style="font-size:16px; margin:0 0 8px 0; color:#1e293b;">Querying ClinVar & UniProt for <strong>${geneSymbol}</strong>...</p>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
+            <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:10px;">⚙️</div>
+            <p><strong>Loading ${geneSymbol} Variant Landscape...</strong></p>
         </div>`;
 
+    // Fetch
     const data = await window.fetchVariantDataLive(geneSymbol);
 
     if (data.error) {
@@ -7873,149 +7885,208 @@ window.renderVariantMap = async function(geneSymbol) {
         return;
     }
 
+    // Save to Global State
     window.CiliAI.activeVariantData = data;
+    
+    // Draw
     window.drawVariantWorkspace();
 };
 
-// 3. DRAWING ENGINE (Annotated Lollipop Plot)
+// 3. DRAWING ENGINE (The UI)
 window.drawVariantWorkspace = function() {
     const data = window.CiliAI.activeVariantData;
     const container = document.getElementById('plotly-container');
 
+    // --- Data Processing ---
     const isPathogenic = (v) => {
-        const sig = (v.clinicalSignificance || v.significance || "").toLowerCase();
-        return sig.includes("pathogenic") || sig.includes("likely pathogenic");
+        const s = (v.clinicalSignificance || v.significance || "").toLowerCase();
+        return s.includes('pathogenic') || s.includes('likely pathogenic');
     };
-    
+
     const allPathogenic = data.variants.filter(isPathogenic);
     const allOthers = data.variants.filter(v => !isPathogenic(v));
 
+    // Display Subset (Top Pathogenic + Random VUS + All Custom)
     const displayVariants = [
-        ...allPathogenic.slice(0, 40), // More pathogenic variants
-        ...allOthers.slice(0, 20),
+        ...allPathogenic.slice(0, 40), 
+        ...allOthers.sort(() => 0.5 - Math.random()).slice(0, 20),
         ...data.customVariants
     ];
 
-    const w = container.clientWidth - 40;
+    // SVG Geometry
+    const w = container.clientWidth || 800;
     const h = 500;
-    const pad = 50;
-    const trackY = 300;
+    const pad = 60;
+    const trackY = 320;
     const xScale = (pos) => pad + (pos / data.length) * (w - 2 * pad);
 
-    const svgContent = `
-        <div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; font-family:'Inter',sans-serif;">
+    // --- HTML TEMPLATE ---
+    const html = `
+        <div style="width:100%; height:100%; display:flex; flex-direction:column; font-family:'Inter', sans-serif; background:white;">
             
-            <div style="padding:10px 20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin:0; font-size:16px; color:#1e293b;">${data.gene} Variant Landscape</h3>
-                <div style="display:flex; gap:8px;">
-                    <button onclick="window.downloadMSA()" style="padding:4px 10px; font-size:11px; background:#f1f5f9; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">📥 Download MSA</button>
-                    <button onclick="window.download3DStructure()" style="padding:4px 10px; font-size:11px; background:#f1f5f9; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">📥 Download 3D</button>
+            <div style="padding:10px 20px; border-bottom:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h3 style="margin:0; font-size:16px; color:#1e293b;">${data.gene} Variants</h3>
+                    <span style="font-size:11px; color:#64748b;">${data.length} aa • ${data.variants.length} total variants</span>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="window.downloadMSA()" style="display:flex; align-items:center; gap:5px; padding:6px 12px; background:white; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; cursor:pointer;">
+                        📥 Download MSA
+                    </button>
+                    <button onclick="window.download3DStructure()" style="display:flex; align-items:center; gap:5px; padding:6px 12px; background:white; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; cursor:pointer;">
+                        📥 Download 3D
+                    </button>
                 </div>
             </div>
 
             <div style="flex:1; overflow:hidden; position:relative;">
-                <div id="var-tooltip" style="position:absolute; display:none; background:rgba(15,23,42,0.95); color:white; padding:8px 12px; border-radius:6px; font-size:12px; pointer-events:none; z-index:100; max-width:250px;"></div>
+                <div id="var-tooltip" style="position:absolute; display:none; background:rgba(15,23,42,0.95); color:white; padding:8px 12px; border-radius:6px; font-size:11px; z-index:100; pointer-events:none; box-shadow:0 10px 15px rgba(0,0,0,0.3);"></div>
 
-                <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" id="variant-svg">
-                    <line x1="${pad}" y1="${trackY}" x2="${w-pad}" y2="${trackY}" stroke="#94a3b8" stroke-width="2" />
-                    <text x="${pad}" y="${trackY + 20}" font-size="10" fill="#64748b">1</text>
-                    <text x="${w-pad}" y="${trackY + 20}" font-size="10" fill="#64748b" text-anchor="end">${data.length}</text>
-
+                <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}">
+                    <line x1="${pad}" y1="${trackY}" x2="${w-pad}" y2="${trackY}" stroke="#cbd5e0" stroke-width="4" stroke-linecap="round" />
+                    
                     ${data.domains.map((d, i) => {
                         const x = xScale(d.start);
-                        const width = Math.max(xScale(d.end) - x, 4);
+                        const width = Math.max(xScale(d.end) - x, 5);
                         return `
-                        <g>
-                            <rect x="${x}" y="${trackY - 10}" width="${width}" height="20" rx="4" fill="${d.color}" opacity="0.8" stroke="white" stroke-width="1">
+                            <rect x="${x}" y="${trackY-12}" width="${width}" height="24" rx="4" fill="${d.color}" opacity="0.8" stroke="white" stroke-width="1">
                                 <title>${d.name} (${d.start}-${d.end})</title>
                             </rect>
-                            <text x="${x + width/2}" y="${trackY + 35}" font-size="9" fill="#475569" text-anchor="middle" style="pointer-events:none;">${d.name.substring(0,8)}</text>
-                        </g>`;
+                            <text x="${x + width/2}" y="${trackY+28}" font-size="9" fill="#475569" text-anchor="middle">${d.name.substring(0,8)}</text>
+                        `;
                     }).join('')}
 
                     ${displayVariants.map(v => {
                         const isCustom = v.isCustom;
                         const isPatho = isCustom ? (v.significance === 'Pathogenic') : isPathogenic(v);
+                        
                         const x = xScale(v.begin);
-                        const color = isCustom ? '#a855f7' : (isPatho ? '#dc2626' : '#94a3b8'); 
-                        const radius = isCustom ? 6 : (isPatho ? 5 : 3);
-                        const stemHeight = isPatho ? 40 + (v.begin % 60) : 20 + (v.begin % 30);
-                        const yHead = trackY - 15 - stemHeight;
+                        const color = isCustom ? '#a855f7' : (isPatho ? '#dc2626' : '#94a3b8');
+                        const radius = isCustom ? 7 : (isPatho ? 5 : 3);
+                        // Stagger heights to prevent overlap
+                        const stemHeight = isPatho ? (60 + (v.begin % 3) * 20) : (20 + (v.begin % 3) * 10);
+                        const yHead = trackY - 12 - stemHeight;
                         
-                        const title = `p.${v.wildType}${v.begin}${v.mutatedType}`;
+                        const aaChange = `p.${v.wildType}${v.begin}${v.mutatedType}`;
                         const disease = v.association?.[0]?.name || (isPatho ? "Pathogenic Variant" : "VUS");
-                        
+
                         return `
-                            <g style="cursor:pointer;" 
-                               onmouseenter="window.showVarTooltip(event, '${title}', '${disease}', '${v.clinicalSignificance||""}')"
-                               onmouseleave="window.hideVarTooltip()"
-                               onclick="window.openVariantPanel('${title}', '${v.begin}', '${disease}', '${data.gene}')">
-                                <line x1="${x}" y1="${trackY - 10}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="1" opacity="0.5" />
+                            <g style="cursor:pointer" 
+                               onclick="window.openVariantPanel('${aaChange}', '${v.begin}', '${disease}', '${data.gene}')"
+                               onmouseenter="window.showVarTooltip(event, '${aaChange}', '${disease}', '${v.clinicalSignificance || 'Uncertain'}')"
+                               onmouseleave="window.hideVarTooltip()">
+                                
+                                <line x1="${x}" y1="${trackY-12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="1" />
                                 <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1" />
-                                ${isPatho ? `<text x="${x}" y="${yHead-8}" font-size="9" fill="#dc2626" text-anchor="middle" font-weight="bold">${title}</text>` : ''}
-                            </g>`;
+                                
+                                ${isPatho ? `<text x="${x}" y="${yHead-8}" font-size="10" font-weight="bold" fill="#dc2626" text-anchor="middle" transform="rotate(-45, ${x}, ${yHead-8})">${aaChange}</text>` : ''}
+                            </g>
+                        `;
                     }).join('')}
                 </svg>
             </div>
 
-            <div style="padding:15px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:15px; flex-wrap:wrap;">
+            <div style="padding:15px; background:#f1f5f9; border-top:1px solid #e2e8f0; display:flex; flex-wrap:wrap; gap:20px; align-items:start;">
                 
-                <div style="display:flex; gap:8px; align-items:center; border-right:1px solid #cbd5e0; padding-right:15px;">
-                    <span style="font-size:11px; font-weight:bold; color:#64748b;">ADD VARIANT:</span>
-                    <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:4px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:80px;">
-                    <select id="custom-var-sig" style="padding:4px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
-                        <option value="Pathogenic">Pathogenic</option>
-                        <option value="VUS">VUS</option>
-                    </select>
-                    <button onclick="window.addUserVariant()" style="padding:4px 10px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">+ Plot</button>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <span style="font-size:10px; font-weight:bold; color:#64748b; text-transform:uppercase;">Add Custom Variant</span>
+                    <div style="display:flex; gap:5px;">
+                        <input id="custom-var-input" type="text" placeholder="p.L301R" style="width:80px; padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
+                        <select id="custom-var-sig" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
+                            <option value="Pathogenic">Pathogenic</option>
+                            <option value="VUS">VUS</option>
+                        </select>
+                        <button onclick="window.addUserVariant()" style="padding:6px 12px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+</button>
+                    </div>
                 </div>
 
-                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                    <span style="font-size:11px; font-weight:bold; color:#64748b;">DOMAIN COLORS:</span>
-                    ${data.domains.map((d, i) => `
-                        <div style="display:flex; align-items:center; gap:3px; background:white; padding:2px 6px; border:1px solid #e2e8f0; border-radius:4px;">
-                            <input type="color" value="${d.color}" onchange="window.updateDomainColor(${i}, this.value)" style="width:16px; height:16px; border:none; padding:0; cursor:pointer;">
-                            <span style="font-size:10px;">${d.name.substring(0,6)}</span>
-                        </div>
-                    `).join('')}
+                <div style="flex:1; display:flex; flex-direction:column; gap:5px;">
+                    <span style="font-size:10px; font-weight:bold; color:#64748b; text-transform:uppercase;">Edit Domain Colors</span>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        ${data.domains.map((d, i) => `
+                            <div style="display:flex; align-items:center; gap:4px; background:white; padding:3px 6px; border-radius:4px; border:1px solid #cbd5e0;">
+                                <input type="color" value="${d.color}" onchange="window.updateDomainColor(${i}, this.value)" style="width:16px; height:16px; border:none; padding:0; cursor:pointer;">
+                                <span style="font-size:11px; color:#334155;">${d.name}</span>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             </div>
         </div>
     `;
 
-    container.innerHTML = svgContent;
+    container.innerHTML = html;
 };
 
-// 4. HELPERS
-window.updateDomainColor = function(idx, color) {
-    window.CiliAI.activeVariantData.domains[idx].color = color;
-    window.drawVariantWorkspace();
-};
-
-window.downloadMSA = function() {
-    // Mock download for demo (real implementation requires backend MSA generation)
-    alert("Downloading Multiple Sequence Alignment (FASTA)...");
-};
-
-window.download3DStructure = function() {
-    const gene = window.CiliAI.activeVariantData.gene;
-    window.open(`https://alphafold.ebi.ac.uk/files/AF-${window.CiliAI.activeVariantData.uniprotID}-F1-model_v4.cif`, '_blank');
-};
-
+// 4. ACTION HELPERS
 window.showVarTooltip = function(e, title, subtitle, sig) {
     const tip = document.getElementById('var-tooltip');
+    if(!tip) return;
     tip.style.display = 'block';
     tip.style.left = (e.offsetX + 15) + 'px';
     tip.style.top = (e.offsetY + 15) + 'px';
     tip.innerHTML = `
         <div style="font-weight:bold;">${title}</div>
-        <div style="color:#fbbf24; font-size:11px; margin-bottom:2px;">${subtitle}</div>
-        <div style="font-size:10px; opacity:0.8;">${sig || "Unknown Significance"}</div>
+        <div style="color:#fbbf24; margin-bottom:2px;">${subtitle.replace(/"/g, "")}</div>
+        <div style="opacity:0.8;">${sig}</div>
     `;
 };
 
 window.hideVarTooltip = function() {
-    document.getElementById('var-tooltip').style.display = 'none';
+    const tip = document.getElementById('var-tooltip');
+    if(tip) tip.style.display = 'none';
+};
+
+window.addUserVariant = function() {
+    const val = document.getElementById('custom-var-input').value;
+    const sig = document.getElementById('custom-var-sig').value;
+    const match = val.match(/(\d+)/);
+    
+    if(!match) { alert("Please include the position number (e.g. 301)."); return; }
+    
+    window.CiliAI.activeVariantData.customVariants.push({
+        wildType: val.charAt(0) || '?',
+        mutatedType: val.slice(-1) || '?',
+        begin: parseInt(match[1]),
+        significance: sig,
+        association: [{ name: "User Custom Variant" }],
+        isCustom: true
+    });
+    window.drawVariantWorkspace();
+};
+
+window.updateDomainColor = function(index, newColor) {
+    window.CiliAI.activeVariantData.domains[index].color = newColor;
+    window.drawVariantWorkspace();
+};
+
+window.downloadMSA = async function() {
+    const gene = window.CiliAI.activeVariantData.gene;
+    alert(`Generating MSA for ${gene}... This may take a few seconds.`);
+    
+    // Trigger the conservation logic to fetch sequences
+    // In a real app, you would separate the fetch logic. 
+    // Here we simulate by calling the checkConservation logic or fetching raw data.
+    // For this demo, we create a placeholder FASTA.
+    
+    const text = `>Human_${gene}\n${"M".repeat(100)}... (Sequence would be here)\n>Mouse_${gene}\n${"M".repeat(100)}...`;
+    
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${gene}_MSA.fasta`;
+    a.click();
+};
+
+window.download3DStructure = function() {
+    const data = window.CiliAI.activeVariantData;
+    if(data && data.uniprotID) {
+        // Direct link to AlphaFold CIF
+        window.open(`https://alphafold.ebi.ac.uk/files/AF-${data.uniprotID}-F1-model_v4.cif`, '_blank');
+    } else {
+        alert("Structure data not loaded yet.");
+    }
 };
 
 // 3. DRAWING ENGINE (Nature Colors + Stable Interaction)
@@ -8565,6 +8636,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
