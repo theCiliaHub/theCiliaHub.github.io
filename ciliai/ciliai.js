@@ -7109,9 +7109,7 @@ window.getClusterBoundaries = getClusterBoundaries;
 window.getGenesByComplex = getGenesByComplex;
 window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
 
-//* ==============================================================
- * MODULE: ADVANCED SEARCH & FILTERS (v9.0)
- * ============================================================== */
+
 // --- 1. SEARCH STATE MANAGEMENT ---
 window.SearchState = {
     history: JSON.parse(localStorage.getItem('ciliai_search_history') || '[]'),
@@ -8401,6 +8399,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
