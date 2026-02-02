@@ -8148,8 +8148,9 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
         'T': '#fa9600', 'N': '#00dcdc', 'Q': '#00dcdc', 'C': '#e6e600', 'P': '#dc9682'
     };
     const modal = document.createElement('div');
+    modal.id = 'msa-modal';   // ← added ID
     modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:0; border-radius:12px; box-shadow:0 25px 50px rgba(0,0,0,0.5); z-index:10000; width:600px; font-family:'Roboto Mono', monospace; overflow:hidden;`;
-    // 1. Header
+   // Header part – replace the close button line with:
     let html = `
         <div style="background:#1e293b; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
             <div>
@@ -8158,7 +8159,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
             </div>
             <div style="display:flex; gap:10px;">
                 <button onclick="window.downloadMSA('${gene}', ${pos}, '${JSON.stringify(alignments)}')" style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">📥 Download</button>
-                <button onclick="this.closest('div').parentElement.remove()" style="border:none; background:none; color:white; cursor:pointer; font-size:20px;">×</button>
+                <button id="msa-close-btn" style="border:none; background:none; color:white; cursor:pointer; font-size:20px;">×</button>
             </div>
         </div>
         
@@ -8204,13 +8205,30 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
             ">${char}</div>
         `;
     }
-    modal.innerHTML = html;
+   modal.innerHTML = html;
     document.body.appendChild(modal);
-    
-    // Reset button
+
+    // Clean close handler
+    document.getElementById('msa-close-btn').onclick = () => {
+        const m = document.getElementById('msa-modal');
+        if (m) m.remove();
+    };
+
+    // Also support Esc key
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            const m = document.getElementById('msa-modal');
+            if (m) m.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    // Reset button text
     const btn = document.getElementById('vp-action');
     if(btn) btn.innerText = "🌍 Check Conservation";
 };
+
 window.downloadMSA = function(gene, pos, alignmentsStr) {
     const alignments = JSON.parse(alignmentsStr);
     let txt = `Alignment around position ${pos}\n\n`;
@@ -8267,128 +8285,206 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
         }
     }
     // 3. MAIN RENDERER
-    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
-        const btn = document.getElementById('btn-3d');
-        const originalText = btn ? btn.innerText : "🧊 View 3D";
-        
-        if (btn) {
-            btn.innerText = "⏳ Finding Structure...";
-            btn.disabled = true;
+   window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+    const btn = document.getElementById('btn-3d');
+    const originalText = btn ? btn.innerText : "🧊 View 3D";
+
+    if (btn) {
+        btn.innerText = "⏳ Finding Structure...";
+        btn.disabled = true;
+    }
+
+    try {
+        // A. Ensure Mol* library is loaded
+        await window.loadMolStar();
+
+        // B. Fetch variant & sequence data to get UniProt ID
+        const data = await window.fetchVariantDataLive(geneSymbol);
+        if (data.error || !data.uniprotID) {
+            throw new Error("Could not resolve UniProt ID.");
         }
-        try {
-            // A. Load Library
-            await window.loadMolStar();
-            // B. Resolve Data
-            const data = await window.fetchVariantDataLive(geneSymbol);
-            if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
-            const uniprotID = data.uniprotID;
-            // C. Get URL
-            const afUrl = await getAlphaFoldUrl(uniprotID);
-            if (!afUrl) throw new Error(`No AlphaFold structure found for ${geneSymbol}.`);
-            window.currentAfUrl = afUrl;
-            // D. Configure Selection (Persistent & High Contrast)
-            // We use 'selection-data' instead of 'highlight-data' for persistence
-            window.currentSelectData = variantPos ? [{
-                entity_id: "1",
-                residue_number: parseInt(variantPos, 10),
-                color: { r: 255, g: 0, b: 255 }, // Neon Magenta
-                focus: true // Auto-zoom to this residue
-            }] : [];
-            // E. Create Modal
-            const modal = document.createElement('div');
-            modal.id = 'molstar-modal';
-            modal.style.cssText = `
-                position: fixed; inset: 0; width: 100vw; height: 100dvh;
-                background: rgba(0,0,0,0.95); z-index: 200000;
-                display: flex; flex-direction: column; justify-content: center; align-items: center;
-            `;
-            modal.innerHTML = `
-                <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
-                    
-                    <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                        <div>
-                            <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} 3D Structure</div>
-                            <div style="font-size: 13px; color: #64748b;">
-                                ${variantPos ? `Variant: <strong style="color:#d946ef; background:#fdf4ff; padding:2px 6px; border-radius:4px; border:1px solid #f0abfc;">${variantAA}${variantPos}</strong>` : 'Full Protein View'} 
-                                <span style="margin: 0 8px; color: #cbd5e1;">|</span> UniProt: ${uniprotID}
-                            </div>
-                        </div>
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            ${variantPos ? `<button id="focus-btn" style="padding:6px 12px; background:#fff; border:1px solid #d946ef; color:#d946ef; font-size:12px; font-weight:600; border-radius:4px; cursor:pointer;">🎯 Focus Variant</button>` : ''}
-                            <button onclick="window.downloadStructure('${geneSymbol}')" style="padding:6px 12px; background:#fff; border:1px solid #cbd5e0; color:#475569; font-size:12px; font-weight:600; border-radius:4px; cursor:pointer;">📥 CIF</button>
-                            <button id="close-3d" style="background: #e2e8f0; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; color: #475569; font-weight:bold;">✕</button>
+        const uniprotID = data.uniprotID;
+
+        // C. Get AlphaFold model URL
+        const afUrl = await getAlphaFoldUrl(uniprotID);
+        if (!afUrl) {
+            throw new Error(`No AlphaFold structure found for ${geneSymbol}.`);
+        }
+        window.currentAfUrl = afUrl;
+
+        // D. Initialize selection array (persistent across adds)
+        window.currentSelectData = variantPos ? [{
+            entity_id: "1",
+            residue_number: parseInt(variantPos, 10),
+            color: { r: 255, g: 0, b: 255 }, // Neon Magenta for primary variant
+            focus: true
+        }] : [];
+
+        // E. Create modal
+        const modal = document.createElement('div');
+        modal.id = 'molstar-modal';
+        modal.style.cssText = `
+            position: fixed; inset: 0; width: 100vw; height: 100dvh;
+            background: rgba(0,0,0,0.95); z-index: 200000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        `;
+
+        modal.innerHTML = `
+            <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
+                
+                <!-- Header -->
+                <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} 3D Structure</div>
+                        <div style="font-size: 13px; color: #64748b;" id="variant-status">
+                            ${variantPos 
+                                ? `Primary variant: <strong style="color:#d946ef; background:#fdf4ff; padding:2px 6px; border-radius:4px; border:1px solid #f0abfc;">${variantAA}${variantPos}</strong>` 
+                                : 'Full Protein View'}
+                            <span id="extra-count" style="display:none; margin-left:12px; color:#7c3aed; font-weight:500;">
+                                (+<span id="extra-num">0</span> more highlighted)
+                            </span>
                         </div>
                     </div>
-                    <div style="flex: 1; position: relative; background: #fff; overflow: hidden;">
-                        <pdbe-molstar 
-                            id="pdbe-molstar-target"
-                            custom-data-url="${afUrl}"
-                            custom-data-format="cif"
-                            alphafold-view="true"
-                            hide-controls="true"
-                            bg-color-r="255" bg-color-g="255" bg-color-b="255"
-                            selection-data='${JSON.stringify(window.currentSelectData)}'
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"
-                        ></pdbe-molstar>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <button id="focus-btn" style="padding:6px 14px; background:#fff; border:1px solid #d946ef; color:#d946ef; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">
+                            🎯 Focus All Selected
+                        </button>
+                        <button onclick="window.downloadStructure('${geneSymbol}')" style="padding:6px 14px; background:#fff; border:1px solid #cbd5e0; color:#475569; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">
+                            📥 Download CIF
+                        </button>
+                        <button id="close-3d" style="background: #e2e8f0; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; color: #475569; font-weight:bold;">✕</button>
                     </div>
-                    <div style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; gap: 20px; flex-wrap: wrap; flex-shrink: 0;">
+                </div>
+
+                <!-- Viewer Container -->
+                <div style="flex: 1; position: relative; background: #ffffff; overflow: hidden;">
+                    <pdbe-molstar 
+                        id="pdbe-molstar-target"
+                        custom-data-url="${afUrl}"
+                        custom-data-format="cif"
+                        alphafold-view="true"
+                        hide-controls="true"
+                        bg-color-r="255" bg-color-g="255" bg-color-b="255"
+                        selection-data='${JSON.stringify(window.currentSelectData)}'
+                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"
+                    ></pdbe-molstar>
+                </div>
+
+                <!-- Footer / Legend + Add controls -->
+                <div style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; flex-shrink: 0; gap: 15px;">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
                         <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High (>90)</span>
                         <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (90-70)</span>
                         <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (70-50)</span>
                         <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered</span>
-                        ${variantPos ? `<span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; border-radius:50%; border:1px solid #000; margin-right:5px;"></span>Variant (Selected)</span>` : ''}
-                        <div style="margin-left:auto; display:flex; gap:5px; align-items:center;">
-                            <input id="add-var-3d" type="number" placeholder="Add residue" style="width:100px; padding:4px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
-                            <button onclick="window.addVariantTo3D()" style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">+ Highlight</button>
-                        </div>
+                        <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;">
+                            <span style="width:10px; height:10px; background:#d946ef; border-radius:50%; border:1px solid #000; margin-right:5px;"></span>Primary Variant
+                        </span>
+                        <span style="display:flex; align-items:center; color:#7c3aed;">
+                            <span style="width:10px; height:10px; background:#ffd700; border-radius:50%; margin-right:5px;"></span>Added Highlights
+                        </span>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input id="add-var-3d" type="number" min="1" placeholder="Residue #" style="width:110px; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
+                        <button onclick="window.addVariantTo3D()" style="padding:6px 14px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500;">
+                            + Highlight
+                        </button>
                     </div>
                 </div>
-            `;
-            document.body.appendChild(modal);
-            // Manual Focus Handler
-            const focusBtn = modal.querySelector('#focus-btn');
-            if(focusBtn) {
-                focusBtn.onclick = () => {
-                    const plugin = document.getElementById('pdbe-molstar-target');
-                    if(plugin && plugin.viewerInstance) {
-                        plugin.viewerInstance.visual.select({
-                            data: window.currentSelectData,
-                            nonSelectedColor: {r:255,g:255,b:255} // Optional: fade others?
-                        });
-                    }
-                };
-            }
-            // Close Logic
-            const close = () => {
-                modal.remove();
-                if (btn) { btn.innerText = originalText; btn.disabled = false; }
-            };
-            modal.querySelector('#close-3d').onclick = close;
-            window.addEventListener('keydown', e => { if(e.key === 'Escape') close(); }, {once:true});
-            if (btn) { btn.innerText = originalText; btn.disabled = false; }
-        } catch (e) {
-            console.error(e);
-            alert("3D Viewer Error: " + e.message);
-            if (btn) { btn.innerText = originalText; btn.disabled = false; }
-        }
-    };
-    window.addVariantTo3D = function() {
-        const input = document.getElementById('add-var-3d');
-        const pos = parseInt(input.value);
-        if (!isNaN(pos)) {
-            window.currentSelectData.push({
-                entity_id: "1",
-                residue_number: pos,
-                color: { r: 255, g: 255, b: 0 }, // Yellow for additional
-                focus: false
-            });
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Focus all selected residues
+        const focusBtn = document.getElementById('focus-btn');
+        focusBtn.onclick = () => {
             const plugin = document.getElementById('pdbe-molstar-target');
-            plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
-            plugin.viewerInstance.visual.select({ data: window.currentSelectData });
-            input.value = '';
+            if (plugin?.viewerInstance && window.currentSelectData.length > 0) {
+                const focusList = window.currentSelectData.map(s => ({
+                    entity_id: s.entity_id,
+                    residue_number: s.residue_number
+                }));
+                plugin.viewerInstance.visual.focus({ data: focusList });
+            }
+        };
+
+        // Close logic
+        const close = () => {
+            modal.remove();
+            window.currentSelectData = []; // Clean up
+            window.currentAfUrl = null;
+            if (btn) {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        document.getElementById('close-3d').onclick = close;
+        window.addEventListener('keydown', e => {
+            if (e.key === 'Escape') close();
+        }, { once: true });
+
+        // Reset loading button
+        if (btn) {
+            btn.innerText = originalText;
+            btn.disabled = false;
         }
-    };
-    window.downloadStructure = function(geneSymbol) {
+
+    } catch (e) {
+        console.error("3D Viewer Error:", e);
+        alert("3D Viewer Error: " + e.message);
+        if (btn) {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
+};
+// Updated add function with feedback
+window.addVariantTo3D = function() {
+    const input = document.getElementById('add-var-3d');
+    const pos = parseInt(input.value.trim());
+    if (!isNaN(pos) && pos > 0) {
+        // Prevent duplicate
+        if (window.currentSelectData.some(s => s.residue_number === pos)) {
+            alert(`Residue ${pos} is already highlighted.`);
+            return;
+        }
+
+        window.currentSelectData.push({
+            entity_id: "1",
+            residue_number: pos,
+            color: { r: 255, g: 215, b: 0 }, // gold/yellow for added ones
+            focus: false
+        });
+
+        const plugin = document.getElementById('pdbe-molstar-target');
+        if (plugin) {
+            plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
+            // Force re-apply selection
+            if (plugin.viewerInstance) {
+                plugin.viewerInstance.visual.select({ data: window.currentSelectData });
+            }
+        }
+
+        // Update UI feedback
+        const extraNum = document.getElementById('extra-num');
+        const extraCount = document.getElementById('extra-count');
+        const count = window.currentSelectData.length - 1; // -1 = original
+        if (extraNum && extraCount) {
+            extraNum.textContent = count;
+            extraCount.style.display = count > 0 ? 'inline' : 'none';
+        }
+
+        input.value = '';
+        input.focus();
+    } else {
+        alert('Please enter a valid positive residue number.');
+    }
+};
+    
+window.downloadStructure = function(geneSymbol) {
         const a = document.createElement('a');
         a.href = window.currentAfUrl;
         a.download = `${geneSymbol}_AlphaFold.cif`;
@@ -8399,6 +8495,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
