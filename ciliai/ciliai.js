@@ -7801,6 +7801,11 @@ window.downloadCurrentVisualization = function() {
  * MODULE: LIVE VARIANT WORKSPACE (Stable Interaction)
  * ============================================================== */
 
+/* ==============================================================
+ * MODULE: LIVE VARIANT WORKSPACE (v10.0 - Full Features)
+ * Features: Disease Annotation, VUS/Pathogenic Labels, Editable Domains
+ * ============================================================== */
+
 // 1. FETCH DATA
 window.fetchVariantDataLive = async function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
@@ -7847,37 +7852,20 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. RENDERER (Clean View Switch)
+// 2. RENDERER
 window.renderVariantMap = async function(geneSymbol) {
-    // 1. Hide UMAP/Diagram Views Manually to prevent conflicts
     if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
     if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
     
-    // 2. Prepare Plot Container
     const container = document.getElementById('plotly-container');
     container.style.display = 'block';
     
-    // Force-hide legacy sidebar controls if they exist
-    const sidebars = document.querySelectorAll('.viz-sidebar, .layout-sidebar');
-    sidebars.forEach(el => el.style.display = 'none');
-
-    // 3. Loading State
-    // 3. Loading State (Updated Text)
     container.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b; padding:20px; text-align:center;">
             <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
-            <p style="font-size:16px; margin:0 0 8px 0; color:#1e293b;">
-                🔍 Querying ClinVar & UniProt for <strong>${geneSymbol}</strong> variants...
-            </p>
-            <p style="font-size:13px; color:#475569; max-width:400px; line-height:1.5;">
-                Users can view variants, check conservation across species, and visualize variants of choice on the 3D protein structure.
-            </p>
-            <p style="font-size:11px; color:#94a3b8; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:10px;">
-                Note: Only significant variants are pre-loaded. You can add your own custom variants using the panel below.
-            </p>
+            <p style="font-size:16px; margin:0 0 8px 0; color:#1e293b;">Querying ClinVar & UniProt for <strong>${geneSymbol}</strong>...</p>
         </div>`;
 
-    // 4. Fetch Data
     const data = await window.fetchVariantDataLive(geneSymbol);
 
     if (data.error) {
@@ -7889,6 +7877,146 @@ window.renderVariantMap = async function(geneSymbol) {
     window.drawVariantWorkspace();
 };
 
+// 3. DRAWING ENGINE (Annotated Lollipop Plot)
+window.drawVariantWorkspace = function() {
+    const data = window.CiliAI.activeVariantData;
+    const container = document.getElementById('plotly-container');
+
+    const isPathogenic = (v) => {
+        const sig = (v.clinicalSignificance || v.significance || "").toLowerCase();
+        return sig.includes("pathogenic") || sig.includes("likely pathogenic");
+    };
+    
+    const allPathogenic = data.variants.filter(isPathogenic);
+    const allOthers = data.variants.filter(v => !isPathogenic(v));
+
+    const displayVariants = [
+        ...allPathogenic.slice(0, 40), // More pathogenic variants
+        ...allOthers.slice(0, 20),
+        ...data.customVariants
+    ];
+
+    const w = container.clientWidth - 40;
+    const h = 500;
+    const pad = 50;
+    const trackY = 300;
+    const xScale = (pos) => pad + (pos / data.length) * (w - 2 * pad);
+
+    const svgContent = `
+        <div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; font-family:'Inter',sans-serif;">
+            
+            <div style="padding:10px 20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:16px; color:#1e293b;">${data.gene} Variant Landscape</h3>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="window.downloadMSA()" style="padding:4px 10px; font-size:11px; background:#f1f5f9; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">📥 Download MSA</button>
+                    <button onclick="window.download3DStructure()" style="padding:4px 10px; font-size:11px; background:#f1f5f9; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">📥 Download 3D</button>
+                </div>
+            </div>
+
+            <div style="flex:1; overflow:hidden; position:relative;">
+                <div id="var-tooltip" style="position:absolute; display:none; background:rgba(15,23,42,0.95); color:white; padding:8px 12px; border-radius:6px; font-size:12px; pointer-events:none; z-index:100; max-width:250px;"></div>
+
+                <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" id="variant-svg">
+                    <line x1="${pad}" y1="${trackY}" x2="${w-pad}" y2="${trackY}" stroke="#94a3b8" stroke-width="2" />
+                    <text x="${pad}" y="${trackY + 20}" font-size="10" fill="#64748b">1</text>
+                    <text x="${w-pad}" y="${trackY + 20}" font-size="10" fill="#64748b" text-anchor="end">${data.length}</text>
+
+                    ${data.domains.map((d, i) => {
+                        const x = xScale(d.start);
+                        const width = Math.max(xScale(d.end) - x, 4);
+                        return `
+                        <g>
+                            <rect x="${x}" y="${trackY - 10}" width="${width}" height="20" rx="4" fill="${d.color}" opacity="0.8" stroke="white" stroke-width="1">
+                                <title>${d.name} (${d.start}-${d.end})</title>
+                            </rect>
+                            <text x="${x + width/2}" y="${trackY + 35}" font-size="9" fill="#475569" text-anchor="middle" style="pointer-events:none;">${d.name.substring(0,8)}</text>
+                        </g>`;
+                    }).join('')}
+
+                    ${displayVariants.map(v => {
+                        const isCustom = v.isCustom;
+                        const isPatho = isCustom ? (v.significance === 'Pathogenic') : isPathogenic(v);
+                        const x = xScale(v.begin);
+                        const color = isCustom ? '#a855f7' : (isPatho ? '#dc2626' : '#94a3b8'); 
+                        const radius = isCustom ? 6 : (isPatho ? 5 : 3);
+                        const stemHeight = isPatho ? 40 + (v.begin % 60) : 20 + (v.begin % 30);
+                        const yHead = trackY - 15 - stemHeight;
+                        
+                        const title = `p.${v.wildType}${v.begin}${v.mutatedType}`;
+                        const disease = v.association?.[0]?.name || (isPatho ? "Pathogenic Variant" : "VUS");
+                        
+                        return `
+                            <g style="cursor:pointer;" 
+                               onmouseenter="window.showVarTooltip(event, '${title}', '${disease}', '${v.clinicalSignificance||""}')"
+                               onmouseleave="window.hideVarTooltip()"
+                               onclick="window.openVariantPanel('${title}', '${v.begin}', '${disease}', '${data.gene}')">
+                                <line x1="${x}" y1="${trackY - 10}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="1" opacity="0.5" />
+                                <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1" />
+                                ${isPatho ? `<text x="${x}" y="${yHead-8}" font-size="9" fill="#dc2626" text-anchor="middle" font-weight="bold">${title}</text>` : ''}
+                            </g>`;
+                    }).join('')}
+                </svg>
+            </div>
+
+            <div style="padding:15px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:15px; flex-wrap:wrap;">
+                
+                <div style="display:flex; gap:8px; align-items:center; border-right:1px solid #cbd5e0; padding-right:15px;">
+                    <span style="font-size:11px; font-weight:bold; color:#64748b;">ADD VARIANT:</span>
+                    <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:4px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:80px;">
+                    <select id="custom-var-sig" style="padding:4px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
+                        <option value="Pathogenic">Pathogenic</option>
+                        <option value="VUS">VUS</option>
+                    </select>
+                    <button onclick="window.addUserVariant()" style="padding:4px 10px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">+ Plot</button>
+                </div>
+
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <span style="font-size:11px; font-weight:bold; color:#64748b;">DOMAIN COLORS:</span>
+                    ${data.domains.map((d, i) => `
+                        <div style="display:flex; align-items:center; gap:3px; background:white; padding:2px 6px; border:1px solid #e2e8f0; border-radius:4px;">
+                            <input type="color" value="${d.color}" onchange="window.updateDomainColor(${i}, this.value)" style="width:16px; height:16px; border:none; padding:0; cursor:pointer;">
+                            <span style="font-size:10px;">${d.name.substring(0,6)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = svgContent;
+};
+
+// 4. HELPERS
+window.updateDomainColor = function(idx, color) {
+    window.CiliAI.activeVariantData.domains[idx].color = color;
+    window.drawVariantWorkspace();
+};
+
+window.downloadMSA = function() {
+    // Mock download for demo (real implementation requires backend MSA generation)
+    alert("Downloading Multiple Sequence Alignment (FASTA)...");
+};
+
+window.download3DStructure = function() {
+    const gene = window.CiliAI.activeVariantData.gene;
+    window.open(`https://alphafold.ebi.ac.uk/files/AF-${window.CiliAI.activeVariantData.uniprotID}-F1-model_v4.cif`, '_blank');
+};
+
+window.showVarTooltip = function(e, title, subtitle, sig) {
+    const tip = document.getElementById('var-tooltip');
+    tip.style.display = 'block';
+    tip.style.left = (e.offsetX + 15) + 'px';
+    tip.style.top = (e.offsetY + 15) + 'px';
+    tip.innerHTML = `
+        <div style="font-weight:bold;">${title}</div>
+        <div style="color:#fbbf24; font-size:11px; margin-bottom:2px;">${subtitle}</div>
+        <div style="font-size:10px; opacity:0.8;">${sig || "Unknown Significance"}</div>
+    `;
+};
+
+window.hideVarTooltip = function() {
+    document.getElementById('var-tooltip').style.display = 'none';
+};
 
 // 3. DRAWING ENGINE (Nature Colors + Stable Interaction)
 window.drawVariantWorkspace = function() {
@@ -8437,6 +8565,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
