@@ -8269,117 +8269,62 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 };
 
 /* ==============================================================
- * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Production v9.0)
- * Features: Triple-Fallback Loader, API-Driven AlphaFold, Fullscreen Modal
+ * MODULE: UNIVERSAL 3D STRUCTURE VIEWER (Production v9.1)
+ * Features: API-Driven, Persistent Selection, Focus Control
  * ============================================================== */
 
 (function() {
     'use strict';
 
-    const CONFIG = {
-        VERSION: '3.10.0', // Lock to specific stable version
-        TIMEOUT: 15000,    // 15s timeout per source
-        CDN_SOURCES: [
-            {
-                name: 'jsdelivr',
-                css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar.css',
-                js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar-component.js'
-            },
-            {
-                name: 'unpkg',
-                css: 'https://unpkg.com/pdbe-molstar@3.10.0/build/pdbe-molstar.css',
-                js: 'https://unpkg.com/pdbe-molstar@3.10.0/build/pdbe-molstar-component.js'
-            }
-        ]
-    };
-
-    let viewerLoaded = false;
-    let loadingPromise = null;
-
-    /* ----------------------------------------------------------
-     * 1. CORE LOADER (Strategy: Web Component Only)
-     * We stick to the Web Component strategy because it handles
-     * the canvas lifecycle automatically.
-     * ---------------------------------------------------------- */
+    // 1. LOADER
     window.loadMolStar = async function() {
         if (customElements.get('pdbe-molstar')) return true;
-        if (loadingPromise) return loadingPromise;
 
-        loadingPromise = new Promise(async (resolve, reject) => {
-            console.log("[CiliAI] Initializing 3D Engine...");
+        return new Promise((resolve, reject) => {
+            console.log("[CiliAI] Downloading 3D Engine...");
 
-            for (const source of CONFIG.CDN_SOURCES) {
-                try {
-                    console.log(`[CiliAI] Attempting load from: ${source.name}`);
-                    
-                    // 1. Load CSS
-                    if (!document.querySelector(`link[href="${source.css}"]`)) {
-                        const link = document.createElement('link');
-                        link.rel = 'stylesheet';
-                        link.href = source.css;
-                        document.head.appendChild(link);
-                    }
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
+            document.head.appendChild(link);
 
-                    // 2. Load JS
-                    await new Promise((res, rej) => {
-                        const script = document.createElement('script');
-                        script.src = source.js;
-                        script.onload = res;
-                        script.onerror = rej;
-                        document.head.appendChild(script);
-                    });
-
-                    // 3. Wait for Registry
-                    await customElements.whenDefined('pdbe-molstar');
-                    console.log(`[CiliAI] Success: <pdbe-molstar> registered via ${source.name}`);
-                    viewerLoaded = true;
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js';
+            
+            script.onload = () => {
+                customElements.whenDefined('pdbe-molstar').then(() => {
+                    console.log("[CiliAI] 3D Engine Ready.");
                     resolve(true);
-                    return;
-
-                } catch (e) {
-                    console.warn(`[CiliAI] Source ${source.name} failed:`, e);
-                }
-            }
-
-            reject(new Error("Failed to load 3D engine from all sources."));
-            loadingPromise = null;
+                });
+            };
+            
+            script.onerror = () => reject(new Error("Failed to load PDBe Mol* script."));
+            document.head.appendChild(script);
         });
-
-        return loadingPromise;
     };
 
-    /* ----------------------------------------------------------
-     * 2. ALPHAFOLD API RESOLVER (Fixes 404 Errors)
-     * ---------------------------------------------------------- */
+    // 2. HELPER: Get AlphaFold URL
     async function getAlphaFoldUrl(uniprotID) {
-        console.log(`[CiliAI] Resolving AlphaFold URL for ${uniprotID}...`);
         try {
-            // Ask EBI API for the correct file path
+            console.log(`[CiliAI] Resolving AlphaFold URL for ${uniprotID}...`);
             const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotID}`);
-            if (!res.ok) throw new Error(`API Error ${res.status}`);
+            if (!res.ok) return null;
             const data = await res.json();
-            
-            if (Array.isArray(data) && data.length > 0) {
-                console.log(`[CiliAI] Found URL: ${data[0].cifUrl}`);
-                return data[0].cifUrl; 
-            }
-            throw new Error("No structure found in API response");
+            if (Array.isArray(data) && data.length > 0) return data[0].cifUrl; 
+            return null;
         } catch (e) {
-            console.warn("[CiliAI] API Lookup failed, trying fallback...", e);
-            // Fallback: Try v4, then v3 if API is down
-            return `https://alphafold.ebi.ac.uk/files/AF-${uniprotID}-F1-model_v4.cif`;
+            console.warn("AlphaFold API Lookup failed:", e);
+            return null;
         }
     }
 
-    /* ----------------------------------------------------------
-     * 3. MAIN RENDERER (Cinema Mode Modal)
-     * ---------------------------------------------------------- */
+    // 3. MAIN RENDERER
     window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
         const btn = document.getElementById('btn-3d');
         const originalText = btn ? btn.innerText : "🧊 View 3D";
         
         if (btn) {
-            btn.innerHTML = "⏳ Finding Structure...";
+            btn.innerText = "⏳ Finding Structure...";
             btn.disabled = true;
         }
 
@@ -8389,18 +8334,20 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
             // B. Resolve Data
             const data = await window.fetchVariantDataLive(geneSymbol);
-            if (!data.uniprotID) throw new Error("Could not resolve UniProt ID.");
+            if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
             const uniprotID = data.uniprotID;
 
-            // C. Get Real URL
+            // C. Get URL
             const afUrl = await getAlphaFoldUrl(uniprotID);
+            if (!afUrl) throw new Error(`No AlphaFold structure found for ${geneSymbol}.`);
 
-            // D. Highlight Config
-            const highlightData = variantPos ? [{
+            // D. Configure Selection (Persistent & High Contrast)
+            // We use 'selection-data' instead of 'highlight-data' for persistence
+            const selectData = variantPos ? [{
                 entity_id: "1",
                 residue_number: parseInt(variantPos, 10),
-                color: { r: 255, g: 0, b: 255 }, // Magenta
-                focus: true
+                color: { r: 255, g: 0, b: 255 }, // Neon Magenta
+                focus: true // Auto-zoom to this residue
             }] : [];
 
             // E. Create Modal
@@ -8408,21 +8355,25 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
             modal.id = 'molstar-modal';
             modal.style.cssText = `
                 position: fixed; inset: 0; width: 100vw; height: 100dvh;
-                background: rgba(0,0,0,0.92); z-index: 200000;
+                background: rgba(0,0,0,0.95); z-index: 200000;
                 display: flex; flex-direction: column; justify-content: center; align-items: center;
             `;
 
             modal.innerHTML = `
                 <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
+                    
                     <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
                         <div>
-                            <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} Structure</div>
+                            <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} 3D Structure</div>
                             <div style="font-size: 13px; color: #64748b;">
-                                ${variantPos ? `Highlighting Variant: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>` : 'Full Protein View'} 
+                                ${variantPos ? `Variant: <strong style="color:#d946ef; background:#fdf4ff; padding:2px 6px; border-radius:4px; border:1px solid #f0abfc;">${variantAA}${variantPos}</strong>` : 'Full Protein View'} 
                                 <span style="margin: 0 8px; color: #cbd5e1;">|</span> UniProt: ${uniprotID}
                             </div>
                         </div>
-                        <button id="close-3d" style="background: #e2e8f0; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; color: #475569;">✕</button>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            ${variantPos ? `<button id="focus-btn" style="padding:6px 12px; background:#fff; border:1px solid #d946ef; color:#d946ef; font-size:12px; font-weight:600; border-radius:4px; cursor:pointer;">🎯 Focus Variant</button>` : ''}
+                            <button id="close-3d" style="background: #e2e8f0; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; color: #475569; font-weight:bold;">✕</button>
+                        </div>
                     </div>
 
                     <div style="flex: 1; position: relative; background: #fff; overflow: hidden;">
@@ -8433,26 +8384,38 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
                             alphafold-view="true"
                             hide-controls="true"
                             bg-color-r="255" bg-color-g="255" bg-color-b="255"
-                            highlight-data='${JSON.stringify(highlightData)}'
+                            selection-data='${JSON.stringify(selectData)}'
                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"
                         ></pdbe-molstar>
                     </div>
 
                     <div style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; gap: 20px; flex-wrap: wrap; flex-shrink: 0;">
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; margin-right:5px;"></span>Very High (>90)</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; margin-right:5px;"></span>High</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; margin-right:5px;"></span>Low</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; margin-right:5px;"></span>Disordered</span>
+                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High (>90)</span>
+                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (90-70)</span>
+                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (70-50)</span>
+                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered</span>
+                        ${variantPos ? `<span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;"><span style="width:10px; height:10px; background:#d946ef; border-radius:50%; border:1px solid #000; margin-right:5px;"></span>Variant (Selected)</span>` : ''}
                     </div>
                 </div>
             `;
 
             document.body.appendChild(modal);
 
-            // Force Resize (Wake up canvas)
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+            // Manual Focus Handler
+            const focusBtn = modal.querySelector('#focus-btn');
+            if(focusBtn) {
+                focusBtn.onclick = () => {
+                    const plugin = document.getElementById('pdbe-molstar-target');
+                    if(plugin && plugin.viewerInstance) {
+                        plugin.viewerInstance.visual.select({
+                            data: selectData,
+                            nonSelectedColor: {r:255,g:255,b:255} // Optional: fade others?
+                        });
+                    }
+                };
+            }
 
-            // Cleanup Logic
+            // Close Logic
             const close = () => {
                 modal.remove();
                 if (btn) { btn.innerText = originalText; btn.disabled = false; }
@@ -8474,6 +8437,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
