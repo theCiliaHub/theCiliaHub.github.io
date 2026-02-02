@@ -8285,7 +8285,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
         }
     }
     // 3. MAIN RENDERER
-   window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+  window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('btn-3d');
     const originalText = btn ? btn.innerText : "🧊 View 3D";
 
@@ -8316,7 +8316,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
         window.currentSelectData = variantPos ? [{
             entity_id: "1",
             residue_number: parseInt(variantPos, 10),
-            color: { r: 255, g: 0, b: 255 }, // Neon Magenta for primary variant
+            color: { r: 217, g: 70, b: 239 }, // #d946ef - magenta/pink for primary
             focus: true
         }] : [];
 
@@ -8340,8 +8340,8 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
                             ${variantPos 
                                 ? `Primary variant: <strong style="color:#d946ef; background:#fdf4ff; padding:2px 6px; border-radius:4px; border:1px solid #f0abfc;">${variantAA}${variantPos}</strong>` 
                                 : 'Full Protein View'}
-                            <span id="extra-count" style="display:none; margin-left:12px; color:#7c3aed; font-weight:500;">
-                                (+<span id="extra-num">0</span> more highlighted)
+                            <span id="extra-count" style="display:none; margin-left:12px; color:#ca8a04; font-weight:500;">
+                                (+<span id="extra-num">0</span> added highlights)
                             </span>
                         </div>
                     </div>
@@ -8370,24 +8370,22 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
                     ></pdbe-molstar>
                 </div>
 
-                <!-- Footer / Legend + Add controls -->
-                <div style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; flex-shrink: 0; gap: 15px;">
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High (>90)</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (90-70)</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (70-50)</span>
-                        <span style="display:flex; align-items:center;"><span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered</span>
-                        <span style="display:flex; align-items:center; font-weight:bold; color:#d946ef;">
-                            <span style="width:10px; height:10px; background:#d946ef; border-radius:50%; border:1px solid #000; margin-right:5px;"></span>Primary Variant
+                <!-- Footer: Only variant highlight legend + add controls -->
+                <div style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 12px; color: #475569; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; flex-shrink: 0; gap: 15px;">
+                    <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+                        <span style="display:flex; align-items:center; font-weight:500;">
+                            <span style="width:12px; height:12px; background:#d946ef; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>
+                            Primary Variant
                         </span>
-                        <span style="display:flex; align-items:center; color:#7c3aed;">
-                            <span style="width:10px; height:10px; background:#ffd700; border-radius:50%; margin-right:5px;"></span>Added Highlights
+                        <span style="display:flex; align-items:center; font-weight:500;">
+                            <span style="width:12px; height:12px; background:#ffd700; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>
+                            Added Highlights
                         </span>
                     </div>
 
                     <div style="display:flex; gap:10px; align-items:center;">
                         <input id="add-var-3d" type="number" min="1" placeholder="Residue #" style="width:110px; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
-                        <button onclick="window.addVariantTo3D()" style="padding:6px 14px; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500;">
+                        <button onclick="window.addVariantTo3D()" style="padding:6px 14px; background:#ca8a04; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500;">
                             + Highlight
                         </button>
                     </div>
@@ -8413,7 +8411,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
         // Close logic
         const close = () => {
             modal.remove();
-            window.currentSelectData = []; // Clean up
+            window.currentSelectData = [];
             window.currentAfUrl = null;
             if (btn) {
                 btn.innerText = originalText;
@@ -8441,10 +8439,12 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
         }
     }
 };
+    
 // Updated add function with feedback
 window.addVariantTo3D = function() {
     const input = document.getElementById('add-var-3d');
     const pos = parseInt(input.value.trim());
+    
     if (!isNaN(pos) && pos > 0) {
         // Prevent duplicate
         if (window.currentSelectData.some(s => s.residue_number === pos)) {
@@ -8455,23 +8455,22 @@ window.addVariantTo3D = function() {
         window.currentSelectData.push({
             entity_id: "1",
             residue_number: pos,
-            color: { r: 255, g: 215, b: 0 }, // gold/yellow for added ones
+            color: { r: 255, g: 215, b: 0 }, // #ffd700 - gold/yellow
             focus: false
         });
 
         const plugin = document.getElementById('pdbe-molstar-target');
         if (plugin) {
             plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
-            // Force re-apply selection
             if (plugin.viewerInstance) {
                 plugin.viewerInstance.visual.select({ data: window.currentSelectData });
             }
         }
 
-        // Update UI feedback
+        // Update counter
         const extraNum = document.getElementById('extra-num');
         const extraCount = document.getElementById('extra-count');
-        const count = window.currentSelectData.length - 1; // -1 = original
+        const count = window.currentSelectData.length - 1; // subtract primary
         if (extraNum && extraCount) {
             extraNum.textContent = count;
             extraCount.style.display = count > 0 ? 'inline' : 'none';
@@ -8495,6 +8494,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
