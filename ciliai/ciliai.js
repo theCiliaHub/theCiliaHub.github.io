@@ -8767,27 +8767,53 @@ window.downloadStructure = function(geneSymbol) {
         window.addChatMessage(`<div class="ai-result-card">📊 Generated Comparative Radar Chart for <strong>${genes.join(', ')}</strong>.</div>`, false);
     };
 
-    // 3. MUTATION BURDEN ANALYZER
+    // 3. MUTATION BURDEN ANALYZER (FIXED: Deep Scan Logic)
+    // ==============================================================
     window.analyzeMutationBurden = async function(geneSymbol) {
         window.addChatMessage(`🔍 Analyzing mutation burden for <strong>${geneSymbol}</strong>...`, false);
         
+        // 1. Fetch Data
         const data = await window.fetchVariantDataLive(geneSymbol);
+        
         if (data.error) {
             window.addChatMessage(`Could not analyze mutations: ${data.error}`, false);
             return;
         }
 
         const variants = data.variants || [];
-        const countVariants = (regex) => variants.filter(v => {
-            const sig = v.clinicalSignificance || v.significance || "";
-            return regex.test(sig) && !/conflicting/i.test(sig);
-        }).length;
+        
+        // 2. Helper: Deep Text Extraction
+        // Scans clinicalSignificance, associations, and descriptions
+        const getVariantText = (v) => {
+            let text = (v.clinicalSignificance || v.significance || "").toString();
+            if (v.association) text += " " + JSON.stringify(v.association);
+            if (v.descriptions) text += " " + JSON.stringify(v.descriptions);
+            return text.toLowerCase();
+        };
 
-        const pathogenic = countVariants(/pathogenic/i);
-        const benign = countVariants(/benign/i);
-        const vus = variants.length - pathogenic - benign;
+        // 3. Robust Counting Logic
+        let pathogenic = 0;
+        let benign = 0;
+        let vus = 0;
+
+        variants.forEach(v => {
+            const text = getVariantText(v);
+            
+            // Exclude conflicting interpretations from definitive counts
+            const isConflicting = text.includes("conflicting");
+
+            if (text.includes("pathogenic") && !text.includes("likely benign") && !isConflicting) {
+                pathogenic++;
+            } else if ((text.includes("benign") || text.includes("likely benign")) && !text.includes("pathogenic") && !isConflicting) {
+                benign++;
+            } else {
+                vus++;
+            }
+        });
+
         const total = variants.length;
 
+        // 4. Render Report
         const report = `
             <div class="ai-result-card">
                 <h4>🧬 Mutation Burden: ${geneSymbol}</h4>
@@ -8805,18 +8831,24 @@ window.downloadStructure = function(geneSymbol) {
                         <div style="font-size:11px; color:#14532d;">Benign</div>
                     </div>
                 </div>
-                <div style="height:12px; width:100%; display:flex; border-radius:6px; overflow:hidden;">
+                
+                <div style="height:12px; width:100%; display:flex; border-radius:6px; overflow:hidden; background:#eee;">
                     <div style="width:${(pathogenic/total)*100}%; background:#ef4444;" title="Pathogenic"></div>
                     <div style="width:${(vus/total)*100}%; background:#9ca3af;" title="VUS"></div>
                     <div style="width:${(benign/total)*100}%; background:#22c55e;" title="Benign"></div>
                 </div>
-                <p style="font-size:11px; color:#666; margin-top:8px;">Total variants analyzed: ${total} (Source: ClinVar/UniProt)</p>
-                <button class="ciliai-button" style="width:100%; justify-content:center; margin-top:10px;" onclick="window.renderVariantMap('${geneSymbol}')">📍 View on Protein Map</button>
-            </div>`;
+
+                <p style="font-size:11px; color:#666; margin-top:8px;">
+                    Total variants analyzed: ${total.toLocaleString()} (Source: ClinVar/UniProt)
+                </p>
+                <button class="ciliai-button" style="width:100%; justify-content:center; margin-top:10px;" onclick="window.renderVariantMap('${geneSymbol}')">
+                    📍 View on Protein Map
+                </button>
+            </div>
+        `;
         
         window.addChatMessage(report, false);
     };
-
     // Initialize Auto-Save
     setTimeout(() => window.CiliAI.Session.start(), 5000);
     console.log("[CiliAI] Advanced Analytics & Persistence module loaded.");
@@ -8826,3 +8858,4 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
