@@ -8713,38 +8713,56 @@ window.downloadStructure = function(geneSymbol) {
     };
 
     // 2. COMPARATIVE RADAR CHART
+   // 2. COMPARATIVE RADAR CHART (Refined: Custom Colors & Explanation)
+    // ==============================================================
     window.renderComparativeRadar = function(genesInput) {
         const genes = Array.isArray(genesInput) ? genesInput : genesInput.split(/[,\s]+/).filter(Boolean);
         if (genes.length < 1) return;
 
+        // Switch to plot view
         window.switchView('plot'); 
         const container = document.getElementById('plotly-container');
         container.innerHTML = '';
         container.style.display = 'block';
 
         const data = [];
-        genes.forEach(geneSym => {
+        const colors = ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed']; // Blue, Red, Green, Amber, Purple
+        
+        genes.forEach((geneSym, idx) => {
             const g = window.CiliAI.lookups.geneMap[geneSym.toUpperCase()];
             if (!g) return;
 
-            // Metrics Calculation
-            let conservationScore = 0.4; 
-            if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') conservationScore = 1.0;
-            else if (g.Ortholog_Drosophila && g.Ortholog_Drosophila !== 'N/A') conservationScore = 0.8;
-            else if (g.Ortholog_Mouse && g.Ortholog_Mouse !== 'N/A') conservationScore = 0.6;
+            // --- Metrics Calculation ---
+            
+            // 1. Conservation (Proxy: Is it in distant species?)
+            // Logic: 0.2 base. +0.2 for Mouse, +0.3 for Zebrafish/Xenopus, +0.3 for C. elegans
+            let conservationScore = 0.2; 
+            if (g.Ortholog_Mouse && g.Ortholog_Mouse !== 'N/A') conservationScore += 0.2;
+            if (g.Ortholog_Zebrafish && g.Ortholog_Zebrafish !== 'N/A') conservationScore += 0.3;
+            if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') conservationScore += 0.3;
+            conservationScore = Math.min(conservationScore, 1.0);
 
+            // 2. Disease Burden (Count of associated diseases)
             let diseaseCount = 0;
             if (Array.isArray(g.Ciliopathies)) diseaseCount = g.Ciliopathies.length;
             else if (g.Ciliopathy && g.Ciliopathy !== 'N/A') diseaseCount = 1;
-            const diseaseScore = Math.min(diseaseCount / 4, 1);
+            // Scale: 5+ diseases = 100%
+            const diseaseScore = Math.min(diseaseCount / 5, 1); 
 
-            let exprScore = 0.1;
+            // 3. Expression Level (Normalized Max TPM from current dataset)
+            let exprScore = 0.05; // Non-zero baseline so it shows up
             if (g.expression && g.expression.scRNA) {
                 const maxVal = Math.max(...Object.values(g.expression.scRNA));
-                exprScore = Math.min(maxVal / 20, 1);
+                // Scale: 50 TPM = 100% (High expression)
+                exprScore = Math.min(maxVal / 50, 1);
             }
 
-            const complexityScore = g.complex_components ? 1.0 : 0.3;
+            // 4. Complexity (Is it a known complex component?)
+            // Logic: 1.0 if in complex, 0.4 if not
+            const complexityScore = g.complex_components ? 1.0 : 0.4;
+
+            // 5. Study Depth (Proxy: # of screens present in)
+            // Scale: 3+ screens = 100%
             const studyScore = (g.screens && g.screens.length > 0) ? Math.min(g.screens.length / 3, 1) : 0.2;
 
             data.push({
@@ -8752,19 +8770,38 @@ window.downloadStructure = function(geneSymbol) {
                 r: [conservationScore, diseaseScore, exprScore, complexityScore, studyScore, conservationScore],
                 theta: ['Conservation', 'Disease Load', 'Expression', 'Complex Stability', 'Study Depth', 'Conservation'],
                 fill: 'toself',
-                name: g.Gene
+                name: g.Gene,
+                line: { color: colors[idx % colors.length] },
+                opacity: 0.6
             });
         });
 
         const layout = {
-            polar: { radialaxis: { visible: true, range: [0, 1] } },
-            title: `Comparative Profile: ${genes.join(' vs ')}`,
+            polar: {
+                radialaxis: { visible: true, range: [0, 1] }
+            },
+            title: `Multivariate Profile: ${genes.join(' vs ')}`,
             showlegend: true,
             margin: { t: 50, b: 50, l: 50, r: 50 }
         };
 
         Plotly.newPlot(container, data, layout);
-        window.addChatMessage(`<div class="ai-result-card">📊 Generated Comparative Radar Chart for <strong>${genes.join(', ')}</strong>.</div>`, false);
+        
+        // --- Detailed Explanation ---
+        const explanation = `
+            <div class="ai-result-card">
+                <h4>📊 Radar Chart Analysis</h4>
+                <p>Comparing biological dimensions for <strong>${genes.join(', ')}</strong>:</p>
+                <ul style="font-size:12px; color:#475569; padding-left:20px; line-height:1.6;">
+                    <li><strong>Conservation:</strong> Based on ortholog presence (Mouse, Zebrafish, <em>C. elegans</em>). Higher means evolutionarily ancient.</li>
+                    <li><strong>Disease Load:</strong> Based on number of associated ciliopathies. 0 means no direct disease link found yet.</li>
+                    <li><strong>Expression:</strong> Normalized max TPM in Lung scRNA-seq. <br><em>(Note: Low score may mean the gene is specific to other tissues like Retina or Kidney).</em></li>
+                    <li><strong>Complex Stability:</strong> 1.0 if the protein is a known component of a stable complex (e.g. BBSome, IFT).</li>
+                    <li><strong>Study Depth:</strong> Based on appearance in high-throughput screens (siRNA/CRISPR).</li>
+                </ul>
+            </div>
+        `;
+        window.addChatMessage(explanation, false);
     };
 
     // 3. MUTATION BURDEN ANALYZER (FIXED: Deep Scan Logic)
@@ -8858,4 +8895,5 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
