@@ -8668,32 +8668,23 @@ window.downloadStructure = function(geneSymbol) {
     'use strict';
 
     // 1. AUTO-SAVE SYSTEM
-    // ==============================================================
     window.CiliAI.Session = {
         key: 'ciliai_autosave_v1',
         
         start: function(interval = 30000) {
             console.log("[CiliAI] Auto-save enabled.");
-            // Check for saved session on load
             const saved = localStorage.getItem(this.key);
             if (saved) {
                 const meta = JSON.parse(saved);
-                // Only restore if less than 24 hours old
                 const age = (Date.now() - meta.timestamp) / 1000 / 60 / 60; 
-                if (age < 24) {
-                    console.log(`[CiliAI] Session found from ${meta.date}`);
-                    // Optional: You could auto-restore here or add a UI notification
-                }
+                if (age < 24) console.log(`[CiliAI] Session found from ${meta.date}`);
             }
-
-            // Start background timer
             setInterval(() => this.save(), interval);
         },
 
         save: function() {
             const chatContent = document.getElementById('messages')?.innerHTML || '';
-            if (!chatContent) return; // Don't save empty states
-
+            if (!chatContent) return;
             const state = {
                 timestamp: Date.now(),
                 date: new Date().toLocaleString(),
@@ -8705,17 +8696,12 @@ window.downloadStructure = function(geneSymbol) {
 
         restore: function() {
             const saved = localStorage.getItem(this.key);
-            if (!saved) {
-                alert("No saved session found.");
-                return;
-            }
+            if (!saved) { alert("No saved session found."); return; }
             const state = JSON.parse(saved);
-            
             if (state.dataset) window.CiliAI.activeDataset = state.dataset;
             if (state.history && document.getElementById('messages')) {
                 document.getElementById('messages').innerHTML = state.history;
-                const chat = document.getElementById('messages');
-                chat.scrollTop = chat.scrollHeight;
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
             }
             window.addChatMessage(`🔄 Session restored from ${state.date}`, false);
         },
@@ -8726,49 +8712,39 @@ window.downloadStructure = function(geneSymbol) {
         }
     };
 
-    // 2. COMPARATIVE RADAR CHART (The "Scientist's View")
-    // ==============================================================
+    // 2. COMPARATIVE RADAR CHART
     window.renderComparativeRadar = function(genesInput) {
         const genes = Array.isArray(genesInput) ? genesInput : genesInput.split(/[,\s]+/).filter(Boolean);
         if (genes.length < 1) return;
 
-        // Switch to plot view
         window.switchView('plot'); 
         const container = document.getElementById('plotly-container');
         container.innerHTML = '';
         container.style.display = 'block';
 
         const data = [];
-        
         genes.forEach(geneSym => {
             const g = window.CiliAI.lookups.geneMap[geneSym.toUpperCase()];
             if (!g) return;
 
-            // --- Metrics Calculation ---
-            
-            // 1. Conservation (Proxy: Is it in C. elegans/Drosophila?)
+            // Metrics Calculation
             let conservationScore = 0.4; 
             if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') conservationScore = 1.0;
             else if (g.Ortholog_Drosophila && g.Ortholog_Drosophila !== 'N/A') conservationScore = 0.8;
             else if (g.Ortholog_Mouse && g.Ortholog_Mouse !== 'N/A') conservationScore = 0.6;
 
-            // 2. Disease Burden (Count of associated diseases)
             let diseaseCount = 0;
             if (Array.isArray(g.Ciliopathies)) diseaseCount = g.Ciliopathies.length;
             else if (g.Ciliopathy && g.Ciliopathy !== 'N/A') diseaseCount = 1;
-            const diseaseScore = Math.min(diseaseCount / 4, 1); // Cap at 4 diseases
+            const diseaseScore = Math.min(diseaseCount / 4, 1);
 
-            // 3. Expression Level (Normalized Max TPM)
             let exprScore = 0.1;
             if (g.expression && g.expression.scRNA) {
                 const maxVal = Math.max(...Object.values(g.expression.scRNA));
-                exprScore = Math.min(maxVal / 20, 1); // Normalize: 20 TPM = 1.0
+                exprScore = Math.min(maxVal / 20, 1);
             }
 
-            // 4. Complexity (Is it a known complex component?)
             const complexityScore = g.complex_components ? 1.0 : 0.3;
-
-            // 5. Study Depth (Proxy: # of screens present in)
             const studyScore = (g.screens && g.screens.length > 0) ? Math.min(g.screens.length / 3, 1) : 0.2;
 
             data.push({
@@ -8781,9 +8757,7 @@ window.downloadStructure = function(geneSymbol) {
         });
 
         const layout = {
-            polar: {
-                radialaxis: { visible: true, range: [0, 1] }
-            },
+            polar: { radialaxis: { visible: true, range: [0, 1] } },
             title: `Comparative Profile: ${genes.join(' vs ')}`,
             showlegend: true,
             margin: { t: 50, b: 50, l: 50, r: 50 }
@@ -8794,21 +8768,16 @@ window.downloadStructure = function(geneSymbol) {
     };
 
     // 3. MUTATION BURDEN ANALYZER
-    // ==============================================================
     window.analyzeMutationBurden = async function(geneSymbol) {
         window.addChatMessage(`🔍 Analyzing mutation burden for <strong>${geneSymbol}</strong>...`, false);
         
-        // Reuse existing fetch logic
         const data = await window.fetchVariantDataLive(geneSymbol);
-        
         if (data.error) {
             window.addChatMessage(`Could not analyze mutations: ${data.error}`, false);
             return;
         }
 
         const variants = data.variants || [];
-        
-        // Robust Regex Filtering for ClinVar significance
         const countVariants = (regex) => variants.filter(v => {
             const sig = v.clinicalSignificance || v.significance || "";
             return regex.test(sig) && !/conflicting/i.test(sig);
@@ -8819,7 +8788,6 @@ window.downloadStructure = function(geneSymbol) {
         const vus = variants.length - pathogenic - benign;
         const total = variants.length;
 
-        // Visual HTML Report
         const report = `
             <div class="ai-result-card">
                 <h4>🧬 Mutation Burden: ${geneSymbol}</h4>
@@ -8842,33 +8810,19 @@ window.downloadStructure = function(geneSymbol) {
                     <div style="width:${(vus/total)*100}%; background:#9ca3af;" title="VUS"></div>
                     <div style="width:${(benign/total)*100}%; background:#22c55e;" title="Benign"></div>
                 </div>
-                <p style="font-size:11px; color:#666; margin-top:8px;">
-                    Total variants analyzed: ${total} (Source: ClinVar/UniProt)
-                </p>
-                <button class="ciliai-button" style="width:100%; justify-content:center; margin-top:10px;" onclick="window.renderVariantMap('${geneSymbol}')">
-                    📍 View on Protein Map
-                </button>
-            </div>
-        `;
+                <p style="font-size:11px; color:#666; margin-top:8px;">Total variants analyzed: ${total} (Source: ClinVar/UniProt)</p>
+                <button class="ciliai-button" style="width:100%; justify-content:center; margin-top:10px;" onclick="window.renderVariantMap('${geneSymbol}')">📍 View on Protein Map</button>
+            </div>`;
         
         window.addChatMessage(report, false);
     };
 
+    // Initialize Auto-Save
+    setTimeout(() => window.CiliAI.Session.start(), 5000);
+    console.log("[CiliAI] Advanced Analytics & Persistence module loaded.");
+
+})(); 
+
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
