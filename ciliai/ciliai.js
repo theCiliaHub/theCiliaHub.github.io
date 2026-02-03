@@ -8712,7 +8712,7 @@ window.downloadStructure = function(geneSymbol) {
         }
     };
 
-   // 2. COMPARATIVE RADAR CHART (Scientific & Explanatory)
+ // 2. COMPARATIVE RADAR CHART (Scientific V3: Global Atlas Integration)
     // ==============================================================
     window.renderComparativeRadar = function(genesInput) {
         const genes = Array.isArray(genesInput) ? genesInput : genesInput.split(/[,\s]+/).filter(Boolean);
@@ -8724,50 +8724,72 @@ window.downloadStructure = function(geneSymbol) {
         container.style.display = 'block';
 
         const data = [];
-        // Distinct color palette for comparison
+        // Distinct, high-contrast palette
         const colors = ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed']; 
         
+        // Helper: Query the GLOBAL Atlas defined in loadCiliAIData
+        const analyzeGlobalExpression = (gene) => {
+            if (window.CiliAI.expressionAtlas && window.CiliAI.expressionAtlas[gene]) {
+                const entry = window.CiliAI.expressionAtlas[gene];
+                
+                // 1. Breadth: "Pan-ciliary Score"
+                // How many tissues have >0 expression? (Normalized 0-1)
+                const breadth = (entry.n_tissues_expressed || 0) / 6; 
+                
+                // 2. Intensity: Peak Expression
+                // Filter out metadata keys to find max numeric value
+                const values = Object.values(entry).filter(v => typeof v === 'number' && v < 10000); 
+                const maxTPM = Math.max(...values, 0);
+                const intensity = Math.min(maxTPM / 50, 1.0); // Cap at 50 TPM
+
+                return { breadth, intensity, category: entry.Category || 'Unknown' };
+            }
+            // Fallback if atlas missing
+            return { breadth: 0.1, intensity: 0.1, category: 'No Data' };
+        };
+
         genes.forEach((geneSym, idx) => {
-            const g = window.CiliAI.lookups.geneMap[geneSym.toUpperCase()];
+            const gene = geneSym.toUpperCase();
+            const g = window.CiliAI.lookups.geneMap[gene];
             if (!g) return;
 
-            // --- METRICS LOGIC ---
-            
-            // 1. Conservation: Based on Ortholog Presence
-            // (0.2 Base + presence in key model organisms)
+            // --- 1. Evolution (Conservation) ---
+            // Base 0.2 + bonuses for evolutionary distance
             let conservationScore = 0.2; 
             if (g.Ortholog_Mouse && g.Ortholog_Mouse !== 'N/A') conservationScore += 0.2;
             if (g.Ortholog_Zebrafish && g.Ortholog_Zebrafish !== 'N/A') conservationScore += 0.3;
             if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') conservationScore += 0.3;
             conservationScore = Math.min(conservationScore, 1.0);
 
-            // 2. Disease Load: Count of Ciliopathies
-            // (More diseases = higher score/burden)
-            let diseaseCount = 0;
-            if (Array.isArray(g.Ciliopathies)) diseaseCount = g.Ciliopathies.length;
-            else if (g.Ciliopathy && g.Ciliopathy !== 'N/A') diseaseCount = 1;
-            const diseaseScore = Math.min(diseaseCount / 5, 1); // Cap at 5 diseases
-
-            // 3. Expression: Normalized to Lung scRNA-seq
-            // (Low score usually indicates the gene is Idio-ciliary/Tissue specific to another organ)
-            let exprScore = 0.05; 
-            if (g.expression && g.expression.scRNA) {
-                const maxVal = Math.max(...Object.values(g.expression.scRNA));
-                exprScore = Math.min(maxVal / 50, 1); // 50 TPM = 100%
+            // --- 2. Clinical Relevance (Replaces "Disease Load") ---
+            // 1.0 = Confirmed Ciliopathy. 0.5 = Candidate. 0 = None.
+            let clinicalScore = 0;
+            if ((g.Ciliopathies && g.Ciliopathies.length > 0) || (g.Ciliopathy && g.Ciliopathy !== 'N/A')) {
+                clinicalScore = 1.0;
+            } else if (g.OMIM?.ID) {
+                clinicalScore = 0.6; 
+            } else if (g.screens && g.screens.length > 1) {
+                clinicalScore = 0.3; // Functional hit only
             }
 
-            // 4. Complex Stability: Binary (Is it in a stable complex like IFT/BBS?)
-            const complexityScore = g.complex_components ? 1.0 : 0.3;
+            // --- 3. Global Expression Metrics ---
+            const exprStats = analyzeGlobalExpression(gene);
 
-            // 5. Study Depth: Proxy based on presence in functional screens
-            const studyScore = (g.screens && g.screens.length > 0) ? Math.min(g.screens.length / 3, 1) : 0.2;
+            // --- 4. Structural Interaction ---
+            // 1.0 = Structural Complex (IFT, BBS). 0.6 = Functional Module. 
+            let interactionScore = 0.2;
+            if (g.complex_components || (window.CiliAI.lookups.complexByGene && window.CiliAI.lookups.complexByGene[gene])) {
+                interactionScore = 1.0;
+            } else if (g['Functional.category']) {
+                interactionScore = 0.6;
+            }
 
             data.push({
                 type: 'scatterpolar',
-                r: [conservationScore, diseaseScore, exprScore, complexityScore, studyScore, conservationScore],
-                theta: ['Conservation', 'Disease Load', 'Expression', 'Complex Stability', 'Study Depth', 'Conservation'],
+                r: [conservationScore, clinicalScore, exprStats.breadth, exprStats.intensity, interactionScore, conservationScore],
+                theta: ['Evolution (Age)', 'Clinical Relevance', 'Tissue Breadth', 'Expr. Intensity', 'Interaction', 'Evolution (Age)'],
                 fill: 'toself',
-                name: g.Gene,
+                name: `<b>${gene}</b>`, 
                 line: { color: colors[idx % colors.length], width: 2 },
                 opacity: 0.5
             });
@@ -8777,24 +8799,25 @@ window.downloadStructure = function(geneSymbol) {
             polar: {
                 radialaxis: { visible: true, range: [0, 1] }
             },
-            title: `Multivariate Profile: ${genes.join(' vs ')}`,
+            title: `Multi-Dimensional Analysis: ${genes.join(' vs ')}`,
             showlegend: true,
-            margin: { t: 50, b: 50, l: 50, r: 50 }
+            margin: { t: 60, b: 50, l: 60, r: 60 },
+            legend: { orientation: 'h', y: -0.15 } 
         };
 
         Plotly.newPlot(container, data, layout);
         
-        // --- CONTEXTUAL EXPLANATION ---
+        // --- Scientific Explanation ---
         const explanation = `
             <div class="ai-result-card">
-                <h4>📊 Radar Chart Interpretation</h4>
-                <p>Comparing <strong>${genes.join(', ')}</strong> across 5 dimensions:</p>
+                <h4>📊 Analysis Interpretation</h4>
+                <p>Comparing <strong>${genes.join(', ')}</strong> across 5 biological dimensions:</p>
                 <ul style="font-size:12px; color:#475569; padding-left:20px; line-height:1.6;">
-                    <li><strong>Conservation (Top):</strong> Evolutionary depth. High score = conserved in C. elegans/Zebrafish.</li>
-                    <li><strong>Disease Load (Right):</strong> Number of associated ciliopathies. 0 means no direct link found in database.</li>
-                    <li><strong>Expression (Bottom):</strong> Based on Lung scRNA-seq intensity. <br><em>Note: A low score often means the gene is specific to another tissue (e.g., Retina or Kidney).</em></li>
-                    <li><strong>Complex Stability (Left):</strong> 1.0 indicates a known stable protein complex component (e.g., BBSome).</li>
-                    <li><strong>Study Depth:</strong> Frequency of hits in high-throughput siRNA/CRISPR screens.</li>
+                    <li><strong>Evolution (Age):</strong> Conservation across model organisms. High score = Ancient/Conserved.</li>
+                    <li><strong>Clinical Relevance:</strong> 1.0 indicates a confirmed Human Ciliopathy gene.</li>
+                    <li><strong>Tissue Breadth (Pan-ciliary Score):</strong> Calculated from the <strong>Global Atlas</strong> (6 organs). <br>High = Pan-ciliary (Ubiquitous). Low = Tissue-specific (Idio-ciliary).</li>
+                    <li><strong>Expr. Intensity:</strong> Peak expression level (TPM) across all datasets.</li>
+                    <li><strong>Interaction:</strong> 1.0 indicates membership in a stable structural complex (e.g., IFT, BBSome).</li>
                 </ul>
             </div>
         `;
@@ -8893,6 +8916,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
