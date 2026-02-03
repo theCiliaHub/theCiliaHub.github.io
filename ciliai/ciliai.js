@@ -8712,57 +8712,54 @@ window.downloadStructure = function(geneSymbol) {
         }
     };
 
-    // 2. COMPARATIVE RADAR CHART
-   // 2. COMPARATIVE RADAR CHART (Refined: Custom Colors & Explanation)
+   // 2. COMPARATIVE RADAR CHART (Scientific & Explanatory)
     // ==============================================================
     window.renderComparativeRadar = function(genesInput) {
         const genes = Array.isArray(genesInput) ? genesInput : genesInput.split(/[,\s]+/).filter(Boolean);
         if (genes.length < 1) return;
 
-        // Switch to plot view
         window.switchView('plot'); 
         const container = document.getElementById('plotly-container');
         container.innerHTML = '';
         container.style.display = 'block';
 
         const data = [];
-        const colors = ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed']; // Blue, Red, Green, Amber, Purple
+        // Distinct color palette for comparison
+        const colors = ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed']; 
         
         genes.forEach((geneSym, idx) => {
             const g = window.CiliAI.lookups.geneMap[geneSym.toUpperCase()];
             if (!g) return;
 
-            // --- Metrics Calculation ---
+            // --- METRICS LOGIC ---
             
-            // 1. Conservation (Proxy: Is it in distant species?)
-            // Logic: 0.2 base. +0.2 for Mouse, +0.3 for Zebrafish/Xenopus, +0.3 for C. elegans
+            // 1. Conservation: Based on Ortholog Presence
+            // (0.2 Base + presence in key model organisms)
             let conservationScore = 0.2; 
             if (g.Ortholog_Mouse && g.Ortholog_Mouse !== 'N/A') conservationScore += 0.2;
             if (g.Ortholog_Zebrafish && g.Ortholog_Zebrafish !== 'N/A') conservationScore += 0.3;
             if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') conservationScore += 0.3;
             conservationScore = Math.min(conservationScore, 1.0);
 
-            // 2. Disease Burden (Count of associated diseases)
+            // 2. Disease Load: Count of Ciliopathies
+            // (More diseases = higher score/burden)
             let diseaseCount = 0;
             if (Array.isArray(g.Ciliopathies)) diseaseCount = g.Ciliopathies.length;
             else if (g.Ciliopathy && g.Ciliopathy !== 'N/A') diseaseCount = 1;
-            // Scale: 5+ diseases = 100%
-            const diseaseScore = Math.min(diseaseCount / 5, 1); 
+            const diseaseScore = Math.min(diseaseCount / 5, 1); // Cap at 5 diseases
 
-            // 3. Expression Level (Normalized Max TPM from current dataset)
-            let exprScore = 0.05; // Non-zero baseline so it shows up
+            // 3. Expression: Normalized to Lung scRNA-seq
+            // (Low score usually indicates the gene is Idio-ciliary/Tissue specific to another organ)
+            let exprScore = 0.05; 
             if (g.expression && g.expression.scRNA) {
                 const maxVal = Math.max(...Object.values(g.expression.scRNA));
-                // Scale: 50 TPM = 100% (High expression)
-                exprScore = Math.min(maxVal / 50, 1);
+                exprScore = Math.min(maxVal / 50, 1); // 50 TPM = 100%
             }
 
-            // 4. Complexity (Is it a known complex component?)
-            // Logic: 1.0 if in complex, 0.4 if not
-            const complexityScore = g.complex_components ? 1.0 : 0.4;
+            // 4. Complex Stability: Binary (Is it in a stable complex like IFT/BBS?)
+            const complexityScore = g.complex_components ? 1.0 : 0.3;
 
-            // 5. Study Depth (Proxy: # of screens present in)
-            // Scale: 3+ screens = 100%
+            // 5. Study Depth: Proxy based on presence in functional screens
             const studyScore = (g.screens && g.screens.length > 0) ? Math.min(g.screens.length / 3, 1) : 0.2;
 
             data.push({
@@ -8771,8 +8768,8 @@ window.downloadStructure = function(geneSymbol) {
                 theta: ['Conservation', 'Disease Load', 'Expression', 'Complex Stability', 'Study Depth', 'Conservation'],
                 fill: 'toself',
                 name: g.Gene,
-                line: { color: colors[idx % colors.length] },
-                opacity: 0.6
+                line: { color: colors[idx % colors.length], width: 2 },
+                opacity: 0.5
             });
         });
 
@@ -8787,22 +8784,23 @@ window.downloadStructure = function(geneSymbol) {
 
         Plotly.newPlot(container, data, layout);
         
-        // --- Detailed Explanation ---
+        // --- CONTEXTUAL EXPLANATION ---
         const explanation = `
             <div class="ai-result-card">
-                <h4>📊 Radar Chart Analysis</h4>
-                <p>Comparing biological dimensions for <strong>${genes.join(', ')}</strong>:</p>
+                <h4>📊 Radar Chart Interpretation</h4>
+                <p>Comparing <strong>${genes.join(', ')}</strong> across 5 dimensions:</p>
                 <ul style="font-size:12px; color:#475569; padding-left:20px; line-height:1.6;">
-                    <li><strong>Conservation:</strong> Based on ortholog presence (Mouse, Zebrafish, <em>C. elegans</em>). Higher means evolutionarily ancient.</li>
-                    <li><strong>Disease Load:</strong> Based on number of associated ciliopathies. 0 means no direct disease link found yet.</li>
-                    <li><strong>Expression:</strong> Normalized max TPM in Lung scRNA-seq. <br><em>(Note: Low score may mean the gene is specific to other tissues like Retina or Kidney).</em></li>
-                    <li><strong>Complex Stability:</strong> 1.0 if the protein is a known component of a stable complex (e.g. BBSome, IFT).</li>
-                    <li><strong>Study Depth:</strong> Based on appearance in high-throughput screens (siRNA/CRISPR).</li>
+                    <li><strong>Conservation (Top):</strong> Evolutionary depth. High score = conserved in C. elegans/Zebrafish.</li>
+                    <li><strong>Disease Load (Right):</strong> Number of associated ciliopathies. 0 means no direct link found in database.</li>
+                    <li><strong>Expression (Bottom):</strong> Based on Lung scRNA-seq intensity. <br><em>Note: A low score often means the gene is specific to another tissue (e.g., Retina or Kidney).</em></li>
+                    <li><strong>Complex Stability (Left):</strong> 1.0 indicates a known stable protein complex component (e.g., BBSome).</li>
+                    <li><strong>Study Depth:</strong> Frequency of hits in high-throughput siRNA/CRISPR screens.</li>
                 </ul>
             </div>
         `;
         window.addChatMessage(explanation, false);
     };
+    
 
     // 3. MUTATION BURDEN ANALYZER (FIXED: Deep Scan Logic)
     // ==============================================================
@@ -8895,5 +8893,6 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
