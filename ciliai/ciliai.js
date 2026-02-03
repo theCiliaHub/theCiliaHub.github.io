@@ -6680,11 +6680,12 @@ const intentHandlers = [
 intentHandlers.sort((a, b) => b.priority - a.priority);
 
 // 4. New Dispatcher: handleAIQuery (Updated for v12.0 Features)
+// 4. New Dispatcher: handleAIQuery (Updated for v12.0 & Legacy Support)
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow || !query) return;
 
-    // Fail-safe: Ensure utils exist (fixes "Cannot read properties of undefined")
+    // 1. Fail-safe: Ensure utils exist (fixes "Cannot read properties of undefined")
     if (!window.CiliAI.utils) {
         console.warn("CiliAI.utils was missing. Re-initializing.");
         window.CiliAI.utils = {
@@ -6701,6 +6702,7 @@ window.handleAIQuery = async function (query) {
     if (window.log) window.log(`Routing query: ${query}`);
 
     try {
+        // 2. Loading Check
         if (!window.CiliAI || !window.CiliAI.ready) {
             window.addChatMessage("Data is still loading, please wait...", false);
             return;
@@ -6711,7 +6713,7 @@ window.handleAIQuery = async function (query) {
         // These override standard intents for specific tools
         // =========================================================
 
-        // 1. Session Management
+        // Hook 1: Session Management
         if (qLower.includes('session') || qLower.includes('reset app')) {
             if (window.CiliAI.Session) {
                 if (qLower.includes('save')) {
@@ -6730,7 +6732,7 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-        // 2. Comparative Radar Chart
+        // Hook 2: Comparative Radar Chart
         if (qLower.includes('radar') && (qLower.includes('compare') || qLower.includes('plot'))) {
             const genes = window.CiliAI.utils.extractGenes(query);
             if (genes.length > 0 && window.renderComparativeRadar) {
@@ -6739,7 +6741,7 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-        // 3. Mutation Burden Analysis
+        // Hook 3: Mutation Burden Analysis
         if (qLower.includes('mutation burden') || qLower.includes('analyze mutations') || qLower.includes('variant stats')) {
             const genes = window.CiliAI.utils.extractGenes(query);
             if (genes.length > 0 && window.analyzeMutationBurden) {
@@ -6749,19 +6751,24 @@ window.handleAIQuery = async function (query) {
         }
 
         // =========================================================
-        // STANDARD INTENT LOOP
+        // STANDARD INTENT LOOP (Legacy Support)
         // =========================================================
 
         let htmlResult = null;
 
-        for (const intent of intentHandlers) {
-            if (intent.matcher(qLower)) {
-                // Pass the raw query to the handler
-                htmlResult = await intent.handler(query);
-                
-                if (htmlResult) {
-                    window.addChatMessage(htmlResult, false);
-                    return;
+        // Ensure intentHandlers exists
+        const handlers = window.intentHandlers || []; 
+
+        for (const intent of handlers) {
+            if (intent && typeof intent.matcher === 'function') {
+                if (intent.matcher(qLower)) {
+                    // Pass the raw query to the handler
+                    htmlResult = await intent.handler(query);
+                    
+                    if (htmlResult) {
+                        window.addChatMessage(htmlResult, false);
+                        return;
+                    }
                 }
             }
         }
@@ -6774,6 +6781,7 @@ window.handleAIQuery = async function (query) {
         window.addChatMessage(`An internal error occurred: ${e.message}`, false);
     }
 };
+
 window.fetchVariantData = async function(geneSymbol) {
     try {
         const response = await fetch(`https://mygene.info/v3/query?q=${geneSymbol}&fields=clinvar,gnomad`);
@@ -8849,6 +8857,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
