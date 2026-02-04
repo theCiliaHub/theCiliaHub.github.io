@@ -5143,10 +5143,7 @@ const intentHandlers = [
         }
     },
 
-// ────────────────────────────────────────────────
-//  Conservation of specific residue (L301 in BBS1 etc.)
-// ────────────────────────────────────────────────
-   {
+{
     priority: 89,
     matcher: (qLower) => {
         return (
@@ -5239,6 +5236,7 @@ const intentHandlers = [
         }
     }
 },
+    
     // Ciliopathy classification, overlap, orthologs (combined for efficiency)
     {
         priority: 85,
@@ -9043,6 +9041,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
