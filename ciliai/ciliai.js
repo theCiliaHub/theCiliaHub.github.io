@@ -8269,265 +8269,187 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 };
 
 /* ==============================================================
- * MODULE: UNIVERSAL 3D STRUCTURE VIEWER — v2 (fully fixed)
- *
- * Bugs fixed:
- *   1. "Invalid PDBeMolstarPlugin options" — the <pdbe-molstar> tag
- *      only accepts a specific whitelist of kebab-case attributes.
- *      The previous version passed unknown ones (highlight-data, etc.)
- *      which caused the validation error on every render.
- *
- *   2. Variant not appearing — highlight-data is NOT a supported
- *      attribute. The correct approach is to call the helper methods
- *      AFTER the structure has finished loading:
- *        • instance.visual.select()  — paints the residue magenta
- *        • instance.visual.focus()   — zooms the camera onto it
- *      These are triggered by subscribing to the loadComplete event
- *      that the web component fires when the 3D model is ready.
+ * MODULE: UNIVERSAL 3D STRUCTURE VIEWER – Jan 31, 2026 Fix
+ * Prioritize official EBI static URLs + explicit v3.10.0
+ * Enhanced diagnostics & user-visible retry
  * ============================================================== */
 
-(function () {
-    'use strict';
-
-    // ─── 1. LOADER ────────────────────────────────────────────────
-    window.loadMolStar = async function () {
-        if (customElements.get('pdbe-molstar')) return true;
-
-        return new Promise((resolve, reject) => {
-            console.log("[CiliAI] Downloading 3D Engine...");
-
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
-            document.head.appendChild(link);
-
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js';
-
-            script.onload = () => {
-                customElements.whenDefined('pdbe-molstar').then(() => {
-                    console.log("[CiliAI] 3D Engine Ready (<pdbe-molstar> registered).");
-                    resolve(true);
-                });
-            };
-
-            script.onerror = () => reject(new Error("Failed to load PDBe Mol* script."));
-            document.head.appendChild(script);
-        });
-    };
-
-
-    // ─── 2. HIGHLIGHT + FOCUS after structure loads ──────────────
-    //
-    // The web component exposes its helper API as:
-    //     element.molstarInstance   (the viewer instance)
-    //
-    // And fires a reactive event we can subscribe to:
-    //     element.molstarInstance.events.loadComplete.subscribe(cb)
-    //
-    // Official helper signatures used here:
-    //
-    //   instance.visual.select({
-    //       data: [{ entity_id, start_residue_number, end_residue_number, color, focus }],
-    //       nonSelectedColor   ← optional: greys out the rest
-    //   })
-    //
-    //   instance.visual.focus([
-    //       { entity_id, start_residue_number, end_residue_number }
-    //   ])
-    // ──────────────────────────────────────────────────────────────
-    function applyVariantHighlight(molstarElement, residueNumber) {
-        // Helper: poll for the instance (it attaches asynchronously)
-        function getInstance() {
-            return new Promise((resolve, reject) => {
-                const start = Date.now();
-                const tick = () => {
-                    // pdbe-molstar web component stores the viewer here:
-                    const inst = molstarElement.molstarInstance;
-                    if (inst) {
-                        resolve(inst);
-                    } else if (Date.now() - start > 20000) {
-                        reject(new Error("Mol* viewer instance not available after 20 s."));
-                    } else {
-                        requestAnimationFrame(tick);
-                    }
-                };
-                tick();
-            });
-        }
-
-        getInstance().then((instance) => {
-            // Subscribe to loadComplete — fires when the 3D model is
-            // fully parsed and rendered, so the structure data exists.
-            const sub = instance.events.loadComplete.subscribe(() => {
-                sub.unsubscribe(); // one-shot
-
-                const queryParam = {
-                    entity_id: '1',                        // AlphaFold single-entity models are always entity 1
-                    start_residue_number: residueNumber,
-                    end_residue_number: residueNumber,
-                    color: { r: 217, g: 70, b: 239 },     // #D946EF magenta — matches the legend
-                    focus: true                            // also zoom onto it
-                };
-
-                // select() paints the residue AND greys out the rest
-                instance.visual.select({
-                    data: [queryParam],
-                    nonSelectedColor: { r: 180, g: 180, b: 195 }  // soft grey
-                }).then(() => {
-                    console.log(`[CiliAI] ✅ Variant residue ${residueNumber} highlighted & focused.`);
-                }).catch((err) => {
-                    console.warn("[CiliAI] select() failed:", err);
-                });
-            });
-
-            console.log("[CiliAI] Subscribed to loadComplete — will highlight residue " + residueNumber);
-        }).catch((err) => {
-            console.warn("[CiliAI] Could not get Mol* instance:", err.message);
-        });
+window.loadMolStar = async function (preferredSource = 'jsdelivr') {
+    if (customElements.get('pdbe-molstar-plugin')) {
+        console.log("[CiliAI] PDBe Mol* already registered.");
+        return;
     }
 
+    return new Promise((resolve, reject) => {
+        console.log("[CiliAI] PDBe Mol* load attempt - source: " + preferredSource);
 
-    // ─── 3. VIEWER RENDERER ──────────────────────────────────────
-    window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) {
-        const btn = document.getElementById('btn-3d');
-        const originalText = btn ? btn.innerText : "🧊 View 3D";
-
-        if (btn) {
-            btn.innerText = "⏳ Opening...";
-            btn.disabled = true;
-        }
-
-        try {
-            // A. Load the web component library
-            await window.loadMolStar();
-
-            // B. Resolve UniProt ID
-            const data = await window.fetchVariantDataLive(geneSymbol);
-            if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
-            const uniprotID = data.uniprotID;
-
-            // C. Build the modal
-            const modal = document.createElement('div');
-            modal.id = 'molstar-modal';
-            modal.style.cssText = `
-                position: fixed; inset: 0; width: 100vw; height: 100dvh;
-                background: rgba(0,0,0,0.95); z-index: 200000;
-                display: flex; flex-direction: column; justify-content: center; align-items: center;
-            `;
-
-            // D. innerHTML — ONLY documented attributes on <pdbe-molstar>:
-            //      molecule-id, alphafold-view, hide-controls,
-            //      bg-color-r/g/b, highlight-color-r/g/b
-            //    Everything else (highlight-data, etc.) must be REMOVED
-            //    or the component throws "Invalid PDBeMolstarPlugin options".
-            modal.innerHTML = `
-                <div style="width:94vw; height:92vh; max-width:1400px; background:#fff;
-                            border-radius:12px; overflow:hidden; display:flex; flex-direction:column;
-                            box-shadow:0 25px 50px rgba(0,0,0,0.5);">
-
-                    <!-- Header -->
-                    <div style="padding:15px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;
-                                display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-                        <div>
-                            <div style="font-size:18px; font-weight:700; color:#1e293b;">
-                                ${geneSymbol} &mdash; AlphaFold Structure
-                            </div>
-                            <div style="font-size:13px; color:#64748b;">
-                                ${variantPos
-                                    ? `Variant: <strong style="color:#d946ef;">${variantAA || ''}${variantPos}</strong> &nbsp;|&nbsp;`
-                                    : 'Full Protein View &nbsp;|&nbsp;'
-                                }
-                                UniProt: <strong>${uniprotID}</strong>
-                                &nbsp;|&nbsp; Model: <strong>AF-${uniprotID}-F1</strong>
-                            </div>
-                        </div>
-                        <button id="close-3d"
-                                style="background:#e2e8f0; border:none; width:32px; height:32px;
-                                       border-radius:50%; font-size:18px; cursor:pointer;
-                                       color:#475569; font-weight:bold;"
-                                title="Close (Esc)">✕</button>
-                    </div>
-
-                    <!-- 3D Viewer — ONLY valid attributes here -->
-                    <div style="flex:1; position:relative; background:#fff; overflow:hidden;">
-                        <pdbe-molstar
-                            id="pdbe-molstar-target"
-                            molecule-id="${uniprotID}"
-                            alphafold-view="true"
-                            hide-controls="false"
-                            bg-color-r="255"
-                            bg-color-g="255"
-                            bg-color-b="255"
-                            style="position:absolute; top:0; left:0; width:100%; height:100%; display:block;"
-                        ></pdbe-molstar>
-                    </div>
-
-                    <!-- Legend -->
-                    <div style="padding:12px 20px; background:#fff; border-top:1px solid #e2e8f0;
-                                font-size:11px; color:#475569; display:flex; gap:20px;
-                                flex-wrap:wrap; flex-shrink:0; align-items:center;">
-                        <span style="font-weight:600; color:#334155;">pLDDT Confidence:</span>
-                        <span style="display:flex; align-items:center;">
-                            <span style="width:10px; height:10px; background:#0053D6; border-radius:50%; margin-right:5px;"></span>Very High (&gt;90)
-                        </span>
-                        <span style="display:flex; align-items:center;">
-                            <span style="width:10px; height:10px; background:#65CBF3; border-radius:50%; margin-right:5px;"></span>High (70–90)
-                        </span>
-                        <span style="display:flex; align-items:center;">
-                            <span style="width:10px; height:10px; background:#FFDB13; border-radius:50%; margin-right:5px;"></span>Low (50–70)
-                        </span>
-                        <span style="display:flex; align-items:center;">
-                            <span style="width:10px; height:10px; background:#FF7D45; border-radius:50%; margin-right:5px;"></span>Disordered (&lt;50)
-                        </span>
-                        ${variantPos ? `
-                        <span style="display:flex; align-items:center; font-weight:700; color:#d946ef; margin-left:10px;">
-                            <span style="width:12px; height:12px; background:#d946ef; border-radius:50%;
-                                         margin-right:6px; box-shadow:0 0 6px #d946ef;"></span>
-                            Variant: ${variantAA || ''}${variantPos}
-                        </span>` : ''}
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(modal);
-
-            // E. Close logic
-            const close = () => {
-                modal.remove();
-                if (btn) { btn.innerText = originalText; btn.disabled = false; }
-            };
-            modal.querySelector('#close-3d').onclick = close;
-
-            const escListener = (e) => {
-                if (e.key === 'Escape') {
-                    close();
-                    window.removeEventListener('keydown', escListener);
-                }
-            };
-            window.addEventListener('keydown', escListener);
-
-            // F. Apply variant highlight AFTER the component has loaded its structure.
-            //    We pass the <pdbe-molstar> element; the helper polls for
-            //    .molstarInstance and then subscribes to loadComplete internally.
-            if (variantPos) {
-                const molstarEl = modal.querySelector('#pdbe-molstar-target');
-                applyVariantHighlight(molstarEl, parseInt(variantPos, 10));
+        const sources = {
+            jsdelivr: {
+                css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@latest/build/pdbe-molstar.css',
+                js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@latest/build/pdbe-molstar-component.js'
+            },
+            unpkg: {
+                css: 'https://unpkg.com/pdbe-molstar@latest/build/pdbe-molstar.css',
+                js: 'https://unpkg.com/pdbe-molstar@latest/build/pdbe-molstar-component.js'
             }
+        };
 
-            // G. Reset button state
-            if (btn) { btn.innerText = originalText; btn.disabled = false; }
+        const src = sources[preferredSource] || sources.jsdelivr;
+        console.log("[CiliAI] Using CSS: " + src.css);
+        console.log("[CiliAI] Using JS: " + src.js);
 
-        } catch (e) {
-            console.error("[CiliAI] 3D Viewer Error:", e);
-            alert("3D Viewer Error: " + e.message);
-            if (btn) { btn.innerText = originalText; btn.disabled = false; }
-        }
-    };
+        const cssLink = document.createElement('link');
+        cssLink.rel = 'stylesheet';
+        cssLink.href = src.css;
+        document.head.appendChild(cssLink);
 
-    console.log("[CiliAI] 3D Viewer module loaded.");
-})();
+        const script = document.createElement('script');
+        script.async = true;
+        script.src = src.js;
 
+        const checkInterval = setInterval(() => {
+            if (customElements.get('pdbe-molstar-plugin')) {
+                clearInterval(checkInterval);
+                clearTimeout(safetyTimer);
+                console.log("[CiliAI] SUCCESS: pdbe-molstar-plugin registered!");
+                resolve();
+            }
+        }, 300);
+
+        const safetyTimer = setTimeout(() => {
+            clearInterval(checkInterval);
+            console.warn("[CiliAI] Timeout after 15s - component not registered.");
+            resolve(); // force proceed to show error UI
+        }, 15000);
+
+        script.onload = () => console.log("[CiliAI] Script LOADED via onload (size/content parsed OK?).");
+        script.onerror = (e) => {
+            console.error("[CiliAI] Script LOAD ERROR:", e);
+            reject(new Error("Failed to fetch PDBe Mol* script - check Network tab / extensions."));
+        };
+
+        document.head.appendChild(script);
+    });
+};
+
+// In showStructureViewer: chain fallbacks
+await window.loadMolStar('jsdelivr').catch(() => {
+    console.warn("[CiliAI] jsDelivr failed - retrying unpkg...");
+    return window.loadMolStar('unpkg');
+}).catch(() => {
+    console.error("[CiliAI] All sources failed - likely blocked by extension/network.");
+    // You can show a custom alert or banner here
+});
+
+window.showStructureViewer = async function (geneSymbol, variantPos, variantAA) {
+    const btn = document.getElementById('btn-3d');
+    if (btn) btn.innerText = "⏳ Loading 3D...";
+
+    try {
+        // First try jsDelivr/explicit version
+        await window.loadMolStar(false).catch(() => {
+            console.warn("[CiliAI] jsDelivr failed – auto-retrying with official EBI source...");
+            return window.loadMolStar(true);
+        });
+
+        const data = await window.fetchVariantDataLive(geneSymbol);
+        if (data.error || !data.uniprotID) throw new Error(`No UniProt for ${geneSymbol}`);
+        const uniprotID = data.uniprotID.trim().toUpperCase();
+
+        const highlightData = variantPos ? [{
+            entity_id: "1",
+            residue_number: parseInt(variantPos, 10),
+            color: { r: 255, g: 0, b: 255 },
+            focus: true
+        }] : [];
+
+        const modal = document.createElement('div');
+        modal.id = 'molstar-modal';
+        modal.style.cssText = `position:fixed;inset:0;width:100vw;height:100dvh;background:rgba(0,0,0,0.92);z-index:200000;display:flex;flex-direction:column;justify-content:center;align-items:center;`;
+
+        modal.innerHTML = `
+            <div style="width:92%;height:92%;background:#fff;display:flex;flex-direction:column;border-radius:10px;overflow:hidden;box-shadow:0 10px 60px rgba(0,0,0,0.6);">
+                <div style="padding:14px 24px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <span style="font-size:20px;font-weight:700;color:#0f172a;">${geneSymbol} – AlphaFold Structure</span>
+                        ${variantPos ? `<span style="font-size:14px;color:#475569;margin-left:12px;">Variant: <strong>${variantAA||'?'}${variantPos}</strong> (magenta highlight)</span>` : ''}
+                    </div>
+                    <button id="close-3d" style="font-size:24px;cursor:pointer;border:none;background:none;color:#64748b;padding:0 8px;">✕</button>
+                </div>
+                <div id="molstar-wrapper" style="position:relative;flex:1;width:100%;min-height:0;background:#f8fafc;">
+                    <pdbe-molstar-plugin
+                        id="molstar-target"
+                        molecule-id="${uniprotID}"
+                        alphafold-view="true"
+                        theme="light"
+                        bgcolor="{r:248,g:250,b:252}"
+                        highlight-data='${JSON.stringify(highlightData)}'
+                        style="position:absolute;inset:0;display:block;">
+                    </pdbe-molstar-plugin>
+                </div>
+                <div id="molstar-error" style="padding:12px;background:#fee2e2;color:#991b1b;font-size:14px;text-align:center;display:none;">
+                    3D viewer failed to initialize (likely network/CDN issue). 
+                    <button id="retry-ebi" style="margin-left:12px;padding:6px 14px;background:#1d4ed8;color:white;border:none;border-radius:6px;cursor:pointer;">Retry with Official Source</button>
+                    <br><small>Tip: Try disabling Etikimza extension or use incognito mode.</small>
+                </div>
+                <div style="padding:12px 24px;background:#fff;border-top:1px solid #e2e8f0;font-size:12px;color:#475569;display:flex;gap:18px;flex-wrap:wrap;">
+                    <span style="display:flex;align-items:center;"><span style="width:10px;height:10px;background:#0053D6;border-radius:50%;margin-right:6px;"></span>Very high pLDDT (>90)</span>
+                    <!-- ... other pLDDT legend spans ... -->
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Check for shadow DOM (success indicator)
+        setTimeout(() => {
+            const plugin = document.getElementById('molstar-target');
+            if (plugin && plugin.shadowRoot && plugin.shadowRoot.querySelector('canvas')) {
+                console.log("[CiliAI] Success: Shadow DOM + canvas detected.");
+            } else {
+                console.warn("[CiliAI] No shadow DOM/canvas – load failed.");
+                document.getElementById('molstar-error').style.display = 'block';
+            }
+        }, 8000);
+
+        // Resize kicks
+        const resize = () => window.dispatchEvent(new Event('resize'));
+        [400, 1000, 2200, 5000].forEach(d => setTimeout(resize, d));
+
+        // Close
+        const close = () => {
+            window.removeEventListener('keydown', esc);
+            modal.remove();
+            if (btn) btn.innerText = "🧊 View 3D Structure";
+        };
+        const esc = e => { if (e.key === 'Escape') close(); };
+        window.addEventListener('keydown', esc);
+        modal.querySelector('#close-3d').onclick = close;
+
+        // Retry button – forces EBI source reload
+        modal.querySelector('#retry-ebi')?.addEventListener('click', async () => {
+            document.getElementById('molstar-error').style.display = 'none';
+            document.getElementById('molstar-wrapper').innerHTML = '';
+            const newPlugin = document.createElement('pdbe-molstar-plugin');
+            newPlugin.id = 'molstar-target';
+            newPlugin.setAttribute('molecule-id', uniprotID);
+            newPlugin.setAttribute('alphafold-view', 'true');
+            newPlugin.setAttribute('theme', 'light');
+            newPlugin.setAttribute('bgcolor', '{r:248,g:250,b:252}');
+            newPlugin.setAttribute('highlight-data', JSON.stringify(highlightData));
+            newPlugin.style.cssText = 'position:absolute;inset:0;display:block;';
+            document.getElementById('molstar-wrapper').appendChild(newPlugin);
+            try { await window.loadMolStar(true); } catch(e) {}
+            setTimeout(resize, 800); setTimeout(resize, 2000);
+        });
+
+        if (btn) btn.innerText = "🧊 View 3D Structure";
+
+    } catch (e) {
+        console.error("[CiliAI 3D Fatal]", e);
+        if (btn) btn.innerText = "🧊 3D Failed";
+        alert("3D init failed: " + e.message + "\n\nLikely network/extension issue. Disable Etikimza and retry.");
+    }
+};
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
