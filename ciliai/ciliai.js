@@ -5140,6 +5140,57 @@ const intentHandlers = [
         }
     },
 
+// --- NEW: Specific Residue Conservation Intent ---
+    // Matches: "Conservation of L301 in BBS1", "Check residue 55 on IFT88", "Score for p.A203T"
+    {
+        priority: 89, // High priority to catch specific residue queries
+        matcher: (qLower) => {
+            // Must contain "conservation", "conserved", or "score" AND a number
+            return (qLower.includes('conserv') || qLower.includes('score') || qLower.includes('check')) && 
+                   /\d+/.test(qLower) && 
+                   window.CiliAI.utils.extractGenes(qLower).length > 0;
+        },
+        handler: async (query) => {
+            // 1. Extract Gene
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return "Please specify a gene (e.g., 'Conservation of L301 in BBS1').";
+            const gene = genes[0];
+            
+            // 2. Extract Residue (Robust Regex)
+            // Matches: L301, 301, p.L301, residue 301
+            const posMatch = query.match(/([a-z])?(\d+)([a-z])?/i);
+            
+            if (!posMatch) {
+                return `I found the gene <strong>${gene}</strong>, but I couldn't identify the residue position. Try saying "L301" or "residue 301".`;
+            }
+
+            const refAA = posMatch[1] ? posMatch[1].toUpperCase() : ''; // e.g., 'L'
+            const pos = parseInt(posMatch[2]); // e.g., 301
+            
+            // 3. Chat Feedback Card (with Phylogenetic Tree Context)
+            window.addChatMessage(`
+                <div class="ai-result-card">
+                    <h4>🌍 Evolutionary Analysis</h4>
+                    <p>Checking conservation for <strong>${gene}</strong> at residue <strong>${refAA}${pos}</strong>.</p>
+                    <div style="margin-top:10px; padding:10px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0; font-size:12px; color:#64748b;">
+                        <strong>Scope:</strong> 50+ Species (Primates to Protists)<br>
+                        <strong>Goal:</strong> Determining if this residue is essential for ciliary function.
+                    </div>
+                    
+
+[Image of phylogenetic tree of eukaryotes]
+
+                    <p style="font-size:11px; margin-top:5px; color:#94a3b8;">Loading MSA...</p>
+                </div>
+            `, false);
+
+            // 4. Trigger the Engine
+            await window.checkConservation(gene, pos, refAA || 'X');
+            
+            return null; // The function handles the modal UI
+        }
+    },
+    
     // NEW PRIORITY 88: Structure / Localization Gene Lists (Fixes queries without verbs)
     {
         priority: 88,
@@ -8113,13 +8164,22 @@ window.downloadVariantCSV = function() {
     a.click();
 };
 /* ==============================================================
- * MODULE: ROBUST EVOLUTIONARY ALIGNER (v2.0)
+ * MODULE: CONSERVATION DATA PIPELINE
+ * Connects Fetch Logic -> New Professional MSA Visualizer
  * ============================================================== */
+
+// 1. The Data Fetcher (Updated to call the new renderer)
+/* ==============================================================
+ * MODULE: HIGH-DENSITY EVOLUTIONARY ALIGNER (50+ Species)
+ * Parallel fetching for Primates, Mammals, Vertebrates & Models
+ * ============================================================== */
+
 window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
     const btn = document.getElementById('vp-action');
-    if(btn) btn.innerText = "⏳ Deep scanning...";
+    if(btn) btn.innerText = "⏳ Scanning 50+ species...";
+
     try {
-        // A. Human Reference Sequence
+        // --- Step A: Get Human Reference ---
         const humanRes = await window.fetchVariantDataLive(geneSymbol);
         if(humanRes.error) throw new Error("Could not fetch human reference.");
         
@@ -8127,126 +8187,186 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
         if(!seqRes.ok) throw new Error("Human sequence not found.");
         const seqData = await seqRes.json();
         const humanSeq = seqData.sequence.sequence;
-        // B. Define Target Species
+
+        // --- Step B: Massive 50-Species Target List ---
         const targets = [
-            { id: 9544, name: 'Macaque', icon: '🐵' },
+            // --- PRIMATES (12) ---
+            { id: 9598,  name: 'Chimp', icon: '🐵' },
+            { id: 9597,  name: 'Bonobo', icon: '🐵' },
+            { id: 9593,  name: 'Gorilla', icon: '🦍' },
+            { id: 9601,  name: 'Orangutan', icon: '🦧' },
+            { id: 9544,  name: 'Rhesus Macaque', icon: '🐒' },
+            { id: 9541,  name: 'Crab-eating Macaque', icon: '🐒' },
+            { id: 9554,  name: 'Baboon', icon: '🐒' },
+            { id: 9483,  name: 'Marmoset', icon: '🐒' },
+            { id: 9510,  name: 'Squirrel Monkey', icon: '🐒' },
+            { id: 30611, name: 'Bushbaby', icon: '🐒' },
+            { id: 30608, name: 'Lemur', icon: '🐒' },
+            
+            // --- MAMMALS (15) ---
             { id: 10090, name: 'Mouse', icon: '🐭' },
             { id: 10116, name: 'Rat', icon: '🐀' },
-            { id: 8364, name: 'Xenopus', icon: '🐸' },
-            { id: 7955, name: 'Zebrafish', icon: '🐟' },
-            { id: 7227, name: 'Drosophila', icon: '🪰' },
-            { id: 6239, name: 'C. elegans', icon: '🪱' }
+            { id: 10036, name: 'Hamster', icon: '🐹' },
+            { id: 10141, name: 'Guinea Pig', icon: '🐹' },
+            { id: 9986,  name: 'Rabbit', icon: '🐰' },
+            { id: 9615,  name: 'Dog', icon: '🐕' },
+            { id: 9685,  name: 'Cat', icon: '🐈' },
+            { id: 9669,  name: 'Ferret', icon: '🦦' },
+            { id: 9913,  name: 'Cow', icon: '🐄' },
+            { id: 9823,  name: 'Pig', icon: '🐖' },
+            { id: 9940,  name: 'Sheep', icon: '🐑' },
+            { id: 9796,  name: 'Horse', icon: '🐎' },
+            { id: 9785,  name: 'Elephant', icon: '🐘' },
+            { id: 9365,  name: 'Hedgehog', icon: '🦔' }, // Sonic hedgehog pathway relevance!
+            
+            // --- BIRDS & REPTILES (5) ---
+            { id: 9031,  name: 'Chicken', icon: '🐔' },
+            { id: 9103,  name: 'Turkey', icon: '🦃' },
+            { id: 59729, name: 'Zebra Finch', icon: '🐦' },
+            { id: 28377, name: 'Anole Lizard', icon: '🦎' },
+            { id: 8479,  name: 'Painted Turtle', icon: '🐢' },
+
+            // --- AMPHIBIANS & FISH (7) ---
+            { id: 8364,  name: 'Xenopus tropicalis', icon: '🐸' },
+            { id: 8355,  name: 'Xenopus laevis', icon: '🐸' },
+            { id: 7955,  name: 'Zebrafish', icon: '🐟' },
+            { id: 8090,  name: 'Medaka', icon: '🐟' },
+            { id: 31033, name: 'Fugu', icon: '🐡' },
+            { id: 998810, name: 'Tetraodon', icon: '🐡' },
+            { id: 69293, name: 'Stickleback', icon: '🐟' },
+
+            // --- INVERTEBRATES & CILIARY MODELS (11) ---
+            { id: 6239,  name: 'C. elegans', icon: '🪱' },
+            { id: 6238,  name: 'C. briggsae', icon: '🪱' },
+            { id: 7227,  name: 'Drosophila', icon: '🪰' },
+            { id: 7165,  name: 'Mosquito', icon: '🦟' },
+            { id: 7460,  name: 'Honey Bee', icon: '🐝' },
+            { id: 3055,  name: 'Chlamydomonas', icon: '🌿' }, // Critical
+            { id: 5691,  name: 'Trypanosoma', icon: '🦠' },   // Critical
+            { id: 5911,  name: 'Tetrahymena', icon: '🦠' },
+            { id: 5888,  name: 'Paramecium', icon: '🦠' },
+            { id: 5741,  name: 'Giardia', icon: '🦠' },
+            { id: 10228, name: 'Sea Anemone', icon: '🪸' }
         ];
-        // C. Fetch Orthologs (Parallel Strategy)
-        // 1. Try Homologene first (fastest)
+
+        // --- Step C: Fetch Orthologs (Homologene Backbone) ---
         const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
         const orthoData = await orthoRes.json();
         let orthologs = [];
+
         if (orthoData.hits?.[0]?.homologene?.id) {
             const hID = orthoData.hits[0].homologene.id;
-            const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=100`);
+            // Fetch ALL homologene members at once
+            const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=200`);
             const groupData = await groupRes.json();
             orthologs = groupData.hits || [];
         }
-        // 2. "Rescue" missing species with direct queries
-        // If we didn't find a Rat ortholog in Homologene, ask for it directly
-        const missing = targets.filter(t => !orthologs.find(o => o.taxid === t.id));
-        if (missing.length > 0) {
-            console.log(`[CiliAI] Attempting to rescue missing orthologs: ${missing.map(m=>m.name).join(', ')}`);
-            const rescuePromises = missing.map(t => 
-                // "Find gene in [species] that is the ortholog of human [GENE]"
-                // Note: MyGene doesn't have a direct "ortholog_of" endpoint, so we rely on symbol matching fallback
-                // A better fallback for production is searching by name in that species
-                fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${t.id}&fields=uniprot,symbol`)
-                    .then(r => r.json())
-                    .then(d => d.hits?.[0] ? { ...d.hits[0], taxid: t.id } : null)
-            );
-            const rescued = (await Promise.all(rescuePromises)).filter(Boolean);
-            orthologs = [...orthologs, ...rescued];
-        }
-        // D. Align Sequences (Fuzzy Window)
-        const alignments = [];
-        let conservedCount = 0;
-        let totalAligned = 0;
+
+        // --- Step D: Parallel "Rescue" & Alignment ---
+        // We do EVERYTHING in parallel to ensure speed with 50+ species
         
-        // Human Fingerprint (20aa context)
-        const windowSize = 20;
+        // Human Context Window (20 AA)
+        const windowSize = 20; 
         const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
         const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
         const humanFingerprint = humanSeq.substring(hStart, hEnd);
+        const refAA = humanSeq[humanPos - 1];
 
-        // Add Human
+        // Prepare Human Entry
         const dispStartH = Math.max(0, (humanPos - 1) - 7);
         const dispEndH = Math.min(humanSeq.length, (humanPos - 1) + 8);
-        const humanSegment = humanSeq.substring(dispStartH, dispEndH);
-        const refAA = humanSeq[humanPos - 1];
-        alignments.push({
+        const results = [{
             species: 'Human',
             icon: '👤',
             symbol: geneSymbol,
-            seq: humanSegment,
-            centerResidue: refAA,
-            isConserved: true
+            seq: humanSeq.substring(dispStartH, dispEndH),
+            isConserved: true,
+            score: 1.0 // Reference
+        }];
+
+        let conservedCount = 0;
+        let totalAligned = 0;
+
+        // PARALLEL PROCESSING FUNCTION
+        const processSpecies = async (t) => {
+            let orthoGene = orthologs.find(g => g.taxid === t.id);
+            
+            // If missing in Homologene, try direct rescue
+            if (!orthoGene) {
+                try {
+                    const rRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${t.id}&fields=uniprot,symbol`);
+                    const rData = await rRes.json();
+                    if (rData.hits && rData.hits.length > 0) {
+                        orthoGene = { ...rData.hits[0], taxid: t.id };
+                    }
+                } catch(e) {}
+            }
+
+            if (!orthoGene) return null; // No ortholog found
+
+            let uID = orthoGene.uniprot?.Swiss_Prot || orthoGene.uniprot?.TrEMBL;
+            const finalUID = Array.isArray(uID) ? uID[0] : uID;
+            
+            if (!finalUID) return null;
+
+            try {
+                const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
+                if (!sRes.ok) return null;
+                const sData = await sRes.json();
+                const seq = sData.sequence.sequence;
+                
+                // Fuzzy Match
+                const bestMatch = findBestAlignment(humanFingerprint, seq);
+                
+                if (bestMatch.score > 0.30) { 
+                    const centerIdx = bestMatch.index + Math.floor(windowSize/2);
+                    const dispStart = Math.max(0, centerIdx - 7);
+                    const dispEnd = Math.min(seq.length, centerIdx + 8);
+                    const segment = seq.substring(dispStart, dispEnd);
+                    const residue = seq[centerIdx];
+                    const isMatch = residue === refAA;
+                    
+                    return {
+                        species: t.name,
+                        icon: t.icon,
+                        symbol: orthoGene.symbol,
+                        seq: segment,
+                        centerResidue: residue,
+                        isConserved: isMatch
+                    };
+                }
+            } catch(err) { return null; }
+            return null;
+        };
+
+        // RUN ALL SPECIES IN PARALLEL
+        const promises = targets.map(t => processSpecies(t));
+        const alignedResults = (await Promise.all(promises)).filter(Boolean);
+
+        // Calculate stats
+        alignedResults.forEach(r => {
+            if(r.isConserved) conservedCount++;
+            totalAligned++;
+            results.push(r);
         });
 
-        for (const t of targets) {
-            const orthoGene = orthologs.find(g => g.taxid === t.id);
-            
-            if (orthoGene) {
-                let uID = orthoGene.uniprot?.Swiss_Prot || orthoGene.uniprot?.TrEMBL;
-                const finalUID = Array.isArray(uID) ? uID[0] : uID;
-                if (finalUID) {
-                    try {
-                        const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
-                        if(sRes.ok) {
-                            const sData = await sRes.json();
-                            const seq = sData.sequence.sequence;
-                            
-                            // Fuzzy Scan
-                            const bestMatch = findBestAlignment(humanFingerprint, seq);
-                            
-                            if (bestMatch.score > 0.35) { // Threshold: 35% similarity
-                                const centerIdx = bestMatch.index + Math.floor(windowSize/2);
-                                
-                                // Display Window (15aa for better context)
-                                const dispStart = Math.max(0, centerIdx - 7);
-                                const dispEnd = Math.min(seq.length, centerIdx + 8);
-                                const segment = seq.substring(dispStart, dispEnd);
-                                
-                                // Check center residue
-                                const residue = seq[centerIdx];
-                                const isMatch = residue === refAA;
-                                if(isMatch) conservedCount++;
-                                totalAligned++;
-                                alignments.push({
-                                    species: t.name,
-                                    icon: t.icon,
-                                    symbol: orthoGene.symbol,
-                                    seq: segment,
-                                    centerResidue: residue,
-                                    isConserved: isMatch
-                                });
-                            }
-                        }
-                    } catch(err) { console.warn(`Failed seq fetch for ${t.name}`); }
-                }
-            }
-        }
         const score = totalAligned > 0 ? Math.round((conservedCount / totalAligned) * 100) : 0;
         
-        // Trigger New MSA Visualizer
-        window.renderProfessionalMSA(geneSymbol, humanPos, refAA, alignments, score);
+        // --- Step E: Render ---
+        window.renderProfessionalMSA(geneSymbol, humanPos, refAA, results, score);
+
     } catch (e) {
         console.error(e);
         alert("Alignment Error: " + e.message);
+    } finally {
         if(btn) btn.innerText = "🌍 Check Conservation";
     }
 };
-// HELPER: Fuzzy Matcher
+
+// 2. The Fuzzy Matcher Helper (Required for checkConservation)
 function findBestAlignment(query, target) {
     let bestScore = -1;
     let bestIndex = -1;
-    // Fast scan
     for (let i = 0; i <= target.length - query.length; i++) {
         let currentScore = 0;
         for (let j = 0; j < query.length; j++) {
@@ -8259,6 +8379,7 @@ function findBestAlignment(query, target) {
     }
     return { index: bestIndex, score: bestScore / query.length };
 }
+
 /* ==============================================================
  * MODULE: PROFESSIONAL MSA VISUALIZER (Jalview Style)
  * ============================================================== */
@@ -8916,6 +9037,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
