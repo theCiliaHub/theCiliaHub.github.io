@@ -5149,58 +5149,91 @@ const intentHandlers = [
    {
     priority: 89,
     matcher: (qLower) => {
-        return (qLower.includes('conserv') || qLower.includes('score') || qLower.includes('check')) &&
-               /\d+/.test(qLower) &&
-               window.CiliAI.utils.extractGenes(qLower).length > 0;
+        return (
+            qLower.includes('conserv') ||
+            qLower.includes('conserved') ||
+            qLower.includes('conservation') ||
+            qLower.includes('score') ||
+            qLower.includes('check')
+        ) &&
+        /\d+/.test(qLower) &&
+        window.CiliAI.utils.extractGenes(qLower).length > 0;
     },
     handler: async (query) => {
+        // Extract gene first
         const genes = window.CiliAI.utils.extractGenes(query);
         if (genes.length === 0) {
-            return "Please specify a gene (e.g., 'Conservation of L301 in BBS1').";
+            return `<div class="ai-result-card">
+                <p>Please specify a gene (example: <strong>Conservation of L301 in BBS1</strong> or <strong>Is M390 conserved in BBS1?</strong>).</p>
+            </div>`;
         }
+
         const gene = genes[0].toUpperCase();
 
-       const posMatch = query.match(/([A-Za-z])?(\d+)(?:[A-Za-z])?/i);  // More flexible
-if (!posMatch?.[2]) { /* error */ }
+        // More flexible position parsing
+        // Matches: L301, Leu301, p.L301, p.Leu301, L301R, residue 301, position 301, 301L, etc.
+        const posMatch = query.match(/(?:p\.|residue|position)?\s*([A-Za-z]{1,3})?\s*(\d+)\s*([A-Za-z]{1,3})?/i);
 
-try {
-    await window.checkConservation?.(gene, pos, refAA || 'X') ?? console.warn('checkConservation not available');
-} catch (e) {
-    return `<div class="ai-result-card error">Conservation data for ${gene} p.${refAA}${pos} unavailable: ${e.message}</div>`;
-}
+        if (!posMatch || !posMatch[2]) {
+            return `<div class="ai-result-card">
+                <h4>Could not parse residue position</h4>
+                <p>Found gene: <strong>${gene}</strong>, but couldn't identify the position.</p>
+                <p>Try formats like:</p>
+                <ul style="font-size:13px; margin:8px 0 8px 20px;">
+                    <li>Conservation of L301 in BBS1</li>
+                    <li>Is Leu301 conserved in BBS1?</li>
+                    <li>Check conservation of p.M390R BBS1</li>
+                    <li>Residue 390 in BBS1</li>
+                </ul>
+            </div>`;
+        }
 
-        const refAA = (posMatch[1] || '').toUpperCase();
-        const pos = parseInt(posMatch[2], 10);
-        const altAA = (posMatch[3] || '').toUpperCase();  // optional, for future variant context
+        // Extract components
+        const refAA  = (posMatch[1] || '').toUpperCase();           // e.g. L, LEU, M
+        const pos    = parseInt(posMatch[2], 10);                   // e.g. 301
+        const altAA  = (posMatch[3] || '').toUpperCase();           // e.g. R (optional – variant)
 
-        // Show immediate feedback
+        const displayPos = refAA ? `p.${refAA}${pos}` : `p.X${pos}`;
+        const variantNote = altAA ? ` → ${refAA}${pos}${altAA}` : '';
+
+        // Show nice loading card immediately
         window.addChatMessage(`
             <div class="ai-result-card">
-                <h4>🌍 Evolutionary Conservation: ${gene} p.${refAA || 'X'}${pos}</h4>
-                <p>Querying conservation across species (primates → vertebrates → eukaryotes where available)...</p>
-                <div style="margin:10px 0; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; color:#64748b;">
-                    <strong>Scope:</strong> Up to 100+ species (precomputed MSA)<br>
-                    <strong>Goal:</strong> Assess if this position is functionally constrained in the BBSome.
+                <h4>🌍 Evolutionary Conservation: ${gene} ${displayPos}${variantNote}</h4>
+                <p>Querying precomputed multiple sequence alignment...</p>
+                <div style="margin:12px 0; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; color:#64748b;">
+                    <strong>Scope:</strong> 50–100+ species (primates → vertebrates → eukaryotes)<br>
+                    <strong>Goal:</strong> Determine functional constraint at this site
                 </div>
-                <p style="font-size:11px; color:#94a3b8;">Loading alignment & scores...</p>
+                <p style="font-size:11px; color:#94a3b8; margin-top:8px;">
+                    Loading alignment & conservation scores...
+                </p>
             </div>
         `, false);
 
-        // Safety wrapper
+        // Safety-wrapped call to the actual conservation function
         try {
             if (typeof window.checkConservation !== 'function') {
-                throw new Error("checkConservation function not available");
+                throw new Error("Conservation module not loaded (window.checkConservation is missing)");
             }
+
+            // Call the real function
             await window.checkConservation(gene, pos, refAA || 'X');
-            return null;  // success — visual rendered elsewhere
+
+            // If it succeeds, we usually return null → rendering happens in checkConservation
+            return null;
+
         } catch (err) {
-            console.error("Conservation check failed:", err);
-            return `<div class="ai-result-card" style="border-left:4px solid #ef4444;">
-                <h4>Error loading conservation for ${gene} p.${refAA || 'X'}${pos}</h4>
-                <p>${err.message || 'Failed to load MSA / conservation data.'}</p>
-                <p style="font-size:13px; color:#4b5563;">
-                    → Try again or check if BBS1 data is loaded.<br>
-                    → Alternative: ask for "radar chart BBS1" or "mutation burden BBS1".
+            console.error("[Conservation Handler] Failed:", err);
+
+            return `<div class="ai-result-card" style="border-left:4px solid #ef4444; padding-left:12px;">
+                <h4>Error loading conservation for ${gene} ${displayPos}</h4>
+                <p style="color:#374151; margin:8px 0;">
+                    ${err.message || 'Failed to load MSA or conservation scores.'}
+                </p>
+                <p style="font-size:13px; color:#4b5563; margin-top:10px;">
+                    → Make sure phylogeny / alignment data is loaded.<br>
+                    → Try again or use alternatives: "radar chart ${gene}" or "mutation burden ${gene}"
                 </p>
             </div>`;
         }
@@ -9010,6 +9043,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
