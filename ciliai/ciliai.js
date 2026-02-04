@@ -262,21 +262,28 @@ window.neversPhylogenyCache = null;
 window.CiliAI_UMAP = null; // This will be populated from the master DB
 
 // 1. Improved Utility
+// 1. Robust Gene Extraction Utility
 window.CiliAI.utils.extractGenes = function(query) {
     if (!query) return [];
-    // Matches common gene patterns while ignoring common words
-    // Added boundary checks and filtered out common noise words
-    const potentialGenes = query.toUpperCase().match(/\b[A-Z0-9]{2,10}\b/g) || [];
-    const stopWords = ['IS', 'THE', 'AND', 'CHECK', 'SCORE', 'FOR', 'GENE'];
     
-    return potentialGenes.filter(g => 
-        !stopWords.includes(g) && 
-        (window.CiliAI.stats.genes.includes(g) || /^[A-Z]{2,}[0-9]*$/.test(g))
-    );
+    // Convert to upper and find alphanumeric strings (2-10 chars)
+    const tokens = query.toUpperCase().match(/\b[A-Z0-9]{2,10}\b/g) || [];
+    
+    // Words to ignore that might look like genes
+    const stopWords = ['IS', 'THE', 'AND', 'CHECK', 'SCORE', 'FOR', 'GENE', 'WHAT', 'SHOW'];
+    
+    return tokens.filter(g => {
+        const isNotStopWord = !stopWords.includes(g);
+        const isKnownGene = window.CiliAI.stats && 
+                            window.CiliAI.stats.genes && 
+                            window.CiliAI.stats.genes.includes(g);
+        const looksLikeGene = /^[A-Z]{2,}[0-9]*$/.test(g);
+        
+        return isNotStopWord && (isKnownGene || looksLikeGene);
+    });
 };
    
-    // --- Data Maps (These are now just for the AI brain) ---
-
+// --- Data Maps (These are now just for the AI brain) ---
 
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
     const NEVERS_CIL_PANEL = [
@@ -5157,11 +5164,11 @@ const intentHandlers = [
     },
 // Conservation Handler
 {
-   priority: 95, // Bumped priority
+    priority: 89, // Bumped priority
     matcher: (qLower) => {
         const hasKeyword = ['conserv', 'score', 'check', 'residue', 'position'].some(k => qLower.includes(k));
         const hasNumber = /\d+/.test(qLower);
-        const hasGene = window.CiliAI.utils.extractGenes(qLower).length > 0;
+        const hasGene = window.CiliAI.utils.extractGenes && window.CiliAI.utils.extractGenes(qLower).length > 0;
         return hasKeyword && hasNumber && hasGene;
     },
     handler: async (query) => {
@@ -5172,21 +5179,29 @@ const intentHandlers = [
         const posMatch = query.match(/(?:p\.)?([A-Z]{1,3})?(\d+)([A-Z]{1,3})?/i) || 
                          query.match(/(?:residue|position)\s*(\d+)/i);
 
-        if (!posMatch) return `<div class="ai-result-card">Found ${gene}, but couldn't parse position.</div>`;
+        if (!posMatch) {
+            return `<div class="ai-result-card">Found ${gene}, but couldn't parse position.</div>`;
+        }
 
         // Handle different match groups depending on which regex hit
+        // If the first regex hits: group 2 is the digit. If the residue/position regex hits: group 1 is the digit.
         const pos = posMatch[2] || posMatch[1]; 
-        const refAA = posMatch[1] && isNaN(posMatch[1]) ? posMatch[1].toUpperCase() : 'M';
+        const refAA = (posMatch[1] && isNaN(posMatch[1])) ? posMatch[1].toUpperCase() : 'M';
 
         // Trigger visual module
         if (typeof window.checkConservation === 'function') {
-            await window.checkConservation(gene, parseInt(pos), refAA);
-            return null; // Handled by visual module
+            try {
+                await window.checkConservation(gene, parseInt(pos, 10), refAA);
+                return null; // Handled by visual module rendering
+            } catch (err) {
+                console.error("Conservation execution failed:", err);
+                return `<div class="ai-result-card">Error executing checkConservation for ${gene}.</div>`;
+            }
         }
         
         return `<div class="ai-result-card">Module checkConservation not found.</div>`;
     }
-};
+},
     
     // Ciliopathy classification, overlap, orthologs (combined for efficiency)
     {
@@ -8992,6 +9007,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
