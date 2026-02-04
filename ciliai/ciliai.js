@@ -5006,7 +5006,7 @@ const intentHandlers = [
             return explanation + listPreview;
         }
     },
-// 1. COMPARATIVE RADAR CHART INTENT
+// 95 (Alternate): Comparative Radar Chart
     {
         priority: 95,
         matcher: (qLower) => (qLower.includes('compare') || qLower.includes('plot')) && qLower.includes('radar'),
@@ -5017,13 +5017,13 @@ const intentHandlers = [
             }
             if (window.renderComparativeRadar) {
                 window.renderComparativeRadar(genes);
-                return null; // The function handles the UI
+                return null;
             }
             return "Error: Radar Chart module not loaded.";
         }
     },
 
-    // 2. MUTATION BURDEN ANALYSIS INTENT
+    // 94: Mutation Burden Analysis
     {
         priority: 94,
         matcher: (qLower) => qLower.includes('mutation burden') || qLower.includes('analyze mutations') || qLower.includes('variant stats'),
@@ -5140,34 +5140,28 @@ const intentHandlers = [
         }
     },
 
-// --- NEW: Specific Residue Conservation Intent ---
-    // Matches: "Conservation of L301 in BBS1", "Check residue 55 on IFT88", "Score for p.A203T"
+    // 89: Specific Residue Conservation Intent
     {
-        priority: 89, // High priority to catch specific residue queries
+        priority: 89, 
         matcher: (qLower) => {
-            // Must contain "conservation", "conserved", or "score" AND a number
             return (qLower.includes('conserv') || qLower.includes('score') || qLower.includes('check')) && 
                    /\d+/.test(qLower) && 
                    window.CiliAI.utils.extractGenes(qLower).length > 0;
         },
         handler: async (query) => {
-            // 1. Extract Gene
             const genes = window.CiliAI.utils.extractGenes(query);
             if (genes.length === 0) return "Please specify a gene (e.g., 'Conservation of L301 in BBS1').";
             const gene = genes[0];
             
-            // 2. Extract Residue (Robust Regex)
-            // Matches: L301, 301, p.L301, residue 301
             const posMatch = query.match(/([a-z])?(\d+)([a-z])?/i);
             
             if (!posMatch) {
                 return `I found the gene <strong>${gene}</strong>, but I couldn't identify the residue position. Try saying "L301" or "residue 301".`;
             }
 
-            const refAA = posMatch[1] ? posMatch[1].toUpperCase() : ''; // e.g., 'L'
-            const pos = parseInt(posMatch[2]); // e.g., 301
+            const refAA = posMatch[1] ? posMatch[1].toUpperCase() : ''; 
+            const pos = parseInt(posMatch[2]); 
             
-            // 3. Chat Feedback Card (with Phylogenetic Tree Context)
             window.addChatMessage(`
                 <div class="ai-result-card">
                     <h4>🌍 Evolutionary Analysis</h4>
@@ -5184,10 +5178,8 @@ const intentHandlers = [
                 </div>
             `, false);
 
-            // 4. Trigger the Engine
             await window.checkConservation(gene, pos, refAA || 'X');
-            
-            return null; // The function handles the modal UI
+            return null; 
         }
     },
     
@@ -9037,6 +9029,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
