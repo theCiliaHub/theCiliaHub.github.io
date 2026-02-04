@@ -261,6 +261,19 @@ window.liPhylogenyCache = null;
 window.neversPhylogenyCache = null;
 window.CiliAI_UMAP = null; // This will be populated from the master DB
 
+// 1. Improved Utility
+window.CiliAI.utils.extractGenes = function(query) {
+    if (!query) return [];
+    // Matches common gene patterns while ignoring common words
+    // Added boundary checks and filtered out common noise words
+    const potentialGenes = query.toUpperCase().match(/\b[A-Z0-9]{2,10}\b/g) || [];
+    const stopWords = ['IS', 'THE', 'AND', 'CHECK', 'SCORE', 'FOR', 'GENE'];
+    
+    return potentialGenes.filter(g => 
+        !stopWords.includes(g) && 
+        (window.CiliAI.stats.genes.includes(g) || /^[A-Z]{2,}[0-9]*$/.test(g))
+    );
+};
    
     // --- Data Maps (These are now just for the AI brain) ---
 
@@ -5142,100 +5155,38 @@ const intentHandlers = [
             `;
         }
     },
-
+// Conservation Handler
 {
-    priority: 89,
+   priority: 95, // Bumped priority
     matcher: (qLower) => {
-        return (
-            qLower.includes('conserv') ||
-            qLower.includes('conserved') ||
-            qLower.includes('conservation') ||
-            qLower.includes('score') ||
-            qLower.includes('check')
-        ) &&
-        /\d+/.test(qLower) &&
-        window.CiliAI.utils.extractGenes(qLower).length > 0;
+        const hasKeyword = ['conserv', 'score', 'check', 'residue', 'position'].some(k => qLower.includes(k));
+        const hasNumber = /\d+/.test(qLower);
+        const hasGene = window.CiliAI.utils.extractGenes(qLower).length > 0;
+        return hasKeyword && hasNumber && hasGene;
     },
     handler: async (query) => {
-        // Extract gene first
         const genes = window.CiliAI.utils.extractGenes(query);
-        if (genes.length === 0) {
-            return `<div class="ai-result-card">
-                <p>Please specify a gene (example: <strong>Conservation of L301 in BBS1</strong> or <strong>Is M390 conserved in BBS1?</strong>).</p>
-            </div>`;
+        const gene = genes[0];
+
+        // Robust regex for: M390, residue 390, p.M390R, 390M
+        const posMatch = query.match(/(?:p\.)?([A-Z]{1,3})?(\d+)([A-Z]{1,3})?/i) || 
+                         query.match(/(?:residue|position)\s*(\d+)/i);
+
+        if (!posMatch) return `<div class="ai-result-card">Found ${gene}, but couldn't parse position.</div>`;
+
+        // Handle different match groups depending on which regex hit
+        const pos = posMatch[2] || posMatch[1]; 
+        const refAA = posMatch[1] && isNaN(posMatch[1]) ? posMatch[1].toUpperCase() : 'M';
+
+        // Trigger visual module
+        if (typeof window.checkConservation === 'function') {
+            await window.checkConservation(gene, parseInt(pos), refAA);
+            return null; // Handled by visual module
         }
-
-        const gene = genes[0].toUpperCase();
-
-        // More flexible position parsing
-        // Matches: L301, Leu301, p.L301, p.Leu301, L301R, residue 301, position 301, 301L, etc.
-        const posMatch = query.match(/(?:p\.|residue|position)?\s*([A-Za-z]{1,3})?\s*(\d+)\s*([A-Za-z]{1,3})?/i);
-
-        if (!posMatch || !posMatch[2]) {
-            return `<div class="ai-result-card">
-                <h4>Could not parse residue position</h4>
-                <p>Found gene: <strong>${gene}</strong>, but couldn't identify the position.</p>
-                <p>Try formats like:</p>
-                <ul style="font-size:13px; margin:8px 0 8px 20px;">
-                    <li>Conservation of L301 in BBS1</li>
-                    <li>Is Leu301 conserved in BBS1?</li>
-                    <li>Check conservation of p.M390R BBS1</li>
-                    <li>Residue 390 in BBS1</li>
-                </ul>
-            </div>`;
-        }
-
-        // Extract components
-        const refAA  = (posMatch[1] || '').toUpperCase();           // e.g. L, LEU, M
-        const pos    = parseInt(posMatch[2], 10);                   // e.g. 301
-        const altAA  = (posMatch[3] || '').toUpperCase();           // e.g. R (optional – variant)
-
-        const displayPos = refAA ? `p.${refAA}${pos}` : `p.X${pos}`;
-        const variantNote = altAA ? ` → ${refAA}${pos}${altAA}` : '';
-
-        // Show nice loading card immediately
-        window.addChatMessage(`
-            <div class="ai-result-card">
-                <h4>🌍 Evolutionary Conservation: ${gene} ${displayPos}${variantNote}</h4>
-                <p>Querying precomputed multiple sequence alignment...</p>
-                <div style="margin:12px 0; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; color:#64748b;">
-                    <strong>Scope:</strong> 50–100+ species (primates → vertebrates → eukaryotes)<br>
-                    <strong>Goal:</strong> Determine functional constraint at this site
-                </div>
-                <p style="font-size:11px; color:#94a3b8; margin-top:8px;">
-                    Loading alignment & conservation scores...
-                </p>
-            </div>
-        `, false);
-
-        // Safety-wrapped call to the actual conservation function
-        try {
-            if (typeof window.checkConservation !== 'function') {
-                throw new Error("Conservation module not loaded (window.checkConservation is missing)");
-            }
-
-            // Call the real function
-            await window.checkConservation(gene, pos, refAA || 'X');
-
-            // If it succeeds, we usually return null → rendering happens in checkConservation
-            return null;
-
-        } catch (err) {
-            console.error("[Conservation Handler] Failed:", err);
-
-            return `<div class="ai-result-card" style="border-left:4px solid #ef4444; padding-left:12px;">
-                <h4>Error loading conservation for ${gene} ${displayPos}</h4>
-                <p style="color:#374151; margin:8px 0;">
-                    ${err.message || 'Failed to load MSA or conservation scores.'}
-                </p>
-                <p style="font-size:13px; color:#4b5563; margin-top:10px;">
-                    → Make sure phylogeny / alignment data is loaded.<br>
-                    → Try again or use alternatives: "radar chart ${gene}" or "mutation burden ${gene}"
-                </p>
-            </div>`;
-        }
+        
+        return `<div class="ai-result-card">Module checkConservation not found.</div>`;
     }
-},
+};
     
     // Ciliopathy classification, overlap, orthologs (combined for efficiency)
     {
@@ -9041,6 +8992,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
