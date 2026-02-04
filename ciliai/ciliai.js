@@ -5160,10 +5160,14 @@ const intentHandlers = [
         }
         const gene = genes[0].toUpperCase();
 
-        const posMatch = query.match(/([A-Za-z])?(\d+)([A-Za-z])?/i);
-        if (!posMatch || !posMatch[2]) {
-            return `I found the gene <strong>${gene}</strong>, but couldn't parse the residue (e.g., try "L301" or "Leu301" or "residue 301").`;
-        }
+       const posMatch = query.match(/([A-Za-z])?(\d+)(?:[A-Za-z])?/i);  // More flexible
+if (!posMatch?.[2]) { /* error */ }
+
+try {
+    await window.checkConservation?.(gene, pos, refAA || 'X') ?? console.warn('checkConservation not available');
+} catch (e) {
+    return `<div class="ai-result-card error">Conservation data for ${gene} p.${refAA}${pos} unavailable: ${e.message}</div>`;
+}
 
         const refAA = (posMatch[1] || '').toUpperCase();
         const pos = parseInt(posMatch[2], 10);
@@ -9006,6 +9010,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
