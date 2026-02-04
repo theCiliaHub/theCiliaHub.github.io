@@ -261,29 +261,9 @@ window.liPhylogenyCache = null;
 window.neversPhylogenyCache = null;
 window.CiliAI_UMAP = null; // This will be populated from the master DB
 
-// 1. Improved Utility
-// 1. Robust Gene Extraction Utility
-window.CiliAI.utils.extractGenes = function(query) {
-    if (!query) return [];
-    
-    // Convert to upper and find alphanumeric strings (2-10 chars)
-    const tokens = query.toUpperCase().match(/\b[A-Z0-9]{2,10}\b/g) || [];
-    
-    // Words to ignore that might look like genes
-    const stopWords = ['IS', 'THE', 'AND', 'CHECK', 'SCORE', 'FOR', 'GENE', 'WHAT', 'SHOW'];
-    
-    return tokens.filter(g => {
-        const isNotStopWord = !stopWords.includes(g);
-        const isKnownGene = window.CiliAI.stats && 
-                            window.CiliAI.stats.genes && 
-                            window.CiliAI.stats.genes.includes(g);
-        const looksLikeGene = /^[A-Z]{2,}[0-9]*$/.test(g);
-        
-        return isNotStopWord && (isKnownGene || looksLikeGene);
-    });
-};
    
-// --- Data Maps (These are now just for the AI brain) ---
+    // --- Data Maps (These are now just for the AI brain) ---
+
 
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
     const NEVERS_CIL_PANEL = [
@@ -4870,40 +4850,7 @@ window.handleCellTypeQuestion = function(query) {
 // ==========================================================
 
 const intentHandlers = [
-
-    // ────────────────────────────────────────────────
-    //  Highest priority — session & system commands
-    // ────────────────────────────────────────────────
-    {
-        priority: 99,
-        matcher: (qLower) => qLower.includes('session') || qLower.includes('reset app'),
-        handler: async (query) => {
-            const qLower = window.CiliAI.utils.normalizeQuery(query);
-
-            if (qLower.includes('restore') || qLower.includes('load')) {
-                if (window.CiliAI.Session) {
-                    window.CiliAI.Session.restore();
-                    return "🔄 Attempting to restore previous session...";
-                }
-            }
-
-            if (qLower.includes('clear') || qLower.includes('reset') || qLower.includes('delete')) {
-                if (window.CiliAI.Session) {
-                    window.CiliAI.Session.clear();
-                    return "🗑️ Session history has been cleared.";
-                }
-            }
-
-            if (qLower.includes('save')) {
-                if (window.CiliAI.Session) {
-                    window.CiliAI.Session.save();
-                    return "💾 Session manually saved to local storage.";
-                }
-            }
-
-            return "Session Manager: Use 'Save session', 'Restore session', or 'Clear session'.";
-        }
-    },
+    
     {
         priority: 200,
         matcher: (qLower) => 
@@ -5059,7 +5006,7 @@ const intentHandlers = [
             return explanation + listPreview;
         }
     },
-// 95 (Alternate): Comparative Radar Chart
+// 1. COMPARATIVE RADAR CHART INTENT
     {
         priority: 95,
         matcher: (qLower) => (qLower.includes('compare') || qLower.includes('plot')) && qLower.includes('radar'),
@@ -5070,13 +5017,13 @@ const intentHandlers = [
             }
             if (window.renderComparativeRadar) {
                 window.renderComparativeRadar(genes);
-                return null;
+                return null; // The function handles the UI
             }
             return "Error: Radar Chart module not loaded.";
         }
     },
 
-    // 94: Mutation Burden Analysis
+    // 2. MUTATION BURDEN ANALYSIS INTENT
     {
         priority: 94,
         matcher: (qLower) => qLower.includes('mutation burden') || qLower.includes('analyze mutations') || qLower.includes('variant stats'),
@@ -5093,7 +5040,37 @@ const intentHandlers = [
         }
     },
 
-  
+    // 3. SESSION MANAGEMENT INTENTS
+    {
+        priority: 99, // Highest priority
+        matcher: (qLower) => qLower.includes('session') || qLower.includes('reset app'),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            
+            if (qLower.includes('restore') || qLower.includes('load')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.restore();
+                    return "🔄 Attempting to restore previous session...";
+                }
+            }
+            
+            if (qLower.includes('clear') || qLower.includes('reset') || qLower.includes('delete')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.clear();
+                    return "🗑️ Session history has been cleared.";
+                }
+            }
+            
+            if (qLower.includes('save')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.save();
+                    return "💾 Session manually saved to local storage.";
+                }
+            }
+            
+            return "Session Manager: Use 'Save session', 'Restore session', or 'Clear session'.";
+        }
+    },
     // "Where is [GENE] expressed?" for ANY ciliary gene
     {
         priority: 90,
@@ -5162,47 +5139,103 @@ const intentHandlers = [
             `;
         }
     },
-// Conservation Handler
-{
-    priority: 89, // Bumped priority
-    matcher: (qLower) => {
-        const hasKeyword = ['conserv', 'score', 'check', 'residue', 'position'].some(k => qLower.includes(k));
-        const hasNumber = /\d+/.test(qLower);
-        const hasGene = window.CiliAI.utils.extractGenes && window.CiliAI.utils.extractGenes(qLower).length > 0;
-        return hasKeyword && hasNumber && hasGene;
-    },
-    handler: async (query) => {
-        const genes = window.CiliAI.utils.extractGenes(query);
-        const gene = genes[0];
 
-        // Robust regex for: M390, residue 390, p.M390R, 390M
-        const posMatch = query.match(/(?:p\.)?([A-Z]{1,3})?(\d+)([A-Z]{1,3})?/i) || 
-                         query.match(/(?:residue|position)\s*(\d+)/i);
-
-        if (!posMatch) {
-            return `<div class="ai-result-card">Found ${gene}, but couldn't parse position.</div>`;
-        }
-
-        // Handle different match groups depending on which regex hit
-        // If the first regex hits: group 2 is the digit. If the residue/position regex hits: group 1 is the digit.
-        const pos = posMatch[2] || posMatch[1]; 
-        const refAA = (posMatch[1] && isNaN(posMatch[1])) ? posMatch[1].toUpperCase() : 'M';
-
-        // Trigger visual module
-        if (typeof window.checkConservation === 'function') {
-            try {
-                await window.checkConservation(gene, parseInt(pos, 10), refAA);
-                return null; // Handled by visual module rendering
-            } catch (err) {
-                console.error("Conservation execution failed:", err);
-                return `<div class="ai-result-card">Error executing checkConservation for ${gene}.</div>`;
+// --- NEW: Specific Residue Conservation Intent ---
+    // Matches: "Conservation of L301 in BBS1", "Check residue 55 on IFT88", "Score for p.A203T"
+    {
+        priority: 89, // High priority to catch specific residue queries
+        matcher: (qLower) => {
+            // Must contain "conservation", "conserved", or "score" AND a number
+            return (qLower.includes('conserv') || qLower.includes('score') || qLower.includes('check')) && 
+                   /\d+/.test(qLower) && 
+                   window.CiliAI.utils.extractGenes(qLower).length > 0;
+        },
+        handler: async (query) => {
+            // 1. Extract Gene
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return "Please specify a gene (e.g., 'Conservation of L301 in BBS1').";
+            const gene = genes[0];
+            
+            // 2. Extract Residue (Robust Regex)
+            // Matches: L301, 301, p.L301, residue 301
+            const posMatch = query.match(/([a-z])?(\d+)([a-z])?/i);
+            
+            if (!posMatch) {
+                return `I found the gene <strong>${gene}</strong>, but I couldn't identify the residue position. Try saying "L301" or "residue 301".`;
             }
+
+            const refAA = posMatch[1] ? posMatch[1].toUpperCase() : ''; // e.g., 'L'
+            const pos = parseInt(posMatch[2]); // e.g., 301
+            
+            // 3. Chat Feedback Card (with Phylogenetic Tree Context)
+            window.addChatMessage(`
+                <div class="ai-result-card">
+                    <h4>🌍 Evolutionary Analysis</h4>
+                    <p>Checking conservation for <strong>${gene}</strong> at residue <strong>${refAA}${pos}</strong>.</p>
+                    <div style="margin-top:10px; padding:10px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0; font-size:12px; color:#64748b;">
+                        <strong>Scope:</strong> 50+ Species (Primates to Protists)<br>
+                        <strong>Goal:</strong> Determining if this residue is essential for ciliary function.
+                    </div>
+                    
+
+[Image of phylogenetic tree of eukaryotes]
+
+                    <p style="font-size:11px; margin-top:5px; color:#94a3b8;">Loading MSA...</p>
+                </div>
+            `, false);
+
+            // 4. Trigger the Engine
+            await window.checkConservation(gene, pos, refAA || 'X');
+            
+            return null; // The function handles the modal UI
         }
-        
-        return `<div class="ai-result-card">Module checkConservation not found.</div>`;
-    }
-},
+    },
     
+    // NEW PRIORITY 88: Structure / Localization Gene Lists (Fixes queries without verbs)
+    {
+        priority: 88,
+        matcher: (qLower) => {
+            // Matches "Transition zone genes", "Basal body genes", etc.
+            return (qLower.includes('genes') && (qLower.includes('transition zone') || qLower.includes('basal body') || qLower.includes('axoneme') || qLower.includes('centrosome') || qLower.includes('membrane'))) ||
+                   (qLower.includes('display') && (qLower.includes('transition zone') || qLower.includes('basal body') || qLower.includes('axoneme')));
+        },
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            let loc = null;
+            if (qLower.includes('transition zone')) loc = 'Transition Zone';
+            else if (qLower.includes('basal body')) loc = 'Basal Body';
+            else if (qLower.includes('axoneme')) loc = 'Axoneme';
+            else if (qLower.includes('membrane')) loc = 'Ciliary Membrane';
+            else if (qLower.includes('centrosome')) loc = 'Centrosome';
+
+            if (loc) {
+                let genes = [];
+                // Use global helper if available, otherwise manual filter
+                if (window.getGenesByLocalization) {
+                    genes = window.getGenesByLocalization(loc);
+                } else {
+                    // Fallback manual filter
+                    const normLoc = loc.toLowerCase();
+                    window.CiliAI.masterData.forEach(g => {
+                        if (g.Localization && g.Localization.toLowerCase().includes(normLoc)) {
+                            genes.push({ gene: g.Gene, localization: g.Localization });
+                        }
+                    });
+                }
+                
+                if (genes.length > 0) {
+                    // Use formatListResult to display table immediately
+                    return window.formatListResult 
+                        ? window.formatListResult(`Genes in ${loc}`, genes, `Found ${genes.length} genes localized to ${loc}.`)
+                        : `Found ${genes.length} genes in ${loc}. (Visualizer loading...)`;
+                } else {
+                     return `<div class="ai-result-card"><p>No genes found specifically localized to <strong>${loc}</strong>.</p></div>`;
+                }
+            }
+            return null;
+        }
+    },
+
     // Ciliopathy classification, overlap, orthologs (combined for efficiency)
     {
         priority: 85,
@@ -6671,7 +6704,7 @@ const intentHandlers = [
         }
     },
 
-    // Final fallback
+    // Fallback Intent
     {
         priority: 0,
         matcher: () => true,
@@ -6680,24 +6713,21 @@ const intentHandlers = [
             if (intent && intent.handler) {
                 return intent.handler(intent.entity, query);
             }
-
             let term = window.CiliAI.utils.normalizeQuery(query);
             const match = term.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
             if (match) term = match[1];
-
             term = term.replace(/[?.]/g, '').trim().toUpperCase();
             const genes = window.CiliAI.utils.extractGenes(term);
-
             if (genes.length > 0) {
                 return await window.displayFullGeneInfo(genes[0]);
             } else {
-                return `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, "radar chart", or "mutation burden".`;
+                return `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, localization, or GO term.`;
             }
         }
     }
 ];
 
-// Sort by priority DESCENDING (highest number = highest priority)
+// 3. Sort Handlers by Priority (Descending)
 intentHandlers.sort((a, b) => b.priority - a.priority);
 
 // 4. New Dispatcher: handleAIQuery (Updated for v12.0 Features)
@@ -9007,16 +9037,5 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
-
-
-
-
-
-
 
 
