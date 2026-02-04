@@ -5006,7 +5006,71 @@ const intentHandlers = [
             return explanation + listPreview;
         }
     },
+// 1. COMPARATIVE RADAR CHART INTENT
+    {
+        priority: 95,
+        matcher: (qLower) => (qLower.includes('compare') || qLower.includes('plot')) && qLower.includes('radar'),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length < 1) {
+                return `<div class="ai-result-card"><p>Please specify genes to compare on the radar chart (e.g., "Radar chart for IFT88, BBS1").</p></div>`;
+            }
+            if (window.renderComparativeRadar) {
+                window.renderComparativeRadar(genes);
+                return null; // The function handles the UI
+            }
+            return "Error: Radar Chart module not loaded.";
+        }
+    },
 
+    // 2. MUTATION BURDEN ANALYSIS INTENT
+    {
+        priority: 94,
+        matcher: (qLower) => qLower.includes('mutation burden') || qLower.includes('analyze mutations') || qLower.includes('variant stats'),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) {
+                return `<div class="ai-result-card"><p>Please specify a gene for mutation analysis (e.g., "Mutation burden of USH2A").</p></div>`;
+            }
+            if (window.analyzeMutationBurden) {
+                window.analyzeMutationBurden(genes[0]);
+                return null;
+            }
+            return "Error: Analytics module not loaded.";
+        }
+    },
+
+    // 3. SESSION MANAGEMENT INTENTS
+    {
+        priority: 99, // Highest priority
+        matcher: (qLower) => qLower.includes('session') || qLower.includes('reset app'),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+            
+            if (qLower.includes('restore') || qLower.includes('load')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.restore();
+                    return "🔄 Attempting to restore previous session...";
+                }
+            }
+            
+            if (qLower.includes('clear') || qLower.includes('reset') || qLower.includes('delete')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.clear();
+                    return "🗑️ Session history has been cleared.";
+                }
+            }
+            
+            if (qLower.includes('save')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.save();
+                    return "💾 Session manually saved to local storage.";
+                }
+            }
+            
+            return "Session Manager: Use 'Save session', 'Restore session', or 'Clear session'.";
+        }
+    },
     // "Where is [GENE] expressed?" for ANY ciliary gene
     {
         priority: 90,
@@ -6615,12 +6679,13 @@ const intentHandlers = [
 // 3. Sort Handlers by Priority (Descending)
 intentHandlers.sort((a, b) => b.priority - a.priority);
 
-// 4. New Dispatcher: handleAIQuery (Replaces old version)
+// 4. New Dispatcher: handleAIQuery (Updated for v12.0 Features)
+// 4. New Dispatcher: handleAIQuery (Updated for v12.0 & Legacy Support)
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow || !query) return;
 
-    // Fail-safe: Ensure utils exist (fixes "Cannot read properties of undefined")
+    // 1. Fail-safe: Ensure utils exist (fixes "Cannot read properties of undefined")
     if (!window.CiliAI.utils) {
         console.warn("CiliAI.utils was missing. Re-initializing.");
         window.CiliAI.utils = {
@@ -6637,22 +6702,80 @@ window.handleAIQuery = async function (query) {
     if (window.log) window.log(`Routing query: ${query}`);
 
     try {
+        // 2. Loading Check
         if (!window.CiliAI || !window.CiliAI.ready) {
             window.addChatMessage("Data is still loading, please wait...", false);
             return;
         }
 
-        let htmlResult = null;
+        // =========================================================
+        // DIRECT HOOKS: Advanced Analytics & System Commands (v12.0)
+        // These override standard intents for specific tools
+        // =========================================================
 
-        for (const intent of intentHandlers) {
-            if (intent.matcher(qLower)) {
-                htmlResult = await intent.handler(query);
-                if (htmlResult) {
-                    window.addChatMessage(htmlResult, false);
+        // Hook 1: Session Management
+        if (qLower.includes('session') || qLower.includes('reset app')) {
+            if (window.CiliAI.Session) {
+                if (qLower.includes('save')) {
+                    window.CiliAI.Session.save();
+                    window.addChatMessage("💾 Session manually saved.", false);
+                    return;
+                }
+                if (qLower.includes('restore') || qLower.includes('load')) {
+                    window.CiliAI.Session.restore();
+                    return;
+                }
+                if (qLower.includes('clear') || qLower.includes('reset')) {
+                    window.CiliAI.Session.clear();
                     return;
                 }
             }
         }
+
+        // Hook 2: Comparative Radar Chart
+        if (qLower.includes('radar') && (qLower.includes('compare') || qLower.includes('plot'))) {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length > 0 && window.renderComparativeRadar) {
+                window.renderComparativeRadar(genes);
+                return; // Handled
+            }
+        }
+
+        // Hook 3: Mutation Burden Analysis
+        if (qLower.includes('mutation burden') || qLower.includes('analyze mutations') || qLower.includes('variant stats')) {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length > 0 && window.analyzeMutationBurden) {
+                await window.analyzeMutationBurden(genes[0]);
+                return; // Handled
+            }
+        }
+
+        // =========================================================
+        // STANDARD INTENT LOOP (Legacy Support)
+        // =========================================================
+
+        let htmlResult = null;
+
+        // Ensure intentHandlers exists
+        const handlers = window.intentHandlers || []; 
+
+        for (const intent of handlers) {
+            if (intent && typeof intent.matcher === 'function') {
+                if (intent.matcher(qLower)) {
+                    // Pass the raw query to the handler
+                    htmlResult = await intent.handler(query);
+                    
+                    if (htmlResult) {
+                        window.addChatMessage(htmlResult, false);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Fallback if no intent matched
+        window.addChatMessage(`I'm not sure how to handle: "${query}". Try asking about a gene, "radar chart", or "mutation burden".`, false);
+
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
         window.addChatMessage(`An internal error occurred: ${e.message}`, false);
@@ -8536,6 +8659,202 @@ window.downloadStructure = function(geneSymbol) {
     console.log("[CiliAI] 3D Viewer module loaded.");
 })();
 
+/* ==============================================================
+ * MODULE: ADVANCED ANALYTICS & PERSISTENCE (v12.0 Add-on)
+ * Features: Radar Comparison, Mutation Burden, Auto-Save
+ * ============================================================== */
+
+(function() {
+    'use strict';
+
+    // 1. AUTO-SAVE SYSTEM
+    window.CiliAI.Session = {
+        key: 'ciliai_autosave_v1',
+        
+        start: function(interval = 30000) {
+            console.log("[CiliAI] Auto-save enabled.");
+            const saved = localStorage.getItem(this.key);
+            if (saved) {
+                const meta = JSON.parse(saved);
+                const age = (Date.now() - meta.timestamp) / 1000 / 60 / 60; 
+                if (age < 24) console.log(`[CiliAI] Session found from ${meta.date}`);
+            }
+            setInterval(() => this.save(), interval);
+        },
+
+        save: function() {
+            const chatContent = document.getElementById('messages')?.innerHTML || '';
+            if (!chatContent) return;
+            const state = {
+                timestamp: Date.now(),
+                date: new Date().toLocaleString(),
+                dataset: window.CiliAI.activeDataset || 'lung',
+                history: chatContent
+            };
+            localStorage.setItem(this.key, JSON.stringify(state));
+        },
+
+        restore: function() {
+            const saved = localStorage.getItem(this.key);
+            if (!saved) { alert("No saved session found."); return; }
+            const state = JSON.parse(saved);
+            if (state.dataset) window.CiliAI.activeDataset = state.dataset;
+            if (state.history && document.getElementById('messages')) {
+                document.getElementById('messages').innerHTML = state.history;
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            }
+            window.addChatMessage(`🔄 Session restored from ${state.date}`, false);
+        },
+        
+        clear: function() {
+            localStorage.removeItem(this.key);
+            window.addChatMessage("🗑️ Session memory cleared.", false);
+        }
+    };
+
+    // 2. COMPARATIVE RADAR CHART
+    window.renderComparativeRadar = function(genesInput) {
+        const genes = Array.isArray(genesInput) ? genesInput : genesInput.split(/[,\s]+/).filter(Boolean);
+        if (genes.length < 1) return;
+
+        window.switchView('plot'); 
+        const container = document.getElementById('plotly-container');
+        container.innerHTML = '';
+        container.style.display = 'block';
+
+        const data = [];
+        genes.forEach(geneSym => {
+            const g = window.CiliAI.lookups.geneMap[geneSym.toUpperCase()];
+            if (!g) return;
+
+            // Metrics Calculation
+            let conservationScore = 0.4; 
+            if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') conservationScore = 1.0;
+            else if (g.Ortholog_Drosophila && g.Ortholog_Drosophila !== 'N/A') conservationScore = 0.8;
+            else if (g.Ortholog_Mouse && g.Ortholog_Mouse !== 'N/A') conservationScore = 0.6;
+
+            let diseaseCount = 0;
+            if (Array.isArray(g.Ciliopathies)) diseaseCount = g.Ciliopathies.length;
+            else if (g.Ciliopathy && g.Ciliopathy !== 'N/A') diseaseCount = 1;
+            const diseaseScore = Math.min(diseaseCount / 4, 1);
+
+            let exprScore = 0.1;
+            if (g.expression && g.expression.scRNA) {
+                const maxVal = Math.max(...Object.values(g.expression.scRNA));
+                exprScore = Math.min(maxVal / 20, 1);
+            }
+
+            const complexityScore = g.complex_components ? 1.0 : 0.3;
+            const studyScore = (g.screens && g.screens.length > 0) ? Math.min(g.screens.length / 3, 1) : 0.2;
+
+            data.push({
+                type: 'scatterpolar',
+                r: [conservationScore, diseaseScore, exprScore, complexityScore, studyScore, conservationScore],
+                theta: ['Conservation', 'Disease Load', 'Expression', 'Complex Stability', 'Study Depth', 'Conservation'],
+                fill: 'toself',
+                name: g.Gene
+            });
+        });
+
+        const layout = {
+            polar: { radialaxis: { visible: true, range: [0, 1] } },
+            title: `Comparative Profile: ${genes.join(' vs ')}`,
+            showlegend: true,
+            margin: { t: 50, b: 50, l: 50, r: 50 }
+        };
+
+        Plotly.newPlot(container, data, layout);
+        window.addChatMessage(`<div class="ai-result-card">📊 Generated Comparative Radar Chart for <strong>${genes.join(', ')}</strong>.</div>`, false);
+    };
+
+    // 3. MUTATION BURDEN ANALYZER (FIXED: Deep Scan Logic)
+    // ==============================================================
+    window.analyzeMutationBurden = async function(geneSymbol) {
+        window.addChatMessage(`🔍 Analyzing mutation burden for <strong>${geneSymbol}</strong>...`, false);
+        
+        // 1. Fetch Data
+        const data = await window.fetchVariantDataLive(geneSymbol);
+        
+        if (data.error) {
+            window.addChatMessage(`Could not analyze mutations: ${data.error}`, false);
+            return;
+        }
+
+        const variants = data.variants || [];
+        
+        // 2. Helper: Deep Text Extraction
+        // Scans clinicalSignificance, associations, and descriptions
+        const getVariantText = (v) => {
+            let text = (v.clinicalSignificance || v.significance || "").toString();
+            if (v.association) text += " " + JSON.stringify(v.association);
+            if (v.descriptions) text += " " + JSON.stringify(v.descriptions);
+            return text.toLowerCase();
+        };
+
+        // 3. Robust Counting Logic
+        let pathogenic = 0;
+        let benign = 0;
+        let vus = 0;
+
+        variants.forEach(v => {
+            const text = getVariantText(v);
+            
+            // Exclude conflicting interpretations from definitive counts
+            const isConflicting = text.includes("conflicting");
+
+            if (text.includes("pathogenic") && !text.includes("likely benign") && !isConflicting) {
+                pathogenic++;
+            } else if ((text.includes("benign") || text.includes("likely benign")) && !text.includes("pathogenic") && !isConflicting) {
+                benign++;
+            } else {
+                vus++;
+            }
+        });
+
+        const total = variants.length;
+
+        // 4. Render Report
+        const report = `
+            <div class="ai-result-card">
+                <h4>🧬 Mutation Burden: ${geneSymbol}</h4>
+                <div style="display:flex; gap:10px; margin: 15px 0;">
+                    <div style="flex:1; background:#fee2e2; border:1px solid #fca5a5; padding:10px; border-radius:6px; text-align:center;">
+                        <div style="font-size:20px; font-weight:bold; color:#dc2626;">${pathogenic}</div>
+                        <div style="font-size:11px; color:#7f1d1d;">Pathogenic</div>
+                    </div>
+                    <div style="flex:1; background:#f3f4f6; border:1px solid #d1d5db; padding:10px; border-radius:6px; text-align:center;">
+                        <div style="font-size:20px; font-weight:bold; color:#4b5563;">${vus}</div>
+                        <div style="font-size:11px; color:#374151;">VUS/Uncertain</div>
+                    </div>
+                    <div style="flex:1; background:#dcfce7; border:1px solid #86efac; padding:10px; border-radius:6px; text-align:center;">
+                        <div style="font-size:20px; font-weight:bold; color:#16a34a;">${benign}</div>
+                        <div style="font-size:11px; color:#14532d;">Benign</div>
+                    </div>
+                </div>
+                
+                <div style="height:12px; width:100%; display:flex; border-radius:6px; overflow:hidden; background:#eee;">
+                    <div style="width:${(pathogenic/total)*100}%; background:#ef4444;" title="Pathogenic"></div>
+                    <div style="width:${(vus/total)*100}%; background:#9ca3af;" title="VUS"></div>
+                    <div style="width:${(benign/total)*100}%; background:#22c55e;" title="Benign"></div>
+                </div>
+
+                <p style="font-size:11px; color:#666; margin-top:8px;">
+                    Total variants analyzed: ${total.toLocaleString()} (Source: ClinVar/UniProt)
+                </p>
+                <button class="ciliai-button" style="width:100%; justify-content:center; margin-top:10px;" onclick="window.renderVariantMap('${geneSymbol}')">
+                    📍 View on Protein Map
+                </button>
+            </div>
+        `;
+        
+        window.addChatMessage(report, false);
+    };
+    // Initialize Auto-Save
+    setTimeout(() => window.CiliAI.Session.start(), 5000);
+    console.log("[CiliAI] Advanced Analytics & Persistence module loaded.");
+
+})(); 
+
+
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
