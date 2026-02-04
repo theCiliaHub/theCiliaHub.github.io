@@ -4845,6 +4845,105 @@ window.handleCellTypeQuestion = function(query) {
     return html;
 };
 
+/* ==============================================================
+ * CiliAI Helper: Unified Plot Query Handler
+ * Handles: UMAP, Dot Plots, and Dataset Switching
+ * ============================================================== */
+window.handlePlotQuery = async function(query) {
+    const qLower = window.CiliAI.utils.normalizeQuery(query);
+
+    // 1. Dataset Detection (e.g., "in kidney", "in liver")
+    const availableDatasets = Object.keys(window.CiliAI.datasets).sort((a, b) => b.length - a.length);
+    let detectedDS = null;
+    for (const dsKey of availableDatasets) {
+        let isMatch = qLower.includes(dsKey);
+        // Add synonyms
+        if (dsKey === 'olfactory' && (qLower.includes('nose') || qLower.includes('smell'))) isMatch = true;
+        if (dsKey === 'hypothalamus' && (qLower.includes('brain') || qLower.includes('neuron'))) isMatch = true;
+        if (dsKey === 'chondrocyte' && (qLower.includes('cartilage') || qLower.includes('disc'))) isMatch = true;
+        if (dsKey === 'kidney' && (qLower.includes('renal'))) isMatch = true;
+        if (dsKey === 'liver' && (qLower.includes('hepatic'))) isMatch = true;
+        
+        if (isMatch) { detectedDS = dsKey; break; }
+    }
+    // Switch dataset if explicitly requested
+    if (detectedDS) window.CiliAI.activeDataset = detectedDS;
+
+    // 2. Gene Extraction
+    let genes = window.CiliAI.utils.extractGenes(query);
+    let finalTargetTerm = null;
+    let isComplex = false;
+
+    // Handle "Complex" plotting (e.g. "Plot IFT-B complex")
+    if (genes.length === 0) {
+        let cleanQuery = qLower
+            .replace(/plot|display|show|visualize|umap|heatmap|scrna|expression|dot plot|dotplot/g, '')
+            .replace(/in|for|of|from/g, '')
+            .trim();
+
+        const complexName = window.extractComplexIntent?.(cleanQuery);
+        if (complexName) {
+            const complexGenes = window.getGenesByComplex?.(complexName).map(g => g.gene) || [];
+            if (complexGenes.length) {
+                genes = complexGenes;
+                finalTargetTerm = complexName;
+                isComplex = true;
+            }
+        }
+    }
+
+    const finalGenes = genes.length ? genes : ['WDR31'];
+    const geneSymbol = isComplex ? finalTargetTerm : finalGenes[0];
+
+    // 3. Dot Plot Logic
+    if (qLower.includes('dot plot') || qLower.includes('dotplot')) {
+        if (finalGenes.length === 0) {
+            return `<div class="ai-result-card"><p>Please specify genes for the dot plot.</p></div>`;
+        }
+        
+        if (typeof window.renderDotPlot === 'function') {
+            window.renderDotPlot(finalGenes);
+        } else {
+            return `<div class="ai-result-card"><p>Error: Dot Plot module not loaded.</p></div>`;
+        }
+        
+        return `<div class="ai-result-card">
+                    <h4>📊 Dot Plot Generated</h4>
+                    <p>Visualizing <strong>${finalGenes.length} genes</strong> in <strong>${window.CiliAI.datasets[window.CiliAI.activeDataset].name}</strong>.</p>
+                </div>`;
+    }
+    
+    // 4. UMAP / Scatter Logic
+    const zoomMatch = qLower.match(/zoom to\s+([\w\s\-\(\)]+?)(?:\s+(?:in|for)|$)/i);
+    const zoomToCellType = zoomMatch ? zoomMatch[1].trim() : null;
+
+    if (!isComplex && finalGenes.length > 1) {
+        // Multi-gene Grid
+        await window.renderUMAPGrid({
+            genes: finalGenes,
+            datasetKey: window.CiliAI.activeDataset,
+            containerId: 'plotly-container'
+        });
+    } else {
+        // Single Gene
+        window.switchView('plot');
+        await window.renderUMAPPlot(geneSymbol, finalGenes, zoomToCellType);
+    }
+
+    const currentDS = window.CiliAI.activeDataset;
+    const currentName = window.CiliAI.datasets[currentDS].name;
+
+    return `
+        <div class="ai-result-card">
+            <p><strong>${isComplex ? geneSymbol + ' complex' : finalGenes.join(', ')}</strong></p>
+            <p>${finalGenes.length > 1 && !isComplex
+                ? 'Shown as individual UMAP panels (grid view).'
+                : 'Expression visualized on UMAP.'}
+            </p>
+            <p style="font-size:12px;color:#666;">Dataset: ${currentName}</p>
+        </div>
+    `;
+};
 
 /* ==============================================================
  * CiliAI Engine: Intent Recognition & Safe Routing (v9.2)
@@ -8062,6 +8161,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
