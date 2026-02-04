@@ -5144,91 +5144,64 @@ const intentHandlers = [
     },
 
 // ────────────────────────────────────────────────
-    //  Conservation of specific residue (L301 in BBS1 etc.)
-    // ────────────────────────────────────────────────
-    {
-        priority: 89,
-        matcher: (qLower) =>
-            (qLower.includes('conserv') || qLower.includes('score') || qLower.includes('check')) &&
-            /\d+/.test(qLower) &&
-            window.CiliAI.utils.extractGenes(qLower).length > 0,
-        handler: async (query) => {
-            const genes = window.CiliAI.utils.extractGenes(query);
-            if (genes.length === 0) return "Please specify a gene (e.g., 'Conservation of L301 in BBS1').";
+//  Conservation of specific residue (L301 in BBS1 etc.)
+// ────────────────────────────────────────────────
+   {
+    priority: 89,
+    matcher: (qLower) => {
+        return (qLower.includes('conserv') || qLower.includes('score') || qLower.includes('check')) &&
+               /\d+/.test(qLower) &&
+               window.CiliAI.utils.extractGenes(qLower).length > 0;
+    },
+    handler: async (query) => {
+        const genes = window.CiliAI.utils.extractGenes(query);
+        if (genes.length === 0) {
+            return "Please specify a gene (e.g., 'Conservation of L301 in BBS1').";
+        }
+        const gene = genes[0].toUpperCase();
 
-            const gene = genes[0];
-            const posMatch = query.match(/([a-z])?(\d+)([a-z])?/i);
+        const posMatch = query.match(/([A-Za-z])?(\d+)([A-Za-z])?/i);
+        if (!posMatch || !posMatch[2]) {
+            return `I found the gene <strong>${gene}</strong>, but couldn't parse the residue (e.g., try "L301" or "Leu301" or "residue 301").`;
+        }
 
-            if (!posMatch) {
-                return `I found the gene <strong>${gene}</strong>, but I couldn't identify the residue position. Try saying "L301" or "residue 301".`;
-            }
+        const refAA = (posMatch[1] || '').toUpperCase();
+        const pos = parseInt(posMatch[2], 10);
+        const altAA = (posMatch[3] || '').toUpperCase();  // optional, for future variant context
 
-            const refAA = posMatch[1] ? posMatch[1].toUpperCase() : '';
-            const pos   = parseInt(posMatch[2]);
-
-            window.addChatMessage(`
-                <div class="ai-result-card">
-                    <h4>🌍 Evolutionary Analysis</h4>
-                    <p>Checking conservation for <strong>${gene}</strong> at residue <strong>${refAA}${pos}</strong>.</p>
-                    <div style="margin-top:10px; padding:10px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0; font-size:12px; color:#64748b;">
-                        <strong>Scope:</strong> 50+ Species (Primates to Protists)<br>
-                        <strong>Goal:</strong> Determining if this residue is essential for ciliary function.
-                    </div>
-                    [Image of phylogenetic tree of eukaryotes]
-                    <p style="font-size:11px; margin-top:5px; color:#94a3b8;">Loading MSA...</p>
+        // Show immediate feedback
+        window.addChatMessage(`
+            <div class="ai-result-card">
+                <h4>🌍 Evolutionary Conservation: ${gene} p.${refAA || 'X'}${pos}</h4>
+                <p>Querying conservation across species (primates → vertebrates → eukaryotes where available)...</p>
+                <div style="margin:10px 0; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; color:#64748b;">
+                    <strong>Scope:</strong> Up to 100+ species (precomputed MSA)<br>
+                    <strong>Goal:</strong> Assess if this position is functionally constrained in the BBSome.
                 </div>
-            `, false);
+                <p style="font-size:11px; color:#94a3b8;">Loading alignment & scores...</p>
+            </div>
+        `, false);
 
-            await window.checkConservation(gene, pos, refAA || 'X');
-            return null;
-        }
-    },
-    
-    // NEW PRIORITY 88: Structure / Localization Gene Lists (Fixes queries without verbs)
-    {
-        priority: 88,
-        matcher: (qLower) => {
-            // Matches "Transition zone genes", "Basal body genes", etc.
-            return (qLower.includes('genes') && (qLower.includes('transition zone') || qLower.includes('basal body') || qLower.includes('axoneme') || qLower.includes('centrosome') || qLower.includes('membrane'))) ||
-                   (qLower.includes('display') && (qLower.includes('transition zone') || qLower.includes('basal body') || qLower.includes('axoneme')));
-        },
-        handler: async (query) => {
-            const qLower = window.CiliAI.utils.normalizeQuery(query);
-            let loc = null;
-            if (qLower.includes('transition zone')) loc = 'Transition Zone';
-            else if (qLower.includes('basal body')) loc = 'Basal Body';
-            else if (qLower.includes('axoneme')) loc = 'Axoneme';
-            else if (qLower.includes('membrane')) loc = 'Ciliary Membrane';
-            else if (qLower.includes('centrosome')) loc = 'Centrosome';
-
-            if (loc) {
-                let genes = [];
-                // Use global helper if available, otherwise manual filter
-                if (window.getGenesByLocalization) {
-                    genes = window.getGenesByLocalization(loc);
-                } else {
-                    // Fallback manual filter
-                    const normLoc = loc.toLowerCase();
-                    window.CiliAI.masterData.forEach(g => {
-                        if (g.Localization && g.Localization.toLowerCase().includes(normLoc)) {
-                            genes.push({ gene: g.Gene, localization: g.Localization });
-                        }
-                    });
-                }
-                
-                if (genes.length > 0) {
-                    // Use formatListResult to display table immediately
-                    return window.formatListResult 
-                        ? window.formatListResult(`Genes in ${loc}`, genes, `Found ${genes.length} genes localized to ${loc}.`)
-                        : `Found ${genes.length} genes in ${loc}. (Visualizer loading...)`;
-                } else {
-                     return `<div class="ai-result-card"><p>No genes found specifically localized to <strong>${loc}</strong>.</p></div>`;
-                }
+        // Safety wrapper
+        try {
+            if (typeof window.checkConservation !== 'function') {
+                throw new Error("checkConservation function not available");
             }
-            return null;
+            await window.checkConservation(gene, pos, refAA || 'X');
+            return null;  // success — visual rendered elsewhere
+        } catch (err) {
+            console.error("Conservation check failed:", err);
+            return `<div class="ai-result-card" style="border-left:4px solid #ef4444;">
+                <h4>Error loading conservation for ${gene} p.${refAA || 'X'}${pos}</h4>
+                <p>${err.message || 'Failed to load MSA / conservation data.'}</p>
+                <p style="font-size:13px; color:#4b5563;">
+                    → Try again or check if BBS1 data is loaded.<br>
+                    → Alternative: ask for "radar chart BBS1" or "mutation burden BBS1".
+                </p>
+            </div>`;
         }
-    },
-
+    }
+},
     // Ciliopathy classification, overlap, orthologs (combined for efficiency)
     {
         priority: 85,
@@ -9033,6 +9006,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
