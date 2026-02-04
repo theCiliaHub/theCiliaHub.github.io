@@ -4850,7 +4850,40 @@ window.handleCellTypeQuestion = function(query) {
 // ==========================================================
 
 const intentHandlers = [
-    
+
+    // ────────────────────────────────────────────────
+    //  Highest priority — session & system commands
+    // ────────────────────────────────────────────────
+    {
+        priority: 99,
+        matcher: (qLower) => qLower.includes('session') || qLower.includes('reset app'),
+        handler: async (query) => {
+            const qLower = window.CiliAI.utils.normalizeQuery(query);
+
+            if (qLower.includes('restore') || qLower.includes('load')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.restore();
+                    return "🔄 Attempting to restore previous session...";
+                }
+            }
+
+            if (qLower.includes('clear') || qLower.includes('reset') || qLower.includes('delete')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.clear();
+                    return "🗑️ Session history has been cleared.";
+                }
+            }
+
+            if (qLower.includes('save')) {
+                if (window.CiliAI.Session) {
+                    window.CiliAI.Session.save();
+                    return "💾 Session manually saved to local storage.";
+                }
+            }
+
+            return "Session Manager: Use 'Save session', 'Restore session', or 'Clear session'.";
+        }
+    },
     {
         priority: 200,
         matcher: (qLower) => 
@@ -5040,37 +5073,7 @@ const intentHandlers = [
         }
     },
 
-    // 3. SESSION MANAGEMENT INTENTS
-    {
-        priority: 99, // Highest priority
-        matcher: (qLower) => qLower.includes('session') || qLower.includes('reset app'),
-        handler: async (query) => {
-            const qLower = window.CiliAI.utils.normalizeQuery(query);
-            
-            if (qLower.includes('restore') || qLower.includes('load')) {
-                if (window.CiliAI.Session) {
-                    window.CiliAI.Session.restore();
-                    return "🔄 Attempting to restore previous session...";
-                }
-            }
-            
-            if (qLower.includes('clear') || qLower.includes('reset') || qLower.includes('delete')) {
-                if (window.CiliAI.Session) {
-                    window.CiliAI.Session.clear();
-                    return "🗑️ Session history has been cleared.";
-                }
-            }
-            
-            if (qLower.includes('save')) {
-                if (window.CiliAI.Session) {
-                    window.CiliAI.Session.save();
-                    return "💾 Session manually saved to local storage.";
-                }
-            }
-            
-            return "Session Manager: Use 'Save session', 'Restore session', or 'Clear session'.";
-        }
-    },
+  
     // "Where is [GENE] expressed?" for ANY ciliary gene
     {
         priority: 90,
@@ -5140,28 +5143,29 @@ const intentHandlers = [
         }
     },
 
-    // 89: Specific Residue Conservation Intent
+// ────────────────────────────────────────────────
+    //  Conservation of specific residue (L301 in BBS1 etc.)
+    // ────────────────────────────────────────────────
     {
-        priority: 89, 
-        matcher: (qLower) => {
-            return (qLower.includes('conserv') || qLower.includes('score') || qLower.includes('check')) && 
-                   /\d+/.test(qLower) && 
-                   window.CiliAI.utils.extractGenes(qLower).length > 0;
-        },
+        priority: 89,
+        matcher: (qLower) =>
+            (qLower.includes('conserv') || qLower.includes('score') || qLower.includes('check')) &&
+            /\d+/.test(qLower) &&
+            window.CiliAI.utils.extractGenes(qLower).length > 0,
         handler: async (query) => {
             const genes = window.CiliAI.utils.extractGenes(query);
             if (genes.length === 0) return "Please specify a gene (e.g., 'Conservation of L301 in BBS1').";
+
             const gene = genes[0];
-            
             const posMatch = query.match(/([a-z])?(\d+)([a-z])?/i);
-            
+
             if (!posMatch) {
                 return `I found the gene <strong>${gene}</strong>, but I couldn't identify the residue position. Try saying "L301" or "residue 301".`;
             }
 
-            const refAA = posMatch[1] ? posMatch[1].toUpperCase() : ''; 
-            const pos = parseInt(posMatch[2]); 
-            
+            const refAA = posMatch[1] ? posMatch[1].toUpperCase() : '';
+            const pos   = parseInt(posMatch[2]);
+
             window.addChatMessage(`
                 <div class="ai-result-card">
                     <h4>🌍 Evolutionary Analysis</h4>
@@ -5170,16 +5174,13 @@ const intentHandlers = [
                         <strong>Scope:</strong> 50+ Species (Primates to Protists)<br>
                         <strong>Goal:</strong> Determining if this residue is essential for ciliary function.
                     </div>
-                    
-
-[Image of phylogenetic tree of eukaryotes]
-
+                    [Image of phylogenetic tree of eukaryotes]
                     <p style="font-size:11px; margin-top:5px; color:#94a3b8;">Loading MSA...</p>
                 </div>
             `, false);
 
             await window.checkConservation(gene, pos, refAA || 'X');
-            return null; 
+            return null;
         }
     },
     
@@ -6696,7 +6697,7 @@ const intentHandlers = [
         }
     },
 
-    // Fallback Intent
+    // Final fallback
     {
         priority: 0,
         matcher: () => true,
@@ -6705,21 +6706,24 @@ const intentHandlers = [
             if (intent && intent.handler) {
                 return intent.handler(intent.entity, query);
             }
+
             let term = window.CiliAI.utils.normalizeQuery(query);
             const match = term.match(/(?:what is|describe|localization of|where is)\s+(?:the\s+)?(.+)/i);
             if (match) term = match[1];
+
             term = term.replace(/[?.]/g, '').trim().toUpperCase();
             const genes = window.CiliAI.utils.extractGenes(term);
+
             if (genes.length > 0) {
                 return await window.displayFullGeneInfo(genes[0]);
             } else {
-                return `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, localization, or GO term.`;
+                return `Sorry, I didn't understand: "<strong>${query}</strong>". Try asking about a gene, "radar chart", or "mutation burden".`;
             }
         }
     }
 ];
 
-// 3. Sort Handlers by Priority (Descending)
+// Sort by priority DESCENDING (highest number = highest priority)
 intentHandlers.sort((a, b) => b.priority - a.priority);
 
 // 4. New Dispatcher: handleAIQuery (Updated for v12.0 Features)
@@ -9029,6 +9033,7 @@ window.downloadStructure = function(geneSymbol) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
