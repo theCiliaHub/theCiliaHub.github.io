@@ -1643,9 +1643,10 @@ window.median = function (arr) {
  * MODULE: ADVANCED INTELLIGENCE ADD-ONS (v8.0)
  * Includes: PPI Networks, Fuzzy Search, & Auto-Summaries
  * ============================================================== */
-
-// --- 1. INTERACTIVE PPI NETWORK VISUALIZER ---
-// Renders a force-directed graph of the gene and its complex partners
+/* ==============================================================
+ * MODULE: INTERACTION NETWORKS & INTENT FIXES
+ * ============================================================== */
+// --- 1. FIXED NETWORK RENDERER ---
 window.renderInteractionNetwork = function(geneSymbol) {
     const gene = geneSymbol.toUpperCase();
     const gData = window.CiliAI.lookups.geneMap[gene];
@@ -1654,7 +1655,7 @@ window.renderInteractionNetwork = function(geneSymbol) {
     const nodes = new Set([gene]);
     const edges = [];
     
-    // Check complexes
+    // Check complex_components in gene data
     if (gData && gData.complex_components) {
         Object.entries(gData.complex_components).forEach(([complexName, members]) => {
             members.forEach(member => {
@@ -1665,7 +1666,7 @@ window.renderInteractionNetwork = function(geneSymbol) {
         });
     }
 
-    // Check functional modules (MKS, NPHP, etc via lookups)
+    // Check functional modules lookup
     const modules = window.CiliAI.lookups.byModuleOrComplex || {};
     Object.entries(modules).forEach(([modName, members]) => {
         if (members.includes(gene)) {
@@ -1684,39 +1685,40 @@ window.renderInteractionNetwork = function(geneSymbol) {
         return `<div class="ai-result-card"><p>No known protein interaction complexes found for <strong>${gene}</strong> in the current database.</p></div>`;
     }
 
-    // 2. Switch View
+    // 2. Switch View to Plot container
     window.switchView('plot');
     const container = document.getElementById('plotly-container');
+    if(container) container.style.display = 'block';
 
-    // 3. Prepare Plotly Data (Scatter plot simulates network)
-    // Simple circular layout calculation
+    // 3. Prepare Plotly Data (Force Directed-ish Layout)
     const r = 10;
     const x = [], y = [], text = [], color = [], size = [];
     const edgeX = [], edgeY = [];
 
     nodeList.forEach((node, i) => {
-        // Center node
+        let nx, ny;
+        // Center node = Target Gene
         if (node === gene) {
-            x.push(0); y.push(0);
-            color.push('#e11d48'); // Red for target
-            size.push(30);
+            nx = 0; ny = 0;
+            color.push('#e11d48'); // Red
+            size.push(40);
         } else {
             // Satellite nodes in a circle
             const angle = (2 * Math.PI * i) / (nodeList.length - 1);
-            const nx = r * Math.cos(angle);
-            const ny = r * Math.sin(angle);
-            x.push(nx); y.push(ny);
-            color.push('#3b82f6'); // Blue for partners
-            size.push(20);
+            nx = r * Math.cos(angle);
+            ny = r * Math.sin(angle);
+            color.push('#3b82f6'); // Blue
+            size.push(25);
             
-            // Draw edge
+            // Edge coordinates (Center to Satellite)
             edgeX.push(0, nx, null);
             edgeY.push(0, ny, null);
         }
+        x.push(nx); y.push(ny);
         text.push(node);
     });
 
-    // Trace 1: Edges (Lines)
+    // Trace 1: Edges
     const edgeTrace = {
         x: edgeX, y: edgeY,
         type: 'scatter', mode: 'lines',
@@ -1724,7 +1726,7 @@ window.renderInteractionNetwork = function(geneSymbol) {
         hoverinfo: 'none'
     };
 
-    // Trace 2: Nodes (Dots)
+    // Trace 2: Nodes
     const nodeTrace = {
         x: x, y: y,
         type: 'scatter', mode: 'markers+text',
@@ -1736,19 +1738,20 @@ window.renderInteractionNetwork = function(geneSymbol) {
     const layout = {
         title: `Protein Interactions: ${gene}`,
         showlegend: false,
-        xaxis: { showgrid: false, zeroline: false, showticklabels: false },
-        yaxis: { showgrid: false, zeroline: false, showticklabels: false },
+        xaxis: { showgrid: false, zeroline: false, showticklabels: false, visible: false },
+        yaxis: { showgrid: false, zeroline: false, showticklabels: false, visible: false },
         margin: { t: 40, b: 20, l: 20, r: 20 },
-        height: 500
+        height: 500,
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
     };
 
     Plotly.newPlot('plotly-container', [edgeTrace, nodeTrace], layout);
-    window.CiliAI.currentPlot = container;
+    window.CiliAI.currentPlot = document.getElementById('plotly-container');
 
     return `<div class="ai-result-card">
         <h4>🕸️ Interaction Network: ${gene}</h4>
-        <p>Found <strong>${nodeList.length - 1}</strong> interaction partners (based on CORUM/Complex data).</p>
-        <p style="font-size:11px; color:#666;">Central Node (Red): ${gene}</p>
+        <p>Found <strong>${nodeList.length - 1}</strong> interaction partners.</p>
     </div>`;
 };
 
@@ -6310,7 +6313,22 @@ const intentHandlers = [
             return responseHtml;
         }
     },
-
+// 30b. Protein Network / Interaction (NEW PRIORITY: 30.5)
+    // Runs BEFORE Plot/UMAP (Priority 33)
+    {
+        priority: 30.5, 
+        matcher: (qLower) => 
+            qLower.includes('network') || 
+            qLower.includes('interaction') || 
+            qLower.includes('interact with') ||
+            qLower.includes('binds to'),
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return "Please specify a gene for network analysis.";
+            
+            return window.renderInteractionNetwork(genes[0]);
+        }
+    },
     // 31. Functional Modules
     {
         priority: 31,
@@ -6387,12 +6405,23 @@ const intentHandlers = [
         }
     },
 
-    // 33. Expression / UMAP / Dot Plot
+    // 33. Expression / UMAP (RESTRICTED MATCHING)
+    // FIX: Requires a gene if using "Display" AND excludes "network" keywords
     {
         priority: 33,
-        matcher: (qLower) => 
-            (qLower.includes('plot') || qLower.includes('display') || qLower.includes('heatmap') || qLower.includes('umap') || qLower.includes('dot plot') || qLower.includes('scrna') || qLower.includes('expression')) && 
-            !qLower.includes('compare') && !qLower.includes(' vs '),
+        matcher: (qLower) => {
+            // Case A: Explicit plot keywords (e.g. "plot umap")
+            const hasPlotWord = qLower.includes('plot') || qLower.includes('umap') || qLower.includes('dot plot') || qLower.includes('scrna') || qLower.includes('expression');
+            
+            // Case B: Generic "Display/Show" keywords BUT MUST HAVE A GENE
+            // This prevents "Display protein network" (no gene parsed yet) from triggering this if priority fails
+            const hasDisplayGene = (qLower.includes('display') || qLower.includes('show') || qLower.includes('view')) && window.CiliAI.utils.extractGenes(qLower).length > 0;
+            
+            // Case C: Exclusions (Don't steal other intents)
+            const isExcluded = qLower.includes('network') || qLower.includes('interaction') || qLower.includes('radar') || qLower.includes('structure') || qLower.includes('compare');
+
+            return (hasPlotWord || hasDisplayGene) && !isExcluded;
+        },
         handler: async (query) => window.handlePlotQuery(query)
     },
      // 34. New Intent 1: "Network of [Gene]"
@@ -8522,6 +8551,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
