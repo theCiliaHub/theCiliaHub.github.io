@@ -1638,6 +1638,196 @@ window.median = function (arr) {
         return null; 
     }
 
+
+/* ==============================================================
+ * MODULE: ADVANCED INTELLIGENCE ADD-ONS (v8.0)
+ * Includes: PPI Networks, Fuzzy Search, & Auto-Summaries
+ * ============================================================== */
+
+// --- 1. INTERACTIVE PPI NETWORK VISUALIZER ---
+// Renders a force-directed graph of the gene and its complex partners
+window.renderInteractionNetwork = function(geneSymbol) {
+    const gene = geneSymbol.toUpperCase();
+    const gData = window.CiliAI.lookups.geneMap[gene];
+
+    // 1. Gather Nodes and Edges
+    const nodes = new Set([gene]);
+    const edges = [];
+    
+    // Check complexes
+    if (gData && gData.complex_components) {
+        Object.entries(gData.complex_components).forEach(([complexName, members]) => {
+            members.forEach(member => {
+                const partner = member.toUpperCase();
+                nodes.add(partner);
+                edges.push({ source: gene, target: partner, label: complexName });
+            });
+        });
+    }
+
+    // Check functional modules (MKS, NPHP, etc via lookups)
+    const modules = window.CiliAI.lookups.byModuleOrComplex || {};
+    Object.entries(modules).forEach(([modName, members]) => {
+        if (members.includes(gene)) {
+            members.forEach(m => {
+                if (m !== gene) {
+                    nodes.add(m);
+                    edges.push({ source: gene, target: m, label: modName });
+                }
+            });
+        }
+    });
+
+    const nodeList = Array.from(nodes);
+    
+    if (nodeList.length < 2) {
+        return `<div class="ai-result-card"><p>No known protein interaction complexes found for <strong>${gene}</strong> in the current database.</p></div>`;
+    }
+
+    // 2. Switch View
+    window.switchView('plot');
+    const container = document.getElementById('plotly-container');
+
+    // 3. Prepare Plotly Data (Scatter plot simulates network)
+    // Simple circular layout calculation
+    const r = 10;
+    const x = [], y = [], text = [], color = [], size = [];
+    const edgeX = [], edgeY = [];
+
+    nodeList.forEach((node, i) => {
+        // Center node
+        if (node === gene) {
+            x.push(0); y.push(0);
+            color.push('#e11d48'); // Red for target
+            size.push(30);
+        } else {
+            // Satellite nodes in a circle
+            const angle = (2 * Math.PI * i) / (nodeList.length - 1);
+            const nx = r * Math.cos(angle);
+            const ny = r * Math.sin(angle);
+            x.push(nx); y.push(ny);
+            color.push('#3b82f6'); // Blue for partners
+            size.push(20);
+            
+            // Draw edge
+            edgeX.push(0, nx, null);
+            edgeY.push(0, ny, null);
+        }
+        text.push(node);
+    });
+
+    // Trace 1: Edges (Lines)
+    const edgeTrace = {
+        x: edgeX, y: edgeY,
+        type: 'scatter', mode: 'lines',
+        line: { color: '#ccc', width: 1 },
+        hoverinfo: 'none'
+    };
+
+    // Trace 2: Nodes (Dots)
+    const nodeTrace = {
+        x: x, y: y,
+        type: 'scatter', mode: 'markers+text',
+        text: text, textposition: 'bottom center',
+        marker: { size: size, color: color, line: { width: 2, color: 'white' } },
+        hoverinfo: 'text'
+    };
+
+    const layout = {
+        title: `Protein Interactions: ${gene}`,
+        showlegend: false,
+        xaxis: { showgrid: false, zeroline: false, showticklabels: false },
+        yaxis: { showgrid: false, zeroline: false, showticklabels: false },
+        margin: { t: 40, b: 20, l: 20, r: 20 },
+        height: 500
+    };
+
+    Plotly.newPlot('plotly-container', [edgeTrace, nodeTrace], layout);
+    window.CiliAI.currentPlot = container;
+
+    return `<div class="ai-result-card">
+        <h4>🕸️ Interaction Network: ${gene}</h4>
+        <p>Found <strong>${nodeList.length - 1}</strong> interaction partners (based on CORUM/Complex data).</p>
+        <p style="font-size:11px; color:#666;">Central Node (Red): ${gene}</p>
+    </div>`;
+};
+
+// --- Helper: Fuzzy Search (Levenshtein Distance) ---
+window.fuzzyGeneSearch = function(query) {
+    if (!window.CiliAI.masterData) return null;
+    const qUpper = query.toUpperCase().trim();
+    if (qUpper.length < 3) return null; // Ignore short words
+
+    // Check if exact match exists first
+    if (window.CiliAI.lookups.geneMap[qUpper]) return null;
+
+    // Levenshtein Algorithm
+    const levenshtein = (a, b) => {
+        const matrix = [];
+        for(let i=0; i<=b.length; i++) matrix[i] = [i];
+        for(let j=0; j<=a.length; j++) matrix[0][j] = j;
+        for(let i=1; i<=b.length; i++){
+            for(let j=1; j<=a.length; j++){
+                if(b.charAt(i-1) == a.charAt(j-1)) matrix[i][j] = matrix[i-1][j-1];
+                else matrix[i][j] = Math.min(matrix[i-1][j-1] + 1, Math.min(matrix[i][j-1] + 1, matrix[i-1][j] + 1));
+            }
+        }
+        return matrix[b.length][a.length];
+    };
+
+    // Find closest match
+    let bestMatch = null;
+    let minDistance = 3; // Tolerance threshold
+
+    const genes = Object.keys(window.CiliAI.lookups.geneMap);
+    for (const gene of genes) {
+        // Optimization: only check genes of similar length
+        if (Math.abs(gene.length - qUpper.length) > 2) continue;
+        
+        const dist = levenshtein(qUpper, gene);
+        if (dist < minDistance) {
+            minDistance = dist;
+            bestMatch = gene;
+        }
+    }
+    return bestMatch;
+};
+
+// --- 3. AUTOMATED TEXT COMPARISON ---
+window.generateTextComparison = function(geneA, geneB) {
+    const dataA = window.CiliAI.lookups.geneMap[geneA.toUpperCase()];
+    const dataB = window.CiliAI.lookups.geneMap[geneB.toUpperCase()];
+
+    if (!dataA || !dataB) return "Comparison data not available.";
+
+    // Logic for comparison
+    const locA = dataA.Localization || 'Unknown';
+    const locB = dataB.Localization || 'Unknown';
+    const disA = dataA.Ciliopathy || 'None';
+    const disB = dataB.Ciliopathy || 'None';
+
+    let summary = `<strong>Comparison: ${geneA} vs ${geneB}</strong><br><br>`;
+
+    // Localization
+    if (locA === locB) {
+        summary += `📍 Both genes localize to the <strong>${locA}</strong>.<br>`;
+    } else {
+        summary += `📍 <strong>${geneA}</strong> localizes to the ${locA}, whereas <strong>${geneB}</strong> is found in the ${locB}.<br>`;
+    }
+
+    // Evolution
+    const orthoA = dataA.Ortholog_Mouse !== 'N/A';
+    const orthoB = dataB.Ortholog_Mouse !== 'N/A';
+    if (orthoA && orthoB) {
+        summary += `🧬 Both are conserved in Mouse.<br>`;
+    }
+
+    // Disease
+    summary += `🏥 <strong>${geneA}</strong> is associated with ${disA}, while <strong>${geneB}</strong> is linked to ${disB}.`;
+
+    return `<div class="ai-result-card" style="background:#f0fff4; border:1px solid #c6f6d5;">${summary}</div>`;
+};
+
 window.renderRadarChart = function(genes) {
     if (!genes || genes.length < 2) return;
     
@@ -6205,6 +6395,27 @@ const intentHandlers = [
             !qLower.includes('compare') && !qLower.includes(' vs '),
         handler: async (query) => window.handlePlotQuery(query)
     },
+     // 34. New Intent 1: "Network of [Gene]"
+   {
+       priority: 35,
+       matcher: (q) => q.includes('network') || q.includes('interaction') || q.includes('interact with'),
+       handler: async (q) => {
+           const genes = window.CiliAI.utils.extractGenes(q);
+           if(genes.length === 0) return "Please specify a gene for network analysis.";
+           return window.renderInteractionNetwork(genes[0]);
+       }
+   },
+
+    // 35. New Intent 2: "Compare text summary"
+   {
+       priority: 34,
+       matcher: (q) => q.includes('summarize difference') || (q.includes('compare') && q.includes('text')),
+       handler: async (q) => {
+           const genes = window.CiliAI.utils.extractGenes(q);
+           if(genes.length < 2) return "Need 2 genes to summarize.";
+           return window.generateTextComparison(genes[0], genes[1]);
+       }
+   },
 
     // 34. Variant Queries (Secondary Matcher)
     {
@@ -6413,29 +6624,7 @@ const intentHandlers = [
     }
 ];
 
-// --- MAIN DISPATCHER (Sorts by ASCENDING priority 1..45) ---
-window.handleAIQuery = async function (query) {
-    const qLower = window.CiliAI.utils.normalizeQuery(query);
-    if(window.log) window.log(`Routing query: ${query}`);
 
-    try {
-        // Sort: Priority 1 comes FIRST (Ascending order)
-        const sortedHandlers = intentHandlers.sort((a,b) => a.priority - b.priority);
-
-        for (const intent of sortedHandlers) {
-            if (intent.matcher(qLower)) {
-                const result = await intent.handler(query);
-                if (result) {
-                    window.addChatMessage(result, false);
-                    return;
-                }
-            }
-        }
-    } catch (e) {
-        console.error("AI Error:", e);
-        window.addChatMessage("An internal routing error occurred.", false);
-    }
-};
 
 // Correct: Priority 1 comes FIRST (Ascending)
 const sortedHandlers = [...intentHandlers].sort((a,b) => a.priority - b.priority);
@@ -6457,9 +6646,30 @@ window.handleAIQuery = async function (query) {
     }
 
     // Defensive normalization
-    const qLower = window.CiliAI.utils.normalizeQuery(query);
+    let qLower = window.CiliAI.utils.normalizeQuery(query);
 
     if (window.log) window.log(`Routing query: ${query}`);
+
+    // --- NEW: INTELLIGENT TYPO CORRECTION ---
+    // Check if we found genes. If not, try fuzzy search on the last word.
+    const detectedGenes = window.CiliAI.utils.extractGenes(query);
+    
+    if (detectedGenes.length === 0 && window.CiliAI.masterData) {
+        // Heuristic: Assume the potential gene is the last word (e.g. "What is ITF88")
+        // or the second word (e.g. "Plot ITF88")
+        const words = query.split(' ');
+        const potentialGene = words[words.length - 1].replace(/[^a-zA-Z0-9]/g, ''); 
+        
+        const suggestion = window.fuzzyGeneSearch(potentialGene);
+        
+        if (suggestion) {
+            window.addChatMessage(`🤔 Did you mean <strong>${suggestion}</strong>? I'll assume so.`, false);
+            // Auto-correct the query variables for the router
+            query = query.replace(potentialGene, suggestion);
+            qLower = window.CiliAI.utils.normalizeQuery(query);
+        }
+    }
+    // ----------------------------------------
 
     try {
         // Check if data is ready
@@ -8312,6 +8522,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
