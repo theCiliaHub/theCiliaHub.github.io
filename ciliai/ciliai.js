@@ -5766,7 +5766,7 @@ const intentHandlers = [
 
     // 16a. Disease Variant Burden Analysis (NEW)
     {
-        priority: 16a, 
+        priority: 16, 
         matcher: (qLower) => 
             (qLower.includes('burden') || qLower.includes('load') || qLower.includes('stats') || qLower.includes('summary')) && 
             (qLower.includes('variant') || qLower.includes('mutation')),
@@ -5785,7 +5785,7 @@ const intentHandlers = [
 
     // 16. Live Variant Handler (Highest Priority Variant Check)
     {
-        priority: 16,
+        priority: 17,
         matcher: (qLower) => qLower.includes('variant') || qLower.includes('mutation') || qLower.includes('clinvar'),
         handler: async (query) => {
             const genes = window.CiliAI.utils.extractGenes(query);
@@ -5816,9 +5816,9 @@ const intentHandlers = [
         }
     },
 
-    // 17. Disease Implicated by Gene
+    // 18. Disease Implicated by Gene
     {
-        priority: 17,
+        priority: 18,
         matcher: (qLower) => (qLower.includes('disease') || qLower.includes('ciliopathy')) && (qLower.includes('implicated') || qLower.includes('associated') || qLower.includes('linked') || qLower.includes('cause')),
         handler: async (query) => {
             const genes = window.CiliAI.utils.extractGenes(query);
@@ -5871,9 +5871,9 @@ const intentHandlers = [
         }
     },
 
-    // 18. Mouse Knockout Phenotype
+    // 19. Mouse Knockout Phenotype
     {
-        priority: 18,
+        priority: 19,
         matcher: (qLower) => qLower.includes('mouse') && (qLower.includes('knockout') || qLower.includes('phenotype')),
         handler: async (query) => {
             const genes = window.CiliAI.utils.extractGenes(query);
@@ -5895,23 +5895,23 @@ const intentHandlers = [
         }
     },
 
-    // 19. "How many genes..." (Count)
+    // 20. "How many genes..." (Count)
     {
-        priority: 19,
+        priority: 20,
         matcher: (qLower) => qLower.includes('how many') && qLower.includes('genes'),
         handler: async (query) => window.handleDiseaseGeneListQuery(query) // Reuse handler, list displays count
     },
 
-    // 20. Greetings
+    // 21. Greetings
     {
-        priority: 20,
+        priority: 21,
         matcher: (qLower) => ['hello', 'hi', 'hey', 'greetings'].includes(qLower),
         handler: async () => "Hello! I'm CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'."
     },
 
-    // 21. Terminology Definitions
+    // 22. Terminology Definitions
     {
-        priority: 21,
+        priority: 22,
         matcher: (qLower) => window.terminologyQueries && window.terminologyQueries[qLower],
         handler: async (query) => {
             const qLower = window.CiliAI.utils.normalizeQuery(query);
@@ -5919,9 +5919,9 @@ const intentHandlers = [
         }
     },
 
-    // 22. Localization Gene Lists (Verb-less e.g. "Transition Zone Genes")
+    // 23. Localization Gene Lists (Verb-less e.g. "Transition Zone Genes")
     {
-        priority: 22,
+        priority: 23,
         matcher: (qLower) => (qLower.includes('genes') || qLower.includes('display')) && (qLower.includes('transition zone') || qLower.includes('basal body') || qLower.includes('axoneme') || qLower.includes('membrane') || qLower.includes('centrosome')),
         handler: async (query) => {
             let loc = query.toLowerCase().includes('transition zone') ? 'Transition Zone' : (query.toLowerCase().includes('basal body') ? 'Basal Body' : (query.toLowerCase().includes('axoneme') ? 'Axoneme' : (query.toLowerCase().includes('membrane') ? 'Ciliary Membrane' : 'Centrosome')));
@@ -5951,16 +5951,16 @@ const intentHandlers = [
         }
     },
 
-    // 23. Contextual Follow-up (Screens/References)
+    // 25. Contextual Follow-up (Screens/References)
     {
-        priority: 23,
+        priority: 25,
         matcher: (qLower) => qLower.includes('show screen reference') || qLower.includes('show publication'),
         handler: async () => window.handleScreenReferenceFollowup ? window.handleScreenReferenceFollowup() : null
     },
 
-    // 24. List Genes (General "List X genes")
+    // 26. List Genes (General "List X genes")
     {
-        priority: 24,
+        priority: 26,
         matcher: (qLower) => (qLower.startsWith('list') || qLower.startsWith('show')) && qLower.includes('genes') && !qLower.includes('disease'),
         handler: async (query) => {
             // Try to extract a localization or complex term
@@ -8312,6 +8312,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
