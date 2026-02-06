@@ -2900,11 +2900,11 @@ window.displayFullGeneInfo = async function(geneSymbol) {
         <div id="tab-expression" class="cilia-tab-content">
             <div style="margin-bottom:20px;">
                 <button class="ciliai-button" onclick="window.renderUMAPPlot('${geneSymbol}')">
-                     🔄 View UMAP Plot
+                      🔄 View UMAP Plot
                 </button>
             </div>`;
 
-    // 1. Bulk Tissue Data (Updated Labels)
+    // 1. Bulk Tissue Data
     if (Object.keys(tissueExpr).length > 0) {
         const tissueLabel = nTissues === 1 ? 'Ciliary Tissue' : 'Ciliary Tissues';
 
@@ -2955,18 +2955,14 @@ window.displayFullGeneInfo = async function(geneSymbol) {
                 : '<p style="color:#64748b;">No phylogenetic data available.</p>'}
             <div style="margin-top:20px;">
                 <button class="ciliai-button" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">
-                     
-
-[Image of Phylogenetic Tree]
-
- View Phylogeny Heatmap
+                      🖼️ View Phylogeny Heatmap
                 </button>
             </div>
         </div>`;
 
     html += `</div>`; // Close card container
 
-    // ── ADD EXTERNAL LINKS (The Fix) ──
+    // ── ADD EXTERNAL LINKS ──
     if (window.addExternalLinks) {
         html += window.addExternalLinks(geneSymbol);
     }
@@ -8499,5 +8495,6 @@ window.runMSA = async function(gene, pos, refAA) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
