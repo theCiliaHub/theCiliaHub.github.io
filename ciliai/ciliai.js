@@ -8233,7 +8233,7 @@ window.renderVariantMap = async function(geneSymbol) {
                     <h2 style="margin:0; color:#1e293b;">🧬 ${geneSymbol} Variant Landscape</h2>
                     <span style="font-size:12px; background:#f1f5f9; padding:4px 8px; border-radius:4px;">${uniprotID}</span>
                 </div>
-                ${svg} 
+                ${svg}
                 <div id="var-panel" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-top:20px;">
                     <h3 style="margin:0 0 10px 0; color:#2563eb;" id="vp-title"></h3>
                     <p style="font-size:13px; color:#475569;" id="vp-desc"></p>
@@ -8384,13 +8384,12 @@ window.checkConservation = async function(gene, pos, refAA, altAA) {
         });
         html += `</div></div>`;
         area.innerHTML = html;
-        
 
     } catch (e) {
         area.innerHTML = `Error: ${e.message}`;
     }
 };
-
+    
 // --------------------------------------------------------------
 // 5. 3D STRUCTURE VIEWER (MolStar Integration)
 // --------------------------------------------------------------
@@ -8429,10 +8428,6 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
             </div>`;
         
         document.body.appendChild(modal);
-        
-
-[Image of 3D Protein Structure]
-
         
     } catch (e) {
         alert("3D Viewer Error: " + e.message);
@@ -8540,4 +8535,5 @@ window.runMSA = async function(gene, pos, refAA) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
