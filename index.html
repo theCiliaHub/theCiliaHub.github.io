@@ -601,142 +601,166 @@
                 </div>
             </div>
         </div>
-     <aside class="right-panel">
-    <div class="chat-header">
-        <h2>CiliAI Assistant</h2>
-        <p>Interactive biological logic mapping</p>
+        <aside class="right-panel">
+            <div class="chat-header">
+              <h2>CiliAI Assistant</h2>
+<p>Interactive biological logic mapping</p>
+</div>
+
+<div class="messages-area" id="messages">
+  <div class="ciliai-message assistant">
+    <div class="message-wrapper">
+      <div class="ciliai-message-content">
+
+        👋 <strong>Welcome to CiliAI</strong><br><br>
+
+        Ask me about <strong>ciliary genes</strong>, <strong>expression categories</strong>,
+        <strong>ciliopathies</strong>, <strong>localization</strong>,
+        <strong>evolution</strong>, or <strong>functional screens</strong>.<br><br>
+
+        <strong>Quick things you can try:</strong>
+
+        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+          Gene & Expression
+        </div>
+
+        <div class="suggested-chips" style="margin-bottom:20px;">
+          <span class="gene-badge" style="background:#fffaf0; color:#b7791f; border:1px solid #ecc94b;"
+                onclick="window.renderGoldStandardView()">
+            ⭐ Show Gold Standard ciliary genes
+          </span>
+          
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Hypothalamus specific ciliary genes')">
+            Hypothalamus specific ciliary genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Lung specific ciliary genes')">
+            Lung specific ciliary genes
+          </span>
+          
+          <span class="gene-badge" 
+                onclick="window.handleAIQuery('Dot plot of IFT88, ARL13B, BBS1, FOXJ1')">
+            Dot plot of IFT88, ARL13B, BBS1, FOXJ1
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Compare radar chart for IFT88 and BBS4')">
+            🕸️ Compare radar chart for IFT88 and BBS4
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Show variants in CEP290')">
+            Display variants in CEP290
+          </span>            
+          
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Show genes enriched in Proximal Tubule cells')">
+            Proximal Tubule ciliary enriched genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Display ARL13B scRNA-seq expression')">
+            Display ARL13B scRNA-seq expression
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Show pan-ciliary genes')">
+            Show pan-ciliary genes
+          </span>
+        </div>
+          
+        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+          Ciliopathies & Diseases
+        </div>
+
+        <div class="suggested-chips" style="margin-bottom:20px;">
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Display Joubert syndrome genes')">
+            Display Joubert syndrome genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Analyze mutation burden of CEP290')">
+            📊 Analyze mutation burden of CEP290
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('List Primary Ciliary Dyskinesia genes')">
+            List Primary Ciliary Dyskinesia genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Display Bardet–Biedl genes')">
+            Display Bardet–Biedl genes
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Total ciliopathy genes')">
+            Total ciliopathy genes
+          </span>
+        </div>
+
+        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
+          Localization & Structure
+        </div>
+
+        <div class="suggested-chips">
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('PCM1 localization')">
+            PCM1 localization
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Where is CEP290 localized?')">
+            Where is CEP290 localized?
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Display transition zone genes')">
+            Display transition zone genes
+          </span>
+        </div>
+
+        <div style="margin:20px 0 12px; font-weight:500; color:#4b5563;">
+          Evolution, Screens & Orthologs
+        </div>
+
+        <div class="suggested-chips" style="margin-bottom:20px;">
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Show BBS1 evolution')">
+            Show BBS1 evolution
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Tell me about IFT88 screen')">
+            Tell me about IFT88 screen
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('Display ARL13B mouse ortholog')">
+            Display ARL13B mouse ortholog
+          </span>
+
+          <span class="gene-badge"
+                onclick="window.handleAIQuery('WDR31 domains')">
+            WDR31 domains
+          </span>
+        </div>
+
+      </div>    
     </div>
-
-    <div class="messages-area" id="messages">
-        <div class="ciliai-message assistant">
-            <div class="message-wrapper">
-                <div class="ciliai-message-content">
-
-                    👋 <strong>Welcome to CiliAI</strong><br><br>
-
-                    Ask me about <strong>ciliary genes</strong>, <strong>expression categories</strong>,
-                    <strong>ciliopathies</strong>, <strong>localization</strong>,
-                    <strong>evolution</strong>, or <strong>functional screens</strong>.<br><br>
-
-                    <strong>Quick things you can try:</strong>
-
-                    <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
-                        Gene, Expression & Networks
-                    </div>
-
-                    <div class="suggested-chips" style="margin-bottom:20px;">
-                        <span class="gene-badge" style="background:#fffaf0; color:#b7791f; border:1px solid #ecc94b;"
-                              onclick="window.renderGoldStandardView()">
-                            ⭐ Show Gold Standard ciliary genes
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Show interaction network for BBS4')">
-                           Show interaction network for BBS4
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Summarize difference between IFT88 and BBS1')">
-                         Summarize difference between IFT88 and BBS1
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Compare radar chart for IFT88 and BBS4')">
-                          Compare radar chart for IFT88 and BBS4
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Dot plot of IFT88, ARL13B, BBS1, FOXJ1')">
-                            Dot plot of IFT88, ARL13B, BBS1, FOXJ1
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Display ARL13B scRNA-seq expression')">
-                            Display ARL13B scRNA-seq expression
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Show pan-ciliary genes')">
-                            Show pan-ciliary genes
-                        </span>
-                        
-                        <span class="gene-badge" onclick="window.handleAIQuery('Show genes enriched in Proximal Tubule cells')">
-                            Proximal Tubule ciliary enriched genes
-                        </span>
-                    </div>
-
-                    <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
-                        Ciliopathies & Variants
-                    </div>
-
-                    <div class="suggested-chips" style="margin-bottom:20px;">
-                        <span class="gene-badge" onclick="window.handleAIQuery('Display Joubert syndrome genes')">
-                            Display Joubert syndrome genes
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Analyze mutation burden of CEP290')">
-                          Analyze mutation burden of CEP290
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Show variants in CEP290')">
-                            Display variants in CEP290
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('List Primary Ciliary Dyskinesia genes')">
-                            List Primary Ciliary Dyskinesia genes
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Total ciliopathy genes')">
-                            Total ciliopathy genes
-                        </span>
-                    </div>
-
-                    <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
-                        Localization & Structure
-                    </div>
-
-                    <div class="suggested-chips">
-                        <span class="gene-badge" onclick="window.handleAIQuery('PCM1 localization')">
-                           Show PCM1 localization
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Where is CEP290 localized?')">
-                            Where is CEP290 localized?
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Display transition zone genes')">
-                            Display transition zone genes
-                        </span>
-                        
-                        <span class="gene-badge" onclick="window.handleAIQuery('WDR31 domains')">
-                            Display WDR31 domains
-                        </span>
-                    </div>
-
-                    <div style="margin:20px 0 12px; font-weight:500; color:#4b5563;">
-                        Evolution & Screens
-                    </div>
-
-                    <div class="suggested-chips" style="margin-bottom:20px;">
-                        <span class="gene-badge" onclick="window.handleAIQuery('Show BBS1 evolution')">
-                            Show BBS1 evolution
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Tell me about IFT88 screen')">
-                            Tell me about IFT88 screen
-                        </span>
-
-                        <span class="gene-badge" onclick="window.handleAIQuery('Display ARL13B mouse ortholog')">
-                            Display ARL13B mouse ortholog
-                        </span>
-                    </div>
-
-                </div>    
+  </div>
+</div>
+        
+            <div class="input-area">
+                <div class="chat-input-group">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask about a gene, structure, or disease...">
+                    <button class="send-btn" onclick="window.handleUserSend()">Send</button>
+                </div>
             </div>
-        </div>
-    </div>
-
-    <div class="input-area">
-        <div class="chat-input-group">
-            <input type="text" id="chatInput" class="chat-input" placeholder="Ask about a gene, structure, or disease...">
-            <button class="send-btn" onclick="window.handleUserSend()">Send</button>
-        </div>
-    </div>
-</aside>
+        </aside>
     </div>
 <script>
     
@@ -2362,11 +2386,3 @@ console.log("CiliAI Professional Modules Loaded.");
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
