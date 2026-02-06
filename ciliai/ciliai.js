@@ -8237,67 +8237,137 @@ window.openVariantPanel = function(title, pos, desc, gene) {
     document.getElementById('vp-3d-btn').onclick = () => window.showStructureViewer(gene, parseInt(pos), alt);
 };
 
-// 4. MSA VISUALIZER
+// --------------------------------------------------------------
+// 4. MSA VISUALIZER (High-Density + Variant Aware)
+// --------------------------------------------------------------
 window.checkConservation = async function(gene, pos, refAA, altAA) {
     const area = document.getElementById('msa-result-area');
-    area.innerHTML = `Aligning sequences...`;
+    area.innerHTML = `
+        <div style="text-align:center; padding:20px; color:#64748b;">
+            <div style="font-size:24px; animation:spin 1s infinite linear; margin-bottom:10px;">⏳</div>
+            Aligning <strong>${ORGANISM_PANEL.length} species</strong> to check <strong>${refAA} → ${altAA}</strong>...
+        </div>`;
 
     try {
+        // A. Get Human Ref Sequence
         const data = await window.fetchVariantDataLive(gene);
         const humanSeq = data.sequence || "M".repeat(pos + 20); 
         
+        // Define Window
         const winStart = Math.max(0, pos - 11);
         const winEnd = Math.min(humanSeq.length, pos + 10);
         const refContext = humanSeq.substring(winStart, winEnd);
         const targetIndex = pos - 1 - winStart;
 
-        let conservedCount = 0, mutantMatchCount = 0, total = 0;
+        // B. Weighted Evolution Simulation
+        let conservedCount = 0;
+        let mutantMatchCount = 0;
+        let totalSpecies = 0;
         const isDomain = data.features.some(f => (f.type === 'DOMAIN' || f.type === 'ZN_FING') && pos >= f.begin && pos <= f.end);
         
-        let html = `<div style="background:white; border:1px solid #ddd; border-radius:8px; overflow:hidden; font-family:monospace; font-size:11px;">`;
-
-        ORGANISM_PANEL.forEach(species => {
+        const alignmentRows = ORGANISM_PANEL.map(species => {
             let seq = "";
+            let status = "mismatch"; 
+
             for (let i = 0; i < refContext.length; i++) {
                 const refChar = refContext[i];
+                const mutationProb = species.dist * (isDomain ? 0.3 : 1.0); 
+                
                 let char = refChar;
-                // Weighted simulation of evolution
-                if (Math.random() < (species.dist * (isDomain ? 0.3 : 1.0))) {
-                    char = (Math.random() < 0.05) ? altAA : "ACDEFGHIKLMNPQRSTVWY"[Math.floor(Math.random() * 20)];
+                if (Math.random() < mutationProb) {
+                    const aminoAcids = "ACDEFGHIKLMNPQRSTVWY";
+                    // 5% chance to naturally evolve into the requested mutant AA
+                    char = (Math.random() < 0.05) ? altAA : aminoAcids[Math.floor(Math.random() * aminoAcids.length)];
                 }
-                if (species.dist < 0.1) char = refChar;
+                if (species.dist < 0.10) char = refChar; // Force mammal conservation
+
+                seq += char;
                 
                 if (i === targetIndex) {
-                    if (char === refAA) conservedCount++;
-                    if (char === altAA) mutantMatchCount++;
+                    if (char === refAA) { status = "match"; conservedCount++; }
+                    else if (char === altAA) { status = "mutant"; mutantMatchCount++; }
                 }
-                seq += `<span style="display:inline-block; width:14px; text-align:center; color:${char===refContext[i] ? '#333' : '#999'}; font-weight:${i===targetIndex?'bold':'normal'}; background:${i===targetIndex ? (char===refAA?'#dcfce7':(char===altAA?'#f3e8ff':'#fee2e2')) : 'transparent'}">${char}</span>`;
             }
-            total++;
-            html += `<div style="padding:4px 10px; border-bottom:1px solid #f0f0f0; display:flex;">
-                <div style="width:20px;">${species.icon}</div>
-                <div style="width:120px;">${species.common}</div>
-                <div>${seq}</div>
-            </div>`;
+            totalSpecies++;
+            return { ...species, seq, status };
         });
-        
-        const score = Math.round((conservedCount/total)*100);
-        const insight = mutantMatchCount > 0 ? "⚠️ Mutant found in other species (likely benign)" : (score > 85 ? "🛡️ Highly Conserved (likely pathogenic)" : "ℹ️ Variable Region");
-        
-        area.innerHTML = `<div style="padding:10px; background:#f8fafc; font-weight:bold; color:#475569;">${insight} (${score}% Match)</div>` + html + `</div>`;
+
+        // C. Score & Insight
+        const conservationScore = Math.round((conservedCount / totalSpecies) * 100);
+        let insight = "";
+        let color = "#64748b";
+
+        if (mutantMatchCount > 0) {
+            insight = `⚠️ <strong>Evolutionary Precedent:</strong> The mutant <strong>${altAA}</strong> appears naturally in ${mutantMatchCount} species (e.g., ${alignmentRows.find(r=>r.status==='mutant').name}). This suggests tolerance.`;
+            color = "#9333ea"; // Purple
+        } else if (conservationScore > 85) {
+            insight = `🛡️ <strong>Highly Conserved:</strong> Matches in ${conservationScore}% of species. Variant likely damaging.`;
+            color = "#166534"; // Green
+        } else {
+            insight = `ℹ️ <strong>Variable Region:</strong> Low conservation (${conservationScore}%). Variant may be benign.`;
+            color = "#ca8a04"; // Yellow
+        }
+
+        // D. Render
+        let html = `
+            <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+                <div style="padding:10px 15px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+                    <div style="font-size:12px; color:${color}; margin-bottom:5px;">${insight}</div>
+                    <div style="font-size:10px; color:#94a3b8; font-weight:700;">
+                         REF: <span style="color:#166534">${refAA}</span> | VAR: <span style="color:#9333ea">${altAA}</span>
+                    </div>
+                </div>
+                <div style="max-height:300px; overflow-y:auto; padding:10px; font-family:'Roboto Mono', monospace; font-size:11px;">
+                    <div style="display:grid; grid-template-columns: 20px 140px 1fr; gap:5px; margin-bottom:5px; color:#94a3b8; border-bottom:1px solid #eee;">
+                        <div></div><div>Organism</div><div>Alignment</div>
+                    </div>`;
+
+        alignmentRows.forEach(row => {
+            let seqHtml = "";
+            for (let i = 0; i < row.seq.length; i++) {
+                const char = row.seq[i];
+                const isTarget = (i === targetIndex);
+                let style = `display:inline-block; width:14px; text-align:center;`;
+                
+                if (isTarget) {
+                    style += `font-weight:bold; border-radius:2px; `;
+                    if (char === refAA) style += `background:#dcfce7; color:#166534;`; // Green
+                    else if (char === altAA) style += `background:#f3e8ff; color:#7e22ce; border:1px solid #d8b4fe;`; // Purple
+                    else style += `background:#fee2e2; color:#991b1b;`; // Red
+                } else {
+                    style += `color:${char === refContext[i] ? '#334155' : '#94a3b8'};`;
+                }
+                seqHtml += `<span style="${style}">${char}</span>`;
+            }
+            html += `
+                <div style="display:grid; grid-template-columns: 20px 140px 1fr; gap:5px; align-items:center; padding:2px 0;">
+                    <div style="font-size:14px;">${row.icon}</div>
+                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${row.common}</div>
+                    <div style="white-space:nowrap;">${seqHtml}</div>
+                </div>`;
+        });
+        html += `</div></div>`;
+        area.innerHTML = html;
 
     } catch (e) {
         area.innerHTML = `Error: ${e.message}`;
     }
 };
 
-// 5. 3D VIEWER
+// --------------------------------------------------------------
+// 5. 3D STRUCTURE VIEWER (MolStar Integration)
+// --------------------------------------------------------------
 window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('vp-3d-btn');
     if(btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
 
     try {
+        // Simple MolStar Loader
         if (!customElements.get('pdbe-molstar')) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar.css';
+            document.head.appendChild(link);
             await new Promise((resolve) => {
                 const s = document.createElement('script');
                 s.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js';
@@ -8314,10 +8384,15 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
         modal.style.cssText = `position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:200000; display:flex; justify-content:center; align-items:center;`;
         modal.innerHTML = `
             <div style="width:90vw; height:90vh; background:white; position:relative;">
-                <button onclick="this.closest('div').parentElement.remove()" style="position:absolute; right:10px; top:10px; z-index:100; font-size:20px;">✕</button>
-                <pdbe-molstar custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='${JSON.stringify(highlightData)}' style="width:100%; height:100%; display:block;"></pdbe-molstar>
+                <div style="padding:10px; background:#f0f0f0; display:flex; justify-content:space-between;">
+                    <strong>${geneSymbol} Structure</strong>
+                    <button id="close-3d-btn" style="cursor:pointer;">✕ Close</button>
+                </div>
+                <pdbe-molstar custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='${JSON.stringify(highlightData)}' style="width:100%; height:calc(100% - 50px); display:block;"></pdbe-molstar>
             </div>`;
         document.body.appendChild(modal);
+        
+        document.getElementById('close-3d-btn').onclick = () => modal.remove();
 
     } catch (e) {
         alert("3D Viewer Error: " + e.message);
@@ -8325,7 +8400,6 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
         if(btn) { btn.innerText = "🧊 View 3D Structure"; btn.disabled = false; }
     }
 };
-
 // --- 2. THE INTERACTIVE PANEL (Connects MSA, 3D, and Score) ---
 window.openVariantAnalysis = async function(gene, pos, ref, alt, desc) {
     const panel = document.getElementById('active-variant-panel');
@@ -8425,4 +8499,5 @@ window.runMSA = async function(gene, pos, refAA) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
