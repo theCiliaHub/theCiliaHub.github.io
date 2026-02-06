@@ -7685,284 +7685,173 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-/* ==============================================================
- * MODULE: ADVANCED VARIANT & EVOLUTIONARY SUITE (v16.0 - Stabilized)
- * Features: Linear Map, 65-Species Alignment, 3D Structure
- * ============================================================== */
-
-// 1. DATA: 65-SPECIES ORGANISM PANEL
-const ORGANISM_PANEL = [
-    { name: 'Homo sapiens', common: 'Human', icon: '👤', dist: 0.0 },
-    { name: 'Pan troglodytes', common: 'Chimpanzee', icon: '🐵', dist: 0.01 },
-    { name: 'Gorilla gorilla', common: 'Gorilla', icon: '🦍', dist: 0.02 },
-    { name: 'Macaca mulatta', common: 'Rhesus Macaque', icon: '🐒', dist: 0.06 },
-    { name: 'Mus musculus', common: 'Mouse', icon: '🐭', dist: 0.15 },
-    { name: 'Rattus norvegicus', common: 'Rat', icon: '🐀', dist: 0.16 },
-    { name: 'Bos taurus', common: 'Cow', icon: '🐄', dist: 0.20 },
-    { name: 'Gallus gallus', common: 'Chicken', icon: '🐔', dist: 0.35 },
-    { name: 'Xenopus tropicalis', common: 'Frog', icon: '🐸', dist: 0.45 },
-    { name: 'Danio rerio', common: 'Zebrafish', icon: '🐟', dist: 0.55 },
-    { name: 'Drosophila melanogaster', common: 'Fruit Fly', icon: '🪰', dist: 0.75 },
-    { name: 'Caenorhabditis elegans', common: 'Nematode', icon: '🪱', dist: 0.80 },
-    { name: 'Chlamydomonas reinhardtii', common: 'Chlamy', icon: '🦠', dist: 0.90 },
-    { name: 'Trypanosoma brucei', common: 'Trypanosome', icon: '🦟', dist: 0.95 },
-    { name: 'Leishmania major', common: 'Leishmania', icon: '🦠', dist: 0.96 }
-];
-
-// 2. MAIN RENDERER: LINEAR VARIANT MAP (Creates the DOM structure)
+// 2. RENDERER (Clean View Switch)
 window.renderVariantMap = async function(geneSymbol) {
-    window.switchView('plot');
+    // 1. Hide UMAP/Diagram Views Manually to prevent conflicts
+    if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
+    if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
+    
+    // 2. Prepare Plot Container
     const container = document.getElementById('plotly-container');
-    if (!container) return;
-
     container.style.display = 'block';
+    
+    // Force-hide legacy sidebar controls if they exist
+    const sidebars = document.querySelectorAll('.viz-sidebar, .layout-sidebar');
+    sidebars.forEach(el => el.style.display = 'none');
+
+    // 3. Loading State
+    // 3. Loading State (Updated Text)
     container.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b; padding:20px; text-align:center;">
             <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
-            <h3>Analyzing ${geneSymbol}...</h3>
-            <p>Fetching ClinVar variants, Domains, and 3D Structure data.</p>
+            <p style="font-size:16px; margin:0 0 8px 0; color:#1e293b;">
+                🔍 Querying ClinVar & UniProt for <strong>${geneSymbol}</strong> variants...
+            </p>
+            <p style="font-size:13px; color:#475569; max-width:400px; line-height:1.5;">
+                Users can view variants, check conservation across species, and visualize variants of choice on the 3D protein structure.
+            </p>
+            <p style="font-size:11px; color:#94a3b8; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:10px;">
+                Note: Only significant variants are pre-loaded. You can add your own custom variants using the panel below.
+            </p>
         </div>`;
 
-    try {
-        const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&fields=uniprot.Swiss-Prot`);
-        const mgData = await mgRes.json();
-        const uniprotID = mgData.hits?.[0]?.uniprot?.['Swiss-Prot'];
-        
-        if(!uniprotID) throw new Error(`UniProt ID not found for ${geneSymbol}`);
+    // 4. Fetch Data
+    const data = await window.fetchVariantDataLive(geneSymbol);
 
-        const ebiRes = await fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`);
-        const ebiData = await ebiRes.json();
-        
-        const seqLen = parseInt(ebiData.sequence.length);
-        const domains = ebiData.features.filter(f => f.type === 'DOMAIN' || f.type === 'REPEAT' || f.type === 'ZN_FING');
-        const variants = ebiData.features.filter(f => f.type === 'VARIANT');
-        
-        const width = 800;
-        const scale = (pos) => (pos / seqLen) * (width - 40) + 20;
-        
-        let svg = `<svg viewBox="0 0 ${width} 250" style="width:100%; height:auto; overflow:visible;">`;
-        svg += `<rect x="20" y="100" width="${width-40}" height="12" fill="#e2e8f0" rx="6" />`; 
-        
-        domains.forEach(d => {
-            const x = scale(d.begin);
-            const w = scale(d.end) - x;
-            svg += `<rect x="${x}" y="94" width="${w}" height="24" fill="#3b82f6" opacity="0.8" rx="4" stroke="white"><title>${d.description}</title></rect>`;
-            svg += `<text x="${x + w/2}" y="140" font-size="10" text-anchor="middle" fill="#475569">${d.description.split(' ')[0]}</text>`;
-        });
-
-        // Filter & limit variants to prevent SVG overload
-        const displayVars = variants.filter(v => 
-            v.description.includes('Pathogenic') || v.description.includes('disease') || Math.random() > 0.95
-        ).slice(0, 40);
-
-        displayVars.forEach(v => {
-            const cx = scale(v.begin);
-            const color = v.description.includes('Pathogenic') ? '#ef4444' : '#9ca3af';
-            const descSafe = v.description.replace(/'/g, "").replace(/"/g, "");
-            
-            // Pass the variant string (e.g., "p.Arg301Trp") for parsing
-            const onClick = `window.openVariantPanel('p.${v.wildType}${v.begin}${v.alternativeSequence}', '${v.begin}', '${descSafe}', '${geneSymbol}')`;
-            
-            svg += `
-                <g style="cursor:pointer;" onclick="${onClick}">
-                    <line x1="${cx}" y1="100" x2="${cx}" y2="50" stroke="${color}" stroke-width="2" />
-                    <circle cx="${cx}" cy="50" r="5" fill="${color}" stroke="white" stroke-width="2" />
-                    <title>${v.wildType}${v.begin}${v.alternativeSequence}</title>
-                </g>
-            `;
-        });
-        svg += `</svg>`;
-
-        // CRITICAL: Ensure 'msa-result-area' is created here
-        container.innerHTML = `
-            <div style="padding:20px; height:100%; overflow-y:auto;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h2 style="margin:0; color:#1e293b;">🧬 ${geneSymbol} Variant Landscape</h2>
-                    <span style="font-size:12px; background:#f1f5f9; padding:4px 8px; border-radius:4px;">${uniprotID}</span>
-                </div>
-                ${svg}
-                
-                <div id="var-panel" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-top:20px;">
-                    <h3 style="margin:0 0 10px 0; color:#2563eb;" id="vp-title"></h3>
-                    <p style="font-size:13px; color:#475569;" id="vp-desc"></p>
-                    <div style="display:flex; gap:10px; margin-top:15px;">
-                        <button id="vp-cons-btn" class="ciliai-button">🌍 Check Conservation</button>
-                        <button id="vp-3d-btn" class="ciliai-button">🧊 View 3D Structure</button>
-                    </div>
-                    
-                    <div id="msa-result-area" style="margin-top:15px; border-top:1px solid #e2e8f0; padding-top:15px;"></div>
-                </div>
-            </div>`;
-
-    } catch (e) {
-        container.innerHTML = `<div style="padding:40px; color:#ef4444;">Error: ${e.message}</div>`;
+    if (data.error) {
+        container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Error: ${data.error}</div>`;
+        return;
     }
+
+    window.CiliAI.activeVariantData = data;
+    window.drawVariantWorkspace();
 };
 
-// 3. INTERACTION CONTROLLER (Opens the panel)
+
+// 3. DRAWING ENGINE (Nature Colors + Stable Interaction)
+window.drawVariantWorkspace = function() {
+    const data = window.CiliAI.activeVariantData;
+    const container = document.getElementById('plotly-container');
+
+    const isPathogenic = (v) => JSON.stringify(v).toLowerCase().includes("pathogenic");
+    const allPathogenic = data.variants.filter(isPathogenic);
+    const allOthers = data.variants.filter(v => !isPathogenic(v));
+
+    const displayVariants = [
+        ...allPathogenic.slice(0, 30),
+        ...allOthers.sort(() => 0.5 - Math.random()).slice(0, 30),
+        ...data.customVariants
+    ];
+
+    const w = container.clientWidth - 40;
+    const h = 450;
+    const pad = 40;
+    const trackY = 250;
+    const xScale = (pos) => pad + (pos / data.length) * (w - 2 * pad);
+
+    const svgContent = `
+        <div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; font-family:'Inter',sans-serif;">
+            
+            
+            <div id="var-panel" style="position:absolute; top:10px; right:10px; background:white; padding:15px; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:280px; display:none; z-index:50;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <strong id="vp-title" style="color:#1e293b;">Variant</strong>
+                    <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none; background:none; cursor:pointer;">✕</button>
+                </div>
+                <div id="vp-desc" style="font-size:12px; color:#64748b; margin-bottom:12px; max-height:100px; overflow-y:auto;"></div>
+                <button id="vp-action" style="width:100%; padding:8px; background:#3b82f6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">
+                    🌍 Check Conservation
+                </button>
+            </div>
+
+            <div style="flex:1; overflow:hidden;">
+                <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}">
+                    <text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Landscape</text>
+                    <text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | ${displayVariants.length} Variants Shown</text>
+
+                    <rect x="${pad}" y="${trackY - 6}" width="${w - 2 * pad}" height="12" rx="6" fill="#e2e8f0" />
+                    ${data.domains.map((d, i) => {
+                        const x = xScale(d.start);
+                        const width = Math.max(xScale(d.end) - x, 4);
+                        return `<rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${d.color}" opacity="0.85" stroke="white" stroke-width="1">
+                            <title>${d.name} (${d.start}-${d.end})</title>
+                        </rect>`;
+                    }).join('')}
+
+                    ${displayVariants.map(v => {
+                        const isCustom = v.isCustom;
+                        const isPatho = isCustom ? (v.significance === 'Pathogenic') : isPathogenic(v);
+                        const x = xScale(v.begin);
+                        const color = isCustom ? '#9b59b6' : (isPatho ? '#e74c3c' : '#95a5a6'); 
+                        const radius = isCustom ? 7 : (isPatho ? 5 : 3);
+                        const height = 20 + (v.begin % 100); 
+                        const yHead = trackY - height;
+                        
+                        // Clean data for onclick
+                        const title = `p.${v.wildType}${v.begin}${v.mutatedType}`;
+                        const rawDesc = (v.descriptions?.[0]?.value || "Variant details unavailable");
+                        // Escape quotes for HTML attribute
+                        const descSafe = rawDesc.replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+                        
+                        return `
+                            <g style="cursor:pointer;" 
+                               onclick="window.openVariantPanel('${title}', '${v.begin}', '${descSafe}', '${data.gene}')">
+                                <line x1="${x}" y1="${trackY - 12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="${isCustom ? 2 : 1}" opacity="0.6" />
+                                <circle cx="${x}" cy="${yHead}" r="${radius}" fill="${color}" stroke="white" stroke-width="1">
+                                    <title>${title} (Click for Conservation)</title>
+                                </circle>
+                            </g>`;
+                    }).join('')}
+                </svg>
+            </div>
+
+            <div style="padding:15px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:10px; align-items:center;">
+                <input id="custom-var-input" type="text" placeholder="Add p.L301R" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:100px;">
+                <select id="custom-var-sig" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
+                    <option value="Pathogenic">Pathogenic</option>
+                    <option value="VUS">VUS</option>
+                </select>
+                <button onclick="window.addUserVariant()" style="padding:6px 12px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer;">+ Add</button>
+                <button onclick="window.downloadVariantCSV()" style="padding:6px 12px; background:white; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">📥 CSV</button>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = svgContent;
+};
+
+
+// 4. INTERACTION HELPERS (Updated with 3D Button)
 window.openVariantPanel = function(title, pos, desc, gene) {
     const panel = document.getElementById('var-panel');
-    if (!panel) return; // Guard clause
-
     document.getElementById('vp-title').textContent = title;
-    document.getElementById('vp-desc').textContent = desc;
-    panel.style.display = 'block';
-
-    // Clear previous results
-    const area = document.getElementById('msa-result-area');
-    if(area) area.innerHTML = '';
-
-    // Parse AA (e.g. p.Arg301Trp -> R, W)
-    const match = title.match(/p\.([A-Z][a-z]{0,2})(\d+)([A-Z][a-z]{0,2})/);
-    let ref = '?', alt = '?';
     
-    const convert = (aa) => {
-        const map = {Ala:'A',Arg:'R',Asn:'N',Asp:'D',Cys:'C',Glu:'E',Gln:'Q',Gly:'G',His:'H',Ile:'I',Leu:'L',Lys:'K',Met:'M',Phe:'F',Pro:'P',Ser:'S',Thr:'T',Trp:'W',Tyr:'Y',Val:'V'};
-        return map[aa.charAt(0).toUpperCase() + aa.slice(1).toLowerCase()] || aa;
-    };
+    // Clean description text
+    const cleanDesc = desc.replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+    document.getElementById('vp-desc').textContent = cleanDesc.length > 150 ? cleanDesc.substring(0, 150) + '...' : cleanDesc;
+    
+    // 1. Configure Conservation Button
+    const consBtn = document.getElementById('vp-action');
+    consBtn.onclick = () => window.checkConservation(gene, parseInt(pos), title);
 
-    if (match) {
-        ref = match[1].length === 3 ? convert(match[1]) : match[1];
-        alt = match[3].length === 3 ? convert(match[3]) : match[3];
+    // 2. Configure/Create 3D Structure Button
+    let structBtn = document.getElementById('btn-3d');
+    
+    // If button doesn't exist yet (first run), inject it
+    if (!structBtn) {
+        structBtn = document.createElement('button');
+        structBtn.id = 'btn-3d';
+        structBtn.style.cssText = "width:100%; padding:8px; background:#8b5cf6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600; margin-top:8px;";
+        structBtn.innerText = "🧊 View 3D Structure";
+        consBtn.parentNode.insertBefore(structBtn, consBtn.nextSibling);
     }
-
-    const consBtn = document.getElementById('vp-cons-btn');
-    const structBtn = document.getElementById('vp-3d-btn');
-
-    if (consBtn) consBtn.onclick = () => window.checkConservation(gene, parseInt(pos), ref, alt);
-    if (structBtn) structBtn.onclick = () => window.showStructureViewer(gene, parseInt(pos), alt);
+    
+    // Reset button text & bind click
+    structBtn.innerText = "🧊 View 3D Structure";
+    structBtn.onclick = () => window.showStructureViewer(gene, parseInt(pos), title);
+    
+    panel.style.display = 'block';
 };
-
-// 4. MSA VISUALIZER (Safe Version)
-window.checkConservation = async function(gene, pos, refAA, altAA) {
-    // 1. SAFETY FIX: Try to get the element
-    let area = document.getElementById('msa-result-area');
-
-    // 2. AUTO-REPAIR: If missing, create it on the fly
-    if (!area) {
-        const panel = document.getElementById('var-panel');
-        if (panel) {
-            area = document.createElement('div');
-            area.id = 'msa-result-area';
-            area.style.marginTop = '15px';
-            panel.appendChild(area);
-        } else {
-            console.error("CiliAI Error: Cannot find 'var-panel' to inject MSA results.");
-            alert("Interface Error: Please refresh the variant view.");
-            return;
-        }
-    }
-
-    area.innerHTML = `
-        <div style="text-align:center; padding:20px; color:#64748b;">
-            <div style="font-size:24px; animation:spin 1s infinite linear; margin-bottom:10px;">⏳</div>
-            Aligning <strong>${ORGANISM_PANEL.length} species</strong> to check <strong>${refAA} → ${altAA}</strong>...
-        </div>`;
-
-    try {
-        const data = await window.fetchVariantDataLive(gene);
-        const humanSeq = data.sequence || "M".repeat(pos + 20); 
-        
-        const winStart = Math.max(0, pos - 11);
-        const winEnd = Math.min(humanSeq.length, pos + 10);
-        const refContext = humanSeq.substring(winStart, winEnd);
-        const targetIndex = pos - 1 - winStart;
-
-        let conservedCount = 0;
-        let mutantMatchCount = 0;
-        let totalSpecies = 0;
-        const isDomain = data.features.some(f => (f.type === 'DOMAIN' || f.type === 'ZN_FING') && pos >= f.begin && pos <= f.end);
-        
-        const alignmentRows = ORGANISM_PANEL.map(species => {
-            let seq = "";
-            let status = "mismatch"; 
-
-            for (let i = 0; i < refContext.length; i++) {
-                const refChar = refContext[i];
-                let char = refChar;
-                
-                // Evolutionary Probability Model
-                const mutationProb = species.dist * (isDomain ? 0.3 : 1.0); 
-                
-                if (Math.random() < mutationProb) {
-                    const aminoAcids = "ACDEFGHIKLMNPQRSTVWY";
-                    // 5% chance to naturally evolve into the requested mutant AA
-                    char = (Math.random() < 0.05) ? altAA : aminoAcids[Math.floor(Math.random() * aminoAcids.length)];
-                }
-                if (species.dist < 0.10) char = refChar; // Force mammal conservation
-
-                seq += char;
-                
-                if (i === targetIndex) {
-                    if (char === refAA) { status = "match"; conservedCount++; }
-                    else if (char === altAA) { status = "mutant"; mutantMatchCount++; }
-                }
-            }
-            totalSpecies++;
-            return { ...species, seq, status };
-        });
-
-        const conservationScore = Math.round((conservedCount / totalSpecies) * 100);
-        let insight = "";
-        let color = "#64748b";
-
-        if (mutantMatchCount > 0) {
-            insight = `⚠️ <strong>Evolutionary Precedent:</strong> The mutant <strong>${altAA}</strong> appears naturally in ${mutantMatchCount} species (e.g., ${alignmentRows.find(r=>r.status==='mutant').name}). This suggests tolerance.`;
-            color = "#9333ea"; // Purple
-        } else if (conservationScore > 85) {
-            insight = `🛡️ <strong>Highly Conserved:</strong> Matches in ${conservationScore}% of species. Variant likely damaging.`;
-            color = "#166534"; // Green
-        } else {
-            insight = `ℹ️ <strong>Variable Region:</strong> Low conservation (${conservationScore}%). Variant may be benign.`;
-            color = "#ca8a04"; // Yellow
-        }
-
-        let html = `
-            <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
-                <div style="padding:10px 15px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
-                    <div style="font-size:12px; color:${color}; margin-bottom:5px;">${insight}</div>
-                    <div style="font-size:10px; color:#94a3b8; font-weight:700;">
-                         REF: <span style="color:#166534">${refAA}</span> | VAR: <span style="color:#9333ea">${altAA}</span>
-                    </div>
-                </div>
-                <div style="max-height:300px; overflow-y:auto; padding:10px; font-family:'Roboto Mono', monospace; font-size:11px;">
-                    <div style="display:grid; grid-template-columns: 20px 140px 1fr; gap:5px; margin-bottom:5px; color:#94a3b8; border-bottom:1px solid #eee;">
-                        <div></div><div>Organism</div><div>Alignment</div>
-                    </div>`;
-
-        alignmentRows.forEach(row => {
-            let seqHtml = "";
-            for (let i = 0; i < row.seq.length; i++) {
-                const char = row.seq[i];
-                const isTarget = (i === targetIndex);
-                let style = `display:inline-block; width:14px; text-align:center;`;
-                
-                if (isTarget) {
-                    style += `font-weight:bold; border-radius:2px; `;
-                    if (char === refAA) style += `background:#dcfce7; color:#166534;`; 
-                    else if (char === altAA) style += `background:#f3e8ff; color:#7e22ce; border:1px solid #d8b4fe;`; 
-                    else style += `background:#fee2e2; color:#991b1b;`; 
-                } else {
-                    style += `color:${char === refContext[i] ? '#334155' : '#94a3b8'};`;
-                }
-                seqHtml += `<span style="${style}">${char}</span>`;
-            }
-            html += `
-                <div style="display:grid; grid-template-columns: 20px 140px 1fr; gap:5px; align-items:center; padding:2px 0;">
-                    <div style="font-size:14px;">${row.icon}</div>
-                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${row.common}</div>
-                    <div style="white-space:nowrap;">${seqHtml}</div>
-                </div>`;
-        });
-        html += `</div></div>`;
-        area.innerHTML = html;
-
-    } catch (e) {
-        area.innerHTML = `Error: ${e.message}`;
-    }
-};
-
-// 5. 3D STRUCTURE VIEWER (MolStar Integration)
 
 window.downloadVariantCSV = function() {
     const data = window.CiliAI.activeVariantData;
@@ -8425,12 +8314,14 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
         }
     }
 
-  /* ----------------------------------------------------------
- * 3. MAIN RENDERER (Cinema Mode Modal - Fixed & Self-Contained)
+    /* ----------------------------------------------------------
+     * 3. MAIN RENDERER (Cinema Mode Modal)
+     * ---------------------------------------------------------- */
+    /* ----------------------------------------------------------
+ * 3. MAIN RENDERER (Cinema Mode Modal - Fixed)
  * ---------------------------------------------------------- */
 window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
-    // 1. Safe Button Resolution (Checks both IDs used in previous versions)
-    const btn = document.getElementById('vp-3d-btn') || document.getElementById('btn-3d');
+    const btn = document.getElementById('btn-3d');
     const originalText = btn ? btn.innerText : "🧊 View 3D";
     
     if (btn) {
@@ -8438,7 +8329,7 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
         btn.disabled = true;
     }
 
-    // 2. Internal Helper: AlphaFold URL Resolver (Prevents 'undefined' errors)
+    // --- Helper: Robust AlphaFold URL Resolver ---
     const getAlphaFoldUrl = async (id) => {
         try {
             const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${id}`);
@@ -8451,7 +8342,7 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
     };
 
     try {
-        // A. Load Library (Safe Lazy Load)
+        // A. Load Library (Safe Check)
         if (!customElements.get('pdbe-molstar')) {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
@@ -8465,12 +8356,12 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
             });
         }
 
-        // B. Resolve Data (Uses global fetcher or internal fallback)
+        // B. Resolve Data
         let data;
         if (typeof window.fetchVariantDataLive === 'function') {
             data = await window.fetchVariantDataLive(geneSymbol);
         } else {
-            // Fallback if main fetcher is missing
+            // Fallback fetcher if main one is missing
             const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&fields=uniprot.Swiss-Prot`);
             const mgJson = await mgRes.json();
             const hit = mgJson.hits?.[0];
@@ -8560,10 +8451,8 @@ window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
         if (btn) { btn.innerText = originalText; btn.disabled = false; }
     }
 };
-
     console.log("[CiliAI] 3D Viewer module loaded.");
 })();
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
