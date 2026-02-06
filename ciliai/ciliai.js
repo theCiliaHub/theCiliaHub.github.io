@@ -8154,22 +8154,13 @@ window.renderRadarChart = function(genes) {
     Plotly.newPlot('plotly-container', data, layout);
 };
 
-// --------------------------------------------------------------
-// 2. LINEAR VARIANT MAP (The Hub)
-// --------------------------------------------------------------
+// 2. LINEAR VARIANT MAP
 window.renderVariantMap = async function(geneSymbol) {
     window.switchView('plot');
     const container = document.getElementById('plotly-container');
-    
-    container.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
-            <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
-            <h3>Analyzing ${geneSymbol}...</h3>
-            <p>Fetching ClinVar variants, Domains, and 3D Structure data.</p>
-        </div>`;
+    container.innerHTML = `<div style="padding:40px;text-align:center;">Using Live API to fetch variants for <strong>${geneSymbol}</strong>... <div class="loader"></div></div>`;
 
     try {
-        // A. Fetch Live Data
         const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&fields=uniprot.Swiss-Prot`);
         const mgData = await mgRes.json();
         const uniprotID = mgData.hits?.[0]?.uniprot?.['Swiss-Prot'];
@@ -8179,65 +8170,43 @@ window.renderVariantMap = async function(geneSymbol) {
         const ebiRes = await fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`);
         const ebiData = await ebiRes.json();
         
-        // B. Process Data
         const seqLen = parseInt(ebiData.sequence.length);
         const domains = ebiData.features.filter(f => f.type === 'DOMAIN' || f.type === 'REPEAT' || f.type === 'ZN_FING');
         const variants = ebiData.features.filter(f => f.type === 'VARIANT');
         
-        // C. Draw Linear Map
         const width = 800;
         const scale = (pos) => (pos / seqLen) * (width - 40) + 20;
         
-        let svg = `<svg viewBox="0 0 ${width} 250" style="width:100%; height:auto; overflow:visible;">`;
-        svg += `<rect x="20" y="100" width="${width-40}" height="12" fill="#e2e8f0" rx="6" />`; // Backbone
+        let svg = `<svg viewBox="0 0 ${width} 250" style="width:100%; height:auto;">`;
+        svg += `<rect x="20" y="100" width="${width-40}" height="12" fill="#e2e8f0" rx="6" />`;
         
-        // Domains
         domains.forEach(d => {
             const x = scale(d.begin);
             const w = scale(d.end) - x;
-            svg += `
-                <rect x="${x}" y="94" width="${w}" height="24" fill="#3b82f6" opacity="0.8" rx="4" stroke="white">
-                    <title>${d.description} (${d.begin}-${d.end})</title>
-                </rect>
-                <text x="${x + w/2}" y="140" font-size="10" text-anchor="middle" fill="#475569">${d.description.split(' ')[0]}</text>
-            `;
+            svg += `<rect x="${x}" y="94" width="${w}" height="24" fill="#3b82f6" opacity="0.8" rx="4" stroke="white"><title>${d.description}</title></rect>`;
+            svg += `<text x="${x + w/2}" y="140" font-size="10" text-anchor="middle" fill="#475569">${d.description.split(' ')[0]}</text>`;
         });
 
-        // Variants (Interactive)
-        const displayVars = variants.filter(v => 
-            v.description.includes('Pathogenic') || v.description.includes('disease') || Math.random() > 0.95
-        ).slice(0, 40);
-
-        displayVars.forEach(v => {
+        variants.slice(0, 40).forEach(v => {
             const cx = scale(v.begin);
             const color = v.description.includes('Pathogenic') ? '#ef4444' : '#9ca3af';
             const descSafe = v.description.replace(/'/g, "").replace(/"/g, "");
-            
-            // Pass the variant string (e.g., "p.Arg301Trp") for parsing
             const onClick = `window.openVariantPanel('p.${v.wildType}${v.begin}${v.alternativeSequence}', '${v.begin}', '${descSafe}', '${geneSymbol}')`;
-            
-            svg += `
-                <g style="cursor:pointer;" onclick="${onClick}">
-                    <line x1="${cx}" y1="100" x2="${cx}" y2="50" stroke="${color}" stroke-width="2" />
-                    <circle cx="${cx}" cy="50" r="5" fill="${color}" stroke="white" stroke-width="2" />
-                    <title>${v.wildType}${v.begin}${v.alternativeSequence}</title>
-                </g>
-            `;
+            svg += `<g style="cursor:pointer;" onclick="${onClick}">
+                <line x1="${cx}" y1="100" x2="${cx}" y2="50" stroke="${color}" stroke-width="2" />
+                <circle cx="${cx}" cy="50" r="5" fill="${color}" stroke="white" stroke-width="2" />
+            </g>`;
         });
         svg += `</svg>`;
 
-        // D. Render Container
         container.innerHTML = `
             <div style="padding:20px; height:100%; overflow-y:auto;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h2 style="margin:0; color:#1e293b;">🧬 ${geneSymbol} Variant Landscape</h2>
-                    <span style="font-size:12px; background:#f1f5f9; padding:4px 8px; border-radius:4px;">${uniprotID}</span>
-                </div>
+                <h3>🧬 ${geneSymbol} Variant Landscape</h3>
                 ${svg}
-                <div id="var-panel" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-top:20px;">
-                    <h3 style="margin:0 0 10px 0; color:#2563eb;" id="vp-title"></h3>
-                    <p style="font-size:13px; color:#475569;" id="vp-desc"></p>
-                    <div style="display:flex; gap:10px; margin-top:15px;">
+                <div id="var-panel" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; padding:20px; margin-top:20px;">
+                    <h3 id="vp-title" style="color:#2563eb;"></h3>
+                    <p id="vp-desc" style="font-size:13px;"></p>
+                    <div style="display:flex; gap:10px;">
                         <button id="vp-cons-btn" class="ciliai-button">🌍 Check Conservation</button>
                         <button id="vp-3d-btn" class="ciliai-button">🧊 View 3D Structure</button>
                     </div>
@@ -8250,185 +8219,106 @@ window.renderVariantMap = async function(geneSymbol) {
     }
 };
 
-// --------------------------------------------------------------
-// 3. INTERACTION CONTROLLER (Panel Logic)
-// --------------------------------------------------------------
+// 3. INTERACTION CONTROLLER
 window.openVariantPanel = function(title, pos, desc, gene) {
-    const panel = document.getElementById('var-panel');
+    document.getElementById('var-panel').style.display = 'block';
     document.getElementById('vp-title').textContent = title;
     document.getElementById('vp-desc').textContent = desc;
-    panel.style.display = 'block';
 
-    // Parse AA (e.g. p.Arg301Trp -> R, W)
     const match = title.match(/p\.([A-Z][a-z]{0,2})(\d+)([A-Z][a-z]{0,2})/);
     let ref = '?', alt = '?';
-    if (match) {
-        const convert = (aa) => {
-            const map = {Ala:'A',Arg:'R',Asn:'N',Asp:'D',Cys:'C',Glu:'E',Gln:'Q',Gly:'G',His:'H',Ile:'I',Leu:'L',Lys:'K',Met:'M',Phe:'F',Pro:'P',Ser:'S',Thr:'T',Trp:'W',Tyr:'Y',Val:'V'};
-            return map[aa.charAt(0).toUpperCase() + aa.slice(1).toLowerCase()] || aa;
-        };
-        ref = match[1].length === 3 ? convert(match[1]) : match[1];
-        alt = match[3].length === 3 ? convert(match[3]) : match[3];
-    }
+    
+    // Helper to normalize 3-letter codes
+    const norm = (a) => a.length===3 ? {Ala:'A',Arg:'R',Asn:'N',Asp:'D',Cys:'C',Glu:'E',Gln:'Q',Gly:'G',His:'H',Ile:'I',Leu:'L',Lys:'K',Met:'M',Phe:'F',Pro:'P',Ser:'S',Thr:'T',Trp:'W',Tyr:'Y',Val:'V'}[a] || a : a;
 
-    // Attach Handlers
+    if (match) { ref = norm(match[1]); alt = norm(match[3]); }
+
     document.getElementById('vp-cons-btn').onclick = () => window.checkConservation(gene, parseInt(pos), ref, alt);
     document.getElementById('vp-3d-btn').onclick = () => window.showStructureViewer(gene, parseInt(pos), alt);
 };
 
-// --------------------------------------------------------------
-// 4. MSA VISUALIZER (High-Density + Variant Aware)
-// --------------------------------------------------------------
+// 4. MSA VISUALIZER
 window.checkConservation = async function(gene, pos, refAA, altAA) {
     const area = document.getElementById('msa-result-area');
-    area.innerHTML = `
-        <div style="text-align:center; padding:20px; color:#64748b;">
-            <div style="font-size:24px; animation:spin 1s infinite linear; margin-bottom:10px;">⏳</div>
-            Aligning <strong>${ORGANISM_PANEL.length} species</strong> to check <strong>${refAA} → ${altAA}</strong>...
-        </div>`;
+    area.innerHTML = `Aligning sequences...`;
 
     try {
-        // A. Get Human Ref Sequence
         const data = await window.fetchVariantDataLive(gene);
         const humanSeq = data.sequence || "M".repeat(pos + 20); 
         
-        // Define Window
         const winStart = Math.max(0, pos - 11);
         const winEnd = Math.min(humanSeq.length, pos + 10);
         const refContext = humanSeq.substring(winStart, winEnd);
         const targetIndex = pos - 1 - winStart;
 
-        // B. Weighted Evolution Simulation
-        let conservedCount = 0;
-        let mutantMatchCount = 0;
-        let totalSpecies = 0;
+        let conservedCount = 0, mutantMatchCount = 0, total = 0;
         const isDomain = data.features.some(f => (f.type === 'DOMAIN' || f.type === 'ZN_FING') && pos >= f.begin && pos <= f.end);
         
-        const alignmentRows = ORGANISM_PANEL.map(species => {
-            let seq = "";
-            let status = "mismatch"; 
+        let html = `<div style="background:white; border:1px solid #ddd; border-radius:8px; overflow:hidden; font-family:monospace; font-size:11px;">`;
 
+        ORGANISM_PANEL.forEach(species => {
+            let seq = "";
             for (let i = 0; i < refContext.length; i++) {
                 const refChar = refContext[i];
-                const mutationProb = species.dist * (isDomain ? 0.3 : 1.0); 
-                
                 let char = refChar;
-                if (Math.random() < mutationProb) {
-                    const aminoAcids = "ACDEFGHIKLMNPQRSTVWY";
-                    // 5% chance to naturally evolve into the requested mutant AA
-                    char = (Math.random() < 0.05) ? altAA : aminoAcids[Math.floor(Math.random() * aminoAcids.length)];
+                // Weighted simulation of evolution
+                if (Math.random() < (species.dist * (isDomain ? 0.3 : 1.0))) {
+                    char = (Math.random() < 0.05) ? altAA : "ACDEFGHIKLMNPQRSTVWY"[Math.floor(Math.random() * 20)];
                 }
-                if (species.dist < 0.10) char = refChar; // Force mammal conservation
-
-                seq += char;
+                if (species.dist < 0.1) char = refChar;
                 
                 if (i === targetIndex) {
-                    if (char === refAA) { status = "match"; conservedCount++; }
-                    else if (char === altAA) { status = "mutant"; mutantMatchCount++; }
+                    if (char === refAA) conservedCount++;
+                    if (char === altAA) mutantMatchCount++;
                 }
+                seq += `<span style="display:inline-block; width:14px; text-align:center; color:${char===refContext[i] ? '#333' : '#999'}; font-weight:${i===targetIndex?'bold':'normal'}; background:${i===targetIndex ? (char===refAA?'#dcfce7':(char===altAA?'#f3e8ff':'#fee2e2')) : 'transparent'}">${char}</span>`;
             }
-            totalSpecies++;
-            return { ...species, seq, status };
+            total++;
+            html += `<div style="padding:4px 10px; border-bottom:1px solid #f0f0f0; display:flex;">
+                <div style="width:20px;">${species.icon}</div>
+                <div style="width:120px;">${species.common}</div>
+                <div>${seq}</div>
+            </div>`;
         });
-
-        // C. Score & Insight
-        const conservationScore = Math.round((conservedCount / totalSpecies) * 100);
-        let insight = "";
-        let color = "#64748b";
-
-        if (mutantMatchCount > 0) {
-            insight = `⚠️ <strong>Evolutionary Precedent:</strong> The mutant <strong>${altAA}</strong> appears naturally in ${mutantMatchCount} species (e.g., ${alignmentRows.find(r=>r.status==='mutant').name}). This suggests tolerance.`;
-            color = "#9333ea"; // Purple
-        } else if (conservationScore > 85) {
-            insight = `🛡️ <strong>Highly Conserved:</strong> Matches in ${conservationScore}% of species. Variant likely damaging.`;
-            color = "#166534"; // Green
-        } else {
-            insight = `ℹ️ <strong>Variable Region:</strong> Low conservation (${conservationScore}%). Variant may be benign.`;
-            color = "#ca8a04"; // Yellow
-        }
-
-        // D. Render
-        let html = `
-            <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
-                <div style="padding:10px 15px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
-                    <div style="font-size:12px; color:${color}; margin-bottom:5px;">${insight}</div>
-                </div>
-                <div style="max-height:300px; overflow-y:auto; padding:10px; font-family:'Roboto Mono', monospace; font-size:11px;">
-                    <div style="display:grid; grid-template-columns: 20px 140px 1fr; gap:5px; margin-bottom:5px; color:#94a3b8; border-bottom:1px solid #eee;">
-                        <div></div><div>Organism</div><div>Alignment</div>
-                    </div>`;
-
-        alignmentRows.forEach(row => {
-            let seqHtml = "";
-            for (let i = 0; i < row.seq.length; i++) {
-                const char = row.seq[i];
-                const isTarget = (i === targetIndex);
-                let style = `display:inline-block; width:14px; text-align:center;`;
-                
-                if (isTarget) {
-                    style += `font-weight:bold; border-radius:2px; `;
-                    if (char === refAA) style += `background:#dcfce7; color:#166534;`; // Green
-                    else if (char === altAA) style += `background:#f3e8ff; color:#7e22ce; border:1px solid #d8b4fe;`; // Purple
-                    else style += `background:#fee2e2; color:#991b1b;`; // Red
-                } else {
-                    style += `color:${char === refContext[i] ? '#334155' : '#94a3b8'};`;
-                }
-                seqHtml += `<span style="${style}">${char}</span>`;
-            }
-            html += `
-                <div style="display:grid; grid-template-columns: 20px 140px 1fr; gap:5px; align-items:center; padding:2px 0;">
-                    <div style="font-size:14px;">${row.icon}</div>
-                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${row.common}</div>
-                    <div style="white-space:nowrap;">${seqHtml}</div>
-                </div>`;
-        });
-        html += `</div></div>`;
-        area.innerHTML = html;
+        
+        const score = Math.round((conservedCount/total)*100);
+        const insight = mutantMatchCount > 0 ? "⚠️ Mutant found in other species (likely benign)" : (score > 85 ? "🛡️ Highly Conserved (likely pathogenic)" : "ℹ️ Variable Region");
+        
+        area.innerHTML = `<div style="padding:10px; background:#f8fafc; font-weight:bold; color:#475569;">${insight} (${score}% Match)</div>` + html + `</div>`;
 
     } catch (e) {
         area.innerHTML = `Error: ${e.message}`;
     }
 };
-    
-// --------------------------------------------------------------
-// 5. 3D STRUCTURE VIEWER (MolStar Integration)
-// --------------------------------------------------------------
+
+// 5. 3D VIEWER
 window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
     const btn = document.getElementById('vp-3d-btn');
     if(btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
 
     try {
-        await window.loadMolStar(); // Ensure lib loaded
+        if (!customElements.get('pdbe-molstar')) {
+            await new Promise((resolve) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js';
+                s.onload = resolve;
+                document.head.appendChild(s);
+            });
+        }
+        
         const data = await window.fetchVariantDataLive(geneSymbol);
-        
-        // AlphaFold URL
         const afUrl = `https://alphafold.ebi.ac.uk/files/AF-${data.uniprotID}-F1-model_v4.cif`;
-        
-        // Highlight Config
-        const highlightData = variantPos ? [{
-            entity_id: "1", residue_number: parseInt(variantPos, 10),
-            color: { r: 255, g: 0, b: 255 }, focus: true
-        }] : [];
+        const highlightData = [{ entity_id: "1", residue_number: parseInt(variantPos), color: { r:255, g:0, b:255 }, focus: true }];
 
-        // Modal
         const modal = document.createElement('div');
         modal.style.cssText = `position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:200000; display:flex; justify-content:center; align-items:center;`;
-        
         modal.innerHTML = `
-            <div style="width:90vw; height:90vh; background:white; border-radius:12px; overflow:hidden; position:relative;">
-                <div style="padding:10px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-                    <strong>${geneSymbol} Structure</strong>
-                    <button onclick="this.closest('div').parentElement.parentElement.remove()" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button>
-                </div>
-                <pdbe-molstar id="target-molstar" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true"
-                    bg-color-r="255" bg-color-g="255" bg-color-b="255"
-                    highlight-data='${JSON.stringify(highlightData)}'
-                    style="width:100%; height:calc(100% - 50px); display:block;">
-                </pdbe-molstar>
+            <div style="width:90vw; height:90vh; background:white; position:relative;">
+                <button onclick="this.closest('div').parentElement.remove()" style="position:absolute; right:10px; top:10px; z-index:100; font-size:20px;">✕</button>
+                <pdbe-molstar custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='${JSON.stringify(highlightData)}' style="width:100%; height:100%; display:block;"></pdbe-molstar>
             </div>`;
-        
         document.body.appendChild(modal);
-        
+
     } catch (e) {
         alert("3D Viewer Error: " + e.message);
     } finally {
@@ -8535,5 +8425,4 @@ window.runMSA = async function(gene, pos, refAA) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
 
