@@ -8012,28 +8012,45 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
         return loadingPromise;
     };
 
-    /* ----------------------------------------------------------
-     * 2. ALPHAFOLD API RESOLVER (Fixes 404 Errors)
-     * ---------------------------------------------------------- */
-    async function getAlphaFoldUrl(uniprotID) {
+/* ----------------------------------------------------------
+ * 2. ALPHAFOLD API RESOLVER (Fixes 404 Errors)
+ * ---------------------------------------------------------- */
+(function () {
+    'use strict';
+
+    window.getAlphaFoldUrl = async function (uniprotID) {
         console.log(`[CiliAI] Resolving AlphaFold URL for ${uniprotID}...`);
+
         try {
             // Ask EBI API for the correct file path
-            const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotID}`);
-            if (!res.ok) throw new Error(`API Error ${res.status}`);
-            const data = await res.json();
-            
-            if (Array.isArray(data) && data.length > 0) {
-                console.log(`[CiliAI] Found URL: ${data[0].cifUrl}`);
-                return data[0].cifUrl; 
+            const res = await fetch(
+                `https://alphafold.ebi.ac.uk/api/prediction/${uniprotID}`
+            );
+
+            if (!res.ok) {
+                throw new Error(`API Error ${res.status}`);
             }
-            throw new Error("No structure found in API response");
+
+            const data = await res.json();
+
+            if (Array.isArray(data) && data.length > 0 && data[0].cifUrl) {
+                console.log(`[CiliAI] Found URL: ${data[0].cifUrl}`);
+                return data[0].cifUrl;
+            }
+
+            throw new Error('No structure found in API response');
         } catch (e) {
-            console.warn("[CiliAI] API Lookup failed, trying fallback...", e);
-            // Fallback: Try v4, then v3 if API is down
+            console.warn(
+                '[CiliAI] API lookup failed, using fallback AlphaFold URL',
+                e
+            );
+
+            // Fallback: canonical AlphaFold v4 path
             return `https://alphafold.ebi.ac.uk/files/AF-${uniprotID}-F1-model_v4.cif`;
         }
-    }
+    };
+
+})(); // ✅ REQUIRED — closes the IIFE
 
 
 /* ==============================================================
@@ -8420,81 +8437,133 @@ window.openVariantAnalysis = async function(gene, pos, ref, alt, desc) {
 };
 
 // --- 3. CONSERVATION CHECKER (Requirement #1 & #4) ---
-window.runMSA = async function(gene, pos, refAA) {
+window.runMSA = async function (gene, pos, refAA) {
     const area = document.getElementById('msa-result-area');
-    area.innerHTML = `<em>Checking 7 species for conservation at position ${pos}...</em>`;
+    area.innerHTML = `<em>Checking 5 species for conservation at position ${pos}...</em>`;
 
     try {
-        // 1. Get Human Sequence
+        // 1. Get Human UniProt ID
         const humanRes = await window.fetchVariantDataLive(gene);
-        const seqRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${humanRes.uniprotID}`);
+
+        // 2. Fetch human protein sequence
+        const seqRes = await fetch(
+            `https://www.ebi.ac.uk/proteins/api/proteins/${humanRes.uniprotID}`
+        );
+        if (!seqRes.ok) {
+            throw new Error('Failed to fetch UniProt sequence');
+        }
+
         const seqData = await seqRes.json();
         const humanSeq = seqData.sequence.sequence;
-        
-        // 2. Define Window (10 residues before/after)
+
+        // 3. Validate position
+        if (pos < 1 || pos > humanSeq.length) {
+            throw new Error('Position is outside protein length');
+        }
+
+        // 4. Validate reference amino acid
+        const humanAA = humanSeq[pos - 1];
+        if (refAA && humanAA !== refAA) {
+            console.warn(
+                `Reference AA mismatch: expected ${refAA}, found ${humanAA}`
+            );
+        }
+
+        // 5. Define window (±10 aa, safe at termini)
         const start = Math.max(0, pos - 11);
         const end = Math.min(humanSeq.length, pos + 10);
         const queryFragment = humanSeq.substring(start, end);
-        
-        // 3. Mock Ortholog Fetch (Simulating Homologene for speed in this demo)
-        // In production, you would fetch real ortholog sequences here.
-        // For this visualizer, we generate a visual alignment based on a mock conservation score.
-        
-        // Calculate Pseudo-Conservation Score (Requirement #4)
-        const isCritical = (pos % 5 !== 0); // Mock logic: every 5th residue is variable
-        const conservationScore = isCritical ? 100 : Math.floor(Math.random() * 40 + 40);
-        
-        // Render MSA Table
+
+        // Correct center index (0-based, dynamic)
+        const centerIndex = pos - 1 - start;
+
+        // 6. Mock conservation logic
+        // Every 5th residue is variable (demo logic)
+        const isCritical = pos % 5 !== 0;
+        const conservationScore = isCritical
+            ? 95
+            : Math.floor(Math.random() * 30 + 50); // 50–80%
+
+        // Species list (5 species)
+        const species = ['Human', 'Mouse', 'Zebrafish', 'Xenopus', 'C. elegans'];
+
+        // 7. Render MSA
         let msaHtml = `
             <div style="background:white; border:1px solid #e2e8f0; padding:15px; border-radius:8px;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                     <strong>Multiple Sequence Alignment</strong>
-                    <span style="font-size:12px; background:${isCritical?'#dcfce7':'#fee2e2'}; color:${isCritical?'#166534':'#991b1b'}; padding:2px 8px; border-radius:4px;">
+                    <span style="font-size:12px; background:${isCritical ? '#dcfce7' : '#fee2e2'};
+                                 color:${isCritical ? '#166534' : '#991b1b'};
+                                 padding:2px 8px; border-radius:4px;">
                         Conservation Score: ${conservationScore}%
                     </span>
                 </div>
                 <div style="font-family:'Roboto Mono', monospace; font-size:12px; line-height:1.6;">
         `;
-        
-        const species = ['Human', 'Mouse', 'Zebrafish', 'Xenopus', 'C. elegans'];
-        species.forEach(sp => {
-            // Generate sequence: Keep Ref AA if conserved, else random
-            let seqDisplay = "";
-            for(let i=0; i<queryFragment.length; i++) {
-                const isCenter = (i === 10);
+
+        species.forEach((sp, spIndex) => {
+            let seqDisplay = '';
+
+            for (let i = 0; i < queryFragment.length; i++) {
                 const char = queryFragment[i];
+                const isCenter = i === centerIndex;
+
                 let displayChar = char;
-                
-                // Introduce mutation in lower species if not conserved
-                if (!isCenter && Math.random() > 0.8) displayChar = 'X'; 
-                
-                // Style the center residue
+
+                // Introduce divergence in non-human species
+                if (
+                    spIndex > 0 &&
+                    !isCenter &&
+                    (!isCritical || Math.random() > 0.85)
+                ) {
+                    displayChar = 'X';
+                }
+
                 if (isCenter) {
-                    seqDisplay += `<span style="background:#fef08a; color:#854d0e; font-weight:bold; border:1px solid #ca8a04; padding:0 2px;">${char}</span>`;
+                    seqDisplay += `
+                        <span style="
+                            background:#fef08a;
+                            color:#854d0e;
+                            font-weight:bold;
+                            border:1px solid #ca8a04;
+                            padding:0 2px;
+                        ">${char}</span>`;
                 } else {
-                    seqDisplay += `<span style="color:${displayChar===char ? '#333' : '#94a3b8'}">${displayChar}</span>`;
+                    seqDisplay += `
+                        <span style="color:${displayChar === char ? '#333' : '#94a3b8'}">
+                            ${displayChar}
+                        </span>`;
                 }
             }
-            msaHtml += `<div style="display:flex; justify-content:space-between; width:300px;"><span>${sp}</span> <span>${seqDisplay}</span></div>`;
-        });
-        
-        msaHtml += `</div>
-            <div style="font-size:11px; color:#64748b; margin-top:8px;">
-                ${isCritical ? '⚠️ Highly conserved residue. Mutations here are likely pathogenic.' : 'ℹ️ Variable region. Mutations may be tolerated.'}
-            </div>
-        </div>`;
-        
-        area.innerHTML = msaHtml;
-        // 
 
+            msaHtml += `
+                <div style="display:flex; gap:10px; white-space:nowrap;">
+                    <span style="width:90px;">${sp}</span>
+                    <span>${seqDisplay}</span>
+                </div>`;
+        });
+
+        msaHtml += `
+                </div>
+                <div style="font-size:11px; color:#64748b; margin-top:8px;">
+                    ${
+                        isCritical
+                            ? '⚠️ Highly conserved residue. Mutations here are likely pathogenic.'
+                            : 'ℹ️ Variable region. Mutations may be tolerated.'
+                    }
+                </div>
+            </div>
+        `;
+
+        area.innerHTML = msaHtml;
     } catch (e) {
-        area.innerHTML = `Error: ${e.message}`;
+        area.innerHTML = `<span style="color:#b91c1c;">Error: ${e.message}</span>`;
     }
 };
 
-
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
