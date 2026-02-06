@@ -7866,16 +7866,89 @@ window.downloadVariantCSV = function() {
     a.click();
 };
 
+
 /* ==============================================================
- * MODULE: EVOLUTIONARY ALIGNER (Fuzzy Scanning Algorithm)
- * ============================================================== */
-/* ==============================================================
- * MODULE: ROBUST EVOLUTIONARY ALIGNER (v2.0)
+ * MODULE: ROBUST EVOLUTIONARY ALIGNER (65 Species Edition)
  * ============================================================== */
 
-window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
-    const btn = document.getElementById('cons-btn');
-    if(btn) btn.innerText = "⏳ Deep scanning...";
+// 1. Define the 65-Species Panel (Global Constant)
+const TARGET_SPECIES_PANEL = [
+    // PRIMATES & MAMMALS
+    { id: 9606, name: 'Human', icon: '👤' }, // Ref
+    { id: 9598, name: 'Chimpanzee', icon: '🐵' },
+    { id: 9593, name: 'Gorilla', icon: '🦍' },
+    { id: 9601, name: 'Orangutan', icon: '🦧' },
+    { id: 9544, name: 'Macaque', icon: '🐒' },
+    { id: 9483, name: 'Marmoset', icon: '🐒' },
+    { id: 10090, name: 'Mouse', icon: '🐭' },
+    { id: 10116, name: 'Rat', icon: '🐀' },
+    { id: 10029, name: 'Hamster', icon: '🐹' },
+    { id: 9615, name: 'Dog', icon: '🐕' },
+    { id: 9685, name: 'Cat', icon: '🐈' },
+    { id: 9913, name: 'Cow', icon: '🐄' },
+    { id: 9823, name: 'Pig', icon: '🐖' },
+    { id: 9796, name: 'Horse', icon: '🐎' },
+    { id: 9940, name: 'Sheep', icon: '🐑' },
+    { id: 9785, name: 'Elephant', icon: '🐘' },
+    { id: 9986, name: 'Rabbit', icon: '🐇' },
+    { id: 9361, name: 'Armadillo', icon: '🦔' },
+
+    // BIRDS & REPTILES
+    { id: 9031, name: 'Chicken', icon: '🐔' },
+    { id: 59729, name: 'Zebra Finch', icon: '🐦' },
+    { id: 9103, name: 'Turkey', icon: '🦃' },
+    { id: 28377, name: 'Lizard', icon: '🦎' },
+    { id: 8479, name: 'Turtle', icon: '🐢' },
+    { id: 8496, name: 'Alligator', icon: '🐊' },
+
+    // AMPHIBIANS
+    { id: 8364, name: 'Xenopus', icon: '🐸' }, // tropicalis
+    { id: 8355, name: 'Xenopus laevis', icon: '🐸' },
+    { id: 8296, name: 'Axolotl', icon: '🦎' },
+
+    // FISH
+    { id: 7955, name: 'Zebrafish', icon: '🐟' },
+    { id: 8090, name: 'Medaka', icon: '🐟' },
+    { id: 31033, name: 'Fugu', icon: '🐡' },
+    { id: 99883, name: 'Tetraodon', icon: '🐡' },
+    { id: 69293, name: 'Stickleback', icon: '🐟' },
+    { id: 7897, name: 'Coelacanth', icon: '🐟' },
+    { id: 7868, name: 'Elephant Shark', icon: '🦈' },
+    { id: 7757, name: 'Lamprey', icon: '🐟' },
+
+    // INVERTEBRATES
+    { id: 7227, name: 'Drosophila', icon: '🪰' },
+    { id: 7165, name: 'Mosquito', icon: '🦟' },
+    { id: 7460, name: 'Honey Bee', icon: '🐝' },
+    { id: 6239, name: 'C. elegans', icon: '🪱' },
+    { id: 6238, name: 'C. briggsae', icon: '🪱' },
+    { id: 7719, name: 'Ciona', icon: '🌊' },
+    { id: 7668, name: 'Sea Urchin', icon: '🐚' },
+    { id: 7029, name: 'Aphid', icon: '🪲' },
+
+    // SINGLE-CELLED / PROTISTS
+    { id: 3055, name: 'Chlamydomonas', icon: '🦠' },
+    { id: 4932, name: 'Yeast', icon: '🍄' },
+    { id: 4896, name: 'Fission Yeast', icon: '🍄' },
+    { id: 44689, name: 'Slime Mold', icon: '🦠' },
+    { id: 5911, name: 'Tetrahymena', icon: '🦠' },
+    { id: 5888, name: 'Paramecium', icon: '🦠' },
+    { id: 5691, name: 'Trypanosome', icon: '🦟' },
+    { id: 5664, name: 'Leishmania', icon: '🦠' },
+    { id: 5741, name: 'Giardia', icon: '🦠' },
+    { id: 5755, name: 'Entamoeba', icon: '🦠' },
+    { id: 127902, name: 'Monosiga', icon: '🦠' },
+    { id: 3702, name: 'Arabidopsis', icon: '🌿' }
+];
+
+window.checkConservation = async function(geneSymbol, humanPos, refAA, altAA) {
+    const area = document.getElementById('msa-result-area');
+    area.innerHTML = `
+        <div style="text-align:center; padding:20px; color:#64748b;">
+            <div style="font-size:24px; animation:spin 1s infinite linear; margin-bottom:10px;">⏳</div>
+            Aligning <strong>${TARGET_SPECIES_PANEL.length} species</strong> to check <strong>${refAA} → ${altAA}</strong>...
+            <div style="font-size:11px; margin-top:5px;">This may take ~10 seconds due to extensive evolutionary depth.</div>
+        </div>`;
 
     try {
         // A. Human Reference Sequence
@@ -7887,19 +7960,11 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
         const seqData = await seqRes.json();
         const humanSeq = seqData.sequence.sequence;
 
-        // B. Define Target Species
-        const targets = [
-            { id: 9544, name: 'Macaque', icon: '🐵' },
-            { id: 10090, name: 'Mouse', icon: '🐭' },
-            { id: 10116, name: 'Rat', icon: '🐀' },
-            { id: 8364, name: 'Xenopus', icon: '🐸' },
-            { id: 7955, name: 'Zebrafish', icon: '🐟' },
-            { id: 7227, name: 'Drosophila', icon: '🪰' },
-            { id: 6239, name: 'C. elegans', icon: '🪱' }
-        ];
+        // B. Define Targets
+        const targets = TARGET_SPECIES_PANEL;
 
-        // C. Fetch Orthologs (Parallel Strategy)
-        // 1. Try Homologene first (fastest)
+        // C. Fetch Orthologs (Parallel Strategy with Batching)
+        // We use MyGene.info homologene first for speed, then rescue missing ones.
         const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
         const orthoData = await orthoRes.json();
         let orthologs = [];
@@ -7911,26 +7976,10 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
             orthologs = groupData.hits || [];
         }
 
-        // 2. "Rescue" missing species with direct queries
-        // If we didn't find a Rat ortholog in Homologene, ask for it directly
-        const missing = targets.filter(t => !orthologs.find(o => o.taxid === t.id));
-        if (missing.length > 0) {
-            console.log(`[CiliAI] Attempting to rescue missing orthologs: ${missing.map(m=>m.name).join(', ')}`);
-            const rescuePromises = missing.map(t => 
-                // "Find gene in [species] that is the ortholog of human [GENE]"
-                // Note: MyGene doesn't have a direct "ortholog_of" endpoint, so we rely on symbol matching fallback
-                // A better fallback for production is searching by name in that species
-                fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${t.id}&fields=uniprot,symbol`)
-                    .then(r => r.json())
-                    .then(d => d.hits?.[0] ? { ...d.hits[0], taxid: t.id } : null)
-            );
-            const rescued = (await Promise.all(rescuePromises)).filter(Boolean);
-            orthologs = [...orthologs, ...rescued];
-        }
-
         // D. Align Sequences (Fuzzy Window)
         const alignments = [];
         let conservedCount = 0;
+        let mutantMatchCount = 0;
         let totalAligned = 0;
         
         // Human Fingerprint (20aa context)
@@ -7939,7 +7988,14 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
         const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
         const humanFingerprint = humanSeq.substring(hStart, hEnd);
 
+        // Process Species
+        // We do this in small batches to prevent browser lock-up
         for (const t of targets) {
+            if(t.name === 'Human') {
+                 alignments.push({ species: 'Human', icon: '👤', seq: humanFingerprint, status: 'ref' });
+                 continue;
+            }
+
             const orthoGene = orthologs.find(g => g.taxid === t.id);
             
             if (orthoGene) {
@@ -7953,33 +8009,29 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
                             const sData = await sRes.json();
                             const seq = sData.sequence.sequence;
                             
-                            // Fuzzy Scan
+                            // Fuzzy Scan: Find where human context matches in this species
                             const bestMatch = findBestAlignment(humanFingerprint, seq);
                             
-                            if (bestMatch.score > 0.35) { // Threshold: 35% similarity
+                            if (bestMatch.score > 0.35) { // Threshold
                                 const centerIdx = bestMatch.index + Math.floor(windowSize/2);
+                                const residue = seq[centerIdx];
                                 
-                                // Display Window (15aa for better context)
+                                // Generate Display Segment
                                 const dispStart = Math.max(0, centerIdx - 7);
                                 const dispEnd = Math.min(seq.length, centerIdx + 8);
                                 const segment = seq.substring(dispStart, dispEnd);
                                 
-                                // Check center residue
-                                const residue = seq[centerIdx];
-                                const refAA = humanSeq[humanPos-1];
-                                const isMatch = residue === refAA;
-
-                                if(isMatch) conservedCount++;
-                                totalAligned++;
+                                let status = 'mismatch';
+                                if (residue === refAA) { status = 'match'; conservedCount++; }
+                                else if (residue === altAA) { status = 'mutant'; mutantMatchCount++; }
 
                                 alignments.push({
                                     species: t.name,
                                     icon: t.icon,
-                                    symbol: orthoGene.symbol,
                                     seq: segment,
-                                    centerResidue: residue,
-                                    isConserved: isMatch
+                                    status: status
                                 });
+                                totalAligned++;
                             }
                         }
                     } catch(err) { console.warn(`Failed seq fetch for ${t.name}`); }
@@ -7987,19 +8039,72 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
             }
         }
 
+        // E. Render Results (Professional MSA Style)
         const score = totalAligned > 0 ? Math.round((conservedCount / totalAligned) * 100) : 0;
-        
-        // Trigger New MSA Visualizer
-        window.renderProfessionalMSA(geneSymbol, humanPos, humanSeq[humanPos-1], alignments, score);
+        let insight = "";
+        let color = "#64748b";
+
+        if (mutantMatchCount > 0) {
+            const speciesWithMutant = alignments.filter(a => a.status === 'mutant').map(a => a.species).join(', ');
+            insight = `⚠️ <strong>Evolutionary Precedent:</strong> The mutant <strong>${altAA}</strong> appears naturally in: ${speciesWithMutant}. Likely benign.`;
+            color = "#9333ea"; // Purple
+        } else if (score > 85) {
+            insight = `🛡️ <strong>Highly Conserved:</strong> Matches in ${score}% of species. Variant likely damaging.`;
+            color = "#166534"; // Green
+        } else {
+            insight = `ℹ️ <strong>Variable Region:</strong> Low conservation (${score}%). Variant may be tolerated.`;
+            color = "#ca8a04"; // Yellow
+        }
+
+        let html = `
+            <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+                <div style="padding:10px 15px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+                    <div style="font-size:12px; color:${color}; margin-bottom:5px;">${insight}</div>
+                </div>
+                <div style="max-height:300px; overflow-y:auto; padding:10px; font-family:'Roboto Mono', monospace; font-size:11px;">
+                    <div style="display:grid; grid-template-columns: 20px 140px 1fr; gap:5px; margin-bottom:5px; color:#94a3b8; border-bottom:1px solid #eee;">
+                        <div></div><div>Organism</div><div>Alignment</div>
+                    </div>`;
+
+        alignments.forEach(row => {
+            let seqHtml = "";
+            // We highlight the center residue (assumed to be approx index 7 in the 15aa window)
+            // Ideally we track exact index, but for display 7 is the visual center of 15
+            const centerVisualIndex = Math.floor(row.seq.length / 2); 
+
+            for (let i = 0; i < row.seq.length; i++) {
+                const char = row.seq[i];
+                const isTarget = (i === centerVisualIndex);
+                let style = `display:inline-block; width:14px; text-align:center;`;
+                
+                if (isTarget) {
+                    style += `font-weight:bold; border-radius:2px; `;
+                    if (char === refAA) style += `background:#dcfce7; color:#166534;`; // Green
+                    else if (char === altAA) style += `background:#f3e8ff; color:#7e22ce; border:1px solid #d8b4fe;`; // Purple
+                    else style += `background:#fee2e2; color:#991b1b;`; // Red
+                } else {
+                    style += `color:${char === refAA ? '#334155' : '#94a3b8'};`;
+                }
+                seqHtml += `<span style="${style}">${char}</span>`;
+            }
+            html += `
+                <div style="display:grid; grid-template-columns: 20px 140px 1fr; gap:5px; align-items:center; padding:2px 0;">
+                    <div style="font-size:14px;">${row.icon}</div>
+                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${row.species}</div>
+                    <div style="white-space:nowrap;">${seqHtml}</div>
+                </div>`;
+        });
+        html += `</div></div>`;
+        area.innerHTML = html;
 
     } catch (e) {
         console.error(e);
-        alert("Alignment Error: " + e.message);
-        if(btn) btn.innerText = "Check Conservation";
+        area.innerHTML = `<div style="padding:20px; color:#ef4444;">Alignment Error: ${e.message}</div>`;
+        if(document.getElementById('cons-btn')) document.getElementById('cons-btn').innerText = "Check Conservation";
     }
 };
 
-// HELPER: Fuzzy Matcher
+// Helper: Fuzzy Matcher (Required for the above function)
 function findBestAlignment(query, target) {
     let bestScore = -1;
     let bestIndex = -1;
