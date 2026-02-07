@@ -8121,30 +8121,67 @@ function findBestAlignment(query, target) {
 }
 
 // MSA VISUALIZER
-window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
+window.renderProfessionalMSA = function (gene, pos, refAA, alignments, score) {
+
+    // Remove existing modal if present
+    const existing = document.getElementById('msa-modal');
+    if (existing) existing.remove();
+
     const aaColors = {
-        'A': '#c8c8c8', 'G': '#c8c8c8', 'I': '#0f820f', 'L': '#0f820f', 'V': '#0f820f', 
-        'M': '#0f820f', 'F': '#3232aa', 'W': '#b45b5b', 'Y': '#3232aa', 'H': '#8282d2', 
-        'K': '#145aff', 'R': '#145aff', 'D': '#e60a0a', 'E': '#e60a0a', 'S': '#fa9600', 
-        'T': '#fa9600', 'N': '#00dcdc', 'Q': '#00dcdc', 'C': '#e6e600', 'P': '#dc9682'
+        'A': '#c8c8c8', 'G': '#c8c8c8',
+        'I': '#0f820f', 'L': '#0f820f', 'V': '#0f820f', 'M': '#0f820f',
+        'F': '#3232aa', 'Y': '#3232aa', 'W': '#b45b5b',
+        'H': '#8282d2',
+        'K': '#145aff', 'R': '#145aff',
+        'D': '#e60a0a', 'E': '#e60a0a',
+        'S': '#fa9600', 'T': '#fa9600',
+        'N': '#00dcdc', 'Q': '#00dcdc',
+        'C': '#e6e600',
+        'P': '#dc9682'
     };
+
     const modal = document.createElement('div');
     modal.id = 'msa-modal';
-    modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:0; border-radius:12px; box-shadow:0 25px 50px rgba(0,0,0,0.5); z-index:10000; width:600px; font-family:'Roboto Mono', monospace; overflow:hidden;`;
-    
-    let html = `
+    modal.style.cssText = `
+        position:fixed;
+        top:50%;
+        left:50%;
+        transform:translate(-50%, -50%);
+        background:white;
+        padding:0;
+        border-radius:12px;
+        box-shadow:0 25px 50px rgba(0,0,0,0.5);
+        z-index:10000;
+        width:600px;
+        font-family:'Roboto Mono', monospace;
+        overflow:hidden;
+    `;
+
+    modal.innerHTML = `
         <div style="background:#1e293b; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <h3 style="margin:0; font-size:16px; font-family:'Inter',sans-serif;">${gene} Evolution</h3>
-                <div style="font-size:12px; opacity:0.8; font-family:'Inter',sans-serif;">Residue ${refAA}${pos} • Conservation: <span style="color:${score > 80 ? '#4ade80' : '#f87171'}">${score}%</span></div>
+                <h3 style="margin:0; font-size:16px; font-family:'Inter',sans-serif;">
+                    ${gene} Evolution
+                </h3>
+                <div style="font-size:12px; opacity:0.8; font-family:'Inter',sans-serif;">
+                    Residue ${refAA}${pos} • Conservation:
+                    <span style="color:${score > 80 ? '#4ade80' : '#f87171'}">${score}%</span>
+                </div>
             </div>
             <div style="display:flex; gap:10px;">
-                <button onclick="window.downloadMSA('${gene}', ${pos}, '${JSON.stringify(alignments).replace(/'/g, "\\'")}')" style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">📥 Download</button>
-                <button id="msa-close-btn" style="border:none; background:none; color:white; cursor:pointer; font-size:20px;">×</button>
+                <button id="msa-download-btn"
+                    style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
+                    📥 Download
+                </button>
+                <button id="msa-close-btn"
+                    style="border:none; background:none; color:white; cursor:pointer; font-size:20px;">
+                    ×
+                </button>
             </div>
         </div>
+
         <div style="padding:20px; background:#f8fafc; max-height:60vh; overflow-y:auto;">
-            <div style="display:grid; grid-template-columns: 120px 1fr; gap:10px;">
+            <div style="display:grid; grid-template-columns:120px 1fr; gap:10px;">
                 ${alignments.map(a => `
                     <div style="text-align:right; font-size:12px; padding-top:6px; color:#475569; font-family:'Inter',sans-serif;">
                         ${a.icon} ${a.species}
@@ -8153,20 +8190,51 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
                         ${a.seq.split('').map((char, i) => {
                             const isCenter = i === Math.floor(a.seq.length / 2);
                             const color = aaColors[char] || '#999';
-                            const border = isCenter ? '2px solid #1e293b' : '1px solid rgba(0,0,0,0.1)';
-                            const opacity = a.species === 'Human' ? 1 : 0.9;
-                            return `<div style="width:24px; height:24px; background:${color}; color:white; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; border-radius:3px; border:${border}; opacity:${opacity}; box-shadow: ${isCenter ? '0 0 0 2px rgba(30,41,59,0.2)' : 'none'}; z-index:${isCenter ? 10 : 1};">${char}</div>`;
+                            return `
+                                <div style="
+                                    width:24px;
+                                    height:24px;
+                                    background:${color};
+                                    color:white;
+                                    display:flex;
+                                    align-items:center;
+                                    justify-content:center;
+                                    font-size:12px;
+                                    font-weight:bold;
+                                    border-radius:3px;
+                                    border:${isCenter ? '2px solid #1e293b' : '1px solid rgba(0,0,0,0.1)'};
+                                    opacity:${a.species === 'Human' ? 1 : 0.9};
+                                    box-shadow:${isCenter ? '0 0 0 2px rgba(30,41,59,0.2)' : 'none'};
+                                ">
+                                    ${char}
+                                </div>
+                            `;
                         }).join('')}
                     </div>
                 `).join('')}
             </div>
         </div>
     `;
-    modal.innerHTML = html;
+
     document.body.appendChild(modal);
-    document.getElementById('msa-close-btn').onclick = () => modal.remove();
+
+    // Close button
+    document.getElementById('msa-close-btn').addEventListener('click', () => {
+        modal.remove();
+    });
+
+    // Download button (SAFE: no stringified JSON)
+    document.getElementById('msa-download-btn').addEventListener('click', () => {
+        if (typeof window.downloadMSA === 'function') {
+            window.downloadMSA(gene, pos, alignments);
+        } else {
+            console.warn('downloadMSA is not defined');
+        }
+    });
+
+    // Optional UI sync
     const btn = document.getElementById('vp-action');
-    if(btn) btn.innerText = "🌍 Check Conservation";
+    if (btn) btn.innerText = "🌍 Check Conservation";
 };
 
 window.downloadMSA = function(gene, pos, alignmentsStr) {
@@ -8495,6 +8563,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
