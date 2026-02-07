@@ -7639,10 +7639,7 @@ window.downloadCurrentVisualization = function() {
         }
     }
 };
-/
-/* ==============================================================
- * MODULE: VARIANT VISUALIZATION & 3D STRUCTURE (Integrated)
- * ============================================================== */
+
 /* ==============================================================
  * MODULE: VARIANT ANALYSIS & 3D STRUCTURE SUITE (Fixed v10.0)
  * Includes: Variant Map, MSA Conservation, 3D Viewer, Dot Plot Fixes
@@ -8563,6 +8560,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
