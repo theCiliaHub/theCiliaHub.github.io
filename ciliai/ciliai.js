@@ -7689,7 +7689,7 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. MAIN RENDERER: LINEAR VARIANT MAP (Creates the DOM structure)
+// 2. MAIN RENDERER: LINEAR VARIANT MAP (Dual-Fetch Fixed)
 window.renderVariantMap = async function(geneSymbol) {
     window.switchView('plot');
     const container = document.getElementById('plotly-container');
@@ -7698,67 +7698,130 @@ window.renderVariantMap = async function(geneSymbol) {
     // Force show container
     container.style.display = 'block';
 
-    // Loading State
     container.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
             <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
             <h3>Analyzing ${geneSymbol}...</h3>
-            <p>Fetching ClinVar variants, Domains, and 3D Structure data.</p>
+            <p>Fetching Data from EBI Proteins (Features & Variations)...</p>
         </div>`;
 
     try {
+        // 1. Get UniProt ID
         const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&fields=uniprot.Swiss-Prot`);
         const mgData = await mgRes.json();
-        const uniprotID = mgData.hits?.[0]?.uniprot?.['Swiss-Prot'];
+        const rawID = mgData.hits?.[0]?.uniprot?.['Swiss-Prot'];
+        const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
         
         if(!uniprotID) throw new Error(`UniProt ID not found for ${geneSymbol}`);
 
-        const ebiRes = await fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`);
-        const ebiData = await ebiRes.json();
+        // 2. DUAL FETCH: Request both Features (Domains) and Variations (Variants)
+        const [featRes, varRes] = await Promise.all([
+            fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`),
+            fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`)
+        ]);
+
+        const featData = await featRes.json();
+        // Variation API might 404 if no variants exist, handle safely
+        const varData = varRes.ok ? await varRes.json() : { features: [] };
+
+        // 3. Process Data
+        const seqLen = parseInt(featData.sequence.length);
         
-        const seqLen = parseInt(ebiData.sequence.length);
-        const domains = ebiData.features.filter(f => f.type === 'DOMAIN' || f.type === 'REPEAT' || f.type === 'ZN_FING');
-        const variants = ebiData.features.filter(f => f.type === 'VARIANT');
-        
+        // Robust Domain Filtering: Include Regions, Repeats, Coiled-coils if Domains are missing
+        let domains = featData.features.filter(f => 
+            ['DOMAIN', 'ZN_FING', 'REPEAT', 'MOTIF'].includes(f.type)
+        );
+        // Fallback: If no strict domains, show Regions or Coiled Coils (common in Cilia)
+        if (domains.length === 0) {
+            domains = featData.features.filter(f => ['REGION', 'COILED', 'SITE'].includes(f.type));
+        }
+
+        // Robust Variant Extraction (Prefer Variation API, fallback to Features)
+        let variants = varData.features.filter(f => f.type === 'VARIANT');
+        if (variants.length === 0) {
+             variants = featData.features.filter(f => f.type === 'VARIANT');
+        }
+
+        // 4. Draw SVG
         const width = 800;
         const scale = (pos) => (pos / seqLen) * (width - 40) + 20;
         
         let svg = `<svg viewBox="0 0 ${width} 250" style="width:100%; height:auto; overflow:visible;">`;
+        
+        // Protein Backbone
         svg += `<rect x="20" y="100" width="${width-40}" height="12" fill="#e2e8f0" rx="6" />`; 
         
+        // Render Domains (Blue Blocks)
         domains.forEach(d => {
-            const x = scale(d.begin);
-            const w = scale(d.end) - x;
-            svg += `<rect x="${x}" y="94" width="${w}" height="24" fill="#3b82f6" opacity="0.8" rx="4" stroke="white"><title>${d.description}</title></rect>`;
-            svg += `<text x="${x + w/2}" y="140" font-size="10" text-anchor="middle" fill="#475569">${d.description.split(' ')[0]}</text>`;
+            const x = scale(parseInt(d.begin));
+            const w = Math.max(2, scale(parseInt(d.end)) - x);
+            const title = d.description || d.type;
+            const shortLabel = title.split(' ')[0].substring(0, 10);
+            
+            svg += `
+                <g>
+                    <rect x="${x}" y="94" width="${w}" height="24" fill="#3b82f6" opacity="0.8" rx="4" stroke="white">
+                        <title>${title} (${d.begin}-${d.end})</title>
+                    </rect>
+                    <text x="${x + w/2}" y="135" font-size="10" text-anchor="middle" fill="#475569" style="pointer-events:none;">${shortLabel}</text>
+                </g>`;
         });
 
-        const displayVars = variants.filter(v => 
-            v.description.includes('Pathogenic') || v.description.includes('disease') || Math.random() > 0.95
-        ).slice(0, 40);
+        // 5. Intelligent Variant Filtering
+        // Prioritize Pathogenic, but show others if list is empty
+        let displayVars = variants.filter(v => {
+            const desc = (v.description || v.clinicalSignificance || "").toLowerCase();
+            return desc.includes('pathogenic') || desc.includes('disease') || desc.includes('severe');
+        });
 
+        // Fallback: If no pathogenic variants found, show a random subset of 50 variants
+        if (displayVars.length === 0 && variants.length > 0) {
+            displayVars = variants.sort(() => 0.5 - Math.random()).slice(0, 50);
+        } else {
+            // Limit to 50 to prevent SVG lag
+            displayVars = displayVars.slice(0, 50);
+        }
+
+        // Render Variants (Lollipops)
         displayVars.forEach(v => {
-            const cx = scale(v.begin);
-            const color = v.description.includes('Pathogenic') ? '#ef4444' : '#9ca3af';
-            const descSafe = v.description.replace(/'/g, "").replace(/"/g, "");
+            const vPos = parseInt(v.begin);
+            const cx = scale(vPos);
             
-            // Interaction: Open Panel
-            const onClick = `window.openVariantPanel('p.${v.wildType}${v.begin}${v.alternativeSequence}', '${v.begin}', '${descSafe}', '${geneSymbol}')`;
+            // Determine Color
+            const desc = (v.description || v.clinicalSignificance || "").toLowerCase();
+            let color = '#9ca3af'; // Gray (VUS/Benign)
+            if (desc.includes('pathogenic')) color = '#ef4444'; // Red
+            else if (desc.includes('likely pathogenic')) color = '#f97316'; // Orange
+            
+            // Clean strings for JS interaction
+            const descSafe = (v.description || "Variant").replace(/'/g, "").replace(/"/g, "");
+            const title = `p.${v.wildType}${v.begin}${v.alternativeSequence}`;
+            
+            // Interactive Group
+            const onClick = `window.openVariantPanel('${title}', '${v.begin}', '${descSafe}', '${geneSymbol}')`;
             
             svg += `
                 <g style="cursor:pointer;" onclick="${onClick}">
                     <line x1="${cx}" y1="100" x2="${cx}" y2="50" stroke="${color}" stroke-width="2" />
-                    <circle cx="${cx}" cy="50" r="5" fill="${color}" stroke="white" stroke-width="2" />
+                    <circle cx="${cx}" cy="50" r="5" fill="${color}" stroke="white" stroke-width="2">
+                        <title>${title}: ${descSafe}</title>
+                    </circle>
+                    <rect x="${cx-4}" y="45" width="8" height="60" fill="transparent" />
                 </g>
             `;
         });
         svg += `</svg>`;
 
-        // CRITICAL FIX: Added 'msa-result-area' div below
+        // 6. Final UI Assembly
         container.innerHTML = `
             <div style="padding:20px; height:100%; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h2 style="margin:0; color:#1e293b;">🧬 ${geneSymbol} Variant Landscape</h2>
+                    <div>
+                        <h2 style="margin:0; color:#1e293b;">🧬 ${geneSymbol} Variant Landscape </h2>
+                        <span style="font-size:11px; color:#64748b;">
+                            Found <strong>${variants.length}</strong> variants. Displaying <strong>${displayVars.length}</strong> (Red=Pathogenic).
+                        </span>
+                    </div>
                     <span style="font-size:12px; background:#f1f5f9; padding:4px 8px; border-radius:4px;">${uniprotID}</span>
                 </div>
                 ${svg}
@@ -7766,7 +7829,7 @@ window.renderVariantMap = async function(geneSymbol) {
                 <div id="var-panel" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-top:20px;">
                     <div style="display:flex; justify-content:space-between;">
                          <h3 style="margin:0 0 10px 0; color:#2563eb;" id="vp-title"></h3>
-                         <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none;background:none;cursor:pointer;">✕</button>
+                         <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none;background:none;cursor:pointer;font-size:16px;">✕</button>
                     </div>
                     <p style="font-size:13px; color:#475569;" id="vp-desc"></p>
                     <div style="display:flex; gap:10px; margin-top:15px;">
@@ -7779,6 +7842,7 @@ window.renderVariantMap = async function(geneSymbol) {
             </div>`;
 
     } catch (e) {
+        console.error(e);
         container.innerHTML = `<div style="padding:40px; color:#ef4444;">Error: ${e.message}</div>`;
     }
 };
@@ -8472,4 +8536,5 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
