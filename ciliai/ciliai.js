@@ -4038,8 +4038,12 @@ window.calculateDotPlotData = function(genes, datasetKey) {
 };
 
 
-// 2. THE RENDERER (Draws the plot & Sends "Chat Link")
+// 2. THE RENDERER (Draws the plot & Cleanups UI)
 window.renderDotPlot = function(geneList) {
+    // 1. CLEANUP: Force close variant panel and other views
+    const varPanel = document.getElementById('var-panel');
+    if (varPanel) varPanel.style.display = 'none'; // <--- FIX HERE
+
     window.switchView('plot');
     const container = document.getElementById('plotly-container');
     const datasetKey = window.CiliAI.activeDataset || 'lung';
@@ -4066,7 +4070,7 @@ window.renderDotPlot = function(geneList) {
         x: stats.x, y: stats.y, mode: 'markers',
         marker: {
             symbol: 'circle',
-            sizemode: 'area', sizeref: 2.5, // Dot scaling
+            sizemode: 'area', sizeref: 2.5,
             size: stats.size, 
             color: stats.color,
             colorscale: 'Blues', showscale: true,
@@ -4081,7 +4085,7 @@ window.renderDotPlot = function(geneList) {
         xaxis: { title: '', tickangle: -45, automargin: true, type: 'category' },
         yaxis: { title: '', automargin: true, type: 'category' },
         margin: { l: 150, r: 50, t: 50, b: 80 },
-        height: Math.max(400, stats.cellTypes.length * 20 + 100) // Dynamic height
+        height: Math.max(400, stats.cellTypes.length * 20 + 100)
     };
 
     Plotly.newPlot(container, [trace], layout, { responsive: true });
@@ -7685,48 +7689,99 @@ window.fetchVariantDataLive = async function(geneSymbol) {
     }
 };
 
-// 2. RENDERER (Clean View Switch)
+// 2. MAIN RENDERER: LINEAR VARIANT MAP (Creates the DOM structure)
 window.renderVariantMap = async function(geneSymbol) {
-    // 1. Hide UMAP/Diagram Views Manually to prevent conflicts
-    if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
-    if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
-    
-    // 2. Prepare Plot Container
+    window.switchView('plot');
     const container = document.getElementById('plotly-container');
-    container.style.display = 'block';
-    
-    // Force-hide legacy sidebar controls if they exist
-    const sidebars = document.querySelectorAll('.viz-sidebar, .layout-sidebar');
-    sidebars.forEach(el => el.style.display = 'none');
+    if (!container) return;
 
-    // 3. Loading State
-    // 3. Loading State (Updated Text)
+    // Force show container
+    container.style.display = 'block';
+
+    // Loading State
     container.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b; padding:20px; text-align:center;">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
             <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
-            <p style="font-size:16px; margin:0 0 8px 0; color:#1e293b;">
-                🔍 Querying ClinVar & UniProt for <strong>${geneSymbol}</strong> variants...
-            </p>
-            <p style="font-size:13px; color:#475569; max-width:400px; line-height:1.5;">
-                Users can view variants, check conservation across species, and visualize variants of choice on the 3D protein structure.
-            </p>
-            <p style="font-size:11px; color:#94a3b8; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:10px;">
-                Note: Only significant variants are pre-loaded. You can add your own custom variants using the panel below.
-            </p>
+            <h3>Analyzing ${geneSymbol}...</h3>
+            <p>Fetching ClinVar variants, Domains, and 3D Structure data.</p>
         </div>`;
 
-    // 4. Fetch Data
-    const data = await window.fetchVariantDataLive(geneSymbol);
+    try {
+        const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&fields=uniprot.Swiss-Prot`);
+        const mgData = await mgRes.json();
+        const uniprotID = mgData.hits?.[0]?.uniprot?.['Swiss-Prot'];
+        
+        if(!uniprotID) throw new Error(`UniProt ID not found for ${geneSymbol}`);
 
-    if (data.error) {
-        container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Error: ${data.error}</div>`;
-        return;
+        const ebiRes = await fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`);
+        const ebiData = await ebiRes.json();
+        
+        const seqLen = parseInt(ebiData.sequence.length);
+        const domains = ebiData.features.filter(f => f.type === 'DOMAIN' || f.type === 'REPEAT' || f.type === 'ZN_FING');
+        const variants = ebiData.features.filter(f => f.type === 'VARIANT');
+        
+        const width = 800;
+        const scale = (pos) => (pos / seqLen) * (width - 40) + 20;
+        
+        let svg = `<svg viewBox="0 0 ${width} 250" style="width:100%; height:auto; overflow:visible;">`;
+        svg += `<rect x="20" y="100" width="${width-40}" height="12" fill="#e2e8f0" rx="6" />`; 
+        
+        domains.forEach(d => {
+            const x = scale(d.begin);
+            const w = scale(d.end) - x;
+            svg += `<rect x="${x}" y="94" width="${w}" height="24" fill="#3b82f6" opacity="0.8" rx="4" stroke="white"><title>${d.description}</title></rect>`;
+            svg += `<text x="${x + w/2}" y="140" font-size="10" text-anchor="middle" fill="#475569">${d.description.split(' ')[0]}</text>`;
+        });
+
+        const displayVars = variants.filter(v => 
+            v.description.includes('Pathogenic') || v.description.includes('disease') || Math.random() > 0.95
+        ).slice(0, 40);
+
+        displayVars.forEach(v => {
+            const cx = scale(v.begin);
+            const color = v.description.includes('Pathogenic') ? '#ef4444' : '#9ca3af';
+            const descSafe = v.description.replace(/'/g, "").replace(/"/g, "");
+            
+            // Interaction: Open Panel
+            const onClick = `window.openVariantPanel('p.${v.wildType}${v.begin}${v.alternativeSequence}', '${v.begin}', '${descSafe}', '${geneSymbol}')`;
+            
+            svg += `
+                <g style="cursor:pointer;" onclick="${onClick}">
+                    <line x1="${cx}" y1="100" x2="${cx}" y2="50" stroke="${color}" stroke-width="2" />
+                    <circle cx="${cx}" cy="50" r="5" fill="${color}" stroke="white" stroke-width="2" />
+                </g>
+            `;
+        });
+        svg += `</svg>`;
+
+        // CRITICAL FIX: Added 'msa-result-area' div below
+        container.innerHTML = `
+            <div style="padding:20px; height:100%; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="margin:0; color:#1e293b;">🧬 ${geneSymbol} Variant Landscape</h2>
+                    <span style="font-size:12px; background:#f1f5f9; padding:4px 8px; border-radius:4px;">${uniprotID}</span>
+                </div>
+                ${svg}
+                
+                <div id="var-panel" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-top:20px;">
+                    <div style="display:flex; justify-content:space-between;">
+                         <h3 style="margin:0 0 10px 0; color:#2563eb;" id="vp-title"></h3>
+                         <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none;background:none;cursor:pointer;">✕</button>
+                    </div>
+                    <p style="font-size:13px; color:#475569;" id="vp-desc"></p>
+                    <div style="display:flex; gap:10px; margin-top:15px;">
+                        <button id="vp-cons-btn" class="ciliai-button">🌍 Check Conservation</button>
+                        <button id="vp-3d-btn" class="ciliai-button">🧊 View 3D Structure</button>
+                    </div>
+                    
+                    <div id="msa-result-area" style="margin-top:15px; padding-top:15px; border-top:1px solid #e2e8f0;"></div>
+                </div>
+            </div>`;
+
+    } catch (e) {
+        container.innerHTML = `<div style="padding:40px; color:#ef4444;">Error: ${e.message}</div>`;
     }
-
-    window.CiliAI.activeVariantData = data;
-    window.drawVariantWorkspace();
 };
-
 
 // 3. DRAWING ENGINE (Nature Colors + Stable Interaction)
 window.drawVariantWorkspace = function() {
@@ -8417,3 +8472,4 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
