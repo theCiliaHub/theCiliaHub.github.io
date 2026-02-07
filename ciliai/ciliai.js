@@ -7690,7 +7690,7 @@ window.fetchVariantDataLive = async function(geneSymbol) {
 };
 
 /* ==============================================================
- * 2. MAIN RENDERER: LINEAR VARIANT MAP (High-Density Pathogenic Focus)
+ * 2. MAIN RENDERER: LINEAR VARIANT MAP (Pathogenic Focus + Instructions)
  * ============================================================== */
 window.renderVariantMap = async function(geneSymbol) {
     window.switchView('plot');
@@ -7700,11 +7700,12 @@ window.renderVariantMap = async function(geneSymbol) {
     // Force show container
     container.style.display = 'block';
 
+    // Initial Loading State
     container.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b;">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b; padding:20px; text-align:center;">
             <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
-            <h3>Analyzing ${geneSymbol}...</h3>
-            <p>Fetching domains and variants from UniProt & ClinVar...</p>
+            <h3 style="color:#1e293b; margin:0 0 10px 0;">Analyzing ${geneSymbol}...</h3>
+            <p>I am querying ClinVar & UniProt for variants.</p>
         </div>`;
 
     try {
@@ -7723,70 +7724,58 @@ window.renderVariantMap = async function(geneSymbol) {
         ]);
 
         const featData = await featRes.json();
-        // Handle case where variation API returns 404 (no variants)
         const varData = varRes.ok ? await varRes.json() : { features: [] };
 
         // 3. Process Sequence Length
         const seqLen = parseInt(featData.sequence.length);
 
         // 4. Robust Domain Extraction
-        // First try standard structural domains
         let domains = featData.features.filter(f => 
             ['DOMAIN', 'ZN_FING', 'REPEAT', 'MOTIF'].includes(f.type)
         );
-        // If empty (common in ciliary genes), fall back to Regions/Coiled-coils
         if (domains.length === 0) {
             domains = featData.features.filter(f => ['REGION', 'COILED', 'SITE', 'DNA_BIND'].includes(f.type));
         }
 
-        // 5. Robust Variant Extraction & Prioritization
+        // 5. Variant Extraction & Prioritization
         let allVariants = varData.features.filter(f => f.type === 'VARIANT');
-        
-        // Save for CSV Export later
+
+        // Save for CSV Export
         window.CiliAI.currentAllVariants = allVariants.map(v => ({
             Gene: geneSymbol,
             Position: v.begin,
             Change: `p.${v.wildType}${v.begin}${v.alternativeSequence}`,
-            Type: v.wildType + " -> " + v.alternativeSequence,
-            Significance: (v.clinicalSignificance || v.description || "Uncertain").replace(/_/g, ' '),
+            Significance: (v.clinicalSignificance || v.description || "Uncertain"),
             Association: (v.association && v.association[0] ? v.association[0].name : "Not specified")
         }));
-
-        // Helper: Color Logic
+        
+        // Color Logic
         const getVariantColor = (v) => {
             const desc = (v.description || v.clinicalSignificance || "").toLowerCase();
-            if (desc.includes('pathogenic') && !desc.includes('likely')) return '#ef4444'; // Red (Pathogenic)
+            if (desc.includes('pathogenic') && !desc.includes('likely')) return '#ef4444'; // Red
             if (desc.includes('likely pathogenic')) return '#f97316'; // Orange
             if (desc.includes('benign')) return '#22c55e'; // Green
-            return '#9ca3af'; // Gray (VUS/Uncertain)
+            return '#9ca3af'; // Gray
         };
 
-        // Filter: Strictly prioritize Pathogenic variants
-        let pathogenicVars = allVariants.filter(v => {
-            const c = getVariantColor(v);
-            return c === '#ef4444'; 
-        });
+        // Filter: Strictly prioritize Pathogenic
+        let pathogenicVars = allVariants.filter(v => getVariantColor(v) === '#ef4444');
+        let likelyPathogenicVars = allVariants.filter(v => getVariantColor(v) === '#f97316');
 
-        let likelyPathogenicVars = allVariants.filter(v => {
-            const c = getVariantColor(v);
-            return c === '#f97316';
-        });
-
-        // Combine for display (Cap at 50, prioritize bad ones)
+        // Combine for display (Cap at 50, mostly bad ones)
         let displayVars = [...pathogenicVars, ...likelyPathogenicVars];
         
-        // If we still have room (less than 50), fill with VUS/Benign to show coverage
+        // Fill remaining slots with others if needed
         if (displayVars.length < 50) {
             const remainingSlots = 50 - displayVars.length;
             const others = allVariants.filter(v => !displayVars.includes(v));
-            // Shuffle others to get a random distribution across the gene
             const randomOthers = others.sort(() => 0.5 - Math.random()).slice(0, remainingSlots);
             displayVars = [...displayVars, ...randomOthers];
         } else {
             displayVars = displayVars.slice(0, 50);
         }
         
-        // Sort by position for rendering
+        // Sort by position
         displayVars.sort((a,b) => parseInt(a.begin) - parseInt(b.begin));
 
         // 6. Draw SVG
@@ -7795,11 +7784,10 @@ window.renderVariantMap = async function(geneSymbol) {
         
         let svg = `<svg viewBox="0 0 ${width} 250" style="width:100%; height:auto; overflow:visible;">`;
         
-        // A. Protein Backbone (Grey Line)
+        // A. Protein Backbone
         svg += `<rect x="20" y="100" width="${width-40}" height="12" fill="#e2e8f0" rx="6" />`; 
         
-        // B. Draw Domains (Blue Blocks)
-        // Note: No text labels by default to prevent overlap. Text is in <title> for hover.
+        // B. Draw Domains
         domains.forEach(d => {
             const x = scale(parseInt(d.begin));
             const w = Math.max(3, scale(parseInt(d.end)) - x);
@@ -7811,73 +7799,83 @@ window.renderVariantMap = async function(geneSymbol) {
                         <title>${title} (${d.begin}-${d.end})</title>
                     </rect>
                     <rect x="${x}" y="80" width="${w}" height="50" fill="transparent">
-                        <title>${title} (${d.begin}-${d.end})</title>
+                        <title>${title}</title>
                     </rect>
                 </g>`;
         });
 
-        // C. Draw Variants (Lollipops)
+        // C. Draw Variants
         displayVars.forEach(v => {
             const vPos = parseInt(v.begin);
             const cx = scale(vPos);
             const color = getVariantColor(v);
             
-            // Format titles
+            // Text Formatting
             const rawDesc = v.description || v.clinicalSignificance || "Variant";
             const descSafe = rawDesc.replace(/'/g, "").replace(/"/g, "");
             const title = `p.${v.wildType}${v.begin}${v.alternativeSequence}`;
             
-            // Get Disease association if available
+            // Disease Formatting
             let disease = "Not specified";
             if (v.association && v.association.length > 0) {
                 disease = v.association.map(a => a.name).join(", ");
             } else if (descSafe.includes(":")) {
-                 // Try to parse from description string if formatted like "Disease: description"
                  disease = descSafe.split(':')[0]; 
             }
 
-            // Interaction
+            // Click Handler
             const onClick = `window.openVariantPanel('${title}', '${v.begin}', '${descSafe}', '${geneSymbol}')`;
             
-            // Stagger height slightly to avoid overlapping circles if close
+            // Stagger height for readability
             const stagger = (vPos % 2 === 0) ? 0 : 15;
 
+            // HOVER TOOLTIP: Shows Mutation, Type, and Disease
             svg += `
                 <g style="cursor:pointer;" onclick="${onClick}">
                     <line x1="${cx}" y1="100" x2="${cx}" y2="${50 - stagger}" stroke="${color}" stroke-width="2" />
                     <circle cx="${cx}" cy="${50 - stagger}" r="6" fill="${color}" stroke="white" stroke-width="2">
-                        <title>${title}\nType: ${rawDesc}\nDisease: ${disease}</title>
+                        <title>Mutation: ${title}\nType: ${rawDesc}\nDisease: ${disease}</title>
                     </circle>
                     <rect x="${cx-6}" y="${40-stagger}" width="12" height="${70+stagger}" fill="transparent">
-                         <title>${title}\nType: ${rawDesc}\nDisease: ${disease}</title>
+                         <title>Mutation: ${title}\nType: ${rawDesc}\nDisease: ${disease}</title>
                     </rect>
                 </g>
             `;
         });
         svg += `</svg>`;
 
-        // 7. Final UI Assembly
+        // 7. Final UI Assembly with Instructional Text
         container.innerHTML = `
             <div style="padding:20px; height:100%; overflow-y:auto;">
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:20px;">
+                    <p style="margin:0 0 10px 0; font-size:14px; color:#1e293b;">
+                        <strong>🧬 I am querying ClinVar & UniProt for variants. Here is what you can do:</strong>
+                    </p>
+                    <ul style="margin:0; padding-left:20px; font-size:13px; color:#475569; line-height:1.6;">
+                        <li><strong>Visualize Variants:</strong> See all variants mapped to protein domains .</li>
+                        <li><strong>Check Conservation:</strong> Click any variant, then click <strong>"Check Conservation"</strong> to compare across 7 species.</li>
+                        <li><strong>3D Structure:</strong> Click <strong>"View 3D Structure"</strong> to see where the mutation sits on the AlphaFold protein model.</li>
+                        <li><strong>Custom Variants:</strong> Add your own mutation (e.g., <em>p.L301R</em>) using the "Add" panel at the bottom.</li>
+                    </ul>
+                </div>
+
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
                     <div>
-                        <h2 style="margin:0; color:#1e293b; font-size:18px;">🧬 ${geneSymbol} Variants </h2>
+                        <h2 style="margin:0; color:#1e293b; font-size:18px;">${geneSymbol} Variant Map</h2>
                         <div style="font-size:11px; color:#64748b; margin-top:4px;">
-                            Total Variants: <strong>${allVariants.length}</strong> | Displaying: <strong>${displayVars.length}</strong> (Mostly Pathogenic)
+                            Total: <strong>${allVariants.length}</strong> | Displaying: <strong>${displayVars.length}</strong> (Mostly Pathogenic)
                         </div>
                     </div>
-                    <div style="text-align:right;">
-                        <button onclick="window.downloadFullVariantCSV('${geneSymbol}')" class="ciliai-button" style="padding:4px 10px; font-size:11px; background:#475569;">
-                            ⬇ Download All ${allVariants.length} Variants
-                        </button>
-                    </div>
+                    <button onclick="window.downloadFullVariantCSV('${geneSymbol}')" class="ciliai-button" style="padding:6px 12px; font-size:12px; background:#3b82f6; color:white; border:none; border-radius:6px; cursor:pointer;">
+                        ⬇ Download All Variants
+                    </button>
                 </div>
                 
                 <div style="display:flex; gap:15px; font-size:11px; color:#475569; margin-bottom:10px; justify-content:center;">
-                    <span style="display:flex; align-items:center;"><span style="width:10px;height:10px;background:#ef4444;border-radius:50%;margin-right:5px;"></span>Pathogenic</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px;height:10px;background:#f97316;border-radius:50%;margin-right:5px;"></span>Likely Pathogenic</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px;height:10px;background:#22c55e;border-radius:50%;margin-right:5px;"></span>Benign</span>
-                    <span style="display:flex; align-items:center;"><span style="width:10px;height:10px;background:#9ca3af;border-radius:50%;margin-right:5px;"></span>VUS/Uncertain</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px;height:10px;background:#ef4444;border-radius:50%;margin-right:4px;"></span>Pathogenic</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px;height:10px;background:#f97316;border-radius:50%;margin-right:4px;"></span>Likely Pathogenic</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px;height:10px;background:#22c55e;border-radius:50%;margin-right:4px;"></span>Benign</span>
+                    <span style="display:flex; align-items:center;"><span style="width:10px;height:10px;background:#9ca3af;border-radius:50%;margin-right:4px;"></span>VUS</span>
                 </div>
 
                 ${svg}
@@ -7902,6 +7900,7 @@ window.renderVariantMap = async function(geneSymbol) {
         container.innerHTML = `<div style="padding:40px; color:#ef4444;">Error: ${e.message}</div>`;
     }
 };
+
 
 // 8. CSV Downloader Helper
 window.downloadFullVariantCSV = function(gene) {
@@ -8617,6 +8616,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
