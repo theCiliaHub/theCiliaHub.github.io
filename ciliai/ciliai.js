@@ -7974,7 +7974,7 @@ const TARGET_SPECIES_PANEL = [
     { id: 7955, name: 'Zebrafish', icon: '🐟' },
     { id: 8090, name: 'Medaka', icon: '🐟' },
     { id: 31033, name: 'Fugu', icon: '🐡' },
-    { id: 99883, name: 'Tetraodon', icon: '🐡' },
+    { id: 9989, name: 'Tetraodon', icon: '🐡' },
     { id: 69293, name: 'Stickleback', icon: '🐟' },
     { id: 7897, name: 'Coelacanth', icon: '🐟' },
     { id: 7868, name: 'Elephant Shark', icon: '🦈' },
@@ -8062,7 +8062,7 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
             if(t.name === 'Human') continue;
             const orthoGene = orthologs.find(g => g.taxid === t.id);
             if (orthoGene) {
-                let uID = orthoGene.uniprot?.Swiss_Prot || orthoGene.uniprot?.TrEMBL;
+                let uID = orthoGene.uniprot?.['Swiss-Prot'] || orthoGene.uniprot?.TrEMBL;
                 const finalUID = Array.isArray(uID) ? uID[0] : uID;
                 if (finalUID) {
                     try {
@@ -8560,6 +8560,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
