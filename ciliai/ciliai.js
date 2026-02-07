@@ -8244,6 +8244,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
     a.download = `${gene}_MSA.txt`;
     a.click();
 };
+})();
 
 /* ==============================================================
  * MODULE: 3D STRUCTURE VIEWER (Mol*)
@@ -8560,6 +8561,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
