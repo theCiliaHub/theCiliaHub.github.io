@@ -7293,13 +7293,11 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.0)
- * Enhanced Features:
- * - Full-length MSA with complete protein sequences
- * - Downloadable MSA in FASTA format
- * - All variants shown as clickable markers on human row
- * - Variant information popup on click
- * - Improved position navigation
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.1)
+ * Fixed Issues:
+ * - Human IFT88 sequence now fully visible
+ * - Horizontal scrolling works properly
+ * - Clinical significance and disease info in variant popup
  * ============================================================== */
 (function() {
     'use strict';
@@ -7430,8 +7428,6 @@ window.runDashboardSearch = function() {
             </div>`;
         if (window.addChatMessage) {
             window.addChatMessage(msg, false);
-        } else {
-            console.warn("addChatMessage not found – help message not displayed.");
         }
     };
 
@@ -7620,15 +7616,11 @@ window.runDashboardSearch = function() {
                     const seqData = await seqRes.json();
                     const seq = seqData.sequence.sequence;
 
-                    // Align sequences (simple left-align for now)
-                    const maxLen = Math.max(humanSeq.length, seq.length);
-                    const alignedSeq = seq.padEnd(maxLen, '-');
-
                     alignments.push({
                         species: species.name,
                         icon: species.icon,
                         symbol: hit.symbol || "—",
-                        seq: alignedSeq,
+                        seq: seq,
                         taxId: species.id
                     });
                 } catch (e) {
@@ -7660,7 +7652,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 8. Full-Length MSA View with All Variants
+    // 8. Full-Length MSA View - FIXED SCROLLING
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7681,6 +7673,7 @@ window.runDashboardSearch = function() {
 
         const human = align.alignments[0];
         const fullSeq = human.seq;
+        const seqWidth = fullSeq.length * 18; // Total width needed
 
         // Zappo-style amino acid colors
         const aaColor = {
@@ -7690,13 +7683,13 @@ window.runDashboardSearch = function() {
             'K':'#60a5fa','R':'#60a5fa','H':'#a5b4fc','C':'#f472b6','X':'#9ca3af','-':'#e2e8f0'
         };
 
-        // Get all variants (database + custom)
+        // Get all variants with enhanced info
         const allVars = [...data.variants, ...data.customVariants];
         const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
         const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
         const isLikely = v => /likely pathogenic/i.test(getSig(v));
 
-        // Build variant markers positioned above human sequence
+        // Build variant markers
         let markersHtml = '';
         allVars.forEach(v => {
             const pos = parseInt(v.begin);
@@ -7709,50 +7702,59 @@ window.runDashboardSearch = function() {
             else if (v.isCustom) color = '#d946ef';
 
             const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
-            const disease = v.disease || v.description || (v.clinicalSignificance || "Variant");
-            const safeDesc = disease.replace(/['"]/g, '&quot;');
+            const clinSig = v.clinicalSignificance || v.significance || "Unknown";
+            const disease = v.disease || v.description || "No disease info";
+            
+            // Safely escape for HTML attributes
+            const safeLabel = label.replace(/'/g, "\\'");
+            const safeSig = clinSig.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const safeDisease = disease.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             
             markersHtml += `
                 <span data-pos="${pos}" 
                       class="variant-marker"
-                      onclick="window.showVariantPopup(event, '${label}', '${pos}', '${safeDesc.replace(/'/g, "\\'")}', '${color}')"
+                      onclick="window.showVariantPopup(event, '${safeLabel}', ${pos}, '${safeSig}', '${safeDisease}', '${color}')"
                       style="position:absolute; left:${((pos-1) * 18)}px; top:2px; cursor:pointer; z-index:100;">
-                    <div style="width:10px; height:10px; background:${color}; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>
+                    <div style="width:10px; height:10px; background:${color}; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);" title="${label}"></div>
                 </span>`;
         });
 
-        // Position numbers (every 10) + Human AA row with colored residues
+        // Position numbers (every 10)
         let posHtml = '';
+        for (let i = 0; i < fullSeq.length; i++) {
+            const pos = i + 1;
+            const showLabel = (pos % 10 === 0);
+            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:#64748b;font-weight:${showLabel?'600':'400'};">${showLabel ? pos : '·'}</span>`;
+        }
+
+        // Human sequence row with colored residues
         let humanHtml = '';
         for (let i = 0; i < fullSeq.length; i++) {
             const pos = i + 1;
             const aa = fullSeq[i];
             const color = aaColor[aa] || '#9ca3af';
-            const showLabel = (pos % 10 === 0);
-
-            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:#64748b;font-weight:${showLabel?'600':'400'};">${showLabel ? pos : '·'}</span>`;
             humanHtml += `<span data-pos="${pos}" style="display:inline-block;width:18px;text-align:center;font-size:14px;font-weight:600;color:#fff;background:${color};border-radius:3px;margin:0 1px;">${aa}</span>`;
         }
 
-        // Species rows
+        // Other species rows
         let rowsHtml = '';
-        align.alignments.slice(1).forEach(aln => {  // Skip human (already shown above)
+        align.alignments.slice(1).forEach(aln => {
             let seqHtml = '';
             for (let i = 0; i < aln.seq.length; i++) {
                 const aa = aln.seq[i];
                 const humanAA = fullSeq[i];
                 const isMatch = aa === humanAA && aa !== '-';
                 const color = isMatch ? '#22c55e' : (aaColor[aa] || '#9ca3af');
-                const opacity = isMatch ? '0.3' : '0.15';
+                const bgOpacity = isMatch ? '40' : '20';
                 
-                seqHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:13px;color:${color};background:${color}${opacity.replace('0.', '')};border-radius:2px;margin:0 1px;">${aa}</span>`;
+                seqHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:13px;color:${color};background:${color}${bgOpacity};border-radius:2px;margin:0 1px;">${aa}</span>`;
             }
             rowsHtml += `
-                <div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;font-family:'Roboto Mono', monospace;">
-                    <div style="width:160px;min-width:160px;padding-left:12px;font-weight:500;color:#475569;font-size:13px;">
+                <div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;">
+                    <div style="width:180px;min-width:180px;padding-left:12px;font-weight:500;color:#475569;font-size:13px;font-family:'Inter',sans-serif;">
                         ${aln.icon} ${aln.species}
                     </div>
-                    <div style="flex:1;white-space:nowrap;overflow:hidden;font-size:13px;">${seqHtml}</div>
+                    <div style="font-family:'Roboto Mono',monospace;white-space:nowrap;min-width:${seqWidth}px;">${seqHtml}</div>
                 </div>`;
         });
 
@@ -7785,49 +7787,49 @@ window.runDashboardSearch = function() {
                     <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="e.g. 301" style="width:100px;padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;" />
                     <button onclick="window.jumpToMSAPosition()" class="ciliai-button" style="padding:6px 14px;font-size:13px;">Go</button>
                     <div style="margin-left:auto;font-size:12px;color:#94a3b8;">
-                        Click any variant marker to view details
+                        Scroll right to view full sequence → | Click variant markers for details
                     </div>
                 </div>
 
-                <!-- Main MSA container -->
-                <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
-                    <!-- Sticky header with position numbers and human sequence -->
-                    <div style="background:#fff;border-bottom:2px solid #cbd5e1;flex-shrink:0;">
-                        <!-- Variant markers layer -->
-                        <div style="position:relative;height:20px;padding-left:160px;overflow:hidden;">
-                            <div id="variant-marker-track" style="position:relative;height:100%;white-space:nowrap;">
+                <!-- Fixed header section -->
+                <div style="background:#fff;border-bottom:2px solid #cbd5e1;flex-shrink:0;overflow:hidden;">
+                    <!-- Variant markers -->
+                    <div style="height:20px;display:flex;overflow:hidden;">
+                        <div style="width:180px;min-width:180px;background:#f8fafc;"></div>
+                        <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="variant-scroll">
+                            <div style="position:relative;height:100%;min-width:${seqWidth}px;">
                                 ${markersHtml}
                             </div>
                         </div>
-                        
-                        <!-- Position numbers -->
-                        <div style="display:flex;overflow:hidden;padding:4px 0;">
-                            <div style="width:160px;min-width:160px;padding-left:12px;font-weight:600;color:#334155;font-size:12px;">Position</div>
-                            <div id="position-ruler" style="flex:1;overflow:hidden;white-space:nowrap;font-family:'Roboto Mono',monospace;">
-                                ${posHtml}
-                            </div>
-                        </div>
-                        
-                        <!-- Human sequence row -->
-                        <div style="display:flex;overflow:hidden;padding:6px 0;background:linear-gradient(to bottom, #fff, #f9fafb);">
-                            <div style="width:160px;min-width:160px;padding-left:12px;font-weight:700;color:#1e40af;font-size:13px;">
-                                👤 Human (${data.gene})
-                            </div>
-                            <div id="human-sequence" style="flex:1;overflow:hidden;white-space:nowrap;font-family:'Roboto Mono',monospace;">
-                                ${humanHtml}
-                            </div>
+                    </div>
+                    
+                    <!-- Position numbers -->
+                    <div style="display:flex;padding:4px 0;overflow:hidden;">
+                        <div style="width:180px;min-width:180px;padding-left:12px;font-weight:600;color:#334155;font-size:12px;background:#f8fafc;">Position</div>
+                        <div style="flex:1;overflow-x:auto;overflow-y:hidden;font-family:'Roboto Mono',monospace;" id="position-scroll">
+                            <div style="min-width:${seqWidth}px;">${posHtml}</div>
                         </div>
                     </div>
+                    
+                    <!-- Human sequence -->
+                    <div style="display:flex;padding:6px 0;background:linear-gradient(to bottom, #fff, #f9fafb);overflow:hidden;">
+                        <div style="width:180px;min-width:180px;padding-left:12px;font-weight:700;color:#1e40af;font-size:13px;background:#f8fafc;">
+                            👤 Human (${data.gene})
+                        </div>
+                        <div style="flex:1;overflow-x:auto;overflow-y:hidden;font-family:'Roboto Mono',monospace;" id="human-scroll">
+                            <div style="min-width:${seqWidth}px;">${humanHtml}</div>
+                        </div>
+                    </div>
+                </div>
 
-                    <!-- Scrollable species alignment -->
-                    <div id="msa-scroll" style="flex:1;overflow:auto;background:#fdfdfd;padding:8px 0;">
-                        ${rowsHtml}
-                    </div>
+                <!-- Scrollable species rows -->
+                <div id="msa-scroll" style="flex:1;overflow:auto;background:#fdfdfd;padding:8px 0;">
+                    ${rowsHtml}
                 </div>
             </div>
 
-            <!-- Variant popup (hidden by default) -->
-            <div id="variant-popup" style="display:none;position:fixed;background:white;border:2px solid #e2e8f0;border-radius:8px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:1000;min-width:300px;max-width:400px;">
+            <!-- Variant popup -->
+            <div id="variant-popup" style="display:none;position:fixed;background:white;border:2px solid #e2e8f0;border-radius:8px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:1000;min-width:320px;max-width:450px;">
                 <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                     <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;color:#1e293b;"></h3>
                     <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;padding:0;line-height:1;">×</button>
@@ -7843,14 +7845,14 @@ window.runDashboardSearch = function() {
                 </div>
             </div>`;
 
-        // Sync horizontal scrolling across all sections
+        // Setup synchronized scrolling
         setupSyncScroll();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 9. Variant Popup Handler
+    // 9. Enhanced Variant Popup with Clinical Significance & Disease
     // ─────────────────────────────────────────────────────────────
-    window.showVariantPopup = function(event, label, pos, description, color) {
+    window.showVariantPopup = function(event, label, pos, clinSig, disease, color) {
         event.stopPropagation();
         
         const popup = document.getElementById('variant-popup');
@@ -7863,8 +7865,15 @@ window.runDashboardSearch = function() {
         
         title.innerHTML = `<span style="color:${color};">●</span> ${label}`;
         content.innerHTML = `
-            <div><strong>Position:</strong> ${pos}</div>
-            <div style="margin-top:8px;"><strong>Clinical Significance:</strong><br/>${description}</div>
+            <div style="margin-bottom:8px;"><strong>Position:</strong> ${pos}</div>
+            <div style="margin-bottom:8px;padding:8px;background:#f1f5f9;border-radius:4px;">
+                <strong style="color:#3b82f6;">Clinical Significance:</strong><br/>
+                <span style="font-weight:500;">${clinSig}</span>
+            </div>
+            <div style="padding:8px;background:#fef3c7;border-radius:4px;border-left:3px solid #f59e0b;">
+                <strong style="color:#d97706;">Associated Disease:</strong><br/>
+                ${disease}
+            </div>
         `;
         
         const data = window.CiliAI.activeVariantData;
@@ -7881,26 +7890,38 @@ window.runDashboardSearch = function() {
         
         // Position popup near click
         popup.style.display = 'block';
-        popup.style.left = Math.min(event.clientX + 10, window.innerWidth - 420) + 'px';
-        popup.style.top = Math.min(event.clientY + 10, window.innerHeight - 200) + 'px';
+        popup.style.left = Math.min(event.clientX + 10, window.innerWidth - 470) + 'px';
+        popup.style.top = Math.min(event.clientY + 10, window.innerHeight - 250) + 'px';
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 10. Synchronized Scrolling
+    // 10. Synchronized Scrolling - FIXED
     // ─────────────────────────────────────────────────────────────
     function setupSyncScroll() {
         const msaScroll = document.getElementById('msa-scroll');
-        const posRuler = document.getElementById('position-ruler');
-        const humanSeq = document.getElementById('human-sequence');
-        const markerTrack = document.getElementById('variant-marker-track');
+        const posScroll = document.getElementById('position-scroll');
+        const humanScroll = document.getElementById('human-scroll');
+        const variantScroll = document.getElementById('variant-scroll');
         
-        if (!msaScroll || !posRuler || !humanSeq || !markerTrack) return;
+        if (!msaScroll || !posScroll || !humanScroll || !variantScroll) return;
         
+        // Sync horizontal scroll from species rows to header
         msaScroll.addEventListener('scroll', () => {
             const scrollLeft = msaScroll.scrollLeft;
-            posRuler.scrollLeft = scrollLeft;
-            humanSeq.scrollLeft = scrollLeft;
-            markerTrack.scrollLeft = scrollLeft;
+            posScroll.scrollLeft = scrollLeft;
+            humanScroll.scrollLeft = scrollLeft;
+            variantScroll.scrollLeft = scrollLeft;
+        });
+
+        // Allow scrolling from header sections too
+        [posScroll, humanScroll, variantScroll].forEach(el => {
+            el.addEventListener('scroll', () => {
+                const scrollLeft = el.scrollLeft;
+                msaScroll.scrollLeft = scrollLeft;
+                posScroll.scrollLeft = scrollLeft;
+                humanScroll.scrollLeft = scrollLeft;
+                variantScroll.scrollLeft = scrollLeft;
+            });
         });
     }
 
@@ -7920,15 +7941,15 @@ window.runDashboardSearch = function() {
         const container = document.getElementById('msa-scroll');
         if (!container) return;
         
-        const charWidth = 18;  // Width of each character
+        const charWidth = 18;
+        const labelWidth = 180;
         const targetLeft = (pos - 1) * charWidth - (container.clientWidth / 2) + (charWidth / 2);
         
+        // Scroll all sections
         container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
-        
-        // Also scroll the header sections
-        document.getElementById('position-ruler').scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
-        document.getElementById('human-sequence').scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
-        document.getElementById('variant-marker-track').scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+        document.getElementById('position-scroll')?.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+        document.getElementById('human-scroll')?.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+        document.getElementById('variant-scroll')?.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
     };
 
     // ─────────────────────────────────────────────────────────────
@@ -7944,7 +7965,6 @@ window.runDashboardSearch = function() {
         let fasta = '';
         align.alignments.forEach(a => {
             fasta += `>${a.species}|${a.symbol}\n`;
-            // Split sequence into 60-character lines
             for (let i = 0; i < a.seq.length; i += 60) {
                 fasta += a.seq.substring(i, i + 60) + '\n';
             }
@@ -7989,15 +8009,16 @@ window.runDashboardSearch = function() {
         if (!data) return;
         
         const allVars = [...data.variants, ...data.customVariants];
-        let csv = "Position,Wild_Type,Variant,Clinical_Significance,Description\n";
+        let csv = "Position,Wild_Type,Variant,Clinical_Significance,Disease,Description\n";
         
         allVars.forEach(v => {
             const pos = v.begin;
             const wt = v.wildType || '?';
             const alt = v.alternativeSequence || '?';
-            const sig = (v.clinicalSignificance || '').replace(/"/g, '""');
+            const sig = (v.clinicalSignificance || v.significance || '').replace(/"/g, '""');
+            const disease = (v.disease || '').replace(/"/g, '""');
             const desc = (v.description || '').replace(/"/g, '""');
-            csv += `${pos},${wt},${alt},"${sig}","${desc}"\n`;
+            csv += `${pos},${wt},${alt},"${sig}","${disease}","${desc}"\n`;
         });
         
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -8010,7 +8031,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 13. Other Functions (preserved from original)
+    // 13. Other Functions
     // ─────────────────────────────────────────────────────────────
     window.openVariantPanel = function(title, pos, desc, gene) {
         const panel = document.getElementById('var-panel');
@@ -8053,6 +8074,7 @@ window.runDashboardSearch = function() {
                 alternativeSequence: match[3],
                 clinicalSignificance: "User Requested",
                 description: "Custom variant",
+                disease: "User-defined variant",
                 isCustom: true
             });
 
@@ -8066,19 +8088,21 @@ window.runDashboardSearch = function() {
         return `Loaded ${gene} and analyzing ${variantStr}.`;
     };
 
-    window.checkConservation = async function(geneSymbol, humanPos, refAA) {
-        // This function is preserved but can be enhanced to update the MSA view
+    window.checkConservation = async function(geneSymbol, humanPos) {
         if (window.addChatMessage) {
             window.addChatMessage(`Checking conservation at position ${humanPos}...`, false);
         }
         
-        // The alignment is already loaded, so we can just switch to MSA view
-        // and highlight the position
         window.drawVariantWorkspace('msa');
-        setTimeout(() => window.jumpToMSAPosition(humanPos), 500);
+        setTimeout(() => {
+            const input = document.getElementById('msa-jump-input');
+            if (input) input.value = humanPos;
+            window.jumpToMSAPosition();
+        }, 500);
     };
 
-    console.log("[CiliAI] Variant Analysis & MSA Engine v15.0 – Enhanced with full-length MSA + clickable variants loaded");
+    console.log("[CiliAI] Variant Analysis & MSA Engine v15.1 – Fixed scrolling + enhanced variant info");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
