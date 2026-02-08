@@ -7291,385 +7291,8 @@ window.runDashboardSearch = function() {
             </div>`;
         }).join('');
 };
-
-
 /* ==============================================================
- * MODULE: UI LAYOUT FIXES (Prevents Overflow)
- * ============================================================== */
-(function applyLayoutFixes() {
-    const styleId = 'ciliai-layout-fixes';
-    if (document.getElementById(styleId)) return;
-    
-    const css = `
-        /* 1. Ensure Chat Message Bubble Contains Content */
-        .ciliai-message-content {
-            max-width: 100%;
-            overflow-x: auto; /* Adds scrollbar if content is too wide */
-            box-sizing: border-box;
-        }
-
-        /* 2. Constrain the Gene Card */
-        .ai-result-card {
-            width: 100%;
-            max-width: 600px; /* Prevents it from getting too huge */
-            box-sizing: border-box;
-            background: #fff;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            border: 1px solid #e2e8f0;
-            margin-top: 5px;
-        }
-
-        /* 3. Make Tables Scrollable (Critical for Mobile/Small Screens) */
-        .cilia-tab-content {
-            width: 100%;
-            overflow-x: auto; /* Forces table to scroll inside the tab */
-        }
-        
-        .fancy-table {
-            width: 100%;
-            min-width: 300px; /* Ensures table doesn't crush too small */
-            table-layout: auto;
-        }
-
-        /* 4. Fix Tab Button Wrapping */
-        .cilia-tabs {
-            flex-wrap: wrap; /* Allows tabs to wrap on small screens */
-            gap: 5px;
-        }
-        
-        .cilia-tab-btn {
-            flex: 1 1 auto; /* Tabs grow/shrink to fit */
-            text-align: center;
-            min-width: 80px;
-        }
-    `;
-    
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = css;
-    document.head.appendChild(style);
-    
-    console.log("CiliAI Layout Fixes Applied.");
-})();
-
-
-// Helper: Reset Views – Ensures diagram is visible and refreshed
-window.resetViews = function() {
-    // Hide all alternative views
-    document.getElementById('plotly-container').style.display = 'none';
-    document.getElementById('domain-viewer').style.display = 'none';
-
-    // Always re-inject the full interactive SVG to ensure it's present and clean
-    window.generateAndInjectSVG();
-
-    // Ensure cilia-svg is visible
-    const ciliaSvg = document.getElementById('cilia-svg');
-    if (ciliaSvg) {
-        ciliaSvg.style.display = 'flex';
-        // Remove any table mode class
-        ciliaSvg.classList.remove('table-view-active');
-    }
-
-    // Update title
-    document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
-
-    // Clear any overlays (heatmaps, multi-gene)
-    if (window.SpatialManager && typeof window.SpatialManager.clearOverlays === 'function') {
-        window.SpatialManager.clearOverlays();
-    }
-
-    // Reset zoom/state
-    if (window.SpatialManager && typeof window.SpatialManager.resetZoom === 'function') {
-        window.SpatialManager.resetZoom();
-    }
-};
-
-window.showDiagram = function() {
-    document.getElementById('plotly-container').style.display = 'none';
-    document.getElementById('domain-viewer').style.display = 'none';
-    document.getElementById('cilia-svg').style.display = 'flex';
-    document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
-    if (window.CiliAI) window.CiliAI.currentPlot = null;
-};
-
-window.showPlot = function(plotData, title = "Gene Expression UMAP") {
-    // Hide other views
-    document.getElementById('cilia-svg').style.display = 'none';
-    document.getElementById('domain-viewer').style.display = 'none';
-
-    const plotContainer = document.getElementById('plotly-container');
-    plotContainer.style.display = 'block';
-    document.getElementById('current-viz-title').textContent = title;
-
-    // Clear previous content to avoid artifacts
-    plotContainer.innerHTML = '';
-
-    // Calculate available space
-    const vizCard = document.querySelector('.viz-card');
-    const vizHeader = document.querySelector('.viz-header');
-    const availableHeight = (vizCard && vizHeader)
-        ? (vizCard.clientHeight - vizHeader.clientHeight - 40)
-        : 500;
-    const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
-
-    // Merge and enhance layout
-    const layout = {
-        ...plotData.layout,
-        autosize: true,
-        width: availableWidth,
-        height: availableHeight,
-        margin: { l: 60, r: 30, b: 60, t: 50, pad: 10 },
-        paper_bgcolor: 'white',
-        plot_bgcolor: 'white',
-        xaxis: { ...plotData.layout?.xaxis, automargin: true, tickfont: { size: 10 } },
-        yaxis: { ...plotData.layout?.yaxis, automargin: true, tickfont: { size: 10 } },
-        font: { size: 11 },
-        showlegend: true,
-        legend: {
-            x: 1.02,
-            y: 1,
-            xanchor: 'left',
-            yanchor: 'top',
-            bgcolor: 'rgba(255,255,255,0.8)',
-            bordercolor: '#e1e8ed',
-            borderwidth: 1,
-            font: { size: 10 }
-        }
-    };
-
-    // Purge any existing plot to prevent memory leaks and old listeners
-    if (window.CiliAI?.currentPlot) {
-        Plotly.purge('plotly-container');
-        window.CiliAI.currentPlot = null;
-    }
-
-    // Render the new plot
-    Plotly.newPlot('plotly-container', plotData.data, layout, {
-        responsive: true,
-        displayModeBar: true,
-        displaylogo: false,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
-        scrollZoom: false
-    })
-    .then(() => {
-        // Now gd is the actual graph div element (not a Promise)
-        const gd = document.getElementById('plotly-container');
-
-        // Store reference
-        if (window.CiliAI) {
-            window.CiliAI.currentPlot = gd;
-        }
-
-        // Attach click handler safely
-        gd.on('plotly_click', (e) => {
-            const point = e.points?.[0];
-            const loc = point?.customdata?.localization;
-            if (loc) {
-                window.showDiagram();
-                if (window.SpatialManager && window.CiliAI?.activeGeneContext) {
-                    SpatialManager.highlight(loc, window.CiliAI.activeGeneContext);
-                }
-            }
-        });
-    })
-    .catch(err => {
-        console.error("Plotly rendering failed:", err);
-        window.addChatMessage(`<p style="color:#c62828;">Failed to render plot: ${err.message}</p>`, false);
-    });
-
-    // Responsive resize handler (only one instance)
-    const resizeHandler = () => {
-        const container = document.getElementById('plotly-container');
-        if (window.CiliAI?.currentPlot && container && container.offsetParent !== null) {
-            Plotly.Plots.resize(window.CiliAI.currentPlot);
-        }
-    };
-
-    // Remove any previous listener to avoid duplicates
-    window.removeEventListener('resize', resizeHandler);
-    window.addEventListener('resize', resizeHandler);
-};
-
-window.showDomainViewer = function (gene) {
-    // ── HARD GUARDS & EARLY INITIALIZATION ──
-    if (!window.CiliAI) return;
-
-    // Force-create the entire chain before any access
-    window.CiliAI.lookups           = window.CiliAI.lookups           || {};
-    window.CiliAI.lookups.geneMap    = window.CiliAI.lookups.geneMap    || {};
-    window.CiliAI.lookups.pfamByGene = window.CiliAI.lookups.pfamByGene || {};
-
-    // Extra safety (in case something cleared it after init)
-    if (!window.CiliAI.lookups.pfamByGene) {
-        console.warn("[showDomainViewer] pfamByGene was cleared — re-creating");
-        window.CiliAI.lookups.pfamByGene = {};
-    }
-
-    gene = gene.toUpperCase().trim();
-
-    const domainContainer = document.getElementById('domain-viewer');
-    const titleEl         = document.getElementById('current-viz-title');
-
-    if (!domainContainer || !titleEl) return;
-
-    // ── UI switching ──
-    const ciliaSvg = document.getElementById('cilia-svg');
-    const plotly   = document.getElementById('plotly-container');
-
-    if (ciliaSvg) ciliaSvg.style.display = 'none';
-    if (plotly)   plotly.style.display   = 'none';
-
-    domainContainer.style.display = 'flex';
-    domainContainer.innerHTML = '';
-    titleEl.textContent = `Pfam Domains: ${gene}`;
-
-    // ── Resolve Pfam domains ──
-    let pfam = window.CiliAI.lookups.pfamByGene[gene] || [];
-
-    if (!pfam.length) {
-        const geneData = window.CiliAI.lookups.geneMap[gene];
-
-        if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
-            const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
-            const parts = desc
-                .split(/[;,]/)
-                .map(s => s.trim())
-                .filter(Boolean);
-
-            if (parts.length) {
-                pfam = parts.map((part, i) => ({
-                    id:    `DOM_${i + 1}`,
-                    name:  part,
-                    start: (i * 200) + 50,
-                    end:   (i * 200) + 150
-                }));
-
-                // Cache it
-                window.CiliAI.lookups.pfamByGene[gene] = pfam;
-            }
-        }
-    }
-
-    // ── Special fallback for WDR31 (common case with no strong Pfam hits) ──
-    if (!pfam.length && gene === "WDR31") {
-        pfam = [
-            { id: "WD1", name: "WD40 repeat 1", start:  45, end:  85 },
-            { id: "WD2", name: "WD40 repeat 2", start:  95, end: 135 },
-            { id: "WD3", name: "WD40 repeat 3", start: 155, end: 195 },
-            { id: "WD4", name: "WD40 repeat 4", start: 215, end: 255 },
-        ];
-        // Cache immediately so next call is instant
-        window.CiliAI.lookups.pfamByGene[gene] = pfam;
-    }
-
-    // ── No domains case ──
-    if (!pfam.length) {
-        domainContainer.innerHTML = `
-            <div style="padding:30px; text-align:center; color:#64748b; font-size:14px; line-height:1.5;">
-                <strong>No Pfam domain annotations found for ${gene}</strong><br><br>
-                <small>
-                    Note: Some WD-repeat proteins (like WDR31) form β-propeller structures<br>
-                    but may not receive individual Pfam domain assignments.
-                </small>
-            </div>`;
-        return;
-    }
-
-    // ── Render SVG ──
-    const seqLength = Math.max(...pfam.map(d => d.end), 1000);
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-
-    svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 160`);
-    svg.setAttribute('width',   '100%');
-    svg.setAttribute('height',  '100%');
-    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-
-    // Background line (protein backbone)
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', '50');
-    line.setAttribute('y1', '80');
-    line.setAttribute('x2', seqLength + 50);
-    line.setAttribute('y2', '80');
-    line.setAttribute('stroke', '#4a5568');
-    line.setAttribute('stroke-width', '5');
-    line.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(line);
-
-    // Domains
-    pfam.forEach((domain, index) => {
-        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-
-        const width = domain.end - domain.start + 1;
-        const rect  = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-
-        rect.setAttribute('x',      domain.start + 50);
-        rect.setAttribute('y',      '60');
-        rect.setAttribute('width',  width);
-        rect.setAttribute('height', '40');
-        rect.setAttribute('rx',     '8');
-        rect.setAttribute('fill',   `hsl(${index * 65 + 190}, 85%, 62%)`);
-        rect.setAttribute('stroke', '#ffffff');
-        rect.setAttribute('stroke-width', '2');
-
-        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        title.textContent = `${domain.name}  (${domain.start}–${domain.end})`;
-        rect.appendChild(title);
-
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x',           domain.start + 50 + width / 2);
-        text.setAttribute('y',           '45');
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('font-size',   width > 80 ? '13' : '11');
-        text.setAttribute('font-weight', 'bold');
-        text.setAttribute('fill',        '#1f2937');
-        text.textContent = domain.name;
-
-        group.appendChild(rect);
-        group.appendChild(text);
-        svg.appendChild(group);
-    });
-
-    domainContainer.appendChild(svg);
-};
-
-window.downloadCurrentVisualization = function() {
-    if (window.CiliAI?.currentPlot) {
-        Plotly.downloadImage(window.CiliAI.currentPlot, { format: 'png', filename: 'ciliai-umap-plot', width: 1200, height: 800, scale: 2 });
-    } else if (document.getElementById('domain-viewer').style.display !== 'none') {
-        const svgElement = document.getElementById('domain-viewer').querySelector('svg');
-        if (svgElement) {
-            const svgData = new XMLSerializer().serializeToString(svgElement);
-            const blob = new Blob([svgData], {type: 'image/svg+xml'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'ciliai-domain.svg';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    } else {
-        const svgElement = document.getElementById('cilia-diagram');
-        if (svgElement) {
-            const svgData = new XMLSerializer().serializeToString(svgElement);
-            const blob = new Blob([svgData], {type: 'image/svg+xml'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'ciliai-diagram.svg';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    }
-};
-
-/* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v12.0 - Fixed & Integrated)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v13.0 - Brute Force Discovery)
  * ============================================================== */
 
 (function() {
@@ -7896,7 +7519,6 @@ window.downloadCurrentVisualization = function() {
         
         if (!variantData) return;
 
-        // If no alignment yet, show empty state
         if (!alignData || !alignData.alignments || alignData.alignments.length === 0) {
             container.innerHTML = `
                 <div style="padding:40px; text-align:center;">
@@ -7959,7 +7581,7 @@ window.downloadCurrentVisualization = function() {
         container.innerHTML = `
             <div style="height:100%; display:flex; flex-direction:column; font-family:'Inter', sans-serif;">
                 <div style="padding:10px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-                    <strong style="color:#1e293b;">Evolutionary Alignment (${alignData.alignments.length} Species)</strong>
+                    <strong style="color:#1e293b;">Evolutionary Alignment (${alignData.alignments.length} Species) </strong>
                     <button onclick="window.drawVariantWorkspace()" class="ciliai-button" style="background:#64748b; color:white; font-size:11px;">⬅ Back to Domains</button>
                 </div>
                 <div style="padding:10px; background:#fff; border-bottom:2px solid #e2e8f0; overflow-x:auto;">
@@ -7983,7 +7605,7 @@ window.downloadCurrentVisualization = function() {
         const originalBtnText = btn ? btn.innerText : "🌍 Check Conservation";
         
         if(btn) btn.innerText = "⏳ Deep Scanning...";
-        if(statusDiv) statusDiv.innerHTML = `Running <strong>Hybrid Scan</strong> (Homology + Symbol)... <br><span style="font-size:10px;color:#666;">Aligning genomes...</span>`;
+        if(statusDiv) statusDiv.innerHTML = `Running <strong>Brute Force Scan</strong> (checking aliases)... <br><span style="font-size:10px;color:#666;">This scans 65 genomes individually.</span>`;
         
         try {
             // 1. Get Human Ref & HomoloGene ID
@@ -7993,35 +7615,7 @@ window.downloadCurrentVisualization = function() {
             const humanRes = window.CiliAI.activeVariantData;
             const humanSeq = humanRes.sequence;
             
-            // Fetch HomoloGene ID
-            const geneInfoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
-            const geneInfo = await geneInfoRes.json();
-            const hID = geneInfo.hits?.[0]?.homologene?.id;
-
-            // 2. Prepare Batch Queries
-            const targets = TARGET_SPECIES_PANEL;
-            const allTaxIds = targets.map(t => t.id);
-            let hits = [];
-
-            // QUERY A: HomoloGene Search
-            if (hID) {
-                const homRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=uniprot,taxid,symbol&size=200`);
-                const homData = await homRes.json();
-                if (homData.hits) hits = [...homData.hits];
-            }
-
-            // QUERY B: Symbol Search (Fallback)
-            const foundTaxIds = new Set(hits.map(h => h.taxid));
-            const missingTaxIds = allTaxIds.filter(id => !foundTaxIds.has(id));
-
-            if (missingTaxIds.length > 0) {
-                const taxStr = missingTaxIds.join(',');
-                const symRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${taxStr}&fields=uniprot,taxid,symbol&size=100`);
-                const symData = await symRes.json();
-                if (symData.hits) hits = [...hits, ...symData.hits];
-            }
-
-            // 3. Process Alignments
+            // 2. Prepare Alignment Window
             const alignments = [];
             const windowSize = 25; 
             const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
@@ -8038,16 +7632,26 @@ window.downloadCurrentVisualization = function() {
             let conservedCount = 0;
             let totalAligned = 0;
 
+            // 3. Brute Force Discovery: Search for symbol in each species individually
+            const targets = TARGET_SPECIES_PANEL;
             const processSpecies = async (t) => {
                 if(t.name === 'Human') return;
-                const match = hits.find(h => h.taxid === t.id);
-                if (!match || !match.uniprot) return;
-
-                let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
-                const finalUID = Array.isArray(uID) ? uID[0] : uID;
-                if (!finalUID) return;
-
+                
                 try {
+                    // BROAD SEARCH: "q=IFT88" in this specific TaxID
+                    // This catches orthologs even if they have different names (like osm-5)
+                    // because the symbol usually appears in the record description/alias.
+                    const qUrl = `https://mygene.info/v3/query?q=${geneSymbol}&species=${t.id}&fields=uniprot,symbol&size=1`;
+                    const res = await fetch(qUrl);
+                    const data = await res.json();
+                    
+                    const match = data.hits?.[0];
+                    if (!match || !match.uniprot) return;
+
+                    let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
+                    const finalUID = Array.isArray(uID) ? uID[0] : uID;
+                    if (!finalUID) return;
+
                     const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
                     if(sRes.ok) {
                         const sData = await sRes.json();
@@ -8055,6 +7659,7 @@ window.downloadCurrentVisualization = function() {
                         
                         if (seq.length < humanFingerprint.length) return;
 
+                        // Align
                         let bestScore = -1;
                         let bestIdx = -1;
                         for(let i=0; i <= seq.length - humanFingerprint.length; i++) {
@@ -8066,6 +7671,7 @@ window.downloadCurrentVisualization = function() {
                             if (score === humanFingerprint.length) break; 
                         }
                         
+                        // 20% Threshold
                         if ((bestScore/humanFingerprint.length) >= 0.20) {
                             const center = bestIdx + (windowSize/2);
                             const segStart = Math.max(0, center - 10);
@@ -8087,6 +7693,7 @@ window.downloadCurrentVisualization = function() {
                 } catch(e) { }
             };
 
+            // Run in parallel
             await Promise.allSettled(targets.map(t => processSpecies(t)));
 
             alignments.sort((a, b) => {
@@ -8319,5 +7926,8 @@ window.downloadCurrentVisualization = function() {
 })();
 
 
+
+
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
