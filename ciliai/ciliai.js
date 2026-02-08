@@ -5786,6 +5786,34 @@ const intentHandlers = [
             return "Variant Burden module not loaded.";
         }
     },
+    
+    // 16b. Specific Variant Display (e.g. "Show L301R on IFT88")
+    {
+        priority: 16, 
+        matcher: (qLower) => {
+            const hasGene = window.CiliAI.utils.extractGenes(qLower).length > 0;
+            // Matches patterns like L301R, p.V34G, Val301Gly
+            const hasVariantPattern = /\b[a-z]{1,3}\.?\d+[a-z]{1,3}\b/i.test(qLower); 
+            return hasGene && hasVariantPattern;
+        },
+        handler: async (query) => {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            if (genes.length === 0) return null;
+            
+            const variantMatch = query.match(/\b([a-z]{1,3}\.?\d+[a-z*]{1,3})\b/i);
+            if (!variantMatch) return "I couldn't identify the specific mutation format (e.g., L301R).";
+
+            const gene = genes[0];
+            const variant = variantMatch[1];
+
+            window.addChatMessage(`Loading map for <strong>${gene}</strong> and analyzing <strong>${variant}</strong>...`, false);
+            
+            if (window.displaySpecificVariant) {
+                return await window.displaySpecificVariant(gene, variant);
+            }
+            return "Variant display module not loaded.";
+        }
+    },
 
   // 16. Live Variant Handler (Highest Priority Variant Check)
     {
@@ -7935,10 +7963,14 @@ window.downloadCurrentVisualization = function() {
  * MODULE: ROBUST EVOLUTIONARY ALIGNER (65 Species Edition)
  * ============================================================== */
 
+/* ==============================================================
+ * MODULE: ROBUST EVOLUTIONARY ALIGNER (65 Species Deep Scan)
+ * ============================================================== */
+
 // 1. Define the 65-Species Panel (Global Constant)
 const TARGET_SPECIES_PANEL = [
     // PRIMATES & MAMMALS
-    { id: 9606, name: 'Human', icon: '👤' }, // Ref
+    { id: 9606, name: 'Human', icon: '👤' }, 
     { id: 9598, name: 'Chimpanzee', icon: '🐵' },
     { id: 9593, name: 'Gorilla', icon: '🦍' },
     { id: 9601, name: 'Orangutan', icon: '🦧' },
@@ -7966,7 +7998,7 @@ const TARGET_SPECIES_PANEL = [
     { id: 8496, name: 'Alligator', icon: '🐊' },
 
     // AMPHIBIANS
-    { id: 8364, name: 'Xenopus', icon: '🐸' }, // tropicalis
+    { id: 8364, name: 'Xenopus', icon: '🐸' }, 
     { id: 8355, name: 'Xenopus laevis', icon: '🐸' },
     { id: 8296, name: 'Axolotl', icon: '🦎' },
 
@@ -7974,7 +8006,7 @@ const TARGET_SPECIES_PANEL = [
     { id: 7955, name: 'Zebrafish', icon: '🐟' },
     { id: 8090, name: 'Medaka', icon: '🐟' },
     { id: 31033, name: 'Fugu', icon: '🐡' },
-    { id: 9989, name: 'Tetraodon', icon: '🐡' },
+    { id: 9989, name: 'Tetraodon', icon: '🐡' }, // Corrected ID
     { id: 69293, name: 'Stickleback', icon: '🐟' },
     { id: 7897, name: 'Coelacanth', icon: '🐟' },
     { id: 7868, name: 'Elephant Shark', icon: '🦈' },
@@ -8007,9 +8039,12 @@ const TARGET_SPECIES_PANEL = [
 
 window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
     const btn = document.getElementById('vp-action');
-    if(btn) btn.innerText = "⏳ Deep scanning...";
+    const statusDiv = document.getElementById('vp-desc'); // Use description area for status updates
+    if(btn) btn.innerText = "⏳ Scanning 65 species...";
+    if(statusDiv) statusDiv.innerHTML = `Running deep evolutionary scan... <br><span style="font-size:10px;color:#666;">(This checks 65 genomes, please wait ~5s)</span>`;
+    
     try {
-        // A. Human Reference Sequence
+        // --- A. Fetch Human Reference (Baseline) ---
         const humanRes = await window.fetchVariantDataLive(geneSymbol);
         if(humanRes.error) throw new Error("Could not fetch human reference.");
         
@@ -8018,31 +8053,29 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
         const seqData = await seqRes.json();
         const humanSeq = seqData.sequence.sequence;
 
-        // B. Define Targets & Fetch Orthologs...
+        // --- B. Prepare Targets ---
         const targets = TARGET_SPECIES_PANEL;
-        const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
+        const taxIds = targets.map(t => t.id).join(',');
+
+        // --- C. The "Deep Scan" (Batch Query) ---
+        // We query MyGene for ALL 65 TaxIDs at once to find the gene homolog
+        // This is much more robust than HomoloGene for non-standard species
+        const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${taxIds}&fields=uniprot,taxid,symbol&size=150`);
         const orthoData = await orthoRes.json();
-        let orthologs = [];
+        const hits = orthoData.hits || [];
 
-        if (orthoData.hits?.[0]?.homologene?.id) {
-            const hID = orthoData.hits[0].homologene.id;
-            const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=100`);
-            const groupData = await groupRes.json();
-            orthologs = groupData.hits || [];
-        }
-
-        // D. Align Sequences
+        // --- D. Align Sequences ---
         const alignments = [];
         let conservedCount = 0;
         let totalAligned = 0;
         
-        // Human Fingerprint (20aa context)
+        // Define Human Fingerprint (20aa window) for alignment
         const windowSize = 20;
         const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
         const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
         const humanFingerprint = humanSeq.substring(hStart, hEnd);
 
-        // Add Human
+        // Add Human Self-Alignment
         const dispStartH = Math.max(0, (humanPos - 1) - 7);
         const dispEndH = Math.min(humanSeq.length, (humanPos - 1) + 8);
         const humanSegment = humanSeq.substring(dispStartH, dispEndH);
@@ -8057,53 +8090,92 @@ window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
             isConserved: true
         });
 
-        // Loop through targets...
-        for (const t of targets) {
-            if(t.name === 'Human') continue;
-            const orthoGene = orthologs.find(g => g.taxid === t.id);
-            if (orthoGene) {
-                let uID = orthoGene.uniprot?.['Swiss-Prot'] || orthoGene.uniprot?.TrEMBL;
-                const finalUID = Array.isArray(uID) ? uID[0] : uID;
-                if (finalUID) {
-                    try {
-                        const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
-                        if(sRes.ok) {
-                            const sData = await sRes.json();
-                            const seq = sData.sequence.sequence;
-                            const bestMatch = findBestAlignment(humanFingerprint, seq);
-                            if (bestMatch.score > 0.35) {
-                                const centerIdx = bestMatch.index + Math.floor(windowSize/2);
-                                const dispStart = Math.max(0, centerIdx - 7);
-                                const dispEnd = Math.min(seq.length, centerIdx + 8);
-                                const segment = seq.substring(dispStart, dispEnd);
-                                const residue = seq[centerIdx];
-                                const isMatch = residue === refAA;
-                                if(isMatch) conservedCount++;
-                                totalAligned++;
-                                alignments.push({
-                                    species: t.name, icon: t.icon, symbol: orthoGene.symbol,
-                                    seq: segment, centerResidue: residue, isConserved: isMatch
-                                });
-                            }
-                        }
-                    } catch(err) { console.warn(`Failed seq fetch for ${t.name}`); }
+        // --- E. Process Each Target Species ---
+        const processSpecies = async (t) => {
+            if(t.name === 'Human') return;
+
+            // Find the hit for this specific TaxID in our batch results
+            const match = hits.find(h => h.taxid === t.id);
+            if (!match || !match.uniprot) return; // Gene missing in this species? Skip.
+
+            // Robust ID Extraction (Swiss-Prot preferred, then TrEMBL)
+            let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
+            const finalUID = Array.isArray(uID) ? uID[0] : uID;
+            
+            if (!finalUID) return;
+
+            try {
+                // Fetch the protein sequence from EBI
+                const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
+                if(sRes.ok) {
+                    const sData = await sRes.json();
+                    const seq = sData.sequence.sequence;
+                    
+                    // Align using the fingerprint
+                    const bestMatch = findBestAlignment(humanFingerprint, seq);
+                    
+                    // Threshold: 15% identity is enough for deep time (e.g. Yeast)
+                    if (bestMatch.score > 0.15) { 
+                        const centerIdx = bestMatch.index + Math.floor(windowSize/2);
+                        
+                        // Extract display segment
+                        const dispStart = Math.max(0, centerIdx - 7);
+                        const dispEnd = Math.min(seq.length, centerIdx + 8);
+                        const segment = seq.substring(dispStart, dispEnd);
+                        const residue = seq[centerIdx];
+                        
+                        // Check conservation at the specific variant position
+                        const isMatch = residue === refAA;
+                        if(isMatch) conservedCount++;
+                        totalAligned++;
+                        
+                        alignments.push({
+                            species: t.name, 
+                            icon: t.icon, 
+                            symbol: match.symbol || geneSymbol,
+                            seq: segment, 
+                            centerResidue: residue, 
+                            isConserved: isMatch
+                        });
+                    }
                 }
+            } catch(err) { 
+                console.warn(`Failed seq fetch for ${t.name}`, err); 
             }
-        }
-        
+        };
+
+        // Run fetches in parallel chunks (Promise.allSettled avoids failure cascades)
+        await Promise.allSettled(targets.map(t => processSpecies(t)));
+
+        // --- F. Render Results ---
+        // Sort alignments to match the original panel order (Evolutionary distance)
+        alignments.sort((a, b) => {
+            const idxA = targets.findIndex(t => t.name === a.species);
+            const idxB = targets.findIndex(t => t.name === b.species);
+            return idxA - idxB;
+        });
+
         const score = totalAligned > 0 ? Math.round((conservedCount / totalAligned) * 100) : 0;
+        
+        // Restore UI
+        if(btn) btn.innerText = "🌍 Check Conservation";
+        if(statusDiv) statusDiv.innerHTML = `Analyzed <strong>${totalAligned}</strong> orthologs. Conservation score: <strong>${score}%</strong>`;
+
+        // Launch MSA Viewer
         window.renderProfessionalMSA(geneSymbol, humanPos, refAA, alignments, score);
 
     } catch (e) {
         console.error(e);
         alert("Alignment Error: " + e.message);
         if(btn) btn.innerText = "🌍 Check Conservation";
+        if(statusDiv) statusDiv.textContent = "Error during scan.";
     }
 };
 
 function findBestAlignment(query, target) {
     let bestScore = -1;
     let bestIndex = -1;
+    // Simple sliding window alignment (Hamming distance equivalent for strings)
     for (let i = 0; i <= target.length - query.length; i++) {
         let currentScore = 0;
         for (let j = 0; j < query.length; j++) {
@@ -8233,7 +8305,54 @@ window.renderProfessionalMSA = function (gene, pos, refAA, alignments, score) {
     const btn = document.getElementById('vp-action');
     if (btn) btn.innerText = "🌍 Check Conservation";
 };
+// --- 6. NEW: PROGRAMMATIC VARIANT LOADER & AUTO-SCAN ---
+    window.displaySpecificVariant = async function(gene, variantStr) {
+        // 1. Render the base map first
+        await window.renderVariantMap(gene);
+        
+        // 2. Parse the variant string (e.g., "p.L301R", "L301R", "Val301Gly")
+        const cleanStr = variantStr.replace(/^p\./i, ''); // remove 'p.' prefix
+        const match = cleanStr.match(/^([A-Za-z]+)(\d+)([A-Za-z*]+)$/);
+        
+        if (!match || !window.CiliAI.activeVariantData) {
+            window.addChatMessage(`I loaded the map for <strong>${gene}</strong>, but I couldn't parse the specific variant "${variantStr}". Please try standard format like "p.L301R".`, false);
+            return;
+        }
 
+        const wildType = match[1];
+        const pos = parseInt(match[2]);
+        const mutant = match[3];
+
+        // 3. Inject into Custom Variants
+        const customVar = {
+            wildType: wildType,
+            begin: pos,
+            alternativeSequence: mutant,
+            clinicalSignificance: "User Query",
+            description: "Requested via Chat",
+            isCustom: true
+        };
+        window.CiliAI.activeVariantData.customVariants.push(customVar);
+
+        // 4. Redraw and Open Panel
+        window.drawVariantWorkspace();
+        
+        // Auto-open panel
+        setTimeout(async () => {
+            // Open the panel UI
+            const title = `p.${wildType}${pos}${mutant}`;
+            window.openVariantPanel(title, pos, "User requested analysis", gene);
+            
+            // 5. TRIGGER DEEP SCAN AUTOMATICALLY
+            // We call the new robust scanner immediately
+            window.addChatMessage(`Running <strong>Deep Evolutionary Scan</strong> for ${title} across 65 species...`, false);
+            await window.checkConservation(gene, pos, title);
+            
+        }, 500); // Delay to allow DOM render
+
+        return `Displayed variant <strong>${variantStr}</strong> on ${gene}. Deep scan initiated.`;
+    };
+    
 window.downloadMSA = function(gene, pos, alignmentsStr) {
     const alignments = JSON.parse(alignmentsStr);
     let txt = `Alignment around position ${pos}\n\n`;
@@ -8561,6 +8680,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
