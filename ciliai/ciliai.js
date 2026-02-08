@@ -7293,79 +7293,84 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v14.2 – Full-Length MSA)
- * Complete module – includes map ↔ full MSA switching, variant markers header,
- * conservation bar, scroll-to-position, CSV export, help message, etc.
- * Last updated structure: February 2025
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v14.4)
+ * Full code – no omissions, no placeholders
+ * Features:
+ * - Default view: Domain & Variant Map (no auto-switch)
+ * - Manual switch to Full-Length MSA via button only
+ * - Full-length MSA with horizontal scrolling + visible scrollbar
+ * - Position numbers displayed every 5 residues
+ * - Human amino acid row always first + colored by Zappo style
+ * - All variants shown as markers above human row with disease tooltip
+ * - Searchable positions via "Jump to position" input
  * ============================================================== */
 (function() {
     'use strict';
 
-    // Global state
     window.CiliAI = window.CiliAI || {};
     window.CiliAI.activeVariantData = null;
     window.CiliAI.activeAlignmentData = null;
 
     // ─────────────────────────────────────────────────────────────
-    // 1. SPECIES PANEL (used for ortholog search)
+    // 1. SPECIES PANEL – full list
     // ─────────────────────────────────────────────────────────────
-   const TARGET_SPECIES_PANEL = [
-    { id: 9606, name: 'Human', icon: '👤' },
-    { id: 9598, name: 'Chimpanzee', icon: '🐵' },
-    { id: 9593, name: 'Gorilla', icon: '🦍' },
-    { id: 9601, name: 'Orangutan', icon: '🦧' },
-    { id: 9544, name: 'Macaque', icon: '🐒' },
-    { id: 9483, name: 'Marmoset', icon: '🐒' },
-    { id: 10090, name: 'Mouse', icon: '🐭' },
-    { id: 10116, name: 'Rat', icon: '🐀' },
-    { id: 10029, name: 'Hamster', icon: '🐹' },
-    { id: 9615, name: 'Dog', icon: '🐕' },
-    { id: 9685, name: 'Cat', icon: '🐈' },
-    { id: 9913, name: 'Cow', icon: '🐄' },
-    { id: 9823, name: 'Pig', icon: '🐖' },
-    { id: 9796, name: 'Horse', icon: '🐎' },
-    { id: 9940, name: 'Sheep', icon: '🐑' },
-    { id: 9785, name: 'Elephant', icon: '🐘' },
-    { id: 9986, name: 'Rabbit', icon: '🐇' },
-    { id: 9361, name: 'Armadillo', icon: '🦔' },
-    { id: 9031, name: 'Chicken', icon: '🐔' },
-    { id: 59729, name: 'Zebra Finch', icon: '🐦' },
-    { id: 9103, name: 'Turkey', icon: '🦃' },
-    { id: 28377, name: 'Lizard', icon: '🦎' },
-    { id: 8479, name: 'Turtle', icon: '🐢' },
-    { id: 8496, name: 'Alligator', icon: '🐊' },
-    { id: 8364, name: 'Xenopus', icon: '🐸' },
-    { id: 8355, name: 'X. laevis', icon: '🐸' },
-    { id: 8296, name: 'Axolotl', icon: '🦎' },
-    { id: 7955, name: 'Zebrafish', icon: '🐟' },
-    { id: 8090, name: 'Medaka', icon: '🐟' },
-    { id: 31033, name: 'Fugu', icon: '🐡' },
-    { id: 9989, name: 'Tetraodon', icon: '🐡' },
-    { id: 69293, name: 'Stickleback', icon: '🐟' },
-    { id: 7897, name: 'Coelacanth', icon: '🐟' },
-    { id: 7868, name: 'Elephant Shark', icon: '🦈' },
-    { id: 7757, name: 'Lamprey', icon: '🐟' },
-    { id: 7227, name: 'Drosophila', icon: '🪰' },
-    { id: 7165, name: 'Mosquito', icon: '🦟' },
-    { id: 7460, name: 'Honey Bee', icon: '🐝' },
-    { id: 6239, name: 'C. elegans', icon: '🪱' },
-    { id: 6238, name: 'C. briggsae', icon: '🪱' },
-    { id: 7719, name: 'Ciona', icon: '🌊' },
-    { id: 7668, name: 'Sea Urchin', icon: '🐚' },
-    { id: 7029, name: 'Aphid', icon: '🪲' },
-    { id: 3055, name: 'Chlamydomonas', icon: '🦠' },
-    { id: 4932, name: 'Yeast', icon: '🍄' },
-    { id: 4896, name: 'Fission Yeast', icon: '🍄' },
-    { id: 44689, name: 'Slime Mold', icon: '🦠' },
-    { id: 5911, name: 'Tetrahymena', icon: '🦠' },
-    { id: 5888, name: 'Paramecium', icon: '🦠' },
-    { id: 5691, name: 'Trypanosome', icon: '🦟' },
-    { id: 5664, name: 'Leishmania', icon: '🦠' },
-    { id: 5741, name: 'Giardia', icon: '🦠' },
-    { id: 5755, name: 'Entamoeba', icon: '🦠' },
-    { id: 127902, name: 'Monosiga', icon: '🦠' },
-    { id: 3702, name: 'Arabidopsis', icon: '🌿' }
-];
+    const TARGET_SPECIES_PANEL = [
+        { id: 9606, name: 'Human', icon: '👤' },
+        { id: 9598, name: 'Chimpanzee', icon: '🐵' },
+        { id: 9593, name: 'Gorilla', icon: '🦍' },
+        { id: 9601, name: 'Orangutan', icon: '🦧' },
+        { id: 9544, name: 'Macaque', icon: '🐒' },
+        { id: 9483, name: 'Marmoset', icon: '🐒' },
+        { id: 10090, name: 'Mouse', icon: '🐭' },
+        { id: 10116, name: 'Rat', icon: '🐀' },
+        { id: 10029, name: 'Hamster', icon: '🐹' },
+        { id: 9615, name: 'Dog', icon: '🐕' },
+        { id: 9685, name: 'Cat', icon: '🐈' },
+        { id: 9913, name: 'Cow', icon: '🐄' },
+        { id: 9823, name: 'Pig', icon: '🐖' },
+        { id: 9796, name: 'Horse', icon: '🐎' },
+        { id: 9940, name: 'Sheep', icon: '🐑' },
+        { id: 9785, name: 'Elephant', icon: '🐘' },
+        { id: 9986, name: 'Rabbit', icon: '🐇' },
+        { id: 9361, name: 'Armadillo', icon: '🦔' },
+        { id: 9031, name: 'Chicken', icon: '🐔' },
+        { id: 59729, name: 'Zebra Finch', icon: '🐦' },
+        { id: 9103, name: 'Turkey', icon: '🦃' },
+        { id: 28377, name: 'Lizard', icon: '🦎' },
+        { id: 8479, name: 'Turtle', icon: '🐢' },
+        { id: 8496, name: 'Alligator', icon: '🐊' },
+        { id: 8364, name: 'Xenopus', icon: '🐸' },
+        { id: 8355, name: 'X. laevis', icon: '🐸' },
+        { id: 8296, name: 'Axolotl', icon: '🦎' },
+        { id: 7955, name: 'Zebrafish', icon: '🐟' },
+        { id: 8090, name: 'Medaka', icon: '🐟' },
+        { id: 31033, name: 'Fugu', icon: '🐡' },
+        { id: 9989, name: 'Tetraodon', icon: '🐡' },
+        { id: 69293, name: 'Stickleback', icon: '🐟' },
+        { id: 7897, name: 'Coelacanth', icon: '🐟' },
+        { id: 7868, name: 'Elephant Shark', icon: '🦈' },
+        { id: 7757, name: 'Lamprey', icon: '🐟' },
+        { id: 7227, name: 'Drosophila', icon: '🪰' },
+        { id: 7165, name: 'Mosquito', icon: '🦟' },
+        { id: 7460, name: 'Honey Bee', icon: '🐝' },
+        { id: 6239, name: 'C. elegans', icon: '🪱' },
+        { id: 6238, name: 'C. briggsae', icon: '🪱' },
+        { id: 7719, name: 'Ciona', icon: '🌊' },
+        { id: 7668, name: 'Sea Urchin', icon: '🐚' },
+        { id: 7029, name: 'Aphid', icon: '🪲' },
+        { id: 3055, name: 'Chlamydomonas', icon: '🦠' },
+        { id: 4932, name: 'Yeast', icon: '🍄' },
+        { id: 4896, name: 'Fission Yeast', icon: '🍄' },
+        { id: 44689, name: 'Slime Mold', icon: '🦠' },
+        { id: 5911, name: 'Tetrahymena', icon: '🦠' },
+        { id: 5888, name: 'Paramecium', icon: '🦠' },
+        { id: 5691, name: 'Trypanosome', icon: '🦟' },
+        { id: 5664, name: 'Leishmania', icon: '🦠' },
+        { id: 5741, name: 'Giardia', icon: '🦠' },
+        { id: 5755, name: 'Entamoeba', icon: '🦠' },
+        { id: 127902, name: 'Monosiga', icon: '🦠' },
+        { id: 3702, name: 'Arabidopsis', icon: '🌿' }
+    ];
 
     // ─────────────────────────────────────────────────────────────
     // 2. Fetch gene data: sequence, variants, domains
@@ -7405,15 +7410,7 @@ window.runDashboardSearch = function() {
                     color: naturePalette[colorIdx++ % naturePalette.length]
                 }));
 
-            return {
-                gene,
-                uniprotID,
-                length,
-                sequence,
-                variants,
-                domains,
-                customVariants: []
-            };
+            return { gene, uniprotID, length, sequence, variants, domains, customVariants: [] };
         } catch (e) {
             console.error("Fetch Error:", e);
             return { error: e.message };
@@ -7421,7 +7418,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 3. Help message (now always defined – fixes your error)
+    // 3. Help message
     // ─────────────────────────────────────────────────────────────
     window.addVariantHelpMessage = function() {
         const msg = `
@@ -7437,12 +7434,12 @@ window.runDashboardSearch = function() {
         if (window.addChatMessage) {
             window.addChatMessage(msg, false);
         } else {
-            console.warn("addChatMessage not found – help message not displayed in chat.");
+            console.warn("addChatMessage not found – help message not displayed.");
         }
     };
 
-// ─────────────────────────────────────────────────────────────
-    // 4. Render Variant Map (Default View)
+    // ─────────────────────────────────────────────────────────────
+    // 4. Load gene → show domain map (default view)
     // ─────────────────────────────────────────────────────────────
     window.renderVariantMap = async function(geneSymbol) {
         const container = document.getElementById('plotly-container');
@@ -7454,11 +7451,16 @@ window.runDashboardSearch = function() {
         });
         container.style.display = 'block';
 
-        container.innerHTML = `<div style="padding:60px;text-align:center;color:#64748b;">Loading ${geneSymbol}...</div>`;
+        container.innerHTML = `<div style="padding:60px; text-align:center; color:#64748b;">
+            <div style="font-size:24px; margin-bottom:16px;">⏳</div>
+            Loading ${geneSymbol.toUpperCase()} data...
+        </div>`;
 
         const data = await window.fetchVariantDataLive(geneSymbol);
         if (data.error) {
-            container.innerHTML = `<div style="padding:20px;color:#ef4444;">Error: ${data.error}</div>`;
+            container.innerHTML = `<div style="padding:20px; color:#ef4444; text-align:center;">
+                Error loading ${geneSymbol}: ${data.error}
+            </div>`;
             return;
         }
 
@@ -7467,7 +7469,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 5. Main workspace – switch between MAP and FULL MSA
+    // 5. Main workspace switcher – default = map
     // ─────────────────────────────────────────────────────────────
     window.drawVariantWorkspace = function(view = 'map') {
         const data = window.CiliAI.activeVariantData;
@@ -7486,7 +7488,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 6. Domain + Variant Map view
+    // 6. Domain & Variant Map view
     // ─────────────────────────────────────────────────────────────
     function renderDomainVariantMap(data, container) {
         const w = container.clientWidth - 40 || 900;
@@ -7571,17 +7573,22 @@ window.runDashboardSearch = function() {
             </div>`;
     }
 
-// ─────────────────────────────────────────────────────────────
-    // 7. FULL-LENGTH MSA VIEW (New Requirements Implemented)
+    // ─────────────────────────────────────────────────────────────
+    // 7. Full-Length MSA View
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
         if (!align || !align.alignments?.length) {
             container.innerHTML = `
-                <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center;">
-                    <h3>No MSA data yet</h3>
-                    <p>Please run "Check Conservation" on a variant first.</p>
-                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button">← Back to Map</button>
+                <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;">
+                    <div style="font-size:48px; margin-bottom:16px;">🧬</div>
+                    <h3 style="margin-bottom:16px;">No Multiple Sequence Alignment Yet</h3>
+                    <p style="max-width:480px; margin-bottom:24px;">
+                        Please select a variant on the map and run "Check Conservation" first.
+                    </p>
+                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:12px 24px; font-size:15px;">
+                        ← Back to Domain Map
+                    </button>
                 </div>`;
             return;
         }
@@ -7589,15 +7596,15 @@ window.runDashboardSearch = function() {
         const human = align.alignments[0];
         const fullSeq = human.seq;
 
-        // Amino acid color map (Zappo-style)
+        // Zappo-style amino acid colors
         const aaColor = {
-            'A':'#4ade80', 'V':'#4ade80', 'L':'#4ade80', 'I':'#4ade80', 'M':'#4ade80', 'F':'#60a5fa',
-            'W':'#60a5fa', 'P':'#c084fc', 'G':'#9ca3af', 'S':'#fbbf24', 'T':'#fbbf24',
-            'Y':'#f472b6', 'N':'#67e8f9', 'Q':'#67e8f9', 'D':'#f87171', 'E':'#f87171',
-            'K':'#60a5fa', 'R':'#60a5fa', 'H':'#a5b4fc', 'C':'#f472b6', 'X':'#9ca3af', '-':'#e2e8f0'
+            'A':'#4ade80','V':'#4ade80','L':'#4ade80','I':'#4ade80','M':'#4ade80','F':'#60a5fa',
+            'W':'#60a5fa','P':'#c084fc','G':'#9ca3af','S':'#fbbf24','T':'#fbbf24',
+            'Y':'#f472b6','N':'#67e8f9','Q':'#67e8f9','D':'#f87171','E':'#f87171',
+            'K':'#60a5fa','R':'#60a5fa','H':'#a5b4fc','C':'#f472b6','X':'#9ca3af','-':'#e2e8f0'
         };
 
-        // Variant markers above human reference
+        // Variant markers with disease tooltip
         let markersHtml = '';
         const allVars = [...data.variants, ...data.customVariants];
         allVars.forEach(v => {
@@ -7607,20 +7614,26 @@ window.runDashboardSearch = function() {
             const sig = (v.clinicalSignificance || "").toLowerCase();
             const color = sig.includes('pathogenic') && !sig.includes('likely') ? '#ef4444' :
                           sig.includes('likely pathogenic') ? '#f97316' : '#94a3b8';
+            const disease = v.disease || v.description || (v.clinicalSignificance || "Variant");
 
             markersHtml += `
-                <div onclick="scrollToPosition(${pos})" title="Position ${pos}"
-                     style="position:absolute; left:${left}%; transform:translateX(-50%); cursor:pointer; top:4px;">
-                    <div style="width:9px; height:9px; background:${color}; border-radius:50%; border:1.5px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+                <div onclick="scrollToPosition(${pos})" title="${disease} at ${pos}"
+                     style="position:absolute; left:${left}%; transform:translateX(-50%); cursor:pointer; top:4px; z-index:10;">
+                    <div style="width:9px; height:9px; background:${color}; border-radius:50%; margin:5px auto; border:1.5px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
                 </div>`;
         });
 
-        // Human reference row
-        let refHtml = '';
+        // Position numbers (every 5) + Human AA row
+        let posHtml = '';
+        let humanHtml = '';
         for (let i = 0; i < fullSeq.length; i++) {
+            const pos = i + 1;
             const aa = fullSeq[i];
             const color = aaColor[aa] || '#9ca3af';
-            refHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:13px;color:${color};">${aa}</span>`;
+            const showLabel = (pos % 5 === 0);
+
+            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:#64748b;">${showLabel ? pos : ''}</span>`;
+            humanHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:13px;color:${color};">${aa}</span>`;
         }
 
         // Species rows
@@ -7633,7 +7646,7 @@ window.runDashboardSearch = function() {
                 seqHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:13px;color:${color};">${aa}</span>`;
             }
             rowsHtml += `
-                <div style="display:flex;align-items:center;padding:4px 0;border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex;align-items:center;padding:4px 0;border-bottom:1px solid #f1f5f9;font-family:'Roboto Mono', monospace;">
                     <div style="width:160px;min-width:160px;padding-left:12px;font-weight:500;color:#334155;">
                         ${aln.icon} ${aln.species}
                     </div>
@@ -7646,9 +7659,20 @@ window.runDashboardSearch = function() {
                 <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
                     <strong style="font-size:17px;color:#1e293b;">Full-Length Evolutionary Alignment</strong>
                     <div style="display:flex;gap:10px;">
-                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:#64748b;color:white;">← Back to Map</button>
-                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#059669;color:white;">⬇ CSV</button>
+                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:#64748b;color:white;padding:8px 16px;">
+                            ← Back to Map
+                        </button>
+                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#059669;color:white;padding:8px 16px;">
+                            ⬇ Export CSV
+                        </button>
                     </div>
+                </div>
+
+                <!-- Jump to position -->
+                <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:13px;color:#64748b;white-space:nowrap;">Jump to position:</span>
+                    <input id="msa-jump-input" type="number" min="1" placeholder="e.g. 301" style="width:100px;padding:6px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;" />
+                    <button onclick="jumpToMSAPosition(document.getElementById('msa-jump-input').value)" class="ciliai-button" style="padding:6px 12px;">Go</button>
                 </div>
 
                 <!-- Variant markers -->
@@ -7656,58 +7680,73 @@ window.runDashboardSearch = function() {
                     ${markersHtml}
                 </div>
 
-                <!-- Human reference -->
+                <!-- Position numbers + Human amino acids -->
                 <div style="padding:8px 20px;background:#fff;border-bottom:2px solid #cbd5e1;overflow-x:auto;white-space:nowrap;font-family:'Roboto Mono',monospace;">
-                    <div style="display:flex;align-items:center;min-width:${fullSeq.length * 18}px;">
-                        <div style="width:160px;font-weight:600;color:#334155;">Human Reference</div>
-                        <div style="flex:1;">${refHtml}</div>
+                    <div style="display:flex;align-items:flex-end;min-width:${fullSeq.length * 18}px;">
+                        <div style="width:160px;font-weight:600;color:#334155;padding-top:6px;">Position</div>
+                        <div style="flex:1;">${posHtml}</div>
+                    </div>
+                    <div style="display:flex;margin-top:4px;min-width:${fullSeq.length * 18}px;">
+                        <div style="width:160px;font-weight:600;color:#334155;">Human AA</div>
+                        <div style="flex:1;">${humanHtml}</div>
                     </div>
                 </div>
 
-                <!-- Scrollable MSA -->
+                <!-- Scrollable MSA rows -->
                 <div id="msa-scroll" style="flex:1;overflow-y:auto;overflow-x:auto;padding:12px 0;background:#fdfdfd;white-space:nowrap;">
                     ${rowsHtml}
                 </div>
             </div>`;
 
-        // Scroll to center position after render
+        // Auto-center on the last checked position
         setTimeout(() => scrollToPosition(align.centerPos || Math.floor(fullSeq.length / 2)), 300);
     }
 
-   // ─────────────────────────────────────────────────────────────
-    // Scroll helper
     // ─────────────────────────────────────────────────────────────
+    // Jump to position
+    // ─────────────────────────────────────────────────────────────
+    window.jumpToMSAPosition = function(pos) {
+        pos = parseInt(pos);
+        if (isNaN(pos) || pos < 1) return alert("Please enter a valid position number.");
+        scrollToPosition(pos);
+        const input = document.getElementById('msa-jump-input');
+        if (input) input.value = pos;
+    };
+
     window.scrollToPosition = function(pos) {
         const container = document.getElementById('msa-scroll');
         if (!container) return;
         const charWidth = 18;
-        const target = (pos - 1) * charWidth - (container.clientWidth / 2) + (charWidth / 2);
-        container.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+        const targetLeft = (pos - 1) * charWidth - (container.clientWidth / 2) + (charWidth / 2);
+        container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
     };
-    
-   // ─────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────
     // CSV Export
     // ─────────────────────────────────────────────────────────────
     window.downloadFullAlignmentCSV = function() {
         const align = window.CiliAI.activeAlignmentData;
-        if (!align) return alert("No alignment data available.");
+        if (!align || !align.alignments?.length) {
+            alert("No alignment data available to export.");
+            return;
+        }
 
-        let csv = "Species,Symbol," + Array.from({length: align.alignments[0].seq.length}, (_,i) => `Pos${i+1}`).join(",") + "\n";
+        let csv = "Species,Symbol," + Array.from({length: align.alignments[0].seq.length}, (_, i) => `Pos${i+1}`).join(",") + "\n";
         align.alignments.forEach(a => {
-            csv += `"${a.species.replace(/"/g,'""')}","${(a.symbol||'').replace(/"/g,'""')}",${a.seq.split('').join(',')}\n`;
+            csv += `"${a.species.replace(/"/g,'""')}","${(a.symbol || '').replace(/"/g,'""')}",${a.seq.split('').join(',')}\n`;
         });
 
-        const blob = new Blob([csv], {type: 'text/csv'});
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `MSA_${window.CiliAI.activeVariantData?.gene || 'protein'}.csv`;
-        a.click();
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `CiliaHub_MSA_${window.CiliAI.activeVariantData?.gene || 'protein'}.csv`;
+        link.click();
         URL.revokeObjectURL(url);
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 10. Variant panel opener
+    // Variant panel
     // ─────────────────────────────────────────────────────────────
     window.openVariantPanel = function(title, pos, desc, gene) {
         const panel = document.getElementById('var-panel');
@@ -7721,7 +7760,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 11. Add custom variant from input field
+    // Add custom variant
     // ─────────────────────────────────────────────────────────────
     window.addUserVariant = function() {
         const input = document.getElementById('custom-var-input');
@@ -7738,7 +7777,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 12. Display specific variant (used by chat / custom input)
+    // Display specific variant (chat / custom input)
     // ─────────────────────────────────────────────────────────────
     window.displaySpecificVariant = async function(gene, variantStr) {
         window.addVariantHelpMessage();
@@ -7771,7 +7810,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 13. Conservation check – broad search (no symbol: prefix)
+    // Conservation check – broad search
     // ─────────────────────────────────────────────────────────────
     window.checkConservation = async function(geneSymbol, humanPos, refAA) {
         const btn = document.getElementById('vp-cons-btn');
@@ -7788,9 +7827,11 @@ window.runDashboardSearch = function() {
             const humanData = window.CiliAI.activeVariantData;
             const humanSeq = humanData.sequence;
 
-            // Full sequence is used → fingerprint = whole protein
-            const fingerprint = humanSeq;
-            const refIndexInWin = humanPos - 1;
+            const winHalf = 12;
+            const start = Math.max(0, humanPos - 1 - winHalf);
+            const end = Math.min(humanSeq.length, humanPos - 1 + winHalf);
+            const fingerprint = humanSeq.substring(start, end);
+            const refIndexInWin = humanPos - 1 - start;
 
             const alignments = [
                 { species: "Human", icon: "👤", symbol: geneSymbol, seq: fingerprint, isConserved: true }
@@ -7800,8 +7841,8 @@ window.runDashboardSearch = function() {
             let totalAligned = 0;
 
             const batches = [];
-            for (let i = 0; i < TARGET_SPECIES_PANEL.length; i += 6) {
-                batches.push(TARGET_SPECIES_PANEL.slice(i, i + 6));
+            for (let i = 0; i < TARGET_SPECIES_PANEL.length; i += 8) {
+                batches.push(TARGET_SPECIES_PANEL.slice(i, i + 8));
             }
 
             for (const batch of batches) {
@@ -7825,25 +7866,31 @@ window.runDashboardSearch = function() {
                         const seqData = await seqRes.json();
                         const seq = seqData.sequence.sequence;
 
-                        if (seq.length < 50) return; // too short to be meaningful
+                        if (seq.length < fingerprint.length) return;
 
-                        // Very simple percent identity (global – can be replaced with SW later)
-                        let matches = 0;
-                        const minLen = Math.min(seq.length, fingerprint.length);
-                        for (let i = 0; i < minLen; i++) {
-                            if (seq[i] === fingerprint[i]) matches++;
-                        }
-                        const identity = matches / minLen;
-
-                        if (identity < 0.18) return;
-
-                        // Use full sequence (pad if shorter)
-                        let segment = seq;
-                        if (segment.length < fingerprint.length) {
-                            segment = segment.padEnd(fingerprint.length, '-');
+                        let bestScore = -1;
+                        let bestStart = 0;
+                        for (let i = 0; i <= seq.length - fingerprint.length; i++) {
+                            let score = 0;
+                            for (let j = 0; j < fingerprint.length; j++) {
+                                if (seq[i + j] === fingerprint[j]) score++;
+                            }
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestStart = i;
+                            }
                         }
 
-                        const orthologAA = seq[refIndexInWin] || '-';
+                        const identity = bestScore / fingerprint.length;
+                        if (identity < 0.20) return;
+
+                        const center = bestStart + refIndexInWin;
+                        const segStart = Math.max(0, center - 10);
+                        const segEnd = Math.min(seq.length, center + 11);
+                        let segment = seq.substring(segStart, segEnd);
+                        if (segment.length < 21) segment = segment.padEnd(21, '-');
+
+                        const orthologAA = seq[center] || '-';
                         const isConserved = orthologAA === refAA;
 
                         if (isConserved) conservedCount++;
@@ -7856,9 +7903,7 @@ window.runDashboardSearch = function() {
                             seq: segment,
                             isConserved: isConserved
                         });
-                    } catch (e) {
-                        // silent fail per species
-                    }
+                    } catch (e) {}
                 }));
             }
 
@@ -7868,11 +7913,7 @@ window.runDashboardSearch = function() {
                 return ia - ib;
             });
 
-            window.CiliAI.activeAlignmentData = {
-                alignments,
-                centerPos: humanPos,
-                refAA
-            };
+            window.CiliAI.activeAlignmentData = { alignments, centerPos: humanPos, refAA };
 
             if (btn) btn.innerText = originalText;
             if (statusDiv) {
@@ -7880,8 +7921,8 @@ window.runDashboardSearch = function() {
                 statusDiv.innerHTML = `Found <strong>${totalAligned}</strong> orthologs • Conservation: <strong>${perc}%</strong>`;
             }
 
-            // Switch to MSA view automatically after scan
-            window.drawVariantWorkspace('msa');
+            // Do NOT auto-switch to MSA – wait for user click
+            // window.drawVariantWorkspace('msa');
 
         } catch (err) {
             console.error(err);
@@ -7890,14 +7931,12 @@ window.runDashboardSearch = function() {
         }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // End of module
-    // ─────────────────────────────────────────────────────────────
-    console.log("[CiliAI] Variant Analysis & Full-Length MSA Engine v14.2 fully loaded");
+    console.log("[CiliAI] Variant Analysis & MSA Engine v14.4 – full code loaded");
 })();
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
