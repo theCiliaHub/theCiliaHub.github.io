@@ -5787,7 +5787,7 @@ const intentHandlers = [
         }
     },
 
-    // 16. Live Variant Handler (Highest Priority Variant Check)
+  // 16. Live Variant Handler (Highest Priority Variant Check)
     {
         priority: 17,
         matcher: (qLower) => qLower.includes('variant') || qLower.includes('mutation') || qLower.includes('clinvar'),
@@ -5806,7 +5806,7 @@ const intentHandlers = [
                     
                     <ul style="font-size:13px; color:#475569; padding-left:20px; line-height:1.6;">
                         <li><strong>Visualize Variants:</strong> See Pathogenic (Red) and Uncertain (Gray) variants mapped to protein domains.</li>
-                        <li><strong>Check Conservation:</strong> Click any variant, then click <strong>"Check Conservation"</strong> to compare across 7 species.</li>
+                        <li><strong>Check Conservation:</strong> Click any variant, then click <strong>"Check Conservation"</strong> to compare across 65 species.</li>
                         <li><strong>3D Structure:</strong> Click <strong>"View 3D Structure"</strong> to see where the mutation sits on the AlphaFold protein model.</li>
                         <li><strong>Custom Variants:</strong> Add your own mutation (e.g., <em>p.L301R</em>) using the "Add" panel at the bottom.</li>
                     </ul>
@@ -8561,6 +8561,7 @@ window.downloadMSA = function(gene, pos, alignmentsStr) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
