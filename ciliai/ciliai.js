@@ -7292,7 +7292,7 @@ window.runDashboardSearch = function() {
         }).join('');
 };
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v13.0 - Brute Force Discovery)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v14.0 - Smart Alias Discovery)
  * ============================================================== */
 
 (function() {
@@ -7605,7 +7605,7 @@ window.runDashboardSearch = function() {
         const originalBtnText = btn ? btn.innerText : "🌍 Check Conservation";
         
         if(btn) btn.innerText = "⏳ Deep Scanning...";
-        if(statusDiv) statusDiv.innerHTML = `Running <strong>Brute Force Scan</strong> (checking aliases)... <br><span style="font-size:10px;color:#666;">This scans 65 genomes individually.</span>`;
+        if(statusDiv) statusDiv.innerHTML = `Running <strong>Smart Fallback Scan</strong>... <br><span style="font-size:10px;color:#666;">Checking aliases (e.g. osm-5)...</span>`;
         
         try {
             // 1. Get Human Ref & HomoloGene ID
@@ -7615,7 +7615,36 @@ window.runDashboardSearch = function() {
             const humanRes = window.CiliAI.activeVariantData;
             const humanSeq = humanRes.sequence;
             
-            // 2. Prepare Alignment Window
+            // Fetch HomoloGene ID
+            const geneInfoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
+            const geneInfo = await geneInfoRes.json();
+            const hID = geneInfo.hits?.[0]?.homologene?.id;
+
+            // 2. Prepare Batch Queries
+            const targets = TARGET_SPECIES_PANEL;
+            const allTaxIds = targets.map(t => t.id);
+            let hits = [];
+
+            // QUERY A: HomoloGene Search (Reliable)
+            if (hID) {
+                const homRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=uniprot,taxid,symbol&size=200`);
+                const homData = await homRes.json();
+                if (homData.hits) hits = [...homData.hits];
+            }
+
+            // QUERY B: Symbol/Alias Search (Smart Fallback)
+            const foundTaxIds = new Set(hits.map(h => h.taxid));
+            const missingTaxIds = allTaxIds.filter(id => !foundTaxIds.has(id));
+
+            if (missingTaxIds.length > 0) {
+                // IMPORTANT: Search for 'alias' or 'name' matches too
+                const taxStr = missingTaxIds.join(',');
+                const symRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol} OR alias:${geneSymbol}&species=${taxStr}&fields=uniprot,taxid,symbol&size=100`);
+                const symData = await symRes.json();
+                if (symData.hits) hits = [...hits, ...symData.hits];
+            }
+
+            // 3. Process Alignments
             const alignments = [];
             const windowSize = 25; 
             const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
@@ -7632,26 +7661,16 @@ window.runDashboardSearch = function() {
             let conservedCount = 0;
             let totalAligned = 0;
 
-            // 3. Brute Force Discovery: Search for symbol in each species individually
-            const targets = TARGET_SPECIES_PANEL;
             const processSpecies = async (t) => {
                 if(t.name === 'Human') return;
-                
+                const match = hits.find(h => h.taxid === t.id);
+                if (!match || !match.uniprot) return;
+
+                let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
+                const finalUID = Array.isArray(uID) ? uID[0] : uID;
+                if (!finalUID) return;
+
                 try {
-                    // BROAD SEARCH: "q=IFT88" in this specific TaxID
-                    // This catches orthologs even if they have different names (like osm-5)
-                    // because the symbol usually appears in the record description/alias.
-                    const qUrl = `https://mygene.info/v3/query?q=${geneSymbol}&species=${t.id}&fields=uniprot,symbol&size=1`;
-                    const res = await fetch(qUrl);
-                    const data = await res.json();
-                    
-                    const match = data.hits?.[0];
-                    if (!match || !match.uniprot) return;
-
-                    let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
-                    const finalUID = Array.isArray(uID) ? uID[0] : uID;
-                    if (!finalUID) return;
-
                     const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
                     if(sRes.ok) {
                         const sData = await sRes.json();
@@ -7659,7 +7678,6 @@ window.runDashboardSearch = function() {
                         
                         if (seq.length < humanFingerprint.length) return;
 
-                        // Align
                         let bestScore = -1;
                         let bestIdx = -1;
                         for(let i=0; i <= seq.length - humanFingerprint.length; i++) {
@@ -7671,7 +7689,6 @@ window.runDashboardSearch = function() {
                             if (score === humanFingerprint.length) break; 
                         }
                         
-                        // 20% Threshold
                         if ((bestScore/humanFingerprint.length) >= 0.20) {
                             const center = bestIdx + (windowSize/2);
                             const segStart = Math.max(0, center - 10);
@@ -7693,7 +7710,6 @@ window.runDashboardSearch = function() {
                 } catch(e) { }
             };
 
-            // Run in parallel
             await Promise.allSettled(targets.map(t => processSpecies(t)));
 
             alignments.sort((a, b) => {
@@ -7726,8 +7742,10 @@ window.runDashboardSearch = function() {
     window.displaySpecificVariant = async function(gene, variantStr) {
         window.addVariantHelpMessage();
         await window.renderVariantMap(gene);
+        
+        // Supports L301R, p.L301R, or p.Leu301Arg
         const cleanStr = variantStr.replace(/^p\./i, '');
-        const match = cleanStr.match(/^([A-Za-z]+)(\d+)([A-Za-z*]+)$/);
+        const match = cleanStr.match(/^([A-Za-z]{1,3})(\d+)([A-Za-z*]{1,3})$/);
         
         if (match && window.CiliAI.activeVariantData) {
             const pos = parseInt(match[2]);
@@ -7925,9 +7943,7 @@ window.runDashboardSearch = function() {
     console.log("[CiliAI] 3D Viewer module loaded.");
 })();
 
-
-
-
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
