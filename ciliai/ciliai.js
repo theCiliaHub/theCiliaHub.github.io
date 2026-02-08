@@ -7441,30 +7441,24 @@ window.runDashboardSearch = function() {
         }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 4. Load gene → show domain map
+// ─────────────────────────────────────────────────────────────
+    // 4. Render Variant Map (Default View)
     // ─────────────────────────────────────────────────────────────
     window.renderVariantMap = async function(geneSymbol) {
         const container = document.getElementById('plotly-container');
         if (!container) return;
 
-        // Hide other views if they exist
-        ['cilia-svg', 'domain-viewer', 'msa-result-area'].forEach(id => {
+        ['cilia-svg', 'domain-viewer'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
         container.style.display = 'block';
 
-        container.innerHTML = `<div style="padding:60px; text-align:center; color:#64748b;">
-            <div style="font-size:24px; margin-bottom:16px;">⏳</div>
-            Loading ${geneSymbol.toUpperCase()} data...
-        </div>`;
+        container.innerHTML = `<div style="padding:60px;text-align:center;color:#64748b;">Loading ${geneSymbol}...</div>`;
 
         const data = await window.fetchVariantDataLive(geneSymbol);
         if (data.error) {
-            container.innerHTML = `<div style="padding:20px; color:#ef4444; text-align:center;">
-                Error loading ${geneSymbol}: ${data.error}
-            </div>`;
+            container.innerHTML = `<div style="padding:20px;color:#ef4444;">Error: ${data.error}</div>`;
             return;
         }
 
@@ -7577,166 +7571,138 @@ window.runDashboardSearch = function() {
             </div>`;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 7. Full-Length MSA View
+// ─────────────────────────────────────────────────────────────
+    // 7. FULL-LENGTH MSA VIEW (New Requirements Implemented)
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
         if (!align || !align.alignments?.length) {
             container.innerHTML = `
-                <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;">
-                    <div style="font-size:48px; margin-bottom:16px;">🧬</div>
-                    <h3 style="margin-bottom:16px;">No Multiple Sequence Alignment Yet</h3>
-                    <p style="max-width:480px; margin-bottom:24px;">
-                        Please select a variant on the map and run "Check Conservation" first to generate the evolutionary alignment across species.
-                    </p>
-                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:12px 24px; font-size:15px;">
-                        ← Back to Domain Map
-                    </button>
+                <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center;">
+                    <h3>No MSA data yet</h3>
+                    <p>Please run "Check Conservation" on a variant first.</p>
+                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button">← Back to Map</button>
                 </div>`;
             return;
         }
 
         const human = align.alignments[0];
         const fullSeq = human.seq;
-        const centerPos = align.centerPos || Math.floor(fullSeq.length / 2);
 
-        // Variant markers row (click to jump)
+        // Amino acid color map (Zappo-style)
+        const aaColor = {
+            'A':'#4ade80', 'V':'#4ade80', 'L':'#4ade80', 'I':'#4ade80', 'M':'#4ade80', 'F':'#60a5fa',
+            'W':'#60a5fa', 'P':'#c084fc', 'G':'#9ca3af', 'S':'#fbbf24', 'T':'#fbbf24',
+            'Y':'#f472b6', 'N':'#67e8f9', 'Q':'#67e8f9', 'D':'#f87171', 'E':'#f87171',
+            'K':'#60a5fa', 'R':'#60a5fa', 'H':'#a5b4fc', 'C':'#f472b6', 'X':'#9ca3af', '-':'#e2e8f0'
+        };
+
+        // Variant markers above human reference
         let markersHtml = '';
         const allVars = [...data.variants, ...data.customVariants];
         allVars.forEach(v => {
             const pos = parseInt(v.begin);
             if (pos < 1 || pos > fullSeq.length) return;
-            const pct = ((pos - 1) / fullSeq.length) * 100;
+            const left = ((pos - 1) / fullSeq.length) * 100;
             const sig = (v.clinicalSignificance || "").toLowerCase();
             const color = sig.includes('pathogenic') && !sig.includes('likely') ? '#ef4444' :
                           sig.includes('likely pathogenic') ? '#f97316' : '#94a3b8';
 
             markersHtml += `
-                <div title="Position ${pos} – click to scroll here"
-                     onclick="scrollToPosition(${pos})"
-                     style="position:absolute; left:${pct}%; transform:translateX(-50%); top:4px; width:20px; height:20px; cursor:pointer; z-index:10;">
-                    <div style="width:10px; height:10px; background:${color}; border-radius:50%; margin:5px auto; border:1.5px solid white; box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>
+                <div onclick="scrollToPosition(${pos})" title="Position ${pos}"
+                     style="position:absolute; left:${left}%; transform:translateX(-50%); cursor:pointer; top:4px;">
+                    <div style="width:9px; height:9px; background:${color}; border-radius:50%; border:1.5px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
                 </div>`;
         });
 
-        // Reference sequence + conservation histogram
+        // Human reference row
         let refHtml = '';
-        let consHtml = '';
         for (let i = 0; i < fullSeq.length; i++) {
             const aa = fullSeq[i];
-            const pos = i + 1;
-            const isCenter = pos === centerPos;
-            refHtml += `<span style="display:inline-block; width:18px; text-align:center; font-size:13px; color:#1e293b; ${isCenter ? 'font-weight:bold; border-bottom:2px solid #000;' : ''}">${aa}</span>`;
-
-            let matchCount = 0;
-            align.alignments.forEach(a => { if (a.seq[i] === aa && a.seq[i] !== '-') matchCount++; });
-            const pct = (matchCount / align.alignments.length) * 100;
-            consHtml += `<span style="display:inline-block; width:18px; height:${pct * 0.6}px; background:linear-gradient(to top, #3b82f6, #60a5fa); vertical-align:bottom;"></span>`;
+            const color = aaColor[aa] || '#9ca3af';
+            refHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:13px;color:${color};">${aa}</span>`;
         }
 
         // Species rows
         let rowsHtml = '';
-        align.alignments.slice(1).forEach(aln => {
+        align.alignments.forEach(aln => {
             let seqHtml = '';
             for (let i = 0; i < aln.seq.length; i++) {
-                const char = aln.seq[i];
-                const match = char === fullSeq[i] && char !== '-';
-                seqHtml += `<span style="display:inline-block; width:18px; text-align:center; font-size:13px; color:${match ? '#0f766e' : '#9ca3af'}; ${match ? 'font-weight:600;' : ''}">${char}</span>`;
+                const aa = aln.seq[i];
+                const color = aaColor[aa] || '#9ca3af';
+                seqHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:13px;color:${color};">${aa}</span>`;
             }
             rowsHtml += `
-                <div style="display:flex; align-items:center; padding:4px 0; border-bottom:1px solid #f1f5f9; font-family:'Roboto Mono', monospace;">
-                    <div style="width:160px; min-width:160px; padding-left:12px; font-weight:500; color:#334155;">
+                <div style="display:flex;align-items:center;padding:4px 0;border-bottom:1px solid #f1f5f9;">
+                    <div style="width:160px;min-width:160px;padding-left:12px;font-weight:500;color:#334155;">
                         ${aln.icon} ${aln.species}
-                        <div style="font-size:11px; color:#64748b;">${aln.symbol || '—'}</div>
                     </div>
-                    <div style="flex:1; white-space:nowrap; overflow:hidden;">${seqHtml}</div>
+                    <div style="flex:1;white-space:nowrap;overflow:hidden;">${seqHtml}</div>
                 </div>`;
         });
 
         container.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; font-family:'Inter', sans-serif; background:#fdfdfd;">
-                <!-- Header -->
-                <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-                    <div>
-                        <strong style="font-size:17px; color:#1e293b;">Full-Length Evolutionary Alignment</strong>
-                        <div style="font-size:13px; color:#64748b; margin-top:4px;">
-                            ${align.alignments.length} species • ${fullSeq.length} residues • centered on position ${centerPos}
-                        </div>
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:#64748b; color:white; padding:8px 16px;">
-                            ← Back to Map
-                        </button>
-                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#059669; color:white; padding:8px 16px;">
-                            ⬇ Export CSV
-                        </button>
+            <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif;background:#fdfdfd;">
+                <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                    <strong style="font-size:17px;color:#1e293b;">Full-Length Evolutionary Alignment</strong>
+                    <div style="display:flex;gap:10px;">
+                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:#64748b;color:white;">← Back to Map</button>
+                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#059669;color:white;">⬇ CSV</button>
                     </div>
                 </div>
 
-                <!-- Variant marker row -->
-                <div style="position:relative; height:28px; background:#fff; border-bottom:1px solid #e2e8f0; overflow:hidden;">
+                <!-- Variant markers -->
+                <div style="position:relative;height:28px;background:#fff;border-bottom:1px solid #e2e8f0;overflow:hidden;">
                     ${markersHtml}
                 </div>
 
-                <!-- Reference sequence + conservation bar -->
-                <div style="padding:8px 20px; background:#fff; border-bottom:2px solid #cbd5e1; overflow-x:auto; white-space:nowrap; font-family:'Roboto Mono',monospace;">
-                    <div style="display:flex; align-items:flex-end; min-width:${fullSeq.length * 18}px;">
-                        <div style="width:160px; font-weight:600; color:#334155; padding-top:6px;">Human Reference</div>
+                <!-- Human reference -->
+                <div style="padding:8px 20px;background:#fff;border-bottom:2px solid #cbd5e1;overflow-x:auto;white-space:nowrap;font-family:'Roboto Mono',monospace;">
+                    <div style="display:flex;align-items:center;min-width:${fullSeq.length * 18}px;">
+                        <div style="width:160px;font-weight:600;color:#334155;">Human Reference</div>
                         <div style="flex:1;">${refHtml}</div>
-                    </div>
-                    <div style="display:flex; margin-top:4px; min-width:${fullSeq.length * 18}px;">
-                        <div style="width:160px;"></div>
-                        <div style="flex:1;">${consHtml}</div>
                     </div>
                 </div>
 
-                <!-- Scrollable species rows -->
-                <div id="msa-scroll" style="flex:1; overflow-y:auto; overflow-x:auto; padding:12px 0; background:#fdfdfd;">
+                <!-- Scrollable MSA -->
+                <div id="msa-scroll" style="flex:1;overflow-y:auto;overflow-x:auto;padding:12px 0;background:#fdfdfd;white-space:nowrap;">
                     ${rowsHtml}
                 </div>
             </div>`;
 
-        // Auto-center on the queried position after render
-        setTimeout(() => scrollToPosition(centerPos), 400);
+        // Scroll to center position after render
+        setTimeout(() => scrollToPosition(align.centerPos || Math.floor(fullSeq.length / 2)), 300);
     }
 
+   // ─────────────────────────────────────────────────────────────
+    // Scroll helper
     // ─────────────────────────────────────────────────────────────
-    // 8. Scroll helper – center given position in MSA view
-    // ─────────────────────────────────────────────────────────────
-    function scrollToPosition(pos) {
+    window.scrollToPosition = function(pos) {
         const container = document.getElementById('msa-scroll');
         if (!container) return;
-
-        const charWidth = 18; // must match the span width above
-        const targetLeft = (pos - 1) * charWidth - (container.clientWidth / 2) + (charWidth / 2);
-        container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // 9. CSV export for full MSA
+        const charWidth = 18;
+        const target = (pos - 1) * charWidth - (container.clientWidth / 2) + (charWidth / 2);
+        container.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+    };
+    
+   // ─────────────────────────────────────────────────────────────
+    // CSV Export
     // ─────────────────────────────────────────────────────────────
     window.downloadFullAlignmentCSV = function() {
         const align = window.CiliAI.activeAlignmentData;
-        if (!align || !align.alignments?.length) {
-            alert("No alignment data available to export.");
-            return;
-        }
+        if (!align) return alert("No alignment data available.");
 
-        let csv = "Species,Symbol,";
-        csv += Array.from({length: align.alignments[0].seq.length}, (_, i) => `Pos${i+1}`).join(",") + "\n";
-
+        let csv = "Species,Symbol," + Array.from({length: align.alignments[0].seq.length}, (_,i) => `Pos${i+1}`).join(",") + "\n";
         align.alignments.forEach(a => {
-            csv += `"${a.species.replace(/"/g,'""')}","${(a.symbol || '').replace(/"/g,'""')}",`;
-            csv += a.seq.split('').map(c => `"${c}"`).join(",") + "\n";
+            csv += `"${a.species.replace(/"/g,'""')}","${(a.symbol||'').replace(/"/g,'""')}",${a.seq.split('').join(',')}\n`;
         });
 
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([csv], {type: 'text/csv'});
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `CiliaHub_MSA_${window.CiliAI.activeVariantData?.gene || 'protein'}.csv`;
-        link.click();
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `MSA_${window.CiliAI.activeVariantData?.gene || 'protein'}.csv`;
+        a.click();
         URL.revokeObjectURL(url);
     };
 
@@ -7932,6 +7898,7 @@ window.runDashboardSearch = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
