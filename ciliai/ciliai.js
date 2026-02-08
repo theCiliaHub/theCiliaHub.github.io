@@ -7669,7 +7669,7 @@ window.downloadCurrentVisualization = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v11.0 - Integrated)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v12.0 - Fixed & Integrated)
  * ============================================================== */
 
 (function() {
@@ -7677,8 +7677,8 @@ window.downloadCurrentVisualization = function() {
 
     // --- GLOBAL DATA STORAGE ---
     window.CiliAI = window.CiliAI || {};
-    window.CiliAI.activeVariantData = null; // Stores Gene, Domains, Variants
-    window.CiliAI.activeAlignmentData = null; // Stores Deep Scan results (65 species)
+    window.CiliAI.activeVariantData = null; 
+    window.CiliAI.activeAlignmentData = null; 
 
     // 1. SPECIES PANEL (65 Organisms)
     const TARGET_SPECIES_PANEL = [
@@ -7775,7 +7775,6 @@ window.downloadCurrentVisualization = function() {
 
     // --- 4. VIEW 1: DOMAIN MAP RENDERER ---
     window.renderVariantMap = async function(geneSymbol) {
-        // Prepare container
         ['cilia-svg', 'domain-viewer', 'var-panel'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
@@ -7807,7 +7806,6 @@ window.downloadCurrentVisualization = function() {
         const allLikely = data.variants.filter(isLikely);
         let displayVars = [...allPatho, ...allLikely];
         
-        // Fill up to 50
         if (displayVars.length < 50) {
             const others = data.variants.filter(v => !isPatho(v) && !isLikely(v));
             displayVars = [...displayVars, ...others.slice(0, 50 - displayVars.length)];
@@ -7818,19 +7816,15 @@ window.downloadCurrentVisualization = function() {
         const w = container.clientWidth - 40 || 800;
         const h = 450;
         const pad = 40;
-        const trackY = 200; // Moved up slightly
+        const trackY = 200; 
         const xScale = (pos) => pad + (pos / data.length) * (w - 2 * pad);
 
         let svg = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="overflow:visible;">`;
         
-        // Title
         svg += `<text x="${pad}" y="30" font-size="16" font-weight="bold" fill="#1e293b">${data.gene} Domain Map</text>`;
         svg += `<text x="${pad}" y="50" font-size="11" fill="#64748b">${data.length} aa | ${data.domains.length} Domains</text>`;
-
-        // Backbone
         svg += `<rect x="${pad}" y="${trackY - 6}" width="${w - 2 * pad}" height="12" rx="6" fill="#e2e8f0" />`;
 
-        // Domains
         data.domains.forEach(d => {
             const x = xScale(d.start);
             const width = Math.max(xScale(d.end) - x, 4);
@@ -7839,17 +7833,16 @@ window.downloadCurrentVisualization = function() {
                 </rect>`;
         });
 
-        // Variants
         displayVars.forEach(v => {
             const x = xScale(parseInt(v.begin));
             const sig = getSignificance(v);
-            let color = '#9ca3af'; // Gray
+            let color = '#9ca3af'; 
             if (sig.includes('pathogenic') && !sig.includes('likely')) color = '#ef4444'; 
             else if (sig.includes('likely pathogenic')) color = '#f97316'; 
             else if (sig.includes('benign')) color = '#22c55e'; 
-            else if (v.isCustom) color = '#d946ef'; // Purple for custom
+            else if (v.isCustom) color = '#d946ef'; 
 
-            const height = 20 + (parseInt(v.begin) % 60); // shorter stalks
+            const height = 20 + (parseInt(v.begin) % 60); 
             const yHead = trackY - height;
             
             const mut = `p.${v.wildType}${v.begin}${v.alternativeSequence || v.mutatedType}`;
@@ -7866,7 +7859,6 @@ window.downloadCurrentVisualization = function() {
         });
         svg += `</svg>`;
 
-        // Render with NO Help Text, added Toggle Button
         container.innerHTML = `
             <div style="padding:10px; height:100%; display:flex; flex-direction:column;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -7879,14 +7871,11 @@ window.downloadCurrentVisualization = function() {
                          <button onclick="window.downloadVariantCSV()" class="ciliai-button" style="background:#3b82f6; color:white;">⬇ CSV</button>
                     </div>
                 </div>
-
                 <div style="flex:1; overflow:hidden; border:1px solid #f1f5f9; border-radius:8px;">${svg}</div>
-
                 <div style="padding-top:10px; display:flex; gap:5px; align-items:center;">
                     <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:80px;">
                     <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white;">+ Add</button>
                 </div>
-                
                 <div id="var-panel" style="display:none; position:absolute; top:60px; right:20px; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; width:260px; box-shadow:0 10px 25px rgba(0,0,0,0.15); z-index:100;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                          <h4 style="margin:0; color:#2563eb; font-size:14px;" id="vp-title"></h4>
@@ -7918,25 +7907,19 @@ window.downloadCurrentVisualization = function() {
             return;
         }
 
-        // Prepare the MSA view
-        // We use the first alignment (Human) to generate the "ruler"
         const humanAlign = alignData.alignments[0]; 
         const refSeq = humanAlign.seq;
-        const centerPos = alignData.centerPos; // Absolute protein position
-        
-        // Find variants in this window
         const windowStart = alignData.windowStart;
         const variantsInWindow = variantData.variants.filter(v => {
             const p = parseInt(v.begin);
             return p >= windowStart && p < windowStart + refSeq.length;
         });
 
-        // Build HTML for rows
+        // Rows
         let rowsHtml = alignData.alignments.map(a => {
             let seqHtml = "";
             for(let i=0; i<a.seq.length; i++) {
                 const char = a.seq[i];
-                // Highlight center column
                 const isCenter = (i === Math.floor(a.seq.length/2));
                 const bg = isCenter ? (a.isConserved ? '#dcfce7' : '#fee2e2') : 'transparent';
                 const fw = isCenter ? 'bold' : 'normal';
@@ -7950,7 +7933,7 @@ window.downloadCurrentVisualization = function() {
                 </div>`;
         }).join('');
 
-        // Build Reference Track (Header) with interactive variant markers
+        // Reference Header
         let refTrackHtml = "";
         for(let i=0; i<refSeq.length; i++) {
             const absPos = windowStart + i;
@@ -7963,8 +7946,6 @@ window.downloadCurrentVisualization = function() {
             }
             const isCenter = (i === Math.floor(refSeq.length/2));
             const border = isCenter ? 'border-left:1px solid #000; border-right:1px solid #000;' : '';
-            
-            // Interaction: Click to re-center scan
             const onClick = varsAtPos.length > 0 ? `onclick="window.checkConservation('${variantData.gene}', ${absPos}, 'Var')" style="cursor:pointer;"` : "";
 
             refTrackHtml += `
@@ -7981,7 +7962,6 @@ window.downloadCurrentVisualization = function() {
                     <strong style="color:#1e293b;">Evolutionary Alignment (${alignData.alignments.length} Species)</strong>
                     <button onclick="window.drawVariantWorkspace()" class="ciliai-button" style="background:#64748b; color:white; font-size:11px;">⬅ Back to Domains</button>
                 </div>
-                
                 <div style="padding:10px; background:#fff; border-bottom:2px solid #e2e8f0; overflow-x:auto;">
                     <div style="margin-bottom:5px; font-size:11px; color:#64748b; padding-left:140px;">
                         Interactive Reference (Click Red/Gray dots to re-scan position)
@@ -7991,193 +7971,167 @@ window.downloadCurrentVisualization = function() {
                         <div style="white-space:nowrap;">${refTrackHtml}</div>
                     </div>
                 </div>
-
-                <div style="flex:1; overflow-y:auto; overflow-x:auto;">
-                    ${rowsHtml}
-                </div>
+                <div style="flex:1; overflow-y:auto; overflow-x:auto;">${rowsHtml}</div>
             </div>
         `;
     };
 
-   // --- 6. LOGIC: DEEP SCAN & DATA STORAGE ---
-window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
-    const btn = document.getElementById('vp-cons-btn');
-    const statusDiv = document.getElementById('vp-desc');
-    const originalBtnText = btn ? btn.innerText : "🌍 Check Conservation";
-    
-    if(btn) btn.innerText = "⏳ Deep Scanning...";
-    if(statusDiv) statusDiv.innerHTML = `Running <strong>Hybrid Scan</strong> (Homology + Symbol)... <br><span style="font-size:10px;color:#666;">Aligning genomes...</span>`;
-    
-    try {
-        // 1. Get Human Ref & HomoloGene ID
-        if (!window.CiliAI.activeVariantData) await window.fetchVariantDataLive(geneSymbol);
-        const humanRes = window.CiliAI.activeVariantData;
-        const humanSeq = humanRes.sequence;
+    // --- 6. LOGIC: DEEP SCAN & DATA STORAGE ---
+    window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
+        const btn = document.getElementById('vp-cons-btn');
+        const statusDiv = document.getElementById('vp-desc');
+        const originalBtnText = btn ? btn.innerText : "🌍 Check Conservation";
         
-        // Fetch HomoloGene ID
-        const geneInfoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
-        const geneInfo = await geneInfoRes.json();
-        const hID = geneInfo.hits?.[0]?.homologene?.id;
-
-        // 2. Prepare Batch Queries
-        const targets = TARGET_SPECIES_PANEL;
-        const allTaxIds = targets.map(t => t.id);
-        let hits = [];
-
-        // QUERY A: HomoloGene Search (Reliable, finds orthologs with different names)
-        if (hID) {
-            const homRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=uniprot,taxid,symbol&size=200`);
-            const homData = await homRes.json();
-            if (homData.hits) hits = [...homData.hits];
-        }
-
-        // QUERY B: Symbol Search (Fallback for species not in HomoloGene)
-        // Identify which TaxIDs were NOT found in HomoloGene results
-        const foundTaxIds = new Set(hits.map(h => h.taxid));
-        const missingTaxIds = allTaxIds.filter(id => !foundTaxIds.has(id));
-
-        if (missingTaxIds.length > 0) {
-            const taxStr = missingTaxIds.join(',');
-            const symRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${taxStr}&fields=uniprot,taxid,symbol&size=100`);
-            const symData = await symRes.json();
-            if (symData.hits) hits = [...hits, ...symData.hits];
-        }
-
-        // 3. Process Alignments
-        const alignments = [];
-        const windowSize = 25; 
-        const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
-        const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
-        const humanFingerprint = humanSeq.substring(hStart, hEnd);
+        if(btn) btn.innerText = "⏳ Deep Scanning...";
+        if(statusDiv) statusDiv.innerHTML = `Running <strong>Hybrid Scan</strong> (Homology + Symbol)... <br><span style="font-size:10px;color:#666;">Aligning genomes...</span>`;
         
-        const windowStart = Math.max(0, (humanPos - 1) - 10);
-        const windowEnd = Math.min(humanSeq.length, (humanPos - 1) + 11);
-        const humanSegment = humanSeq.substring(windowStart, windowEnd);
-        const refAA = humanSeq[humanPos - 1];
-
-        alignments.push({ species: 'Human', icon: '👤', symbol: geneSymbol, seq: humanSegment, isConserved: true });
-
-        // Fetch ortholog sequences in parallel
-        let conservedCount = 0;
-        let totalAligned = 0;
-
-        const processSpecies = async (t) => {
-            if(t.name === 'Human') return;
+        try {
+            // 1. Get Human Ref & HomoloGene ID
+            if (!window.CiliAI.activeVariantData) {
+                window.CiliAI.activeVariantData = await window.fetchVariantDataLive(geneSymbol);
+            }
+            const humanRes = window.CiliAI.activeVariantData;
+            const humanSeq = humanRes.sequence;
             
-            // Find match in our combined hits
-            const match = hits.find(h => h.taxid === t.id);
-            if (!match || !match.uniprot) return;
+            // Fetch HomoloGene ID
+            const geneInfoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
+            const geneInfo = await geneInfoRes.json();
+            const hID = geneInfo.hits?.[0]?.homologene?.id;
 
-            let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
-            const finalUID = Array.isArray(uID) ? uID[0] : uID;
-            if (!finalUID) return;
+            // 2. Prepare Batch Queries
+            const targets = TARGET_SPECIES_PANEL;
+            const allTaxIds = targets.map(t => t.id);
+            let hits = [];
 
-            try {
-                const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
-                if(sRes.ok) {
-                    const sData = await sRes.json();
-                    const seq = sData.sequence.sequence;
-                    
-                    // Simple Local Alignment (Fingerprint Search)
-                    let bestScore = -1;
-                    let bestIdx = -1;
-                    
-                    // Optimization: Only scan if sequence is long enough
-                    if (seq.length < humanFingerprint.length) return;
+            // QUERY A: HomoloGene Search
+            if (hID) {
+                const homRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=uniprot,taxid,symbol&size=200`);
+                const homData = await homRes.json();
+                if (homData.hits) hits = [...homData.hits];
+            }
 
-                    for(let i=0; i <= seq.length - humanFingerprint.length; i++) {
-                        let score = 0;
-                        for(let j=0; j<humanFingerprint.length; j++) {
-                            if(humanFingerprint[j] === seq[i+j]) score++;
+            // QUERY B: Symbol Search (Fallback)
+            const foundTaxIds = new Set(hits.map(h => h.taxid));
+            const missingTaxIds = allTaxIds.filter(id => !foundTaxIds.has(id));
+
+            if (missingTaxIds.length > 0) {
+                const taxStr = missingTaxIds.join(',');
+                const symRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${taxStr}&fields=uniprot,taxid,symbol&size=100`);
+                const symData = await symRes.json();
+                if (symData.hits) hits = [...hits, ...symData.hits];
+            }
+
+            // 3. Process Alignments
+            const alignments = [];
+            const windowSize = 25; 
+            const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
+            const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
+            const humanFingerprint = humanSeq.substring(hStart, hEnd);
+            
+            const windowStart = Math.max(0, (humanPos - 1) - 10);
+            const windowEnd = Math.min(humanSeq.length, (humanPos - 1) + 11);
+            const humanSegment = humanSeq.substring(windowStart, windowEnd);
+            const refAA = humanSeq[humanPos - 1];
+
+            alignments.push({ species: 'Human', icon: '👤', symbol: geneSymbol, seq: humanSegment, isConserved: true });
+
+            let conservedCount = 0;
+            let totalAligned = 0;
+
+            const processSpecies = async (t) => {
+                if(t.name === 'Human') return;
+                const match = hits.find(h => h.taxid === t.id);
+                if (!match || !match.uniprot) return;
+
+                let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
+                const finalUID = Array.isArray(uID) ? uID[0] : uID;
+                if (!finalUID) return;
+
+                try {
+                    const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
+                    if(sRes.ok) {
+                        const sData = await sRes.json();
+                        const seq = sData.sequence.sequence;
+                        
+                        if (seq.length < humanFingerprint.length) return;
+
+                        let bestScore = -1;
+                        let bestIdx = -1;
+                        for(let i=0; i <= seq.length - humanFingerprint.length; i++) {
+                            let score = 0;
+                            for(let j=0; j<humanFingerprint.length; j++) {
+                                if(humanFingerprint[j] === seq[i+j]) score++;
+                            }
+                            if(score > bestScore) { bestScore = score; bestIdx = i; }
+                            if (score === humanFingerprint.length) break; 
                         }
-                        if(score > bestScore) { bestScore = score; bestIdx = i; }
-                        // Early exit on perfect match
-                        if (score === humanFingerprint.length) break; 
-                    }
-                    
-                    // Threshold: 20% match is enough to define an orthologous region
-                    if ((bestScore/humanFingerprint.length) >= 0.20) {
-                        const center = bestIdx + (windowSize/2);
-                        const segStart = Math.max(0, center - 10);
-                        const segEnd = Math.min(seq.length, center + 11);
-                        let segment = seq.substring(segStart, segEnd);
                         
-                        // Padding for edge cases
-                        if(segment.length < 21) segment = segment.padEnd(21, '-');
+                        if ((bestScore/humanFingerprint.length) >= 0.20) {
+                            const center = bestIdx + (windowSize/2);
+                            const segStart = Math.max(0, center - 10);
+                            const segEnd = Math.min(seq.length, center + 11);
+                            let segment = seq.substring(segStart, segEnd);
+                            if(segment.length < 21) segment = segment.padEnd(21, '-');
 
-                        const residue = seq[Math.floor(center)];
-                        const isMatch = residue === refAA;
-                        if(isMatch) conservedCount++;
-                        totalAligned++;
-                        
-                        alignments.push({
-                            species: t.name, icon: t.icon, symbol: match.symbol, seq: segment,
-                            isConserved: isMatch
-                        });
+                            const residue = seq[Math.floor(center)];
+                            const isMatch = residue === refAA;
+                            if(isMatch) conservedCount++;
+                            totalAligned++;
+                            
+                            alignments.push({
+                                species: t.name, icon: t.icon, symbol: match.symbol, seq: segment,
+                                isConserved: isMatch
+                            });
+                        }
                     }
-                }
-            } catch(e) { }
-        };
+                } catch(e) { }
+            };
 
-        await Promise.allSettled(targets.map(t => processSpecies(t)));
+            await Promise.allSettled(targets.map(t => processSpecies(t)));
 
-        // Sort by panel order
-        alignments.sort((a, b) => {
-            const ia = targets.findIndex(t => t.name === a.species);
-            const ib = targets.findIndex(t => t.name === b.species);
-            return ia - ib;
-        });
+            alignments.sort((a, b) => {
+                const ia = targets.findIndex(t => t.name === a.species);
+                const ib = targets.findIndex(t => t.name === b.species);
+                return ia - ib;
+            });
 
-        // 4. Save & Render
-        window.CiliAI.activeAlignmentData = {
-            alignments: alignments,
-            centerPos: humanPos,
-            windowStart: windowStart
-        };
+            // 4. Save & Render
+            window.CiliAI.activeAlignmentData = {
+                alignments: alignments,
+                centerPos: humanPos,
+                windowStart: windowStart
+            };
 
-        if(btn) btn.innerText = originalBtnText;
-        if(statusDiv) statusDiv.innerHTML = `Found <strong>${totalAligned}</strong> orthologs. Conservation: <strong>${Math.round((conservedCount/totalAligned)*100)}%</strong>`;
+            if(btn) btn.innerText = originalBtnText;
+            if(statusDiv) statusDiv.innerHTML = `Found <strong>${totalAligned}</strong> orthologs. Conservation: <strong>${Math.round((conservedCount/totalAligned)*100)}%</strong>`;
 
-        // Switch to MSA View
-        window.renderMSAWorkspace();
+            // Switch to MSA View
+            window.renderMSAWorkspace();
 
-    } catch (e) {
-        console.error(e);
-        if(btn) btn.innerText = "Error";
-        if(statusDiv) statusDiv.textContent = "Scan failed.";
-    }
-};
-
-function findBestAlignment(query, target) {
-    // Replaced by inline logic above for simplicity, but kept if needed
-    return { index: 0, score: 0 }; 
-}
+        } catch (e) {
+            console.error(e);
+            if(btn) btn.innerText = "Error";
+            if(statusDiv) statusDiv.textContent = "Scan failed.";
+        }
+    };
 
     // --- 7. INTENT HANDLER LOGIC (Specific Variant) ---
     window.displaySpecificVariant = async function(gene, variantStr) {
-        // 1. Post Help Text to Chat
         window.addVariantHelpMessage();
-
-        // 2. Load Map
         await window.renderVariantMap(gene);
-        
-        // 3. Parse and Add
         const cleanStr = variantStr.replace(/^p\./i, '');
         const match = cleanStr.match(/^([A-Za-z]+)(\d+)([A-Za-z*]+)$/);
         
         if (match && window.CiliAI.activeVariantData) {
             const pos = parseInt(match[2]);
             const title = `p.${match[1]}${pos}${match[3]}`;
-            
             window.CiliAI.activeVariantData.customVariants.push({
                 wildType: match[1], begin: pos, alternativeSequence: match[3],
                 clinicalSignificance: "Requested", isCustom: true
             });
-            window.drawVariantWorkspace(); // Redraw map with new point
+            window.drawVariantWorkspace(); 
             
-            // 4. Auto-Run Deep Scan & Show MSA
             window.addChatMessage(`Running <strong>Deep 65-Species Scan</strong> for ${title}...`, false);
-            // This will auto-switch to MSA view when done because of the "User requested" flag logic inside checkConservation
             await window.checkConservation(gene, pos, "User requested");
         }
         return `Loaded ${gene} and analyzing ${variantStr}.`;
@@ -8185,7 +8139,6 @@ function findBestAlignment(query, target) {
     
     // --- UTILS ---
     window.openVariantPanel = function(title, pos, desc, gene) {
-        // Legacy support for map clicks - show small panel
         const p = document.getElementById('var-panel');
         if(p) {
             document.getElementById('vp-title').textContent = title;
@@ -8200,7 +8153,7 @@ function findBestAlignment(query, target) {
         if(i && i.value) window.displaySpecificVariant(window.CiliAI.activeVariantData.gene, i.value);
     };
 
-})(); // End Module
+})(); 
 
 /* ==============================================================
  * MODULE: 3D STRUCTURE VIEWER (Mol*)
@@ -8259,7 +8212,11 @@ function findBestAlignment(query, target) {
         }
         try {
             await window.loadMolStar();
-            const data = await window.fetchVariantDataLive(geneSymbol);
+            if (!window.CiliAI.activeVariantData) {
+                window.CiliAI.activeVariantData = await window.fetchVariantDataLive(geneSymbol);
+            }
+            const data = window.CiliAI.activeVariantData;
+            
             if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
             const uniprotID = data.uniprotID;
             const afUrl = await getAlphaFoldUrl(uniprotID);
@@ -8362,7 +8319,5 @@ function findBestAlignment(query, target) {
 })();
 
 
-
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
