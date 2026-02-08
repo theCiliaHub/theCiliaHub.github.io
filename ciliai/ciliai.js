@@ -7999,117 +7999,159 @@ window.downloadCurrentVisualization = function() {
         `;
     };
 
-    // --- 6. LOGIC: DEEP SCAN & DATA STORAGE ---
-    window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
-        const btn = document.getElementById('vp-cons-btn');
-        if(btn) btn.innerText = "⏳ Scanning 65 species...";
+   // --- 6. LOGIC: DEEP SCAN & DATA STORAGE ---
+window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
+    const btn = document.getElementById('vp-cons-btn');
+    const statusDiv = document.getElementById('vp-desc');
+    const originalBtnText = btn ? btn.innerText : "🌍 Check Conservation";
+    
+    if(btn) btn.innerText = "⏳ Deep Scanning...";
+    if(statusDiv) statusDiv.innerHTML = `Running <strong>Hybrid Scan</strong> (Homology + Symbol)... <br><span style="font-size:10px;color:#666;">Aligning genomes...</span>`;
+    
+    try {
+        // 1. Get Human Ref & HomoloGene ID
+        if (!window.CiliAI.activeVariantData) await window.fetchVariantDataLive(geneSymbol);
+        const humanRes = window.CiliAI.activeVariantData;
+        const humanSeq = humanRes.sequence;
         
-        try {
-            // 1. Get Human Ref
-            if (!window.CiliAI.activeVariantData) await window.fetchVariantDataLive(geneSymbol);
-            const humanSeq = window.CiliAI.activeVariantData.sequence;
-            
-            // 2. Prepare Batch Query
-            const targets = TARGET_SPECIES_PANEL;
-            const taxIds = targets.map(t => t.id).join(',');
-            const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${taxIds}&fields=uniprot,taxid,symbol&size=150`);
-            const orthoData = await orthoRes.json();
-            const hits = orthoData.hits || [];
+        // Fetch HomoloGene ID
+        const geneInfoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
+        const geneInfo = await geneInfoRes.json();
+        const hID = geneInfo.hits?.[0]?.homologene?.id;
 
-            // 3. Process Alignments
-            const alignments = [];
-            const windowSize = 25; // Slightly larger window for "Full MSA" feel
-            const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
-            const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
-            const humanFingerprint = humanSeq.substring(hStart, hEnd);
-            
-            // Store window info for the renderer
-            const windowStart = Math.max(0, (humanPos - 1) - 10);
-            const windowEnd = Math.min(humanSeq.length, (humanPos - 1) + 11);
-            const humanSegment = humanSeq.substring(windowStart, windowEnd);
+        // 2. Prepare Batch Queries
+        const targets = TARGET_SPECIES_PANEL;
+        const allTaxIds = targets.map(t => t.id);
+        let hits = [];
 
-            alignments.push({ species: 'Human', icon: '👤', symbol: geneSymbol, seq: humanSegment, isConserved: true });
-
-            // Fetch ortholog sequences in parallel
-            const processSpecies = async (t) => {
-                if(t.name === 'Human') return;
-                const match = hits.find(h => h.taxid === t.id);
-                if (!match || !match.uniprot) return;
-
-                let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
-                const finalUID = Array.isArray(uID) ? uID[0] : uID;
-                if (!finalUID) return;
-
-                try {
-                    const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
-                    if(sRes.ok) {
-                        const sData = await sRes.json();
-                        const seq = sData.sequence.sequence;
-                        
-                        // Simple Alignment
-                        let bestScore = -1;
-                        let bestIdx = -1;
-                        // Search for the fingerprint in the ortholog sequence
-                        // Optimization: Search only valid regions if sequence is huge
-                        for(let i=0; i <= seq.length - humanFingerprint.length; i++) {
-                            let score = 0;
-                            for(let j=0; j<humanFingerprint.length; j++) {
-                                if(humanFingerprint[j] === seq[i+j]) score++;
-                            }
-                            if(score > bestScore) { bestScore = score; bestIdx = i; }
-                        }
-                        
-                        if ((bestScore/humanFingerprint.length) > 0.15) {
-                            // Extract matching window corresponding to humanSegment
-                            // The fingerprint was centered, so we adjust indices
-                            const center = bestIdx + (windowSize/2);
-                            const segStart = Math.max(0, center - 10);
-                            const segEnd = Math.min(seq.length, center + 11);
-                            const segment = seq.substring(segStart, segEnd);
-                            
-                            // Pad if short at edges
-                            const paddedSeg = segment.padEnd(humanSegment.length, '-');
-                            
-                            alignments.push({
-                                species: t.name, icon: t.icon, symbol: match.symbol, seq: paddedSeg,
-                                isConserved: paddedSeg[10] === humanSegment[10] // Center check
-                            });
-                        }
-                    }
-                } catch(e) {}
-            };
-
-            await Promise.allSettled(targets.map(t => processSpecies(t)));
-
-            // Sort by panel order
-            alignments.sort((a, b) => {
-                const ia = targets.findIndex(t => t.name === a.species);
-                const ib = targets.findIndex(t => t.name === b.species);
-                return ia - ib;
-            });
-
-            // 4. Save to Global State
-            window.CiliAI.activeAlignmentData = {
-                alignments: alignments,
-                centerPos: humanPos,
-                windowStart: windowStart
-            };
-
-            // 5. Update UI
-            if(btn) btn.innerText = "🌍 Check Conservation";
-            
-            // If the user requested this specifically, switch to MSA view immediately
-            // Otherwise, stay on map but enable the button
-            const isAuto = aaChange.includes("User requested");
-            if (isAuto || document.getElementById('msa-modal')) { // If auto or previously viewing MSA
-                 window.renderMSAWorkspace();
-            }
-
-        } catch (e) {
-            console.error(e);
-            if(btn) btn.innerText = "Error";
+        // QUERY A: HomoloGene Search (Reliable, finds orthologs with different names)
+        if (hID) {
+            const homRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=uniprot,taxid,symbol&size=200`);
+            const homData = await homRes.json();
+            if (homData.hits) hits = [...homData.hits];
         }
-    };
+
+        // QUERY B: Symbol Search (Fallback for species not in HomoloGene)
+        // Identify which TaxIDs were NOT found in HomoloGene results
+        const foundTaxIds = new Set(hits.map(h => h.taxid));
+        const missingTaxIds = allTaxIds.filter(id => !foundTaxIds.has(id));
+
+        if (missingTaxIds.length > 0) {
+            const taxStr = missingTaxIds.join(',');
+            const symRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${taxStr}&fields=uniprot,taxid,symbol&size=100`);
+            const symData = await symRes.json();
+            if (symData.hits) hits = [...hits, ...symData.hits];
+        }
+
+        // 3. Process Alignments
+        const alignments = [];
+        const windowSize = 25; 
+        const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
+        const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
+        const humanFingerprint = humanSeq.substring(hStart, hEnd);
+        
+        const windowStart = Math.max(0, (humanPos - 1) - 10);
+        const windowEnd = Math.min(humanSeq.length, (humanPos - 1) + 11);
+        const humanSegment = humanSeq.substring(windowStart, windowEnd);
+        const refAA = humanSeq[humanPos - 1];
+
+        alignments.push({ species: 'Human', icon: '👤', symbol: geneSymbol, seq: humanSegment, isConserved: true });
+
+        // Fetch ortholog sequences in parallel
+        let conservedCount = 0;
+        let totalAligned = 0;
+
+        const processSpecies = async (t) => {
+            if(t.name === 'Human') return;
+            
+            // Find match in our combined hits
+            const match = hits.find(h => h.taxid === t.id);
+            if (!match || !match.uniprot) return;
+
+            let uID = match.uniprot['Swiss-Prot'] || match.uniprot.TrEMBL;
+            const finalUID = Array.isArray(uID) ? uID[0] : uID;
+            if (!finalUID) return;
+
+            try {
+                const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
+                if(sRes.ok) {
+                    const sData = await sRes.json();
+                    const seq = sData.sequence.sequence;
+                    
+                    // Simple Local Alignment (Fingerprint Search)
+                    let bestScore = -1;
+                    let bestIdx = -1;
+                    
+                    // Optimization: Only scan if sequence is long enough
+                    if (seq.length < humanFingerprint.length) return;
+
+                    for(let i=0; i <= seq.length - humanFingerprint.length; i++) {
+                        let score = 0;
+                        for(let j=0; j<humanFingerprint.length; j++) {
+                            if(humanFingerprint[j] === seq[i+j]) score++;
+                        }
+                        if(score > bestScore) { bestScore = score; bestIdx = i; }
+                        // Early exit on perfect match
+                        if (score === humanFingerprint.length) break; 
+                    }
+                    
+                    // Threshold: 20% match is enough to define an orthologous region
+                    if ((bestScore/humanFingerprint.length) >= 0.20) {
+                        const center = bestIdx + (windowSize/2);
+                        const segStart = Math.max(0, center - 10);
+                        const segEnd = Math.min(seq.length, center + 11);
+                        let segment = seq.substring(segStart, segEnd);
+                        
+                        // Padding for edge cases
+                        if(segment.length < 21) segment = segment.padEnd(21, '-');
+
+                        const residue = seq[Math.floor(center)];
+                        const isMatch = residue === refAA;
+                        if(isMatch) conservedCount++;
+                        totalAligned++;
+                        
+                        alignments.push({
+                            species: t.name, icon: t.icon, symbol: match.symbol, seq: segment,
+                            isConserved: isMatch
+                        });
+                    }
+                }
+            } catch(e) { }
+        };
+
+        await Promise.allSettled(targets.map(t => processSpecies(t)));
+
+        // Sort by panel order
+        alignments.sort((a, b) => {
+            const ia = targets.findIndex(t => t.name === a.species);
+            const ib = targets.findIndex(t => t.name === b.species);
+            return ia - ib;
+        });
+
+        // 4. Save & Render
+        window.CiliAI.activeAlignmentData = {
+            alignments: alignments,
+            centerPos: humanPos,
+            windowStart: windowStart
+        };
+
+        if(btn) btn.innerText = originalBtnText;
+        if(statusDiv) statusDiv.innerHTML = `Found <strong>${totalAligned}</strong> orthologs. Conservation: <strong>${Math.round((conservedCount/totalAligned)*100)}%</strong>`;
+
+        // Switch to MSA View
+        window.renderMSAWorkspace();
+
+    } catch (e) {
+        console.error(e);
+        if(btn) btn.innerText = "Error";
+        if(statusDiv) statusDiv.textContent = "Scan failed.";
+    }
+};
+
+function findBestAlignment(query, target) {
+    // Replaced by inline logic above for simplicity, but kept if needed
+    return { index: 0, score: 0 }; 
+}
 
     // --- 7. INTENT HANDLER LOGIC (Specific Variant) ---
     window.displaySpecificVariant = async function(gene, variantStr) {
@@ -8323,3 +8365,4 @@ window.downloadCurrentVisualization = function() {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
