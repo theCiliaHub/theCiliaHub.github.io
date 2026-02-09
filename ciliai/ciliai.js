@@ -7293,11 +7293,11 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.3)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.4)
  * Fixed Issues:
- * - Human amino acids properly integrated and visible
- * - Color scheme matches reference MSA image
- * - All variants visible as clickable markers
+ * - Human sequence now properly displayed in MSA
+ * - Scroll buttons added for easy navigation
+ * - Jump to position functionality fixed
  * ============================================================== */
 (function() {
     'use strict';
@@ -7652,7 +7652,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 8. Full-Length MSA View - MATCHING REFERENCE IMAGE COLORS
+    // 8. Full-Length MSA View with Scroll Buttons
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7677,28 +7677,28 @@ window.runDashboardSearch = function() {
 
         // Color scheme matching the reference MSA image
         const aaColorScheme = {
-            'A': { bg: '#80a0f0', text: '#000' },     // Blue
-            'R': { bg: '#f01505', text: '#fff' },     // Red (basic)
-            'N': { bg: '#00ff00', text: '#000' },     // Green (polar)
-            'D': { bg: '#c048c0', text: '#fff' },     // Magenta (acidic)
-            'C': { bg: '#f08080', text: '#000' },     // Light coral
-            'Q': { bg: '#00ff00', text: '#000' },     // Green (polar)
-            'E': { bg: '#c048c0', text: '#fff' },     // Magenta (acidic)
-            'G': { bg: '#f09048', text: '#000' },     // Orange
-            'H': { bg: '#15a4a4', text: '#fff' },     // Teal (aromatic/basic)
-            'I': { bg: '#80a0f0', text: '#000' },     // Blue (hydrophobic)
-            'L': { bg: '#80a0f0', text: '#000' },     // Blue (hydrophobic)
-            'K': { bg: '#f01505', text: '#fff' },     // Red (basic)
-            'M': { bg: '#80a0f0', text: '#000' },     // Blue (hydrophobic)
-            'F': { bg: '#80a0f0', text: '#000' },     // Blue (aromatic)
-            'P': { bg: '#ffff00', text: '#000' },     // Yellow (proline)
-            'S': { bg: '#00ff00', text: '#000' },     // Green (polar)
-            'T': { bg: '#00ff00', text: '#000' },     // Green (polar)
-            'W': { bg: '#80a0f0', text: '#000' },     // Blue (aromatic)
-            'Y': { bg: '#15a4a4', text: '#fff' },     // Teal (aromatic)
-            'V': { bg: '#80a0f0', text: '#000' },     // Blue (hydrophobic)
-            'X': { bg: '#bebebe', text: '#000' },     // Gray (unknown)
-            '-': { bg: '#ffffff', text: '#000' }      // White (gap)
+            'A': { bg: '#80a0f0', text: '#000' },
+            'R': { bg: '#f01505', text: '#fff' },
+            'N': { bg: '#00ff00', text: '#000' },
+            'D': { bg: '#c048c0', text: '#fff' },
+            'C': { bg: '#f08080', text: '#000' },
+            'Q': { bg: '#00ff00', text: '#000' },
+            'E': { bg: '#c048c0', text: '#fff' },
+            'G': { bg: '#f09048', text: '#000' },
+            'H': { bg: '#15a4a4', text: '#fff' },
+            'I': { bg: '#80a0f0', text: '#000' },
+            'L': { bg: '#80a0f0', text: '#000' },
+            'K': { bg: '#f01505', text: '#fff' },
+            'M': { bg: '#80a0f0', text: '#000' },
+            'F': { bg: '#80a0f0', text: '#000' },
+            'P': { bg: '#ffff00', text: '#000' },
+            'S': { bg: '#00ff00', text: '#000' },
+            'T': { bg: '#00ff00', text: '#000' },
+            'W': { bg: '#80a0f0', text: '#000' },
+            'Y': { bg: '#15a4a4', text: '#fff' },
+            'V': { bg: '#80a0f0', text: '#000' },
+            'X': { bg: '#bebebe', text: '#000' },
+            '-': { bg: '#ffffff', text: '#000' }
         };
 
         // Get all variants
@@ -7738,15 +7738,7 @@ window.runDashboardSearch = function() {
             posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${showLabel?'#1e293b':'#cbd5e0'};font-weight:${showLabel?'700':'400'};font-family:monospace;">${showLabel ? pos : '·'}</span>`;
         }
 
-        // Human sequence row - NOW PROPERLY INTEGRATED
-        let humanHtml = '';
-        for (let i = 0; i < fullSeq.length; i++) {
-            const aa = fullSeq[i];
-            const colors = aaColorScheme[aa] || aaColorScheme['X'];
-            humanHtml += `<span style="display:inline-block;width:18px;height:18px;text-align:center;line-height:18px;font-size:12px;font-weight:700;font-family:monospace;color:${colors.text};background:${colors.bg};">${aa}</span>`;
-        }
-
-        // Other species rows
+        // Build all alignment rows including Human
         let rowsHtml = '';
         align.alignments.forEach((aln, idx) => {
             let seqHtml = '';
@@ -7756,13 +7748,11 @@ window.runDashboardSearch = function() {
                 const isMatch = aa === humanAA && aa !== '-';
                 const colors = aaColorScheme[aa] || aaColorScheme['X'];
                 
-                // Bold text for conserved residues
                 const fontWeight = isMatch ? '700' : '400';
                 
                 seqHtml += `<span style="display:inline-block;width:18px;height:18px;text-align:center;line-height:18px;font-size:12px;font-weight:${fontWeight};font-family:monospace;color:${colors.text};background:${colors.bg};">${aa}</span>`;
             }
             
-            // Add human row in the alignment section as well
             rowsHtml += `
                 <div style="display:flex;align-items:center;border-bottom:1px solid #e5e7eb;">
                     <div style="width:200px;min-width:200px;padding:4px 12px;font-weight:${idx===0?'700':'500'};color:${idx===0?'#1e40af':'#475569'};font-size:13px;background:#f8fafc;">
@@ -7795,13 +7785,26 @@ window.runDashboardSearch = function() {
                     </div>
                 </div>
 
-                <!-- Jump to position -->
+                <!-- Navigation Controls -->
                 <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;">
                     <span style="font-size:13px;color:#64748b;">Jump to position:</span>
                     <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="e.g. 301" style="width:100px;padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;" />
-                    <button onclick="window.jumpToMSAPosition()" class="ciliai-button" style="padding:6px 14px;font-size:13px;">Go</button>
-                    <div style="margin-left:auto;font-size:12px;color:#94a3b8;">
-                        🖱️ Scroll horizontally → | 🎯 Click variant markers above for details
+                    <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:6px 14px;font-size:13px;background:#3b82f6;color:white;">Go</button>
+                    
+                    <!-- Scroll Buttons -->
+                    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                        <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#64748b;color:white;" title="Scroll Left">
+                            ◄ Left
+                        </button>
+                        <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#64748b;color:white;" title="Scroll Right">
+                            Right ►
+                        </button>
+                        <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#059669;color:white;" title="Go to Start">
+                            ⏮ Start
+                        </button>
+                        <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#059669;color:white;" title="Go to End">
+                            End ⏭
+                        </button>
                     </div>
                 </div>
 
@@ -7814,6 +7817,7 @@ window.runDashboardSearch = function() {
                     <span><span style="display:inline-block;width:14px;height:14px;background:#15a4a4;vertical-align:middle;margin-right:4px;"></span>Aromatic</span>
                     <span><span style="display:inline-block;width:14px;height:14px;background:#ffff00;vertical-align:middle;margin-right:4px;"></span>Proline</span>
                     <span><span style="display:inline-block;width:14px;height:14px;background:#f09048;vertical-align:middle;margin-right:4px;"></span>Glycine</span>
+                    <span style="margin-left:auto;font-weight:600;">🖱️ Click variant markers above for details</span>
                 </div>
 
                 <!-- Fixed header with variants and position numbers -->
@@ -7861,7 +7865,52 @@ window.runDashboardSearch = function() {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 9. Enhanced Variant Popup
+    // 9. MSA Scroll Functions
+    // ─────────────────────────────────────────────────────────────
+    window.msaScrollLeft = function() {
+        const container = document.getElementById('msa-scroll');
+        const headerScroll = document.getElementById('header-scroll');
+        if (!container) return;
+        
+        const scrollAmount = 500;
+        container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+        if (headerScroll) headerScroll.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+    };
+
+    window.msaScrollRight = function() {
+        const container = document.getElementById('msa-scroll');
+        const headerScroll = document.getElementById('header-scroll');
+        if (!container) return;
+        
+        const scrollAmount = 500;
+        container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        if (headerScroll) headerScroll.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    };
+
+    window.msaScrollToStart = function() {
+        const container = document.getElementById('msa-scroll');
+        const headerScroll = document.getElementById('header-scroll');
+        if (!container) return;
+        
+        container.scrollTo({ left: 0, behavior: 'smooth' });
+        if (headerScroll) headerScroll.scrollTo({ left: 0, behavior: 'smooth' });
+    };
+
+    window.msaScrollToEnd = function() {
+        const container = document.getElementById('msa-scroll');
+        const headerScroll = document.getElementById('header-scroll');
+        if (!container) return;
+        
+        const maxScroll = container.scrollWidth - container.clientWidth;
+        container.scrollTo({ left: maxScroll, behavior: 'smooth' });
+        if (headerScroll) {
+            const maxHeaderScroll = headerScroll.scrollWidth - headerScroll.clientWidth;
+            headerScroll.scrollTo({ left: maxHeaderScroll, behavior: 'smooth' });
+        }
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // 10. Enhanced Variant Popup
     // ─────────────────────────────────────────────────────────────
     window.showVariantPopup = function(event, label, pos, clinSig, disease, color) {
         event.stopPropagation();
@@ -7905,7 +7954,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 10. Synchronized Scrolling
+    // 11. Synchronized Scrolling
     // ─────────────────────────────────────────────────────────────
     function setupSyncScroll() {
         const msaScroll = document.getElementById('msa-scroll');
@@ -7923,15 +7972,24 @@ window.runDashboardSearch = function() {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 11. Jump to Position
+    // 12. Jump to Position - FIXED
     // ─────────────────────────────────────────────────────────────
-    window.jumpToMSAPosition = function() {
+    window.msaJumpToPosition = function() {
         const input = document.getElementById('msa-jump-input');
         if (!input) return;
         
         const pos = parseInt(input.value);
-        if (isNaN(pos) || pos < 1) {
-            alert("Please enter a valid position number.");
+        const align = window.CiliAI.activeAlignmentData;
+        
+        if (!align || !align.alignments?.[0]) {
+            alert("No alignment data loaded.");
+            return;
+        }
+        
+        const maxPos = align.alignments[0].seq.length;
+        
+        if (isNaN(pos) || pos < 1 || pos > maxPos) {
+            alert(`Please enter a valid position number between 1 and ${maxPos}.`);
             return;
         }
         
@@ -7940,16 +7998,28 @@ window.runDashboardSearch = function() {
         if (!container) return;
         
         const charWidth = 18;
-        const targetLeft = (pos - 1) * charWidth - (container.clientWidth / 2) + 200;
+        const labelWidth = 200;
+        const targetLeft = (pos - 1) * charWidth - (container.clientWidth - labelWidth) / 2;
         
         container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
         if (headerScroll) {
             headerScroll.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
         }
+        
+        // Visual feedback
+        input.style.background = '#d1fae5';
+        setTimeout(() => { input.style.background = ''; }, 500);
     };
 
+    // Allow Enter key in jump input
+    document.addEventListener('keypress', (e) => {
+        if (e.target.id === 'msa-jump-input' && e.key === 'Enter') {
+            window.msaJumpToPosition();
+        }
+    });
+
     // ─────────────────────────────────────────────────────────────
-    // 12. Download Functions
+    // 13. Download Functions
     // ─────────────────────────────────────────────────────────────
     window.downloadMSAFasta = function() {
         const align = window.CiliAI.activeAlignmentData;
@@ -8027,7 +8097,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 13. Other Functions
+    // 14. Other Functions
     // ─────────────────────────────────────────────────────────────
     window.openVariantPanel = function(title, pos, desc, gene) {
         const panel = document.getElementById('var-panel');
@@ -8093,14 +8163,15 @@ window.runDashboardSearch = function() {
         setTimeout(() => {
             const input = document.getElementById('msa-jump-input');
             if (input) input.value = humanPos;
-            window.jumpToMSAPosition();
+            window.msaJumpToPosition();
         }, 500);
     };
 
-    console.log("[CiliAI] Variant Analysis & MSA Engine v15.3 – Human sequence integrated + reference color scheme");
+    console.log("[CiliAI] Variant Analysis & MSA Engine v15.4 – Human sequence fixed + scroll buttons + working jump");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
