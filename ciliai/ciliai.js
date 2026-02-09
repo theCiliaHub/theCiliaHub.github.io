@@ -7629,12 +7629,22 @@ window.runDashboardSearch = function() {
             }));
         }
 
-        // Sort by taxonomic order
-        alignments.sort((a, b) => {
-            const ia = TARGET_SPECIES_PANEL.findIndex(t => t.name === a.species);
-            const ib = TARGET_SPECIES_PANEL.findIndex(t => t.name === b.species);
-            return ia - ib;
-        });
+       // Sort by taxonomic order — ALWAYS keep Human first
+    alignments.sort((a, b) => {
+    // Force Human to top
+    if (a.taxId === 9606) return -1;
+    if (b.taxId === 9606) return 1;
+
+    const ia = TARGET_SPECIES_PANEL.findIndex(t => t.name === a.species);
+    const ib = TARGET_SPECIES_PANEL.findIndex(t => t.name === b.species);
+
+    // Fallback safety if species not found in panel
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+
+    return ia - ib;
+});
 
         // Pad all sequences to same length
         const maxLen = Math.max(...alignments.map(a => a.seq.length));
@@ -7910,6 +7920,34 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
+// Variant (header) ONLY scroll controls
+// ─────────────────────────────────────────────────────────────
+window.variantScrollLeft = function () {
+    const headerScroll = document.getElementById('header-scroll');
+    if (!headerScroll) return;
+    headerScroll.scrollBy({ left: -500, behavior: 'smooth' });
+};
+
+window.variantScrollRight = function () {
+    const headerScroll = document.getElementById('header-scroll');
+    if (!headerScroll) return;
+    headerScroll.scrollBy({ left: 500, behavior: 'smooth' });
+};
+
+window.variantScrollToStart = function () {
+    const headerScroll = document.getElementById('header-scroll');
+    if (!headerScroll) return;
+    headerScroll.scrollTo({ left: 0, behavior: 'smooth' });
+};
+
+window.variantScrollToEnd = function () {
+    const headerScroll = document.getElementById('header-scroll');
+    if (!headerScroll) return;
+    const maxScroll = headerScroll.scrollWidth - headerScroll.clientWidth;
+    headerScroll.scrollTo({ left: maxScroll, behavior: 'smooth' });
+};
+
+    // ─────────────────────────────────────────────────────────────
     // 10. Enhanced Variant Popup
     // ─────────────────────────────────────────────────────────────
     window.showVariantPopup = function(event, label, pos, clinSig, disease, color) {
@@ -8171,6 +8209,7 @@ window.runDashboardSearch = function() {
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
