@@ -7293,11 +7293,11 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.2)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.3)
  * Fixed Issues:
- * - Human amino acids now display correctly
- * - Variants markers visible and clickable
- * - Better color scheme with dark text on colored backgrounds
+ * - Human amino acids properly integrated and visible
+ * - Color scheme matches reference MSA image
+ * - All variants visible as clickable markers
  * ============================================================== */
 (function() {
     'use strict';
@@ -7652,7 +7652,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 8. Full-Length MSA View - FIXED DISPLAY
+    // 8. Full-Length MSA View - MATCHING REFERENCE IMAGE COLORS
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7673,41 +7673,41 @@ window.runDashboardSearch = function() {
 
         const human = align.alignments[0];
         const fullSeq = human.seq;
-        const seqWidth = fullSeq.length * 20; // 20px per character
+        const seqWidth = fullSeq.length * 18;
 
-        // Enhanced amino acid colors with better contrast (dark text on light/medium backgrounds)
+        // Color scheme matching the reference MSA image
         const aaColorScheme = {
-            'A': { bg: '#a7f3d0', text: '#065f46' }, // Aliphatic - green
-            'V': { bg: '#a7f3d0', text: '#065f46' },
-            'L': { bg: '#a7f3d0', text: '#065f46' },
-            'I': { bg: '#a7f3d0', text: '#065f46' },
-            'M': { bg: '#a7f3d0', text: '#065f46' },
-            'F': { bg: '#bfdbfe', text: '#1e40af' }, // Aromatic - blue
-            'W': { bg: '#bfdbfe', text: '#1e40af' },
-            'Y': { bg: '#fbcfe8', text: '#9f1239' }, // Aromatic + OH - pink
-            'P': { bg: '#ddd6fe', text: '#5b21b6' }, // Proline - purple
-            'G': { bg: '#d1d5db', text: '#374151' }, // Glycine - gray
-            'S': { bg: '#fde68a', text: '#92400e' }, // Hydroxyl - yellow
-            'T': { bg: '#fde68a', text: '#92400e' },
-            'C': { bg: '#fda4af', text: '#9f1239' }, // Sulfur - rose
-            'N': { bg: '#a5f3fc', text: '#164e63' }, // Amide - cyan
-            'Q': { bg: '#a5f3fc', text: '#164e63' },
-            'D': { bg: '#fca5a5', text: '#991b1b' }, // Acidic - red
-            'E': { bg: '#fca5a5', text: '#991b1b' },
-            'K': { bg: '#93c5fd', text: '#1e3a8a' }, // Basic - blue
-            'R': { bg: '#93c5fd', text: '#1e3a8a' },
-            'H': { bg: '#c7d2fe', text: '#3730a3' }, // Basic - indigo
-            'X': { bg: '#e5e7eb', text: '#6b7280' }, // Unknown - gray
-            '-': { bg: '#f3f4f6', text: '#9ca3af' }  // Gap - light gray
+            'A': { bg: '#80a0f0', text: '#000' },     // Blue
+            'R': { bg: '#f01505', text: '#fff' },     // Red (basic)
+            'N': { bg: '#00ff00', text: '#000' },     // Green (polar)
+            'D': { bg: '#c048c0', text: '#fff' },     // Magenta (acidic)
+            'C': { bg: '#f08080', text: '#000' },     // Light coral
+            'Q': { bg: '#00ff00', text: '#000' },     // Green (polar)
+            'E': { bg: '#c048c0', text: '#fff' },     // Magenta (acidic)
+            'G': { bg: '#f09048', text: '#000' },     // Orange
+            'H': { bg: '#15a4a4', text: '#fff' },     // Teal (aromatic/basic)
+            'I': { bg: '#80a0f0', text: '#000' },     // Blue (hydrophobic)
+            'L': { bg: '#80a0f0', text: '#000' },     // Blue (hydrophobic)
+            'K': { bg: '#f01505', text: '#fff' },     // Red (basic)
+            'M': { bg: '#80a0f0', text: '#000' },     // Blue (hydrophobic)
+            'F': { bg: '#80a0f0', text: '#000' },     // Blue (aromatic)
+            'P': { bg: '#ffff00', text: '#000' },     // Yellow (proline)
+            'S': { bg: '#00ff00', text: '#000' },     // Green (polar)
+            'T': { bg: '#00ff00', text: '#000' },     // Green (polar)
+            'W': { bg: '#80a0f0', text: '#000' },     // Blue (aromatic)
+            'Y': { bg: '#15a4a4', text: '#fff' },     // Teal (aromatic)
+            'V': { bg: '#80a0f0', text: '#000' },     // Blue (hydrophobic)
+            'X': { bg: '#bebebe', text: '#000' },     // Gray (unknown)
+            '-': { bg: '#ffffff', text: '#000' }      // White (gap)
         };
 
-        // Get all variants with enhanced info
+        // Get all variants
         const allVars = [...data.variants, ...data.customVariants];
         const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
         const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
         const isLikely = v => /likely pathogenic/i.test(getSig(v));
 
-        // Build variant markers - FIXED
+        // Build variant markers
         let markersHtml = '';
         allVars.forEach(v => {
             const pos = parseInt(v.begin);
@@ -7727,28 +7727,28 @@ window.runDashboardSearch = function() {
             const safeSig = clinSig.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const safeDisease = disease.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             
-            markersHtml += `<span data-pos="${pos}" class="variant-marker" onclick="window.showVariantPopup(event, '${safeLabel}', ${pos}, '${safeSig}', '${safeDisease}', '${color}')" style="position:absolute;left:${((pos-1)*20)}px;top:4px;cursor:pointer;z-index:100;"><div style="width:12px;height:12px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4);" title="${label}"></div></span>`;
+            markersHtml += `<div data-pos="${pos}" class="variant-marker" onclick="window.showVariantPopup(event, '${safeLabel}', ${pos}, '${safeSig}', '${safeDisease}', '${color}')" style="position:absolute;left:${((pos-1)*18)+3}px;top:2px;cursor:pointer;z-index:100;width:12px;height:12px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4);" title="${label}"></div>`;
         });
 
-        // Position numbers (every 10) - FIXED
+        // Position numbers (every 10)
         let posHtml = '';
         for (let i = 0; i < fullSeq.length; i++) {
             const pos = i + 1;
             const showLabel = (pos % 10 === 0);
-            posHtml += `<span style="display:inline-block;width:20px;text-align:center;font-size:10px;color:${showLabel?'#1e293b':'#94a3b8'};font-weight:${showLabel?'700':'400'};">${showLabel ? pos : '·'}</span>`;
+            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${showLabel?'#1e293b':'#cbd5e0'};font-weight:${showLabel?'700':'400'};font-family:monospace;">${showLabel ? pos : '·'}</span>`;
         }
 
-        // Human sequence row with colored residues - FIXED
+        // Human sequence row - NOW PROPERLY INTEGRATED
         let humanHtml = '';
         for (let i = 0; i < fullSeq.length; i++) {
             const aa = fullSeq[i];
             const colors = aaColorScheme[aa] || aaColorScheme['X'];
-            humanHtml += `<span style="display:inline-block;width:20px;text-align:center;font-size:13px;font-weight:700;color:${colors.text};background:${colors.bg};border-radius:4px;margin:0 1px;padding:2px 0;box-shadow:0 1px 2px rgba(0,0,0,0.1);">${aa}</span>`;
+            humanHtml += `<span style="display:inline-block;width:18px;height:18px;text-align:center;line-height:18px;font-size:12px;font-weight:700;font-family:monospace;color:${colors.text};background:${colors.bg};">${aa}</span>`;
         }
 
         // Other species rows
         let rowsHtml = '';
-        align.alignments.slice(1).forEach(aln => {
+        align.alignments.forEach((aln, idx) => {
             let seqHtml = '';
             for (let i = 0; i < aln.seq.length; i++) {
                 const aa = aln.seq[i];
@@ -7756,22 +7756,24 @@ window.runDashboardSearch = function() {
                 const isMatch = aa === humanAA && aa !== '-';
                 const colors = aaColorScheme[aa] || aaColorScheme['X'];
                 
-                // Highlight conservation with green border
-                const border = isMatch ? 'border:2px solid #10b981;' : '';
+                // Bold text for conserved residues
+                const fontWeight = isMatch ? '700' : '400';
                 
-                seqHtml += `<span style="display:inline-block;width:20px;text-align:center;font-size:12px;font-weight:${isMatch?'600':'400'};color:${colors.text};background:${colors.bg};border-radius:3px;margin:0 1px;padding:2px 0;${border}">${aa}</span>`;
+                seqHtml += `<span style="display:inline-block;width:18px;height:18px;text-align:center;line-height:18px;font-size:12px;font-weight:${fontWeight};font-family:monospace;color:${colors.text};background:${colors.bg};">${aa}</span>`;
             }
+            
+            // Add human row in the alignment section as well
             rowsHtml += `
-                <div style="display:flex;align-items:center;padding:4px 0;border-bottom:1px solid #f1f5f9;">
-                    <div style="width:200px;min-width:200px;padding-left:12px;font-weight:500;color:#475569;font-size:13px;font-family:'Inter',sans-serif;">
+                <div style="display:flex;align-items:center;border-bottom:1px solid #e5e7eb;">
+                    <div style="width:200px;min-width:200px;padding:4px 12px;font-weight:${idx===0?'700':'500'};color:${idx===0?'#1e40af':'#475569'};font-size:13px;background:#f8fafc;">
                         ${aln.icon} ${aln.species}
                     </div>
-                    <div style="font-family:'Roboto Mono',monospace;white-space:nowrap;">${seqHtml}</div>
+                    <div style="overflow:hidden;white-space:nowrap;">${seqHtml}</div>
                 </div>`;
         });
 
         container.innerHTML = `
-            <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif;background:#fdfdfd;">
+            <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif;background:#fff;">
                 <!-- Header -->
                 <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
                     <div>
@@ -7795,57 +7797,45 @@ window.runDashboardSearch = function() {
 
                 <!-- Jump to position -->
                 <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;">
-                    <span style="font-size:13px;color:#64748b;white-space:nowrap;">Jump to position:</span>
+                    <span style="font-size:13px;color:#64748b;">Jump to position:</span>
                     <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="e.g. 301" style="width:100px;padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;" />
                     <button onclick="window.jumpToMSAPosition()" class="ciliai-button" style="padding:6px 14px;font-size:13px;">Go</button>
                     <div style="margin-left:auto;font-size:12px;color:#94a3b8;">
-                        🖱️ Scroll right to view full sequence → | 🎯 Click variant markers for details
+                        🖱️ Scroll horizontally → | 🎯 Click variant markers above for details
                     </div>
                 </div>
 
                 <!-- Color Legend -->
-                <div style="padding:8px 20px;background:#fefce8;border-bottom:1px solid #fde047;display:flex;gap:16px;font-size:11px;flex-wrap:wrap;">
-                    <span><span style="display:inline-block;width:16px;height:16px;background:#a7f3d0;border-radius:3px;vertical-align:middle;"></span> Aliphatic</span>
-                    <span><span style="display:inline-block;width:16px;height:16px;background:#bfdbfe;border-radius:3px;vertical-align:middle;"></span> Aromatic</span>
-                    <span><span style="display:inline-block;width:16px;height:16px;background:#fde68a;border-radius:3px;vertical-align:middle;"></span> Polar</span>
-                    <span><span style="display:inline-block;width:16px;height:16px;background:#fca5a5;border-radius:3px;vertical-align:middle;"></span> Acidic</span>
-                    <span><span style="display:inline-block;width:16px;height:16px;background:#93c5fd;border-radius:3px;vertical-align:middle;"></span> Basic</span>
-                    <span><span style="display:inline-block;width:16px;height:16px;background:#ddd6fe;border-radius:3px;vertical-align:middle;"></span> Proline</span>
-                    <span style="margin-left:auto;"><span style="display:inline-block;width:16px;height:16px;border:2px solid #10b981;border-radius:3px;vertical-align:middle;"></span> Conserved</span>
+                <div style="padding:8px 20px;background:#fef3c7;border-bottom:1px solid #fde047;display:flex;gap:16px;font-size:11px;flex-wrap:wrap;">
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#80a0f0;vertical-align:middle;margin-right:4px;"></span>Hydrophobic</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#f01505;vertical-align:middle;margin-right:4px;"></span>Basic (+)</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#c048c0;vertical-align:middle;margin-right:4px;"></span>Acidic (-)</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#00ff00;vertical-align:middle;margin-right:4px;"></span>Polar</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#15a4a4;vertical-align:middle;margin-right:4px;"></span>Aromatic</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#ffff00;vertical-align:middle;margin-right:4px;"></span>Proline</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#f09048;vertical-align:middle;margin-right:4px;"></span>Glycine</span>
                 </div>
 
-                <!-- Fixed header section -->
+                <!-- Fixed header with variants and position numbers -->
                 <div style="background:#fff;border-bottom:2px solid #cbd5e1;flex-shrink:0;">
-                    <div style="display:flex;overflow:hidden;">
+                    <div style="display:flex;">
                         <div style="width:200px;min-width:200px;background:#f8fafc;"></div>
-                        <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll-container">
+                        <div style="flex:1;overflow-x:auto;overflow-y:hidden;position:relative;" id="header-scroll">
                             <!-- Variant markers -->
-                            <div style="position:relative;height:24px;min-width:${seqWidth}px;">
+                            <div style="position:relative;height:20px;min-width:${seqWidth}px;">
                                 ${markersHtml}
                             </div>
                             
-                            <!-- Position numbers -->
-                            <div style="padding:4px 0;min-width:${seqWidth}px;font-family:'Roboto Mono',monospace;">
+                            <!-- Position ruler -->
+                            <div style="min-width:${seqWidth}px;padding:2px 0;">
                                 ${posHtml}
                             </div>
-                            
-                            <!-- Human sequence -->
-                            <div style="padding:6px 0;background:linear-gradient(to bottom,#fff,#f9fafb);min-width:${seqWidth}px;font-family:'Roboto Mono',monospace;">
-                                ${humanHtml}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Human label (left side) -->
-                    <div style="position:absolute;top:0;left:0;width:200px;height:100%;pointer-events:none;">
-                        <div style="position:absolute;bottom:6px;left:12px;font-weight:700;color:#1e40af;font-size:13px;background:#f8fafc;padding:4px 8px;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-                            👤 Human (${data.gene})
                         </div>
                     </div>
                 </div>
 
-                <!-- Scrollable species rows -->
-                <div id="msa-scroll" style="flex:1;overflow:auto;background:#fdfdfd;padding:8px 0;">
+                <!-- Scrollable alignment with ALL species including Human -->
+                <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;">
                     ${rowsHtml}
                 </div>
             </div>
@@ -7867,7 +7857,6 @@ window.runDashboardSearch = function() {
                 </div>
             </div>`;
 
-        // Setup synchronized scrolling
         setupSyncScroll();
     }
 
@@ -7916,11 +7905,11 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 10. Synchronized Scrolling - FIXED
+    // 10. Synchronized Scrolling
     // ─────────────────────────────────────────────────────────────
     function setupSyncScroll() {
         const msaScroll = document.getElementById('msa-scroll');
-        const headerScroll = document.getElementById('header-scroll-container');
+        const headerScroll = document.getElementById('header-scroll');
         
         if (!msaScroll || !headerScroll) return;
         
@@ -7947,11 +7936,11 @@ window.runDashboardSearch = function() {
         }
         
         const container = document.getElementById('msa-scroll');
-        const headerScroll = document.getElementById('header-scroll-container');
+        const headerScroll = document.getElementById('header-scroll');
         if (!container) return;
         
-        const charWidth = 20;
-        const targetLeft = (pos - 1) * charWidth - (container.clientWidth / 2) + (charWidth / 2);
+        const charWidth = 18;
+        const targetLeft = (pos - 1) * charWidth - (container.clientWidth / 2) + 200;
         
         container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
         if (headerScroll) {
@@ -8108,9 +8097,10 @@ window.runDashboardSearch = function() {
         }, 500);
     };
 
-    console.log("[CiliAI] Variant Analysis & MSA Engine v15.2 – Fixed human sequence & variant display + enhanced colors");
+    console.log("[CiliAI] Variant Analysis & MSA Engine v15.3 – Human sequence integrated + reference color scheme");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
