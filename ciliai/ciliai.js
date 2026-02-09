@@ -7293,11 +7293,12 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.4)
- * Fixed Issues:
- * - Human sequence now properly displayed in MSA
- * - Scroll buttons added for easy navigation
- * - Jump to position functionality fixed
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.5)
+ * Enhanced Features:
+ * 1. Changeable amino acid colors with Nature/Science-ready schemes
+ * 2. Human amino acids prominently displayed in MSA
+ * 3. Fully functional MSA scroll with keyboard support
+ * 4. Additional improvements while maintaining working code
  * ============================================================== */
 (function() {
     'use strict';
@@ -7305,6 +7306,87 @@ window.runDashboardSearch = function() {
     window.CiliAI = window.CiliAI || {};
     window.CiliAI.activeVariantData = null;
     window.CiliAI.activeAlignmentData = null;
+    
+    // Initialize color scheme system
+    window.CiliAI.activeColorScheme = 'Taylor';
+
+    // ─────────────────────────────────────────────────────────────
+    // COLOR SCHEMES FOR NATURE/SCIENCE JOURNALS
+    // ─────────────────────────────────────────────────────────────
+    const NATURE_COLOR_SCHEMES = {
+        'Taylor': { // Default - Nature publication quality
+            'A': { bg: '#CCFF00', text: '#000' },
+            'R': { bg: '#0000FF', text: '#FFF' },
+            'N': { bg: '#FF00FF', text: '#FFF' },
+            'D': { bg: '#FF0000', text: '#FFF' },
+            'C': { bg: '#FFFF00', text: '#000' },
+            'Q': { bg: '#FF00FF', text: '#FFF' },
+            'E': { bg: '#FF0000', text: '#FFF' },
+            'G': { bg: '#FF9900', text: '#000' },
+            'H': { bg: '#0066FF', text: '#FFF' },
+            'I': { bg: '#CCFF00', text: '#000' },
+            'L': { bg: '#CCFF00', text: '#000' },
+            'K': { bg: '#0000FF', text: '#FFF' },
+            'M': { bg: '#CCFF00', text: '#000' },
+            'F': { bg: '#CCFF00', text: '#000' },
+            'P': { bg: '#FF00CC', text: '#FFF' },
+            'S': { bg: '#FF9900', text: '#000' },
+            'T': { bg: '#FF9900', text: '#000' },
+            'W': { bg: '#CCFF00', text: '#000' },
+            'Y': { bg: '#0066FF', text: '#FFF' },
+            'V': { bg: '#CCFF00', text: '#000' },
+            'X': { bg: '#BEBEBE', text: '#000' },
+            '-': { bg: '#FFFFFF', text: '#000' }
+        },
+        'Clustal': { // Classic Clustal scheme used in many Science papers
+            'A': { bg: '#80A0F0', text: '#000' },
+            'R': { bg: '#F01505', text: '#FFF' },
+            'N': { bg: '#00FF00', text: '#000' },
+            'D': { bg: '#C048C0', text: '#FFF' },
+            'C': { bg: '#F08080', text: '#000' },
+            'Q': { bg: '#00FF00', text: '#000' },
+            'E': { bg: '#C048C0', text: '#FFF' },
+            'G': { bg: '#F09048', text: '#000' },
+            'H': { bg: '#15A4A4', text: '#FFF' },
+            'I': { bg: '#80A0F0', text: '#000' },
+            'L': { bg: '#80A0F0', text: '#000' },
+            'K': { bg: '#F01505', text: '#FFF' },
+            'M': { bg: '#80A0F0', text: '#000' },
+            'F': { bg: '#80A0F0', text: '#000' },
+            'P': { bg: '#FFFF00', text: '#000' },
+            'S': { bg: '#00FF00', text: '#000' },
+            'T': { bg: '#00FF00', text: '#000' },
+            'W': { bg: '#80A0F0', text: '#000' },
+            'Y': { bg: '#15A4A4', text: '#FFF' },
+            'V': { bg: '#80A0F0', text: '#000' },
+            'X': { bg: '#BEBEBE', text: '#000' },
+            '-': { bg: '#FFFFFF', text: '#000' }
+        },
+        'Zappo': { // Biochemical properties - Nature Communications
+            'A': { bg: '#FFA500', text: '#000' }, // Hydrophobic
+            'R': { bg: '#0000FF', text: '#FFF' }, // Positive
+            'N': { bg: '#00FFFF', text: '#000' }, // Polar
+            'D': { bg: '#FF0000', text: '#FFF' }, // Negative
+            'C': { bg: '#FFFF00', text: '#000' }, // Cysteine
+            'Q': { bg: '#00FFFF', text: '#000' }, // Polar
+            'E': { bg: '#FF0000', text: '#FFF' }, // Negative
+            'G': { bg: '#FFA500', text: '#000' }, // Hydrophobic
+            'H': { bg: '#FF69B4', text: '#FFF' }, // Aromatic
+            'I': { bg: '#FFA500', text: '#000' }, // Hydrophobic
+            'L': { bg: '#FFA500', text: '#000' }, // Hydrophobic
+            'K': { bg: '#0000FF', text: '#FFF' }, // Positive
+            'M': { bg: '#FFA500', text: '#000' }, // Hydrophobic
+            'F': { bg: '#FF69B4', text: '#FFF' }, // Aromatic
+            'P': { bg: '#800080', text: '#FFF' }, // Proline
+            'S': { bg: '#00FFFF', text: '#000' }, // Polar
+            'T': { bg: '#00FFFF', text: '#000' }, // Polar
+            'W': { bg: '#FF69B4', text: '#FFF' }, // Aromatic
+            'Y': { bg: '#FF69B4', text: '#FFF' }, // Aromatic
+            'V': { bg: '#FFA500', text: '#000' }, // Hydrophobic
+            'X': { bg: '#BEBEBE', text: '#000' }, // Unknown
+            '-': { bg: '#FFFFFF', text: '#000' }  // Gap
+        }
+    };
 
     // ─────────────────────────────────────────────────────────────
     // 1. SPECIES PANEL – full list
@@ -7629,22 +7711,22 @@ window.runDashboardSearch = function() {
             }));
         }
 
-       // Sort by taxonomic order — ALWAYS keep Human first
-    alignments.sort((a, b) => {
-    // Force Human to top
-    if (a.taxId === 9606) return -1;
-    if (b.taxId === 9606) return 1;
+        // Sort by taxonomic order — ALWAYS keep Human first
+        alignments.sort((a, b) => {
+            // Force Human to top
+            if (a.taxId === 9606) return -1;
+            if (b.taxId === 9606) return 1;
 
-    const ia = TARGET_SPECIES_PANEL.findIndex(t => t.name === a.species);
-    const ib = TARGET_SPECIES_PANEL.findIndex(t => t.name === b.species);
+            const ia = TARGET_SPECIES_PANEL.findIndex(t => t.name === a.species);
+            const ib = TARGET_SPECIES_PANEL.findIndex(t => t.name === b.species);
 
-    // Fallback safety if species not found in panel
-    if (ia === -1 && ib === -1) return 0;
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
+            // Fallback safety if species not found in panel
+            if (ia === -1 && ib === -1) return 0;
+            if (ia === -1) return 1;
+            if (ib === -1) return -1;
 
-    return ia - ib;
-});
+            return ia - ib;
+        });
 
         // Pad all sequences to same length
         const maxLen = Math.max(...alignments.map(a => a.seq.length));
@@ -7662,7 +7744,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 8. Full-Length MSA View with Scroll Buttons
+    // 8. Full-Length MSA View with Enhanced Features
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7685,31 +7767,8 @@ window.runDashboardSearch = function() {
         const fullSeq = human.seq;
         const seqWidth = fullSeq.length * 18;
 
-        // Color scheme matching the reference MSA image
-        const aaColorScheme = {
-            'A': { bg: '#80a0f0', text: '#000' },
-            'R': { bg: '#f01505', text: '#fff' },
-            'N': { bg: '#00ff00', text: '#000' },
-            'D': { bg: '#c048c0', text: '#fff' },
-            'C': { bg: '#f08080', text: '#000' },
-            'Q': { bg: '#00ff00', text: '#000' },
-            'E': { bg: '#c048c0', text: '#fff' },
-            'G': { bg: '#f09048', text: '#000' },
-            'H': { bg: '#15a4a4', text: '#fff' },
-            'I': { bg: '#80a0f0', text: '#000' },
-            'L': { bg: '#80a0f0', text: '#000' },
-            'K': { bg: '#f01505', text: '#fff' },
-            'M': { bg: '#80a0f0', text: '#000' },
-            'F': { bg: '#80a0f0', text: '#000' },
-            'P': { bg: '#ffff00', text: '#000' },
-            'S': { bg: '#00ff00', text: '#000' },
-            'T': { bg: '#00ff00', text: '#000' },
-            'W': { bg: '#80a0f0', text: '#000' },
-            'Y': { bg: '#15a4a4', text: '#fff' },
-            'V': { bg: '#80a0f0', text: '#000' },
-            'X': { bg: '#bebebe', text: '#000' },
-            '-': { bg: '#ffffff', text: '#000' }
-        };
+        // Get current color scheme
+        const aaColorScheme = NATURE_COLOR_SCHEMES[window.CiliAI.activeColorScheme] || NATURE_COLOR_SCHEMES['Taylor'];
 
         // Get all variants
         const allVars = [...data.variants, ...data.customVariants];
@@ -7748,7 +7807,7 @@ window.runDashboardSearch = function() {
             posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${showLabel?'#1e293b':'#cbd5e0'};font-weight:${showLabel?'700':'400'};font-family:monospace;">${showLabel ? pos : '·'}</span>`;
         }
 
-        // Build all alignment rows including Human
+        // Build all alignment rows with HUMAN PROMINENTLY DISPLAYED
         let rowsHtml = '';
         align.alignments.forEach((aln, idx) => {
             let seqHtml = '';
@@ -7764,9 +7823,9 @@ window.runDashboardSearch = function() {
             }
             
             rowsHtml += `
-                <div style="display:flex;align-items:center;border-bottom:1px solid #e5e7eb;">
-                    <div style="width:200px;min-width:200px;padding:4px 12px;font-weight:${idx===0?'700':'500'};color:${idx===0?'#1e40af':'#475569'};font-size:13px;background:#f8fafc;">
-                        ${aln.icon} ${aln.species}
+                <div style="display:flex;align-items:center;border-bottom:1px solid #e5e7eb;background:${idx===0?'#f0f9ff':'#fff'};">
+                    <div style="width:200px;min-width:200px;padding:4px 12px;font-weight:${idx===0?'700':'500'};color:${idx===0?'#1e40af':'#475569'};font-size:${idx===0?'14px':'13px'};background:${idx===0?'#dbeafe':'#f8fafc'};border-right:${idx===0?'3px solid #3b82f6':'none'};">
+                        ${aln.icon} ${aln.species} ${idx===0?'<span style="color:#3b82f6;">(Human)</span>':''}
                     </div>
                     <div style="overflow:hidden;white-space:nowrap;">${seqHtml}</div>
                 </div>`;
@@ -7782,7 +7841,18 @@ window.runDashboardSearch = function() {
                             ${fullSeq.length} residues • ${align.alignments.length} species • ${allVars.length} variants
                         </div>
                     </div>
-                    <div style="display:flex;gap:10px;">
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <!-- Color Scheme Selector -->
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <span style="font-size:12px;color:#64748b;">Color Scheme:</span>
+                            <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:4px 8px;border:1px solid #cbd5e0;border-radius:4px;font-size:12px;background:white;">
+                                <option value="Taylor" ${window.CiliAI.activeColorScheme === 'Taylor' ? 'selected' : ''}>Taylor (Nature)</option>
+                                <option value="Clustal" ${window.CiliAI.activeColorScheme === 'Clustal' ? 'selected' : ''}>Clustal (Science)</option>
+                                <option value="Zappo" ${window.CiliAI.activeColorScheme === 'Zappo' ? 'selected' : ''}>Zappo (Biochemical)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Action Buttons -->
                         <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:#64748b;color:white;padding:8px 16px;">
                             ← Domain Map
                         </button>
@@ -7796,21 +7866,32 @@ window.runDashboardSearch = function() {
                 </div>
 
                 <!-- Navigation Controls -->
-                <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;">
+                <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                     <span style="font-size:13px;color:#64748b;">Jump to position:</span>
                     <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="e.g. 301" style="width:100px;padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;" />
                     <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:6px 14px;font-size:13px;background:#3b82f6;color:white;">Go</button>
                     
+                    <!-- Zoom Controls -->
+                    <div style="display:flex;gap:4px;align-items:center;margin-left:12px;">
+                        <button onclick="window.msaZoomOut()" class="ciliai-button" style="padding:4px 8px;font-size:12px;background:#64748b;color:white;" title="Zoom Out">
+                            🔍−
+                        </button>
+                        <span style="font-size:11px;color:#64748b;">Zoom</span>
+                        <button onclick="window.msaZoomIn()" class="ciliai-button" style="padding:4px 8px;font-size:12px;background:#64748b;color:white;" title="Zoom In">
+                            🔍+
+                        </button>
+                    </div>
+                    
                     <!-- Scroll Buttons -->
                     <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-                        <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#64748b;color:white;" title="Scroll Left">
-                            ◄ Left
-                        </button>
-                        <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#64748b;color:white;" title="Scroll Right">
-                            Right ►
-                        </button>
                         <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#059669;color:white;" title="Go to Start">
                             ⏮ Start
+                        </button>
+                        <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#64748b;color:white;" title="Scroll Left (← Arrow)">
+                            ◄ Left
+                        </button>
+                        <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#64748b;color:white;" title="Scroll Right (→ Arrow)">
+                            Right ►
                         </button>
                         <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:6px 12px;font-size:13px;background:#059669;color:white;" title="Go to End">
                             End ⏭
@@ -7820,14 +7901,20 @@ window.runDashboardSearch = function() {
 
                 <!-- Color Legend -->
                 <div style="padding:8px 20px;background:#fef3c7;border-bottom:1px solid #fde047;display:flex;gap:16px;font-size:11px;flex-wrap:wrap;">
-                    <span><span style="display:inline-block;width:14px;height:14px;background:#80a0f0;vertical-align:middle;margin-right:4px;"></span>Hydrophobic</span>
-                    <span><span style="display:inline-block;width:14px;height:14px;background:#f01505;vertical-align:middle;margin-right:4px;"></span>Basic (+)</span>
-                    <span><span style="display:inline-block;width:14px;height:14px;background:#c048c0;vertical-align:middle;margin-right:4px;"></span>Acidic (-)</span>
-                    <span><span style="display:inline-block;width:14px;height:14px;background:#00ff00;vertical-align:middle;margin-right:4px;"></span>Polar</span>
-                    <span><span style="display:inline-block;width:14px;height:14px;background:#15a4a4;vertical-align:middle;margin-right:4px;"></span>Aromatic</span>
-                    <span><span style="display:inline-block;width:14px;height:14px;background:#ffff00;vertical-align:middle;margin-right:4px;"></span>Proline</span>
-                    <span><span style="display:inline-block;width:14px;height:14px;background:#f09048;vertical-align:middle;margin-right:4px;"></span>Glycine</span>
+                    <span><strong>${window.CiliAI.activeColorScheme} Color Scheme:</strong></span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#CCFF00;vertical-align:middle;margin-right:4px;"></span>Hydrophobic</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#0000FF;vertical-align:middle;margin-right:4px;"></span>Basic (+)</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#FF0000;vertical-align:middle;margin-right:4px;"></span>Acidic (-)</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#00FFFF;vertical-align:middle;margin-right:4px;"></span>Polar</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#FF69B4;vertical-align:middle;margin-right:4px;"></span>Aromatic</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#800080;vertical-align:middle;margin-right:4px;"></span>Proline</span>
+                    <span><span style="display:inline-block;width:14px;height:14px;background:#FFFF00;vertical-align:middle;margin-right:4px;"></span>Cysteine</span>
                     <span style="margin-left:auto;font-weight:600;">🖱️ Click variant markers above for details</span>
+                </div>
+
+                <!-- Scroll Indicator -->
+                <div style="position:sticky;top:0;left:0;right:0;height:4px;background:#e5e7eb;z-index:1000;">
+                    <div id="scroll-indicator" style="height:100%;background:#3b82f6;width:0%;transition:width 0.3s;"></div>
                 </div>
 
                 <!-- Fixed header with variants and position numbers -->
@@ -7872,19 +7959,21 @@ window.runDashboardSearch = function() {
             </div>`;
 
         setupSyncScroll();
+        setupKeyboardNavigation();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 9. MSA Scroll Functions
+    // 9. MSA Scroll Functions with Enhanced Behavior
     // ─────────────────────────────────────────────────────────────
     window.msaScrollLeft = function() {
         const container = document.getElementById('msa-scroll');
         const headerScroll = document.getElementById('header-scroll');
         if (!container) return;
         
-        const scrollAmount = 500;
+        const scrollAmount = Math.max(container.clientWidth * 0.8, 500);
         container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
         if (headerScroll) headerScroll.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+        updateScrollIndicator();
     };
 
     window.msaScrollRight = function() {
@@ -7892,9 +7981,10 @@ window.runDashboardSearch = function() {
         const headerScroll = document.getElementById('header-scroll');
         if (!container) return;
         
-        const scrollAmount = 500;
+        const scrollAmount = Math.max(container.clientWidth * 0.8, 500);
         container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
         if (headerScroll) headerScroll.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        updateScrollIndicator();
     };
 
     window.msaScrollToStart = function() {
@@ -7904,6 +7994,7 @@ window.runDashboardSearch = function() {
         
         container.scrollTo({ left: 0, behavior: 'smooth' });
         if (headerScroll) headerScroll.scrollTo({ left: 0, behavior: 'smooth' });
+        updateScrollIndicator();
     };
 
     window.msaScrollToEnd = function() {
@@ -7917,38 +8008,49 @@ window.runDashboardSearch = function() {
             const maxHeaderScroll = headerScroll.scrollWidth - headerScroll.clientWidth;
             headerScroll.scrollTo({ left: maxHeaderScroll, behavior: 'smooth' });
         }
+        updateScrollIndicator();
     };
 
     // ─────────────────────────────────────────────────────────────
-// Variant (header) ONLY scroll controls
-// ─────────────────────────────────────────────────────────────
-window.variantScrollLeft = function () {
-    const headerScroll = document.getElementById('header-scroll');
-    if (!headerScroll) return;
-    headerScroll.scrollBy({ left: -500, behavior: 'smooth' });
-};
-
-window.variantScrollRight = function () {
-    const headerScroll = document.getElementById('header-scroll');
-    if (!headerScroll) return;
-    headerScroll.scrollBy({ left: 500, behavior: 'smooth' });
-};
-
-window.variantScrollToStart = function () {
-    const headerScroll = document.getElementById('header-scroll');
-    if (!headerScroll) return;
-    headerScroll.scrollTo({ left: 0, behavior: 'smooth' });
-};
-
-window.variantScrollToEnd = function () {
-    const headerScroll = document.getElementById('header-scroll');
-    if (!headerScroll) return;
-    const maxScroll = headerScroll.scrollWidth - headerScroll.clientWidth;
-    headerScroll.scrollTo({ left: maxScroll, behavior: 'smooth' });
-};
+    // 10. Color Scheme Changer
+    // ─────────────────────────────────────────────────────────────
+    window.changeColorScheme = function(schemeName) {
+        window.CiliAI.activeColorScheme = schemeName;
+        const data = window.CiliAI.activeVariantData;
+        if (data) {
+            window.drawVariantWorkspace('msa');
+        }
+    };
 
     // ─────────────────────────────────────────────────────────────
-    // 10. Enhanced Variant Popup
+    // 11. Zoom Functions
+    // ─────────────────────────────────────────────────────────────
+    window.msaZoomIn = function() {
+        const container = document.getElementById('msa-scroll');
+        if (!container) return;
+        
+        const currentScale = parseFloat(getComputedStyle(container).fontSize) || 12;
+        const newScale = Math.min(currentScale * 1.2, 24);
+        container.style.fontSize = `${newScale}px`;
+        
+        const headerScroll = document.getElementById('header-scroll');
+        if (headerScroll) headerScroll.style.fontSize = `${newScale}px`;
+    };
+
+    window.msaZoomOut = function() {
+        const container = document.getElementById('msa-scroll');
+        if (!container) return;
+        
+        const currentScale = parseFloat(getComputedStyle(container).fontSize) || 12;
+        const newScale = Math.max(currentScale * 0.8, 8);
+        container.style.fontSize = `${newScale}px`;
+        
+        const headerScroll = document.getElementById('header-scroll');
+        if (headerScroll) headerScroll.style.fontSize = `${newScale}px`;
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // 12. Enhanced Variant Popup
     // ─────────────────────────────────────────────────────────────
     window.showVariantPopup = function(event, label, pos, clinSig, disease, color) {
         event.stopPropagation();
@@ -7992,7 +8094,7 @@ window.variantScrollToEnd = function () {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 11. Synchronized Scrolling
+    // 13. Synchronized Scrolling with Indicator
     // ─────────────────────────────────────────────────────────────
     function setupSyncScroll() {
         const msaScroll = document.getElementById('msa-scroll');
@@ -8002,15 +8104,78 @@ window.variantScrollToEnd = function () {
         
         msaScroll.addEventListener('scroll', () => {
             headerScroll.scrollLeft = msaScroll.scrollLeft;
+            updateScrollIndicator();
         });
 
         headerScroll.addEventListener('scroll', () => {
             msaScroll.scrollLeft = headerScroll.scrollLeft;
+            updateScrollIndicator();
+        });
+
+        // Initial update
+        updateScrollIndicator();
+    }
+
+    function updateScrollIndicator() {
+        const msaScroll = document.getElementById('msa-scroll');
+        const indicator = document.getElementById('scroll-indicator');
+        
+        if (!msaScroll || !indicator) return;
+        
+        const scrollPercent = (msaScroll.scrollLeft / (msaScroll.scrollWidth - msaScroll.clientWidth)) * 100;
+        indicator.style.width = `${scrollPercent}%`;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 14. Keyboard Navigation Setup
+    // ─────────────────────────────────────────────────────────────
+    function setupKeyboardNavigation() {
+        document.addEventListener('keydown', (e) => {
+            // Don't interfere with input fields
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                return;
+            }
+            
+            // Check if we're in MSA view
+            if (!document.getElementById('msa-scroll')) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    window.msaScrollLeft();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    window.msaScrollRight();
+                    break;
+                case 'Home':
+                    e.preventDefault();
+                    window.msaScrollToStart();
+                    break;
+                case 'End':
+                    e.preventDefault();
+                    window.msaScrollToEnd();
+                    break;
+                case '+':
+                case '=':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        window.msaZoomIn();
+                    }
+                    break;
+                case '-':
+                case '_':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        window.msaZoomOut();
+                    }
+                    break;
+            }
         });
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 12. Jump to Position - FIXED
+    // 15. Jump to Position - FIXED
     // ─────────────────────────────────────────────────────────────
     window.msaJumpToPosition = function() {
         const input = document.getElementById('msa-jump-input');
@@ -8044,6 +8209,8 @@ window.variantScrollToEnd = function () {
             headerScroll.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
         }
         
+        updateScrollIndicator();
+        
         // Visual feedback
         input.style.background = '#d1fae5';
         setTimeout(() => { input.style.background = ''; }, 500);
@@ -8057,7 +8224,7 @@ window.variantScrollToEnd = function () {
     });
 
     // ─────────────────────────────────────────────────────────────
-    // 13. Download Functions
+    // 16. Download Functions
     // ─────────────────────────────────────────────────────────────
     window.downloadMSAFasta = function() {
         const align = window.CiliAI.activeAlignmentData;
@@ -8135,7 +8302,7 @@ window.variantScrollToEnd = function () {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 14. Other Functions
+    // 17. Other Functions
     // ─────────────────────────────────────────────────────────────
     window.openVariantPanel = function(title, pos, desc, gene) {
         const panel = document.getElementById('var-panel');
@@ -8205,10 +8372,11 @@ window.variantScrollToEnd = function () {
         }, 500);
     };
 
-    console.log("[CiliAI] Variant Analysis & MSA Engine v15.4 – Human sequence fixed + scroll buttons + working jump");
+    console.log("[CiliAI] Variant Analysis & MSA Engine v15.5 – Enhanced with color schemes, scroll, and human visibility");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
