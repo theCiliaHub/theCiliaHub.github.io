@@ -7293,8 +7293,8 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.8 - HUMAN VISIBLE FIX)
- * CRITICAL FIX: Human amino acids NOW GUARANTEED VISIBLE
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.9 - UNIFIED MSA)
+ * UPDATE: Human row now treated as standard MSA row (No Reference Styling)
  * ============================================================== */
 (function() {
     'use strict';
@@ -7672,7 +7672,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // CRITICAL FIX: MSA Rendering with VISIBLE Human Amino Acids
+    // CRITICAL FIX: MSA Rendering with UNIFIED ROWS (No Special Human Ref)
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7689,10 +7689,6 @@ window.runDashboardSearch = function() {
         const human = align.alignments[0];
         const fullSeq = human.seq;
         const seqWidth = fullSeq.length * 18;
-
-        // CRITICAL: Verify human sequence exists
-        console.log("Human sequence length:", fullSeq.length);
-        console.log("First 50 amino acids:", fullSeq.substring(0, 50));
 
         // GET ACTIVE COLOR SCHEME
         const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
@@ -7726,9 +7722,9 @@ window.runDashboardSearch = function() {
             posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${show?'#000':'#ddd'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
         }
 
-        // BUILD ALL ROWS - CRITICAL FIX FOR HUMAN VISIBILITY
+        // BUILD ALL ROWS - UNIFIED STYLING (No 'Reference' distinction)
         let rowsHtml = '';
-        align.alignments.forEach((aln, idx) => {
+        align.alignments.forEach((aln) => {
             let seqHtml = '';
             
             // Build each amino acid with explicit styling
@@ -7740,17 +7736,15 @@ window.runDashboardSearch = function() {
                 // Get colors from active scheme
                 const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#cccccc', text: '#000000'};
                 
-                // CRITICAL: Explicit inline styles for GUARANTEED visibility
-                // Added opacity:1 to override any global/inherited transparency
+                // CRITICAL: Explicit inline styles + opacity:1
                 seqHtml += `<span style="display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text};background-color:${colors.bg};opacity:1;border:0.5px solid #f0f0f0;">${aa}</span>`;
             }
             
-            // CRITICAL: Different styling for Human row
-            const isHuman = idx === 0;
+            // Standard row styling for everyone (including Human)
             rowsHtml += `
-                <div style="display:flex;border-bottom:2px solid ${isHuman?'#3b82f6':'#e5e7eb'};background:${isHuman?'#eff6ff':'#ffffff'};">
-                    <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:${isHuman?'bold':'500'};color:${isHuman?'#1e40af':'#475569'};font-size:${isHuman?'14px':'13px'};background:${isHuman?'#dbeafe':'#f8fafc'};border-right:2px solid ${isHuman?'#3b82f6':'#e2e8f0'};">
-                        ${aln.icon} ${aln.species}${isHuman ? ' <span style="color:#3b82f6;font-size:11px;">(Reference)</span>' : ''}
+                <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#ffffff;">
+                    <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:500;color:#475569;font-size:13px;background:#f8fafc;border-right:1px solid #e2e8f0;">
+                        ${aln.icon} ${aln.species}
                     </div>
                     <div style="white-space:nowrap;padding:2px 0;">${seqHtml}</div>
                 </div>`;
@@ -7850,13 +7844,9 @@ window.runDashboardSearch = function() {
 
         setupSyncScroll();
         
-        // CRITICAL: Force scroll to top to ensure Human row is visible
         setTimeout(() => {
             const c = document.getElementById('msa-scroll');
-            if (c) {
-                c.scrollTop = 0;
-                console.log("Forced scroll to top - Human row should be visible now");
-            }
+            if (c) c.scrollTop = 0;
         }, 100);
     }
 
@@ -8005,8 +7995,9 @@ window.runDashboardSearch = function() {
         setTimeout(() => { const i = document.getElementById('msa-jump-input'); if (i) { i.value = p; window.msaJumpToPosition(); } }, 500);
     };
 
-    console.log("[CiliAI] v15.8 – CRITICAL FIX: Human amino acids GUARANTEED VISIBLE with explicit styling");
+    console.log("[CiliAI] v15.9 – UNIFIED MSA: Human row is now standard and fully visible.");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
