@@ -7714,167 +7714,167 @@ window.loadFullLengthAlignment = async function(geneSymbol) {
     };
 };
 
-   // ─────────────────────────────────────────────────────────────
-    // RENDERER WITH CILIAHUB BLUE THEME UI
-    // ─────────────────────────────────────────────────────────────
-    window.renderFullLengthMSA = function(data, container) {
-        const align = window.CiliAI.activeAlignmentData;
-        
-        // 1. Safety Check
-        if (!align || !align.alignments?.length) {
-            container.innerHTML = `
-                <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;">
-                    <div style="font-size:48px; margin-bottom:16px;">🧬</div>
-                    <h3 style="margin-bottom:16px; color:#0056b3;">Loading Alignment...</h3>
-                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:10px 24px; background:#0056b3; color:white; border-radius:4px;">← Back</button>
-                </div>`;
-            return;
-        }
-
-        // 2. Setup Reference (Human)
-        const human = align.alignments.find(a => a.species === 'Human') || align.alignments[0];
-        const fullSeq = human.seq;
-        const seqWidth = fullSeq.length * 18;
-        const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
-
-        // 3. Variant Markers (Blue Theme)
-        const allVars = [...data.variants, ...data.customVariants];
-        const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
-        const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
-        const isLikely = v => /likely pathogenic/i.test(getSig(v));
-
-        let markersHtml = '';
-        allVars.forEach(v => {
-            const pos = parseInt(v.begin);
-            if (pos < 1 || pos > fullSeq.length) return;
-            
-            let color = '#94a3b8';
-            if (isPatho(v)) color = '#dc3545'; // Red for danger
-            else if (isLikely(v)) color = '#fd7e14'; // Orange
-            else if (v.isCustom) color = '#6f42c1'; // Purple
-            else color = '#0056b3'; // Blue for benign/others (Themed)
-
-            const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
-            const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
-            const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
-            
-            markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+4}px;top:5px;cursor:pointer;width:10px;height:10px;background:${color};border-radius:50%;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:100;" title="${label}"></div>`;
-        });
-
-        // 4. Position Numbers (Blue Theme)
-        let posHtml = '';
-        for (let i = 0; i < fullSeq.length; i++) {
-            const pos = i + 1;
-            const show = (pos % 10 === 0);
-            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:${show?'#0056b3':'#cbd5e1'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
-        }
-
-        // 5. Build Rows with CiliaHub Blue Styling
-        let rowsHtml = '';
-        align.alignments.forEach((aln) => {
-            let seqHtml = '';
-            for (let i = 0; i < aln.seq.length; i++) {
-                const aa = aln.seq[i];
-                const humanAA = fullSeq[i];
-                const isMatch = aa === humanAA && aa !== '-';
-                const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#ffffff', text: '#000000'};
-                
-                // FORCE VISIBILITY with !important
-                seqHtml += `<span style="display:inline-block;width:18px;height:24px;line-height:24px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text} !important;background-color:${colors.bg} !important;opacity:1 !important;visibility:visible !important;position:relative;z-index:10;border-right:1px solid rgba(0,0,0,0.05);">${aa}</span>`;
-            }
-            
-            rowsHtml += `
-                <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#ffffff;">
-                    <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:500;color:#0056b3;font-size:13px;background:#f0f7ff;border-right:2px solid #0056b3;display:flex;align-items:center;">
-                        <span style="margin-right:6px;">${aln.icon}</span> ${aln.species}
-                    </div>
-                    <div style="white-space:nowrap;padding:0;">${seqHtml}</div>
-                </div>`;
-        });
-
-        // 6. Main Container Layout (CiliaHub Blue Headers & Buttons)
+ // ─────────────────────────────────────────────────────────────
+// RENDERER WITH CILIAHUB BLUE THEME UI (REPLACEMENT)
+// ─────────────────────────────────────────────────────────────
+window.renderFullLengthMSA = function(data, container) {
+    const align = window.CiliAI.activeAlignmentData;
+    
+    // 1. Safety Check
+    if (!align || !align.alignments?.length) {
         container.innerHTML = `
-            <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif; background:#fff;">
-                <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-                    <div>
-                        <strong style="font-size:16px;">${data.gene} Evolutionary Analysis</strong>
-                        <div style="font-size:12px;opacity:0.9;margin-top:2px;">${fullSeq.length} AA • ${align.alignments.length} Species</div>
-                    </div>
-                    <div style="display:flex;gap:10px;">
-                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;">
-                            <option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Blue)</option>
-                            <option value="Taylor" ${window.CiliAI.activeColorScheme==='Taylor'?'selected':''}>Taylor</option>
-                            <option value="Zappo" ${window.CiliAI.activeColorScheme==='Zappo'?'selected':''}>Zappo</option>
-                        </select>
-                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:rgba(255,255,255,0.2);color:white;padding:6px 12px;border:1px solid rgba(255,255,255,0.4);">← Back</button>
-                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ FASTA</button>
-                    </div>
-                </div>
+            <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;">
+                <div style="font-size:48px; margin-bottom:16px;">🧬</div>
+                <h3 style="margin-bottom:16px; color:#0056b3;">Loading Alignment...</h3>
+                <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:10px 24px; background:#0056b3; color:white; border-radius:4px;">← Back</button>
+            </div>`;
+        return;
+    }
 
-                <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;">
-                    <span style="font-size:13px;color:#0056b3;font-weight:600;">Jump to:</span>
-                    <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Pos" style="width:80px;padding:4px 8px;border:1px solid #0056b3;border-radius:4px;font-size:13px;color:#0056b3;" />
-                    <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:4px 12px;background:#0056b3;color:white;font-size:13px;">Go</button>
-                    
-                    <div style="margin-left:auto;display:flex;gap:4px;">
-                        <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏮</button>
-                        <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">◄</button>
-                        <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">►</button>
-                        <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏭</button>
-                    </div>
-                </div>
+    // 2. Setup Reference (Human)
+    const human = align.alignments.find(a => a.species === 'Human') || align.alignments[0];
+    const fullSeq = human.seq;
+    const seqWidth = fullSeq.length * 18;
+    const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
 
-                <div style="background:#fff;border-bottom:2px solid #0056b3;flex-shrink:0;">
-                    <div style="display:flex;">
-                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;">
-                            <div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Position & Variants</div>
-                        </div>
-                        <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
-                            <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#fff;">${markersHtml}</div>
-                            <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f7ff;">${posHtml}</div>
-                        </div>
-                    </div>
-                </div>
+    // 3. Variant Markers (Blue Theme)
+    const allVars = [...data.variants, ...data.customVariants];
+    const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
+    const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
+    const isLikely = v => /likely pathogenic/i.test(getSig(v));
 
-                <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:thin;scrollbar-color:#0056b3 #f0f7ff;">
-                    ${rowsHtml}
-                </div>
+    let markersHtml = '';
+    allVars.forEach(v => {
+        const pos = parseInt(v.begin);
+        if (pos < 1 || pos > fullSeq.length) return;
+        
+        let color = '#94a3b8';
+        if (isPatho(v)) color = '#dc3545'; // Red for danger
+        else if (isLikely(v)) color = '#fd7e14'; // Orange
+        else if (v.isCustom) color = '#6f42c1'; // Purple
+        else color = '#0056b3'; // Blue for benign/others (Themed)
 
-                <div style="padding:8px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;display:flex;gap:15px;color:#475569;">
-                    <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#80a0f0;display:inline-block;"></span> Hydrophobic (Blue)</div>
-                    <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#f01505;display:inline-block;"></span> Positive (Red)</div>
-                    <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#00ff00;display:inline-block;"></span> Polar (Green)</div>
-                    <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#c048c0;display:inline-block;"></span> Negative (Magenta)</div>
-                </div>
+        const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
+        const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
+        const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
+        
+        markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+4}px;top:5px;cursor:pointer;width:10px;height:10px;background:${color};border-radius:50%;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:100;" title="${label}"></div>`;
+    });
 
-                <style>
-                    #msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
-                    #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; }
-                    #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; }
-                    #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; }
-                    #header-scroll::-webkit-scrollbar { height: 0px; }
-                </style>
+    // 4. Position Numbers (Blue Theme)
+    let posHtml = '';
+    for (let i = 0; i < fullSeq.length; i++) {
+        const pos = i + 1;
+        const show = (pos % 10 === 0);
+        posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:${show?'#0056b3':'#cbd5e1'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
+    }
+
+    // 5. Build Rows with CiliaHub Blue Styling
+    let rowsHtml = '';
+    align.alignments.forEach((aln) => {
+        let seqHtml = '';
+        for (let i = 0; i < aln.seq.length; i++) {
+            const aa = aln.seq[i];
+            const humanAA = fullSeq[i];
+            const isMatch = aa === humanAA && aa !== '-';
+            const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#ffffff', text: '#000000'};
+            
+            // FORCE VISIBILITY with !important
+            seqHtml += `<span style="display:inline-block;width:18px;height:24px;line-height:24px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text} !important;background-color:${colors.bg} !important;opacity:1 !important;visibility:visible !important;position:relative;z-index:10;border-right:1px solid rgba(0,0,0,0.05);">${aa}</span>`;
+        }
+        
+        rowsHtml += `
+            <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#ffffff;">
+                <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:500;color:#0056b3;font-size:13px;background:#f0f7ff;border-right:2px solid #0056b3;display:flex;align-items:center;">
+                    <span style="margin-right:6px;">${aln.icon}</span> ${aln.species}
+                </div>
+                <div style="white-space:nowrap;padding:0;">${seqHtml}</div>
+            </div>`;
+    });
+
+    // 6. Main Container Layout (CiliaHub Blue Headers & Buttons)
+    container.innerHTML = `
+        <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif; background:#fff;">
+            <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                <div>
+                    <strong style="font-size:16px;">${data.gene} Evolutionary Analysis</strong>
+                    <div style="font-size:12px;opacity:0.9;margin-top:2px;">${fullSeq.length} AA • ${align.alignments.length} Species</div>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;">
+                        <option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Blue)</option>
+                        <option value="Taylor" ${window.CiliAI.activeColorScheme==='Taylor'?'selected':''}>Taylor</option>
+                        <option value="Zappo" ${window.CiliAI.activeColorScheme==='Zappo'?'selected':''}>Zappo</option>
+                    </select>
+                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:rgba(255,255,255,0.2);color:white;padding:6px 12px;border:1px solid rgba(255,255,255,0.4);">← Back</button>
+                    <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ FASTA</button>
+                </div>
             </div>
 
-            <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #0056b3;border-radius:6px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:10000;min-width:300px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
-                    <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;color:#0056b3;"></h3>
-                    <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;">&times;</button>
+            <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;">
+                <span style="font-size:13px;color:#0056b3;font-weight:600;">Jump to:</span>
+                <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Pos" style="width:80px;padding:4px 8px;border:1px solid #0056b3;border-radius:4px;font-size:13px;color:#0056b3;" />
+                <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:4px 12px;background:#0056b3;color:white;font-size:13px;">Go</button>
+                
+                <div style="margin-left:auto;display:flex;gap:4px;">
+                    <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏮</button>
+                    <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">◄</button>
+                    <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">►</button>
+                    <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏭</button>
                 </div>
-                <div id="popup-content" style="font-size:13px;line-height:1.6;color:#334155;"></div>
-                <div style="margin-top:12px;padding-top:12px;display:flex;gap:8px;">
-                    <button id="popup-cons-btn" class="ciliai-button" style="background:#0056b3;color:white;padding:6px 12px;flex:1;">Check Conservation</button>
-                    <button id="popup-3d-btn" class="ciliai-button" style="background:#e7f1ff;color:#0056b3;border:1px solid #0056b3;padding:6px 12px;flex:1;">View 3D</button>
-                </div>
-            </div>`;
+            </div>
 
-        setupSyncScroll();
-        
-        setTimeout(() => {
-            const c = document.getElementById('msa-scroll');
-            if (c) c.scrollTop = 0;
-        }, 100);
-    };
+            <div style="background:#fff;border-bottom:2px solid #0056b3;flex-shrink:0;">
+                <div style="display:flex;">
+                    <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;">
+                        <div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Position & Variants</div>
+                    </div>
+                    <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
+                        <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#fff;">${markersHtml}</div>
+                        <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f7ff;">${posHtml}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:thin;scrollbar-color:#0056b3 #f0f7ff;">
+                ${rowsHtml}
+            </div>
+
+            <div style="padding:8px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;display:flex;gap:15px;color:#475569;">
+                <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#80a0f0;display:inline-block;"></span> Hydrophobic (Blue)</div>
+                <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#f01505;display:inline-block;"></span> Positive (Red)</div>
+                <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#00ff00;display:inline-block;"></span> Polar (Green)</div>
+                <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#c048c0;display:inline-block;"></span> Negative (Magenta)</div>
+            </div>
+
+            <style>
+                #msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
+                #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; }
+                #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; }
+                #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; }
+                #header-scroll::-webkit-scrollbar { height: 0px; }
+            </style>
+        </div>
+
+        <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #0056b3;border-radius:6px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:10000;min-width:300px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
+                <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;color:#0056b3;"></h3>
+                <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;">&times;</button>
+            </div>
+            <div id="popup-content" style="font-size:13px;line-height:1.6;color:#334155;"></div>
+            <div style="margin-top:12px;padding-top:12px;display:flex;gap:8px;">
+                <button id="popup-cons-btn" class="ciliai-button" style="background:#0056b3;color:white;padding:6px 12px;flex:1;">Check Conservation</button>
+                <button id="popup-3d-btn" class="ciliai-button" style="background:#e7f1ff;color:#0056b3;border:1px solid #0056b3;padding:6px 12px;flex:1;">View 3D</button>
+            </div>
+        </div>`;
+
+    setupSyncScroll();
+    
+    setTimeout(() => {
+        const c = document.getElementById('msa-scroll');
+        if (c) c.scrollTop = 0;
+    }, 100);
+};
     
     window.msaScrollLeft = function() {
         const c = document.getElementById('msa-scroll');
@@ -8017,16 +8017,105 @@ window.loadFullLengthAlignment = async function(geneSymbol) {
         return `Loaded ${g}`;
     };
 
-    window.checkConservation = async function(g, p) {
-        if (window.addChatMessage) window.addChatMessage(`Checking position ${p}...`, false);
-        window.drawVariantWorkspace('msa');
-        setTimeout(() => { const i = document.getElementById('msa-jump-input'); if (i) { i.value = p; window.msaJumpToPosition(); } }, 500);
-    };
+// --- UPDATED: Connect "Check Conservation" button to Phylogeny Logic ---
+window.checkConservation = async function(g, p) {
+    if (window.addChatMessage) window.addChatMessage(`Checking conservation for <strong>${g}</strong>...`, false);
+    
+    // 1. Ensure Data is Loaded
+    if (!window.liPhylogenyCache) {
+        await window.ensurePhylogenyDataLoaded();
+    }
 
+    // 2. Trigger Phylogeny Heatmap (using existing logic)
+    // This reuses the logic from 'handlePhylogenyVisualizationQuery' but targets the display container directly
+    if (window.renderLiPhylogenyHeatmap) {
+        // Clear previous view
+        window.drawVariantWorkspace('msa'); // Use MSA container or similar large view
+        
+        // Render Plot
+        try {
+            const res = window.renderLiPhylogenyHeatmap([g]);
+            if (res && res.plotData) {
+                const container = document.getElementById('cilia-svg'); // Target the main SVG container
+                if(container) {
+                    container.style.display = 'block';
+                    // Hide other containers
+                    if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
+                    if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
+                    
+                    Plotly.newPlot('cilia-svg', res.plotData, res.plotLayout);
+                    
+                    // Add back button
+                    const backBtn = document.createElement('button');
+                    backBtn.className = 'ciliai-button';
+                    backBtn.innerText = '← Back to Variants';
+                    backBtn.style.position = 'absolute';
+                    backBtn.style.top = '10px';
+                    backBtn.style.right = '10px';
+                    backBtn.style.zIndex = '100';
+                    backBtn.onclick = () => window.renderVariantMap(g);
+                    container.appendChild(backBtn);
+                }
+            }
+        } catch (e) {
+            console.error("Conservation Check Error:", e);
+            window.addChatMessage("Could not render phylogeny plot.", false);
+        }
+    }
+};
+// --- NEW: 3D Structure Viewer Integration (AlphaFold) ---
+window.showStructureViewer = function(gene, pos, variantLabel) {
+    const container = document.getElementById('plotly-container');
+    if (!container) return;
+
+    // 1. Setup UI
+    window.switchView('plot'); // Switch to main view container
+    container.innerHTML = `
+        <div style="height:100%; display:flex; flex-direction:column;">
+            <div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                <h4 style="margin:0; color:#0056b3;">AlphaFold Structure: ${gene}</h4>
+                <button onclick="window.renderVariantMap('${gene}')" class="ciliai-button" style="background:#6c757d;">Close 3D</button>
+            </div>
+            <div id="molstar-viewer" style="flex:1; position:relative; background:#f8f9fa;">
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); text-align:center; color:#666;">
+                    <div style="font-size:24px;">🧬</div>
+                    <p>Loading 3D Structure from AlphaFold...</p>
+                </div>
+            </div>
+            <div style="padding:10px; font-size:12px; color:#666; border-top:1px solid #eee;">
+                <strong>Variant:</strong> ${variantLabel} (Pos: ${pos}) <br>
+                <em>Note: This is a predicted model.</em>
+            </div>
+        </div>
+    `;
+
+    // 2. Load AlphaFold Structure (iframe method for stability/simplicity)
+    // Using EBI's AlphaFold embed logic or a direct Mol* viewer if available. 
+    // For simplicity and reliability without external huge libraries, we use the EBI detailed page in an iframe 
+    // or a direct image if interactivity isn't critical.
+    // BETTER: Use the Mol* plugin if you have it, otherwise fallback to EBI iframe.
+    
+    const uniProtID = window.CiliAI.activeVariantData?.uniprotID;
+    if(!uniProtID) {
+        container.querySelector('#molstar-viewer').innerHTML = '<p style="color:red; text-align:center; padding-top:20px;">UniProt ID not found.</p>';
+        return;
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://alphafold.ebi.ac.uk/entry/${uniProtID}`;
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    
+    const viewer = document.getElementById('molstar-viewer');
+    viewer.innerHTML = ''; // Clear loading text
+    viewer.appendChild(iframe);
+};
     console.log("[CiliAI] v16.1 – FORCED VISIBILITY: Applied !important to all critical MSA styling.");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
