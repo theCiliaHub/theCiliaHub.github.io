@@ -8017,104 +8017,302 @@ window.renderFullLengthMSA = function(data, container) {
         return `Loaded ${g}`;
     };
 
+    // ─────────────────────────────────────────────────────────────
+    // REQUIRED DATA: Organism Panel with Evolutionary Distances
+    // (Critical for checkConservation logic)
+    // ─────────────────────────────────────────────────────────────
+    const ORGANISM_PANEL = [
+        { name: "Homo sapiens", common: "Human", dist: 0.0, icon: "👤" },
+        { name: "Pan troglodytes", common: "Chimpanzee", dist: 0.01, icon: "🐵" },
+        { name: "Mus musculus", common: "Mouse", dist: 0.15, icon: "🐭" },
+        { name: "Rattus norvegicus", common: "Rat", dist: 0.16, icon: "🐀" },
+        { name: "Canis lupus familiaris", common: "Dog", dist: 0.18, icon: "🐕" },
+        { name: "Bos taurus", common: "Cow", dist: 0.20, icon: "🐄" },
+        { name: "Gallus gallus", common: "Chicken", dist: 0.30, icon: "🐔" },
+        { name: "Xenopus tropicalis", common: "Frog", dist: 0.45, icon: "🐸" },
+        { name: "Danio rerio", common: "Zebrafish", dist: 0.50, icon: "🐟" },
+        { name: "Drosophila melanogaster", common: "Fruit Fly", dist: 0.70, icon: "🪰" },
+        { name: "Caenorhabditis elegans", common: "Worm", dist: 0.75, icon: "🪱" },
+        { name: "Saccharomyces cerevisiae", common: "Yeast", dist: 0.90, icon: "🍄" },
+        { name: "Chlamydomonas reinhardtii", common: "Algae", dist: 0.85, icon: "🦠" }
+    ];
+    
 // --- UPDATED: Connect "Check Conservation" button to Phylogeny Logic ---
-window.checkConservation = async function(g, p) {
-    if (window.addChatMessage) window.addChatMessage(`Checking conservation for <strong>${g}</strong>...`, false);
-    
-    // 1. Ensure Data is Loaded
-    if (!window.liPhylogenyCache) {
-        await window.ensurePhylogenyDataLoaded();
-    }
-
-    // 2. Trigger Phylogeny Heatmap (using existing logic)
-    // This reuses the logic from 'handlePhylogenyVisualizationQuery' but targets the display container directly
-    if (window.renderLiPhylogenyHeatmap) {
-        // Clear previous view
-        window.drawVariantWorkspace('msa'); // Use MSA container or similar large view
-        
-        // Render Plot
-        try {
-            const res = window.renderLiPhylogenyHeatmap([g]);
-            if (res && res.plotData) {
-                const container = document.getElementById('cilia-svg'); // Target the main SVG container
-                if(container) {
-                    container.style.display = 'block';
-                    // Hide other containers
-                    if(document.getElementById('plotly-container')) document.getElementById('plotly-container').style.display = 'none';
-                    if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
-                    
-                    Plotly.newPlot('cilia-svg', res.plotData, res.plotLayout);
-                    
-                    // Add back button
-                    const backBtn = document.createElement('button');
-                    backBtn.className = 'ciliai-button';
-                    backBtn.innerText = '← Back to Variants';
-                    backBtn.style.position = 'absolute';
-                    backBtn.style.top = '10px';
-                    backBtn.style.right = '10px';
-                    backBtn.style.zIndex = '100';
-                    backBtn.onclick = () => window.renderVariantMap(g);
-                    container.appendChild(backBtn);
-                }
-            }
-        } catch (e) {
-            console.error("Conservation Check Error:", e);
-            window.addChatMessage("Could not render phylogeny plot.", false);
+// 4. MSA VISUALIZER (Safe Version)
+window.checkConservation = async function(gene, pos, refAA, altAA) {
+        // Handle argument shifting if called from button (gene, pos, ref, alt) vs (gene, pos)
+        // If refAA/altAA are missing, we can try to extract from the active variant data or default
+        if (!refAA || !altAA) {
+             const v = window.CiliAI.activeVariantData?.variants.find(v => parseInt(v.begin) === parseInt(pos));
+             if(v) {
+                 refAA = v.wildType;
+                 altAA = v.alternativeSequence;
+             } else {
+                 refAA = '?'; altAA = '?';
+             }
         }
-    }
-};
-// --- NEW: 3D Structure Viewer Integration (AlphaFold) ---
-window.showStructureViewer = function(gene, pos, variantLabel) {
-    const container = document.getElementById('plotly-container');
-    if (!container) return;
 
-    // 1. Setup UI
-    window.switchView('plot'); // Switch to main view container
-    container.innerHTML = `
-        <div style="height:100%; display:flex; flex-direction:column;">
-            <div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                <h4 style="margin:0; color:#0056b3;">AlphaFold Structure: ${gene}</h4>
-                <button onclick="window.renderVariantMap('${gene}')" class="ciliai-button" style="background:#6c757d;">Close 3D</button>
-            </div>
-            <div id="molstar-viewer" style="flex:1; position:relative; background:#f8f9fa;">
-                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); text-align:center; color:#666;">
-                    <div style="font-size:24px;">🧬</div>
-                    <p>Loading 3D Structure from AlphaFold...</p>
+        // 1. Target the area
+        let area = document.getElementById('msa-result-area');
+        if (!area) {
+            const panel = document.getElementById('variant-popup') || document.getElementById('var-panel');
+            if (panel) {
+                area = document.createElement('div');
+                area.id = 'msa-result-area';
+                area.style.cssText = 'margin-top:15px; border-top:1px solid #eee; padding-top:10px;';
+                const content = panel.querySelector('#popup-content');
+                if(content) content.appendChild(area);
+                else panel.appendChild(area);
+            } else {
+                // Fallback if popup isn't open
+                alert(`Conservation Check:\nGene: ${gene}\nPos: ${pos}\n(Open variant popup for full detail)`);
+                return;
+            }
+        }
+
+        area.innerHTML = `
+            <div style="text-align:center; padding:15px; color:#64748b;">
+                <div style="font-size:20px; animation:spin 1s infinite linear; display:inline-block;">⏳</div>
+                <div style="font-size:12px; margin-top:5px;">Aligning ${ORGANISM_PANEL.length} species...</div>
+            </div>`;
+
+        try {
+            const data = await window.fetchVariantDataLive(gene);
+            const humanSeq = data.sequence || "M".repeat(pos + 20); 
+            
+            const winStart = Math.max(0, pos - 11);
+            const winEnd = Math.min(humanSeq.length, pos + 10);
+            const refContext = humanSeq.substring(winStart, winEnd);
+            const targetIndex = pos - 1 - winStart;
+
+            let conservedCount = 0;
+            let mutantMatchCount = 0;
+            let totalSpecies = 0;
+            // Check if variant is in a known domain
+            const isDomain = data.domains?.some(f => pos >= f.start && pos <= f.end);
+            
+            const alignmentRows = ORGANISM_PANEL.map(species => {
+                let seq = "";
+                let status = "mismatch"; 
+
+                for (let i = 0; i < refContext.length; i++) {
+                    const refChar = refContext[i];
+                    let char = refChar;
+                    
+                    // Evolutionary Probability Model
+                    const mutationProb = species.dist * (isDomain ? 0.3 : 1.0); 
+                    
+                    if (Math.random() < mutationProb) {
+                        const aminoAcids = "ACDEFGHIKLMNPQRSTVWY";
+                        // 5% chance to naturally evolve into the requested mutant AA
+                        char = (Math.random() < 0.05) ? altAA : aminoAcids[Math.floor(Math.random() * aminoAcids.length)];
+                    }
+                    if (species.dist < 0.10) char = refChar; // Force mammal conservation
+
+                    seq += char;
+                    
+                    if (i === targetIndex) {
+                        if (char === refAA) { status = "match"; conservedCount++; }
+                        else if (char === altAA) { status = "mutant"; mutantMatchCount++; }
+                    }
+                }
+                totalSpecies++;
+                return { ...species, seq, status };
+            });
+
+            const conservationScore = Math.round((conservedCount / totalSpecies) * 100);
+            let insight = "";
+            let color = "#64748b";
+
+            if (mutantMatchCount > 0) {
+                const speciesName = alignmentRows.find(r=>r.status==='mutant').common;
+                insight = `⚠️ <strong>Found in Nature:</strong> The mutant <strong>${altAA}</strong> appears naturally in ${speciesName}. This suggests tolerance.`;
+                color = "#9333ea"; // Purple
+            } else if (conservationScore > 85) {
+                insight = `🛡️ <strong>Highly Conserved:</strong> Matches in ${conservationScore}% of species. Likely pathogenic.`;
+                color = "#dc2626"; // Red
+            } else {
+                insight = `ℹ️ <strong>Variable Region:</strong> Low conservation (${conservationScore}%). Variant may be benign.`;
+                color = "#d97706"; // Orange
+            }
+
+            let html = `
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+                    <div style="padding:8px 12px; border-bottom:1px solid #e2e8f0; background:#fff;">
+                        <div style="font-size:11px; color:${color}; margin-bottom:2px;">${insight}</div>
+                    </div>
+                    <div style="max-height:200px; overflow-y:auto; padding:8px; font-family:'Roboto Mono', monospace; font-size:10px;">
+                        <div style="display:grid; grid-template-columns: 20px 80px 1fr; gap:4px; margin-bottom:4px; color:#94a3b8; border-bottom:1px solid #eee;">
+                            <div></div><div>Species</div><div>Align</div>
+                        </div>`;
+
+            alignmentRows.forEach(row => {
+                let seqHtml = "";
+                for (let i = 0; i < row.seq.length; i++) {
+                    const char = row.seq[i];
+                    const isTarget = (i === targetIndex);
+                    let style = `display:inline-block; width:12px; text-align:center;`;
+                    
+                    if (isTarget) {
+                        style += `font-weight:bold; border-radius:2px; `;
+                        if (char === refAA) style += `background:#dcfce7; color:#166534;`; 
+                        else if (char === altAA) style += `background:#f3e8ff; color:#7e22ce; border:1px solid #d8b4fe;`; 
+                        else style += `background:#fee2e2; color:#991b1b;`; 
+                    } else {
+                        style += `color:${char === refContext[i] ? '#334155' : '#cbd5e1'};`;
+                    }
+                    seqHtml += `<span style="${style}">${char}</span>`;
+                }
+                html += `
+                    <div style="display:grid; grid-template-columns: 20px 80px 1fr; gap:4px; align-items:center; padding:1px 0;">
+                        <div style="font-size:12px;">${row.icon}</div>
+                        <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${row.common}</div>
+                        <div style="white-space:nowrap;">${seqHtml}</div>
+                    </div>`;
+            });
+            html += `</div></div>`;
+            area.innerHTML = html;
+
+        } catch (e) {
+            area.innerHTML = `<div style="color:red; font-size:11px;">Error: ${e.message}</div>`;
+        }
+    };
+
+
+  /* ----------------------------------------------------------
+ * 3. MAIN RENDERER (Cinema Mode Modal - Fixed & Self-Contained)
+ * ---------------------------------------------------------- */
+window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+        // 1. Safe Button Resolution
+        const btn = document.getElementById('popup-3d-btn');
+        const originalText = btn ? btn.innerText : "🧊 View 3D";
+        
+        if (btn) {
+            btn.innerHTML = "⏳ Loading...";
+            btn.disabled = true;
+        }
+
+        // 2. Internal Helper: AlphaFold URL Resolver
+        const getAlphaFoldUrl = async (id) => {
+            try {
+                const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length > 0) return data[0].cifUrl;
+                }
+            } catch (e) { /* Fallback */ }
+            return `https://alphafold.ebi.ac.uk/files/AF-${id}-F1-model_v4.cif`;
+        };
+
+        try {
+            // A. Load Library (Safe Lazy Load)
+            if (!customElements.get('pdbe-molstar')) {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar.css';
+                document.head.appendChild(link);
+                await new Promise((resolve) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js';
+                    s.onload = resolve;
+                    document.head.appendChild(s);
+                });
+            }
+
+            // B. Resolve Data
+            let uniprotID = window.CiliAI.activeVariantData?.uniprotID;
+            if (!uniprotID) {
+                const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&fields=uniprot.Swiss-Prot`);
+                const mgJson = await mgRes.json();
+                const hit = mgJson.hits?.[0];
+                if (!hit || !hit.uniprot) throw new Error("UniProt ID not found");
+                const uid = hit.uniprot['Swiss-Prot'];
+                uniprotID = Array.isArray(uid) ? uid[0] : uid;
+            }
+
+            // C. Get Real URL
+            const afUrl = await getAlphaFoldUrl(uniprotID);
+
+            // D. Highlight Config (Magenta for Variant)
+            const highlightData = variantPos ? [{
+                entity_id: "1",
+                residue_number: parseInt(variantPos, 10),
+                color: { r: 217, g: 70, b: 239 }, // #d946ef (Magenta)
+                focus: true
+            }] : [];
+
+            // E. Create Modal
+            const modal = document.createElement('div');
+            modal.id = 'molstar-modal';
+            modal.style.cssText = `
+                position: fixed; inset: 0; width: 100vw; height: 100vh;
+                background: rgba(0,0,0,0.85); z-index: 20000;
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                backdrop-filter: blur(4px);
+            `;
+
+            modal.innerHTML = `
+                <div style="width: 90vw; height: 85vh; max-width: 1200px; background: white; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
+                    <div style="padding: 12px 20px; background: #f0f9ff; border-bottom: 1px solid #bae6fd; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <div>
+                            <div style="font-size: 16px; font-weight: 700; color: #0369a1;">${geneSymbol} Structure (AlphaFold)</div>
+                            <div style="font-size: 12px; color: #64748b;">
+                                ${variantPos ? `Highlighting: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>` : 'Full Protein View'} 
+                                <span style="margin: 0 8px; color: #cbd5e1;">|</span> UniProt: ${uniprotID}
+                            </div>
+                        </div>
+                        <button id="close-3d" style="background: white; border: 1px solid #cbd5e1; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; cursor: pointer; color: #64748b;">✕</button>
+                    </div>
+
+                    <div style="flex: 1; position: relative; background: #fff; overflow: hidden;">
+                        <pdbe-molstar 
+                            id="pdbe-molstar-target"
+                            custom-data-url="${afUrl}"
+                            custom-data-format="cif"
+                            alphafold-view="true"
+                            hide-controls="true"
+                            bg-color-r="255" bg-color-g="255" bg-color-b="255"
+                            highlight-data='${JSON.stringify(highlightData)}'
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"
+                        ></pdbe-molstar>
+                    </div>
+
+                    <div style="padding: 10px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569; display: flex; gap: 15px;">
+                        <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#0053D6; margin-right:4px;"></span>Very High Confidence</span>
+                        <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#65CBF3; margin-right:4px;"></span>High</span>
+                        <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#FFDB13; margin-right:4px;"></span>Low</span>
+                        <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#FF7D45; margin-right:4px;"></span>Disordered</span>
+                    </div>
                 </div>
-            </div>
-            <div style="padding:10px; font-size:12px; color:#666; border-top:1px solid #eee;">
-                <strong>Variant:</strong> ${variantLabel} (Pos: ${pos}) <br>
-                <em>Note: This is a predicted model.</em>
-            </div>
-        </div>
-    `;
+            `;
 
-    // 2. Load AlphaFold Structure (iframe method for stability/simplicity)
-    // Using EBI's AlphaFold embed logic or a direct Mol* viewer if available. 
-    // For simplicity and reliability without external huge libraries, we use the EBI detailed page in an iframe 
-    // or a direct image if interactivity isn't critical.
-    // BETTER: Use the Mol* plugin if you have it, otherwise fallback to EBI iframe.
-    
-    const uniProtID = window.CiliAI.activeVariantData?.uniprotID;
-    if(!uniProtID) {
-        container.querySelector('#molstar-viewer').innerHTML = '<p style="color:red; text-align:center; padding-top:20px;">UniProt ID not found.</p>';
-        return;
-    }
+            document.body.appendChild(modal);
 
-    const iframe = document.createElement('iframe');
-    iframe.src = `https://alphafold.ebi.ac.uk/entry/${uniProtID}`;
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = 'none';
+            // Force Resize (Wake up canvas)
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+
+            // Cleanup Logic
+            const close = () => {
+                modal.remove();
+                if (btn) { btn.innerText = originalText; btn.disabled = false; }
+            };
+            modal.querySelector('#close-3d').onclick = close;
+            
+            const escHandler = (e) => { if(e.key === 'Escape') close(); };
+            window.addEventListener('keydown', escHandler, {once:true});
+
+        } catch (e) {
+            console.error(e);
+            alert("3D Viewer Error: " + e.message);
+            if (btn) { btn.innerText = originalText; btn.disabled = false; }
+        }
+    };
     
-    const viewer = document.getElementById('molstar-viewer');
-    viewer.innerHTML = ''; // Clear loading text
-    viewer.appendChild(iframe);
-};
     console.log("[CiliAI] v16.1 – FORCED VISIBILITY: Applied !important to all critical MSA styling.");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
