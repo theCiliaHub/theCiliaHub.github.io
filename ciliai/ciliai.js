@@ -7293,8 +7293,8 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.0 - UNIFIED MSA)
- * FIX: Human row is now a standard MSA entry (Guaranteed Visibility)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.1 - FORCED VISIBILITY)
+ * FINAL FIX: Uses !important tags to override ALL external CSS hiding text.
  * ============================================================== */
 (function() {
     'use strict';
@@ -7672,7 +7672,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // CRITICAL FIX: MSA Rendering with UNIFIED ROWS (No Special Human Ref)
+    // CRITICAL FIX: MSA Rendering with FORCED VISIBILITY (!important)
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7722,7 +7722,7 @@ window.runDashboardSearch = function() {
             posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${show?'#000':'#ddd'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
         }
 
-        // BUILD ALL ROWS - UNIFIED STYLING (No 'Reference' distinction)
+        // BUILD ALL ROWS - UNIFIED STYLING
         let rowsHtml = '';
         align.alignments.forEach((aln) => {
             let seqHtml = '';
@@ -7736,8 +7736,13 @@ window.runDashboardSearch = function() {
                 // Get colors from active scheme
                 const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#cccccc', text: '#000000'};
                 
-                // CRITICAL: Explicit inline styles + opacity:1
-                seqHtml += `<span style="display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text};background-color:${colors.bg};opacity:1;border:0.5px solid #f0f0f0;">${aa}</span>`;
+                // CRITICAL FIX:
+                // 1. Used !important to override external CSS
+                // 2. Added z-index:10 to ensure it sits on top of any background
+                // 3. Added position:relative to make z-index work
+                // 4. Added visibility:visible !important
+                // 5. Explicitly defined color and background-color with !important
+                seqHtml += `<span style="display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text} !important;background-color:${colors.bg} !important;opacity:1 !important;visibility:visible !important;position:relative;z-index:10;border:0.5px solid #f0f0f0;">${aa}</span>`;
             }
             
             // Standard row styling for everyone (including Human)
@@ -7995,10 +8000,11 @@ window.runDashboardSearch = function() {
         setTimeout(() => { const i = document.getElementById('msa-jump-input'); if (i) { i.value = p; window.msaJumpToPosition(); } }, 500);
     };
 
-    console.log("[CiliAI] v16.0 – UNIFIED MSA: Human row is now standard and fully visible.");
+    console.log("[CiliAI] v16.1 – FORCED VISIBILITY: Applied !important to all critical MSA styling.");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
