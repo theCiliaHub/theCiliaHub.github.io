@@ -7293,8 +7293,8 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.9 - UNIFIED MSA)
- * UPDATE: Human row now treated as standard MSA row (No Reference Styling)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.0 - UNIFIED MSA)
+ * FIX: Human row is now a standard MSA entry (Guaranteed Visibility)
  * ============================================================== */
 (function() {
     'use strict';
@@ -7995,9 +7995,10 @@ window.runDashboardSearch = function() {
         setTimeout(() => { const i = document.getElementById('msa-jump-input'); if (i) { i.value = p; window.msaJumpToPosition(); } }, 500);
     };
 
-    console.log("[CiliAI] v15.9 – UNIFIED MSA: Human row is now standard and fully visible.");
+    console.log("[CiliAI] v16.0 – UNIFIED MSA: Human row is now standard and fully visible.");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
