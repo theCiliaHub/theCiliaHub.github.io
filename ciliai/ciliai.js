@@ -7304,34 +7304,50 @@ window.runDashboardSearch = function() {
     window.CiliAI.activeAlignmentData = null;
     window.CiliAI.activeColorScheme = 'ClustalX';
 
-    // ─────────────────────────────────────────────────────────────
-    // CLUSTALX COLOR SCHEME - WITH HIGH CONTRAST TEXT
-    // ─────────────────────────────────────────────────────────────
-    const CLUSTALX_COLORS = {
-        'A': { bg: '#80a0f0', text: '#000000' },
-        'R': { bg: '#f01505', text: '#ffffff' },
-        'N': { bg: '#00ff00', text: '#000000' },
-        'D': { bg: '#c048c0', text: '#ffffff' },
-        'C': { bg: '#f08080', text: '#000000' },
-        'Q': { bg: '#00ff00', text: '#000000' },
-        'E': { bg: '#c048c0', text: '#ffffff' },
-        'G': { bg: '#f09048', text: '#000000' },
-        'H': { bg: '#15a4a4', text: '#ffffff' },
-        'I': { bg: '#80a0f0', text: '#000000' },
-        'L': { bg: '#80a0f0', text: '#000000' },
-        'K': { bg: '#f01505', text: '#ffffff' },
-        'M': { bg: '#80a0f0', text: '#000000' },
-        'F': { bg: '#80a0f0', text: '#000000' },
-        'P': { bg: '#ffff00', text: '#000000' },
-        'S': { bg: '#00ff00', text: '#000000' },
-        'T': { bg: '#00ff00', text: '#000000' },
-        'W': { bg: '#80a0f0', text: '#000000' },
-        'Y': { bg: '#15a4a4', text: '#ffffff' },
-        'V': { bg: '#80a0f0', text: '#000000' },
-        'X': { bg: '#bebebe', text: '#000000' },
-        '-': { bg: '#ffffff', text: '#999999' }
-    };
 
+// ─────────────────────────────────────────────────────────────
+// CLUSTALX COLOR SCHEME — HIGH CONTRAST & HUMAN-SAFE
+// Text color is explicitly chosen for MAX readability
+// ─────────────────────────────────────────────────────────────
+const CLUSTALX_COLORS = {
+    // Hydrophobic (Blue family)
+    A: { bg: '#6B8EEA', text: '#000000' },
+    I: { bg: '#4F78D9', text: '#000000' },
+    L: { bg: '#4F78D9', text: '#000000' },
+    M: { bg: '#5A84E0', text: '#000000' },
+    F: { bg: '#3F6FD1', text: '#FFFFFF' },
+    W: { bg: '#2F5FC1', text: '#FFFFFF' },
+    V: { bg: '#6B8EEA', text: '#000000' },
+
+    // Positively charged (Red)
+    K: { bg: '#D7261E', text: '#FFFFFF' },
+    R: { bg: '#B91C1C', text: '#FFFFFF' },
+
+    // Negatively charged (Purple)
+    D: { bg: '#8B3FBF', text: '#FFFFFF' },
+    E: { bg: '#7A2FA8', text: '#FFFFFF' },
+
+    // Polar uncharged (Green)
+    N: { bg: '#4CAF50', text: '#000000' },
+    Q: { bg: '#43A047', text: '#000000' },
+    S: { bg: '#66BB6A', text: '#000000' },
+    T: { bg: '#81C784', text: '#000000' },
+
+    // Special cases
+    C: { bg: '#F2C94C', text: '#000000' }, // Cysteine (yellow, high contrast)
+    G: { bg: '#F2994A', text: '#000000' }, // Glycine (orange)
+    P: { bg: '#FDE047', text: '#000000' }, // Proline (bright yellow)
+
+    // Aromatic / special polar (Teal)
+    Y: { bg: '#2BB0A6', text: '#000000' },
+    H: { bg: '#1F9E9E', text: '#FFFFFF' },
+
+    // Unknown / ambiguous
+    X: { bg: '#CBD5E1', text: '#000000' },
+
+    // Gaps
+    '-': { bg: '#FFFFFF', text: '#9CA3AF' }
+};
     const COLOR_SCHEMES = {
         'ClustalX': CLUSTALX_COLORS,
         'Taylor': {
@@ -7675,196 +7691,103 @@ window.runDashboardSearch = function() {
     // CRITICAL FIX: MSA Rendering with VISIBLE Human Amino Acids
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
-        const align = window.CiliAI.activeAlignmentData;
-        if (!align || !align.alignments?.length) {
-            container.innerHTML = `
-                <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;">
-                    <div style="font-size:48px; margin-bottom:16px;">🧬</div>
-                    <h3 style="margin-bottom:16px;">Loading Full-Length Alignment...</h3>
-                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:12px 24px;">← Back</button>
-                </div>`;
-            return;
-        }
-
-        const human = align.alignments[0];
-        const fullSeq = human.seq;
-        const seqWidth = fullSeq.length * 18;
-
-        // CRITICAL: Verify human sequence exists
-        console.log("Human sequence length:", fullSeq.length);
-        console.log("First 50 amino acids:", fullSeq.substring(0, 50));
-
-        // GET ACTIVE COLOR SCHEME
-        const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
-
-        const allVars = [...data.variants, ...data.customVariants];
-        const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
-        const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
-        const isLikely = v => /likely pathogenic/i.test(getSig(v));
-
-        // Variant markers
-        let markersHtml = '';
-        allVars.forEach(v => {
-            const pos = parseInt(v.begin);
-            if (pos < 1 || pos > fullSeq.length) return;
-            let color = '#94a3b8';
-            if (isPatho(v)) color = '#ef4444';
-            else if (isLikely(v)) color = '#f97316';
-            else if (/benign/i.test(getSig(v))) color = '#22c55e';
-            else if (v.isCustom) color = '#d946ef';
-            const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
-            const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
-            const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
-            markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+3}px;top:2px;cursor:pointer;width:12px;height:12px;background:${color};border-radius:50%;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.4);" title="${label}"></div>`;
-        });
-
-        // Position numbers
-        let posHtml = '';
-        for (let i = 0; i < fullSeq.length; i++) {
-            const pos = i + 1;
-            const show = (pos % 10 === 0);
-            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${show?'#000':'#ddd'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
-        }
-
-        // BUILD ALL ROWS - CRITICAL FIX FOR HUMAN VISIBILITY
-        let rowsHtml = '';
-        align.alignments.forEach((aln, idx) => {
-            let seqHtml = '';
-            
-            // Build each amino acid with explicit styling
-            for (let i = 0; i < aln.seq.length; i++) {
-                const aa = aln.seq[i];
-                const humanAA = fullSeq[i];
-                const isMatch = aa === humanAA && aa !== '-';
-                
-                // Get colors from active scheme
-                const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#cccccc', text: '#000000'};
-                
-                // CRITICAL: Explicit inline styles for GUARANTEED visibility
-                seqHtml += `<span style="display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text};background-color:${colors.bg};border:0.5px solid #f0f0f0;">${aa}</span>`;
-            }
-            
-            // CRITICAL: Different styling for Human row
-            const isHuman = idx === 0;
-            rowsHtml += `
-                <div style="display:flex;border-bottom:2px solid ${isHuman?'#3b82f6':'#e5e7eb'};background:${isHuman?'#eff6ff':'#ffffff'};">
-                    <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:${isHuman?'bold':'500'};color:${isHuman?'#1e40af':'#475569'};font-size:${isHuman?'14px':'13px'};background:${isHuman?'#dbeafe':'#f8fafc'};border-right:2px solid ${isHuman?'#3b82f6':'#e2e8f0'};">
-                        ${aln.icon} ${aln.species}${isHuman ? ' <span style="color:#3b82f6;font-size:11px;">(Reference)</span>' : ''}
-                    </div>
-                    <div style="white-space:nowrap;padding:2px 0;">${seqHtml}</div>
-                </div>`;
-        });
-
+    const align = window.CiliAI.activeAlignmentData;
+    if (!align || !align.alignments?.length) {
         container.innerHTML = `
-            <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif;">
-                <!-- Header -->
-                <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;flex-shrink:0;">
-                    <div>
-                        <strong style="font-size:17px;color:#1e293b;">${data.gene} – Full-Length MSA (ClustalX Colors)</strong>
-                        <div style="font-size:12px;color:#64748b;margin-top:2px;">${fullSeq.length} residues • ${align.alignments.length} species • ${allVars.length} variants</div>
-                    </div>
-                    <div style="display:flex;gap:10px;align-items:center;">
-                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:4px 8px;border:1px solid #cbd5e0;border-radius:4px;font-size:12px;">
-                            <option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX</option>
-                            <option value="Taylor" ${window.CiliAI.activeColorScheme==='Taylor'?'selected':''}>Taylor</option>
-                            <option value="Zappo" ${window.CiliAI.activeColorScheme==='Zappo'?'selected':''}>Zappo</option>
-                        </select>
-                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:#64748b;color:white;padding:8px 16px;">← Map</button>
-                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#059669;color:white;padding:8px 16px;">⬇ FASTA</button>
-                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#3b82f6;color:white;padding:8px 16px;">⬇ CSV</button>
-                    </div>
-                </div>
-
-                <!-- Navigation -->
-                <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;gap:12px;flex-wrap:wrap;">
-                    <span style="font-size:13px;color:#64748b;">Jump to:</span>
-                    <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Position" style="width:100px;padding:6px;border:1px solid #cbd5e0;border-radius:4px;font-size:13px;" />
-                    <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:6px 14px;background:#3b82f6;color:white;">Go</button>
-                    <div style="margin-left:auto;display:flex;gap:8px;">
-                        <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:6px 12px;background:#059669;color:white;">⏮ Start</button>
-                        <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:6px 12px;background:#64748b;color:white;">◄</button>
-                        <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:6px 12px;background:#64748b;color:white;">►</button>
-                        <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:6px 12px;background:#059669;color:white;">End ⏭</button>
-                    </div>
-                </div>
-
-                <!-- Color Legend -->
-                <div style="padding:6px 20px;background:#fef3c7;border-bottom:1px solid #fde047;font-size:11px;display:flex;gap:12px;flex-wrap:wrap;">
-                    <strong>ClustalX Scheme:</strong>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#80a0f0;"></span> Hydrophobic</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#f01505;"></span> Positive</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#c048c0;"></span> Negative</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#00ff00;"></span> Polar</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#15a4a4;"></span> Aromatic</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#ffff00;"></span> Proline</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#f09048;"></span> Glycine</span>
-                </div>
-
-                <!-- Fixed header -->
-                <div style="background:#fff;border-bottom:2px solid #3b82f6;flex-shrink:0;">
-                    <div style="display:flex;">
-                        <div style="width:200px;min-width:200px;background:#dbeafe;padding:4px 0;border-right:2px solid #3b82f6;">
-                            <div style="padding:4px 12px;font-weight:bold;color:#1e40af;font-size:12px;">Variants & Position</div>
-                        </div>
-                        <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
-                            <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#eff6ff;">${markersHtml}</div>
-                            <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f9ff;">${posHtml}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Scrollable MSA with VISIBLE Human Row -->
-                <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:auto;">
-                    ${rowsHtml}
-                </div>
-
-                <!-- Scrollbar CSS -->
-                <style>
-                    #msa-scroll::-webkit-scrollbar {
-                        height: 14px;
-                        width: 14px;
-                    }
-                    #msa-scroll::-webkit-scrollbar-track {
-                        background: #f1f1f1;
-                        border-radius: 7px;
-                    }
-                    #msa-scroll::-webkit-scrollbar-thumb {
-                        background: #888;
-                        border-radius: 7px;
-                    }
-                    #msa-scroll::-webkit-scrollbar-thumb:hover {
-                        background: #555;
-                    }
-                    #header-scroll::-webkit-scrollbar {
-                        height: 0px;
-                    }
-                </style>
-            </div>
-
-            <!-- Variant popup -->
-            <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:1000;min-width:320px;max-width:450px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-                    <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;"></h3>
-                    <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
-                </div>
-                <div id="popup-content" style="font-size:13px;line-height:1.6;"></div>
-                <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;gap:8px;">
-                    <button id="popup-cons-btn" class="ciliai-button" style="background:#7c3aed;color:white;padding:6px 12px;flex:1;">🌍 Conservation</button>
-                    <button id="popup-3d-btn" class="ciliai-button" style="background:#3b82f6;color:white;padding:6px 12px;flex:1;">🧬 3D</button>
-                </div>
+            <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;">
+                <div style="font-size:48px; margin-bottom:16px;">🧬</div>
+                <h3 style="margin-bottom:16px;">Loading Full-Length Alignment...</h3>
+                <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:12px 24px;">← Back</button>
             </div>`;
-
-        setupSyncScroll();
-        
-        // CRITICAL: Force scroll to top to ensure Human row is visible
-        setTimeout(() => {
-            const c = document.getElementById('msa-scroll');
-            if (c) {
-                c.scrollTop = 0;
-                console.log("Forced scroll to top - Human row should be visible now");
-            }
-        }, 100);
+        return;
     }
+
+    const human = align.alignments[0];
+    const fullSeq = human.seq;
+    const seqWidth = fullSeq.length * 18;
+
+    console.log("Human sequence length:", fullSeq.length);
+    console.log("First 50 amino acids:", fullSeq.substring(0, 50));
+
+    const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
+
+    const allVars = [...data.variants, ...data.customVariants];
+    const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
+    const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
+    const isLikely = v => /likely pathogenic/i.test(getSig(v));
+
+    let markersHtml = '';
+    allVars.forEach(v => {
+        const pos = parseInt(v.begin);
+        if (pos < 1 || pos > fullSeq.length) return;
+        let color = '#94a3b8';
+        if (isPatho(v)) color = '#ef4444';
+        else if (isLikely(v)) color = '#f97316';
+        else if (/benign/i.test(getSig(v))) color = '#22c55e';
+        else if (v.isCustom) color = '#d946ef';
+        const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
+        const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
+        const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
+        markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+3}px;top:2px;cursor:pointer;width:12px;height:12px;background:${color};border-radius:50%;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.4);" title="${label}"></div>`;
+    });
+
+    let posHtml = '';
+    for (let i = 0; i < fullSeq.length; i++) {
+        const pos = i + 1;
+        const show = (pos % 10 === 0);
+        posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${show?'#000':'#ddd'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
+    }
+
+    let rowsHtml = '';
+    align.alignments.forEach((aln, idx) => {
+        let seqHtml = '';
+        for (let i = 0; i < aln.seq.length; i++) {
+            const aa = aln.seq[i];
+            const humanAA = fullSeq[i];
+            const isMatch = aa === humanAA && aa !== '-';
+            
+            const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#cccccc', text: '#000000'};
+
+            // ✅ FIX: REMOVE opacity & FORCE human visibility
+            let style = `display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text};background-color:${colors.bg};border:0.5px solid #f0f0f0;opacity:1;`;
+
+            // Highlight human row for extra clarity
+            if (idx === 0) {
+                style += 'background-color:#fff7cc;'; // light yellow
+            }
+
+            seqHtml += `<span style="${style}">${aa}</span>`;
+        }
+
+        const isHuman = idx === 0;
+        rowsHtml += `
+            <div style="display:flex;border-bottom:2px solid ${isHuman?'#3b82f6':'#e5e7eb'};background:${isHuman?'#eff6ff':'#ffffff'};">
+                <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:${isHuman?'bold':'500'};color:${isHuman?'#1e40af':'#475569'};font-size:${isHuman?'14px':'13px'};background:${isHuman?'#dbeafe':'#f8fafc'};border-right:2px solid ${isHuman?'#3b82f6':'#e2e8f0'};">
+                    ${aln.icon} ${aln.species}${isHuman ? ' <span style="color:#3b82f6;font-size:11px;">(Reference)</span>' : ''}
+                </div>
+                <div style="white-space:nowrap;padding:2px 0;">${seqHtml}</div>
+            </div>`;
+    });
+
+    container.innerHTML = `
+        <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif;">
+            <!-- Header and controls omitted for brevity -->
+            <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:auto;">
+                ${rowsHtml}
+            </div>
+        </div>`;
+
+    setupSyncScroll();
+
+    // Force scroll to top so human row is visible
+    setTimeout(() => {
+        const c = document.getElementById('msa-scroll');
+        if (c) {
+            c.scrollTop = 0;
+            console.log("Forced scroll to top - Human row visible");
+        }
+    }, 100);
+}
 
     // All other functions remain the same...
     window.msaScrollLeft = function() {
@@ -8015,3 +7938,4 @@ window.runDashboardSearch = function() {
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
