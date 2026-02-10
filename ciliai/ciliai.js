@@ -7304,31 +7304,36 @@ window.runDashboardSearch = function() {
     window.CiliAI.activeAlignmentData = null;
     window.CiliAI.activeColorScheme = 'ClustalX';
 
-    // ─────────────────────────────────────────────────────────────
-    // CLUSTALX COLOR SCHEME - WITH HIGH CONTRAST TEXT
+  // ─────────────────────────────────────────────────────────────
+    // CLUSTALX COLOR SCHEME - UPDATED TO MATCH REFERENCE IMAGE (Vibrant Blue)
     // ─────────────────────────────────────────────────────────────
     const CLUSTALX_COLORS = {
-        'A': { bg: '#80a0f0', text: '#000000' },
-        'R': { bg: '#f01505', text: '#ffffff' },
-        'N': { bg: '#00ff00', text: '#000000' },
-        'D': { bg: '#c048c0', text: '#ffffff' },
-        'C': { bg: '#f08080', text: '#000000' },
-        'Q': { bg: '#00ff00', text: '#000000' },
-        'E': { bg: '#c048c0', text: '#ffffff' },
-        'G': { bg: '#f09048', text: '#000000' },
-        'H': { bg: '#15a4a4', text: '#ffffff' },
-        'I': { bg: '#80a0f0', text: '#000000' },
-        'L': { bg: '#80a0f0', text: '#000000' },
-        'K': { bg: '#f01505', text: '#ffffff' },
-        'M': { bg: '#80a0f0', text: '#000000' },
-        'F': { bg: '#80a0f0', text: '#000000' },
-        'P': { bg: '#ffff00', text: '#000000' },
-        'S': { bg: '#00ff00', text: '#000000' },
-        'T': { bg: '#00ff00', text: '#000000' },
+        // Hydrophobic (The "Mostly Blue" set from your image)
+        'A': { bg: '#80a0f0', text: '#000000' }, 
+        'I': { bg: '#80a0f0', text: '#000000' }, 
+        'L': { bg: '#80a0f0', text: '#000000' }, 
+        'V': { bg: '#80a0f0', text: '#000000' }, 
+        'M': { bg: '#80a0f0', text: '#000000' }, 
+        'F': { bg: '#80a0f0', text: '#000000' }, 
         'W': { bg: '#80a0f0', text: '#000000' },
+        // Positives (Red)
+        'R': { bg: '#f01505', text: '#ffffff' }, 
+        'K': { bg: '#f01505', text: '#ffffff' },
+        // Negatives (Magenta)
+        'N': { bg: '#00ff00', text: '#000000' }, 
+        'Q': { bg: '#00ff00', text: '#000000' }, 
+        'D': { bg: '#c048c0', text: '#ffffff' }, 
+        'E': { bg: '#c048c0', text: '#ffffff' },
+        // Polar/Others
+        'C': { bg: '#f08080', text: '#000000' }, 
+        'G': { bg: '#f09048', text: '#000000' }, 
+        'P': { bg: '#ffff00', text: '#000000' }, 
+        'S': { bg: '#00ff00', text: '#000000' }, 
+        'T': { bg: '#00ff00', text: '#000000' }, 
+        'H': { bg: '#15a4a4', text: '#ffffff' }, 
         'Y': { bg: '#15a4a4', text: '#ffffff' },
-        'V': { bg: '#80a0f0', text: '#000000' },
-        'X': { bg: '#bebebe', text: '#000000' },
+        // Gaps/Unknown
+        'X': { bg: '#ffffff', text: '#000000' }, 
         '-': { bg: '#ffffff', text: '#999999' }
     };
 
@@ -7709,33 +7714,30 @@ window.loadFullLengthAlignment = async function(geneSymbol) {
     };
 };
 
+   // ─────────────────────────────────────────────────────────────
+    // RENDERER WITH CILIAHUB BLUE THEME UI
     // ─────────────────────────────────────────────────────────────
-    // CRITICAL FIX: MSA Rendering with FORCED VISIBILITY (!important)
-    // ─────────────────────────────────────────────────────────────
-  window.renderFullLengthMSA = function(data, container) {
+    window.renderFullLengthMSA = function(data, container) {
         const align = window.CiliAI.activeAlignmentData;
         
-        // 1. Safety Check: Ensure data exists
+        // 1. Safety Check
         if (!align || !align.alignments?.length) {
             container.innerHTML = `
                 <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;">
                     <div style="font-size:48px; margin-bottom:16px;">🧬</div>
-                    <h3 style="margin-bottom:16px;">Loading Full-Length Alignment...</h3>
-                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:12px 24px;">← Back</button>
+                    <h3 style="margin-bottom:16px; color:#0056b3;">Loading Alignment...</h3>
+                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:10px 24px; background:#0056b3; color:white; border-radius:4px;">← Back</button>
                 </div>`;
             return;
         }
 
-        // 2. Locate Human Sequence (Reference)
-        // We look for 'Human' specifically, falling back to index 0 if not named explicitly
+        // 2. Setup Reference (Human)
         const human = align.alignments.find(a => a.species === 'Human') || align.alignments[0];
         const fullSeq = human.seq;
         const seqWidth = fullSeq.length * 18;
-
-        // 3. Get Color Scheme
         const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
 
-        // 4. Build Variant Markers (Ruler)
+        // 3. Variant Markers (Blue Theme)
         const allVars = [...data.variants, ...data.customVariants];
         const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
         const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
@@ -7746,130 +7748,123 @@ window.loadFullLengthAlignment = async function(geneSymbol) {
             const pos = parseInt(v.begin);
             if (pos < 1 || pos > fullSeq.length) return;
             
-            let color = '#94a3b8'; // default gray
-            if (isPatho(v)) color = '#ef4444';
-            else if (isLikely(v)) color = '#f97316';
-            else if (/benign/i.test(getSig(v))) color = '#22c55e';
-            else if (v.isCustom) color = '#d946ef';
+            let color = '#94a3b8';
+            if (isPatho(v)) color = '#dc3545'; // Red for danger
+            else if (isLikely(v)) color = '#fd7e14'; // Orange
+            else if (v.isCustom) color = '#6f42c1'; // Purple
+            else color = '#0056b3'; // Blue for benign/others (Themed)
 
             const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
             const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
             const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
             
-            // Marker circle
-            markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+3}px;top:2px;cursor:pointer;width:12px;height:12px;background:${color};border-radius:50%;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.4);z-index:100;" title="${label}"></div>`;
+            markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+4}px;top:5px;cursor:pointer;width:10px;height:10px;background:${color};border-radius:50%;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:100;" title="${label}"></div>`;
         });
 
-        // 5. Build Position Numbers
+        // 4. Position Numbers (Blue Theme)
         let posHtml = '';
         for (let i = 0; i < fullSeq.length; i++) {
             const pos = i + 1;
             const show = (pos % 10 === 0);
-            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${show?'#000':'#ddd'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
+            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:${show?'#0056b3':'#cbd5e1'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
         }
 
-        // 6. Build Rows
+        // 5. Build Rows with CiliaHub Blue Styling
         let rowsHtml = '';
         align.alignments.forEach((aln) => {
             let seqHtml = '';
-            
             for (let i = 0; i < aln.seq.length; i++) {
                 const aa = aln.seq[i];
                 const humanAA = fullSeq[i];
                 const isMatch = aa === humanAA && aa !== '-';
+                const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#ffffff', text: '#000000'};
                 
-                const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#cccccc', text: '#000000'};
-                
-                // CRITICAL FIX: !important tags added to force visibility
-                seqHtml += `<span style="display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text} !important;background-color:${colors.bg} !important;opacity:1 !important;visibility:visible !important;position:relative;z-index:10;border:0.5px solid #f0f0f0;">${aa}</span>`;
+                // FORCE VISIBILITY with !important
+                seqHtml += `<span style="display:inline-block;width:18px;height:24px;line-height:24px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text} !important;background-color:${colors.bg} !important;opacity:1 !important;visibility:visible !important;position:relative;z-index:10;border-right:1px solid rgba(0,0,0,0.05);">${aa}</span>`;
             }
             
             rowsHtml += `
                 <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#ffffff;">
-                    <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:500;color:#475569;font-size:13px;background:#f8fafc;border-right:1px solid #e2e8f0;">
-                        ${aln.icon} ${aln.species}
+                    <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:500;color:#0056b3;font-size:13px;background:#f0f7ff;border-right:2px solid #0056b3;display:flex;align-items:center;">
+                        <span style="margin-right:6px;">${aln.icon}</span> ${aln.species}
                     </div>
-                    <div style="white-space:nowrap;padding:2px 0;">${seqHtml}</div>
+                    <div style="white-space:nowrap;padding:0;">${seqHtml}</div>
                 </div>`;
         });
 
-        // 7. Assemble Container
+        // 6. Main Container Layout (CiliaHub Blue Headers & Buttons)
         container.innerHTML = `
-            <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif;">
-                <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;flex-shrink:0;">
+            <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif; background:#fff;">
+                <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
                     <div>
-                        <strong style="font-size:17px;color:#1e293b;">${data.gene} – Full-Length MSA (ClustalX Colors)</strong>
-                        <div style="font-size:12px;color:#64748b;margin-top:2px;">${fullSeq.length} residues • ${align.alignments.length} species • ${allVars.length} variants</div>
+                        <strong style="font-size:16px;">${data.gene} Evolutionary Analysis</strong>
+                        <div style="font-size:12px;opacity:0.9;margin-top:2px;">${fullSeq.length} AA • ${align.alignments.length} Species</div>
                     </div>
-                    <div style="display:flex;gap:10px;align-items:center;">
-                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:4px 8px;border:1px solid #cbd5e0;border-radius:4px;font-size:12px;">
-                            <option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX</option>
+                    <div style="display:flex;gap:10px;">
+                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;">
+                            <option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Blue)</option>
                             <option value="Taylor" ${window.CiliAI.activeColorScheme==='Taylor'?'selected':''}>Taylor</option>
                             <option value="Zappo" ${window.CiliAI.activeColorScheme==='Zappo'?'selected':''}>Zappo</option>
                         </select>
-                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:#64748b;color:white;padding:8px 16px;">← Map</button>
-                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#059669;color:white;padding:8px 16px;">⬇ FASTA</button>
-                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#3b82f6;color:white;padding:8px 16px;">⬇ CSV</button>
+                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:rgba(255,255,255,0.2);color:white;padding:6px 12px;border:1px solid rgba(255,255,255,0.4);">← Back</button>
+                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ FASTA</button>
                     </div>
                 </div>
 
-                <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;gap:12px;flex-wrap:wrap;">
-                    <span style="font-size:13px;color:#64748b;">Jump to:</span>
-                    <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Position" style="width:100px;padding:6px;border:1px solid #cbd5e0;border-radius:4px;font-size:13px;" />
-                    <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:6px 14px;background:#3b82f6;color:white;">Go</button>
-                    <div style="margin-left:auto;display:flex;gap:8px;">
-                        <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:6px 12px;background:#059669;color:white;">⏮ Start</button>
-                        <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:6px 12px;background:#64748b;color:white;">◄</button>
-                        <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:6px 12px;background:#64748b;color:white;">►</button>
-                        <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:6px 12px;background:#059669;color:white;">End ⏭</button>
+                <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;">
+                    <span style="font-size:13px;color:#0056b3;font-weight:600;">Jump to:</span>
+                    <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Pos" style="width:80px;padding:4px 8px;border:1px solid #0056b3;border-radius:4px;font-size:13px;color:#0056b3;" />
+                    <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:4px 12px;background:#0056b3;color:white;font-size:13px;">Go</button>
+                    
+                    <div style="margin-left:auto;display:flex;gap:4px;">
+                        <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏮</button>
+                        <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">◄</button>
+                        <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">►</button>
+                        <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏭</button>
                     </div>
                 </div>
 
-                <div style="padding:6px 20px;background:#fef3c7;border-bottom:1px solid #fde047;font-size:11px;display:flex;gap:12px;flex-wrap:wrap;">
-                    <strong>ClustalX Scheme:</strong>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#80a0f0;"></span> Hydrophobic</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#f01505;"></span> Positive</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#c048c0;"></span> Negative</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#00ff00;"></span> Polar</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#15a4a4;"></span> Aromatic</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#ffff00;"></span> Proline</span>
-                    <span><span style="display:inline-block;width:12px;height:12px;background:#f09048;"></span> Glycine</span>
-                </div>
-
-                <div style="background:#fff;border-bottom:2px solid #3b82f6;flex-shrink:0;">
+                <div style="background:#fff;border-bottom:2px solid #0056b3;flex-shrink:0;">
                     <div style="display:flex;">
-                        <div style="width:200px;min-width:200px;background:#dbeafe;padding:4px 0;border-right:2px solid #3b82f6;">
-                            <div style="padding:4px 12px;font-weight:bold;color:#1e40af;font-size:12px;">Variants & Position</div>
+                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;">
+                            <div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Position & Variants</div>
                         </div>
                         <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
-                            <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#eff6ff;">${markersHtml}</div>
-                            <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f9ff;">${posHtml}</div>
+                            <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#fff;">${markersHtml}</div>
+                            <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f7ff;">${posHtml}</div>
                         </div>
                     </div>
                 </div>
 
-                <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:auto;">
+                <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:thin;scrollbar-color:#0056b3 #f0f7ff;">
                     ${rowsHtml}
                 </div>
 
+                <div style="padding:8px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;display:flex;gap:15px;color:#475569;">
+                    <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#80a0f0;display:inline-block;"></span> Hydrophobic (Blue)</div>
+                    <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#f01505;display:inline-block;"></span> Positive (Red)</div>
+                    <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#00ff00;display:inline-block;"></span> Polar (Green)</div>
+                    <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#c048c0;display:inline-block;"></span> Negative (Magenta)</div>
+                </div>
+
                 <style>
-                    #msa-scroll::-webkit-scrollbar { height: 14px; width: 14px; }
-                    #msa-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 7px; }
-                    #msa-scroll::-webkit-scrollbar-thumb { background: #888; border-radius: 7px; }
-                    #msa-scroll::-webkit-scrollbar-thumb:hover { background: #555; }
+                    #msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
+                    #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; }
+                    #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; }
+                    #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; }
                     #header-scroll::-webkit-scrollbar { height: 0px; }
                 </style>
             </div>
 
-            <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:1000;min-width:320px;max-width:450px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-                    <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;"></h3>
-                    <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+            <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #0056b3;border-radius:6px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:10000;min-width:300px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
+                    <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;color:#0056b3;"></h3>
+                    <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;">&times;</button>
                 </div>
-                <div id="popup-content" style="font-size:13px;line-height:1.6;"></div>
-                <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;gap:8px;">
-                    <button id="popup-cons-btn" class="ciliai-button" style="background:#7c3aed;color:white;padding:6px 12px;flex:1;">🌍 Conservation</button>
-                    <button id="popup-3d-btn" class="ciliai-button" style="background:#3b82f6;color:white;padding:6px 12px;flex:1;">🧬 3D</button>
+                <div id="popup-content" style="font-size:13px;line-height:1.6;color:#334155;"></div>
+                <div style="margin-top:12px;padding-top:12px;display:flex;gap:8px;">
+                    <button id="popup-cons-btn" class="ciliai-button" style="background:#0056b3;color:white;padding:6px 12px;flex:1;">Check Conservation</button>
+                    <button id="popup-3d-btn" class="ciliai-button" style="background:#e7f1ff;color:#0056b3;border:1px solid #0056b3;padding:6px 12px;flex:1;">View 3D</button>
                 </div>
             </div>`;
 
@@ -7880,7 +7875,7 @@ window.loadFullLengthAlignment = async function(geneSymbol) {
             if (c) c.scrollTop = 0;
         }, 100);
     };
-
+    
     window.msaScrollLeft = function() {
         const c = document.getElementById('msa-scroll');
         const h = document.getElementById('header-scroll');
@@ -8032,6 +8027,7 @@ window.loadFullLengthAlignment = async function(geneSymbol) {
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
