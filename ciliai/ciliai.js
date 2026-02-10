@@ -7741,7 +7741,8 @@ window.runDashboardSearch = function() {
                 const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#cccccc', text: '#000000'};
                 
                 // CRITICAL: Explicit inline styles for GUARANTEED visibility
-                seqHtml += `<span style="display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text};background-color:${colors.bg};border:0.5px solid #f0f0f0;">${aa}</span>`;
+                // Added opacity:1 to override any global/inherited transparency
+                seqHtml += `<span style="display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text};background-color:${colors.bg};opacity:1;border:0.5px solid #f0f0f0;">${aa}</span>`;
             }
             
             // CRITICAL: Different styling for Human row
@@ -7757,7 +7758,6 @@ window.runDashboardSearch = function() {
 
         container.innerHTML = `
             <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif;">
-                <!-- Header -->
                 <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;flex-shrink:0;">
                     <div>
                         <strong style="font-size:17px;color:#1e293b;">${data.gene} – Full-Length MSA (ClustalX Colors)</strong>
@@ -7775,7 +7775,6 @@ window.runDashboardSearch = function() {
                     </div>
                 </div>
 
-                <!-- Navigation -->
                 <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;gap:12px;flex-wrap:wrap;">
                     <span style="font-size:13px;color:#64748b;">Jump to:</span>
                     <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Position" style="width:100px;padding:6px;border:1px solid #cbd5e0;border-radius:4px;font-size:13px;" />
@@ -7788,7 +7787,6 @@ window.runDashboardSearch = function() {
                     </div>
                 </div>
 
-                <!-- Color Legend -->
                 <div style="padding:6px 20px;background:#fef3c7;border-bottom:1px solid #fde047;font-size:11px;display:flex;gap:12px;flex-wrap:wrap;">
                     <strong>ClustalX Scheme:</strong>
                     <span><span style="display:inline-block;width:12px;height:12px;background:#80a0f0;"></span> Hydrophobic</span>
@@ -7800,7 +7798,6 @@ window.runDashboardSearch = function() {
                     <span><span style="display:inline-block;width:12px;height:12px;background:#f09048;"></span> Glycine</span>
                 </div>
 
-                <!-- Fixed header -->
                 <div style="background:#fff;border-bottom:2px solid #3b82f6;flex-shrink:0;">
                     <div style="display:flex;">
                         <div style="width:200px;min-width:200px;background:#dbeafe;padding:4px 0;border-right:2px solid #3b82f6;">
@@ -7813,12 +7810,10 @@ window.runDashboardSearch = function() {
                     </div>
                 </div>
 
-                <!-- Scrollable MSA with VISIBLE Human Row -->
                 <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:auto;">
                     ${rowsHtml}
                 </div>
 
-                <!-- Scrollbar CSS -->
                 <style>
                     #msa-scroll::-webkit-scrollbar {
                         height: 14px;
@@ -7841,7 +7836,6 @@ window.runDashboardSearch = function() {
                 </style>
             </div>
 
-            <!-- Variant popup -->
             <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:1000;min-width:320px;max-width:450px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
                     <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;"></h3>
@@ -8015,3 +8009,4 @@ window.runDashboardSearch = function() {
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
