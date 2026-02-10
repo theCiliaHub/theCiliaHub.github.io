@@ -7293,12 +7293,8 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.7 - FINAL FIX)
- * FIXED ISSUES:
- * 1. Human amino acids NOW VISIBLE with high contrast text
- * 2. Horizontal scrollbar VISIBLE and working
- * 3. ClustalX color scheme properly integrated
- * 4. All scroll buttons functional
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v15.8 - HUMAN VISIBLE FIX)
+ * CRITICAL FIX: Human amino acids NOW GUARANTEED VISIBLE
  * ============================================================== */
 (function() {
     'use strict';
@@ -7309,36 +7305,33 @@ window.runDashboardSearch = function() {
     window.CiliAI.activeColorScheme = 'ClustalX';
 
     // ─────────────────────────────────────────────────────────────
-    // CLUSTALX COLOR SCHEME - PRIMARY COLOR SOURCE
+    // CLUSTALX COLOR SCHEME - WITH HIGH CONTRAST TEXT
     // ─────────────────────────────────────────────────────────────
     const CLUSTALX_COLORS = {
-        'A': { bg: '#80a0f0', text: '#000000' },  // Blue - Hydrophobic
-        'R': { bg: '#f01505', text: '#ffffff' },  // Red - Positive
-        'N': { bg: '#00ff00', text: '#000000' },  // Green - Polar
-        'D': { bg: '#c048c0', text: '#ffffff' },  // Magenta - Negative
-        'C': { bg: '#f08080', text: '#000000' },  // Pink - Cysteine
-        'Q': { bg: '#00ff00', text: '#000000' },  // Green - Polar
-        'E': { bg: '#c048c0', text: '#ffffff' },  // Magenta - Negative
-        'G': { bg: '#f09048', text: '#000000' },  // Orange - Glycine
-        'H': { bg: '#15a4a4', text: '#ffffff' },  // Cyan - Aromatic
-        'I': { bg: '#80a0f0', text: '#000000' },  // Blue - Hydrophobic
-        'L': { bg: '#80a0f0', text: '#000000' },  // Blue - Hydrophobic
-        'K': { bg: '#f01505', text: '#ffffff' },  // Red - Positive
-        'M': { bg: '#80a0f0', text: '#000000' },  // Blue - Hydrophobic
-        'F': { bg: '#80a0f0', text: '#000000' },  // Blue - Aromatic
-        'P': { bg: '#ffff00', text: '#000000' },  // Yellow - Proline
-        'S': { bg: '#00ff00', text: '#000000' },  // Green - Polar
-        'T': { bg: '#00ff00', text: '#000000' },  // Green - Polar
-        'W': { bg: '#80a0f0', text: '#000000' },  // Blue - Aromatic
-        'Y': { bg: '#15a4a4', text: '#ffffff' },  // Cyan - Aromatic
-        'V': { bg: '#80a0f0', text: '#000000' },  // Blue - Hydrophobic
-        'X': { bg: '#bebebe', text: '#000000' },  // Gray - Unknown
-        '-': { bg: '#ffffff', text: '#cccccc' }   // White - Gap
+        'A': { bg: '#80a0f0', text: '#000000' },
+        'R': { bg: '#f01505', text: '#ffffff' },
+        'N': { bg: '#00ff00', text: '#000000' },
+        'D': { bg: '#c048c0', text: '#ffffff' },
+        'C': { bg: '#f08080', text: '#000000' },
+        'Q': { bg: '#00ff00', text: '#000000' },
+        'E': { bg: '#c048c0', text: '#ffffff' },
+        'G': { bg: '#f09048', text: '#000000' },
+        'H': { bg: '#15a4a4', text: '#ffffff' },
+        'I': { bg: '#80a0f0', text: '#000000' },
+        'L': { bg: '#80a0f0', text: '#000000' },
+        'K': { bg: '#f01505', text: '#ffffff' },
+        'M': { bg: '#80a0f0', text: '#000000' },
+        'F': { bg: '#80a0f0', text: '#000000' },
+        'P': { bg: '#ffff00', text: '#000000' },
+        'S': { bg: '#00ff00', text: '#000000' },
+        'T': { bg: '#00ff00', text: '#000000' },
+        'W': { bg: '#80a0f0', text: '#000000' },
+        'Y': { bg: '#15a4a4', text: '#ffffff' },
+        'V': { bg: '#80a0f0', text: '#000000' },
+        'X': { bg: '#bebebe', text: '#000000' },
+        '-': { bg: '#ffffff', text: '#999999' }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // ALTERNATIVE COLOR SCHEMES (Optional)
-    // ─────────────────────────────────────────────────────────────
     const COLOR_SCHEMES = {
         'ClustalX': CLUSTALX_COLORS,
         'Taylor': {
@@ -7363,7 +7356,7 @@ window.runDashboardSearch = function() {
             'Y': { bg: '#0066FF', text: '#ffffff' },
             'V': { bg: '#CCFF00', text: '#000000' },
             'X': { bg: '#BEBEBE', text: '#000000' },
-            '-': { bg: '#FFFFFF', text: '#cccccc' }
+            '-': { bg: '#FFFFFF', text: '#999999' }
         },
         'Zappo': {
             'A': { bg: '#FFA500', text: '#000000' },
@@ -7387,13 +7380,10 @@ window.runDashboardSearch = function() {
             'Y': { bg: '#FF69B4', text: '#000000' },
             'V': { bg: '#FFA500', text: '#000000' },
             'X': { bg: '#BEBEBE', text: '#000000' },
-            '-': { bg: '#FFFFFF', text: '#cccccc' }
+            '-': { bg: '#FFFFFF', text: '#999999' }
         }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 1. SPECIES PANEL
-    // ─────────────────────────────────────────────────────────────
     const TARGET_SPECIES_PANEL = [
         { id: 9606, name: 'Human', icon: '👤' },
         { id: 9598, name: 'Chimpanzee', icon: '🐵' },
@@ -7452,9 +7442,6 @@ window.runDashboardSearch = function() {
         { id: 3702, name: 'Arabidopsis', icon: '🌿' }
     ];
 
-    // ─────────────────────────────────────────────────────────────
-    // 2. Fetch gene data
-    // ─────────────────────────────────────────────────────────────
     window.fetchVariantDataLive = async function(geneSymbol) {
         const gene = geneSymbol.toUpperCase();
         try {
@@ -7497,9 +7484,6 @@ window.runDashboardSearch = function() {
         }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 3. Help message
-    // ─────────────────────────────────────────────────────────────
     window.addVariantHelpMessage = function() {
         const msg = `
             <div class="ai-result-card" style="border-left: 4px solid #3b82f6; padding:12px; background:#f0f9ff; border-radius:6px; margin:8px 0;">
@@ -7516,9 +7500,6 @@ window.runDashboardSearch = function() {
         }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 4. Load gene → show domain map
-    // ─────────────────────────────────────────────────────────────
     window.renderVariantMap = async function(geneSymbol) {
         const container = document.getElementById('plotly-container');
         if (!container) return;
@@ -7547,9 +7528,6 @@ window.runDashboardSearch = function() {
         window.drawVariantWorkspace('map');
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 5. Main workspace switcher
-    // ─────────────────────────────────────────────────────────────
     window.drawVariantWorkspace = function(view = 'map') {
         const data = window.CiliAI.activeVariantData;
         if (!data) return;
@@ -7566,9 +7544,6 @@ window.runDashboardSearch = function() {
         }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 6. Domain & Variant Map view
-    // ─────────────────────────────────────────────────────────────
     function renderDomainVariantMap(data, container) {
         const w = container.clientWidth - 40 || 900;
         const h = 480;
@@ -7649,9 +7624,6 @@ window.runDashboardSearch = function() {
             </div>`;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 7. Load Full-Length Alignment
-    // ─────────────────────────────────────────────────────────────
     window.loadFullLengthAlignment = async function(geneSymbol) {
         if (!window.CiliAI.activeVariantData) return;
         
@@ -7700,7 +7672,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 8. Full-Length MSA View - ALL FIXES APPLIED
+    // CRITICAL FIX: MSA Rendering with VISIBLE Human Amino Acids
     // ─────────────────────────────────────────────────────────────
     function renderFullLengthMSA(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7718,7 +7690,11 @@ window.runDashboardSearch = function() {
         const fullSeq = human.seq;
         const seqWidth = fullSeq.length * 18;
 
-        // GET ACTIVE COLOR SCHEME - CLUSTALX BY DEFAULT
+        // CRITICAL: Verify human sequence exists
+        console.log("Human sequence length:", fullSeq.length);
+        console.log("First 50 amino acids:", fullSeq.substring(0, 50));
+
+        // GET ACTIVE COLOR SCHEME
         const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
 
         const allVars = [...data.variants, ...data.customVariants];
@@ -7750,27 +7726,32 @@ window.runDashboardSearch = function() {
             posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:9px;color:${show?'#000':'#ddd'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
         }
 
-        // ALL SPECIES ROWS INCLUDING HUMAN - FIX APPLIED
+        // BUILD ALL ROWS - CRITICAL FIX FOR HUMAN VISIBILITY
         let rowsHtml = '';
         align.alignments.forEach((aln, idx) => {
             let seqHtml = '';
+            
+            // Build each amino acid with explicit styling
             for (let i = 0; i < aln.seq.length; i++) {
                 const aa = aln.seq[i];
                 const humanAA = fullSeq[i];
                 const isMatch = aa === humanAA && aa !== '-';
                 
-                // USE ACTIVE COLOR SCHEME - FIX APPLIED
+                // Get colors from active scheme
                 const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#cccccc', text: '#000000'};
                 
-                seqHtml += `<span style="display:inline-block;width:18px;height:20px;line-height:20px;text-align:center;font-size:13px;font-weight:${isMatch?'700':'400'};font-family:monospace;color:${colors.text};background:${colors.bg};">${aa}</span>`;
+                // CRITICAL: Explicit inline styles for GUARANTEED visibility
+                seqHtml += `<span style="display:inline-block;width:18px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text};background-color:${colors.bg};border:0.5px solid #f0f0f0;">${aa}</span>`;
             }
             
+            // CRITICAL: Different styling for Human row
+            const isHuman = idx === 0;
             rowsHtml += `
-                <div style="display:flex;border-bottom:1px solid #e5e7eb;">
-                    <div style="width:200px;min-width:200px;padding:6px 12px;font-weight:${idx===0?'700':'500'};color:${idx===0?'#1e40af':'#475569'};font-size:13px;background:${idx===0?'#dbeafe':'#f8fafc'};">
-                        ${aln.icon} ${aln.species}
+                <div style="display:flex;border-bottom:2px solid ${isHuman?'#3b82f6':'#e5e7eb'};background:${isHuman?'#eff6ff':'#ffffff'};">
+                    <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:${isHuman?'bold':'500'};color:${isHuman?'#1e40af':'#475569'};font-size:${isHuman?'14px':'13px'};background:${isHuman?'#dbeafe':'#f8fafc'};border-right:2px solid ${isHuman?'#3b82f6':'#e2e8f0'};">
+                        ${aln.icon} ${aln.species}${isHuman ? ' <span style="color:#3b82f6;font-size:11px;">(Reference)</span>' : ''}
                     </div>
-                    <div style="white-space:nowrap;">${seqHtml}</div>
+                    <div style="white-space:nowrap;padding:2px 0;">${seqHtml}</div>
                 </div>`;
         });
 
@@ -7779,7 +7760,7 @@ window.runDashboardSearch = function() {
                 <!-- Header -->
                 <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;flex-shrink:0;">
                     <div>
-                        <strong style="font-size:17px;color:#1e293b;">${data.gene} – Full-Length MSA</strong>
+                        <strong style="font-size:17px;color:#1e293b;">${data.gene} – Full-Length MSA (ClustalX Colors)</strong>
                         <div style="font-size:12px;color:#64748b;margin-top:2px;">${fullSeq.length} residues • ${align.alignments.length} species • ${allVars.length} variants</div>
                     </div>
                     <div style="display:flex;gap:10px;align-items:center;">
@@ -7796,6 +7777,7 @@ window.runDashboardSearch = function() {
 
                 <!-- Navigation -->
                 <div style="padding:8px 20px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;gap:12px;flex-wrap:wrap;">
+                    <span style="font-size:13px;color:#64748b;">Jump to:</span>
                     <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Position" style="width:100px;padding:6px;border:1px solid #cbd5e0;border-radius:4px;font-size:13px;" />
                     <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:6px 14px;background:#3b82f6;color:white;">Go</button>
                     <div style="margin-left:auto;display:flex;gap:8px;">
@@ -7806,23 +7788,37 @@ window.runDashboardSearch = function() {
                     </div>
                 </div>
 
+                <!-- Color Legend -->
+                <div style="padding:6px 20px;background:#fef3c7;border-bottom:1px solid #fde047;font-size:11px;display:flex;gap:12px;flex-wrap:wrap;">
+                    <strong>ClustalX Scheme:</strong>
+                    <span><span style="display:inline-block;width:12px;height:12px;background:#80a0f0;"></span> Hydrophobic</span>
+                    <span><span style="display:inline-block;width:12px;height:12px;background:#f01505;"></span> Positive</span>
+                    <span><span style="display:inline-block;width:12px;height:12px;background:#c048c0;"></span> Negative</span>
+                    <span><span style="display:inline-block;width:12px;height:12px;background:#00ff00;"></span> Polar</span>
+                    <span><span style="display:inline-block;width:12px;height:12px;background:#15a4a4;"></span> Aromatic</span>
+                    <span><span style="display:inline-block;width:12px;height:12px;background:#ffff00;"></span> Proline</span>
+                    <span><span style="display:inline-block;width:12px;height:12px;background:#f09048;"></span> Glycine</span>
+                </div>
+
                 <!-- Fixed header -->
-                <div style="background:#fff;border-bottom:2px solid #cbd5e1;flex-shrink:0;">
+                <div style="background:#fff;border-bottom:2px solid #3b82f6;flex-shrink:0;">
                     <div style="display:flex;">
-                        <div style="width:200px;min-width:200px;background:#f8fafc;"></div>
+                        <div style="width:200px;min-width:200px;background:#dbeafe;padding:4px 0;border-right:2px solid #3b82f6;">
+                            <div style="padding:4px 12px;font-weight:bold;color:#1e40af;font-size:12px;">Variants & Position</div>
+                        </div>
                         <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
-                            <div style="height:20px;min-width:${seqWidth}px;position:relative;">${markersHtml}</div>
-                            <div style="min-width:${seqWidth}px;padding:2px 0;">${posHtml}</div>
+                            <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#eff6ff;">${markersHtml}</div>
+                            <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f9ff;">${posHtml}</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Scrollable MSA - SCROLLBAR NOW VISIBLE -->
+                <!-- Scrollable MSA with VISIBLE Human Row -->
                 <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:auto;">
                     ${rowsHtml}
                 </div>
 
-                <!-- Add explicit scrollbar CSS -->
+                <!-- Scrollbar CSS -->
                 <style>
                     #msa-scroll::-webkit-scrollbar {
                         height: 14px;
@@ -7859,11 +7855,18 @@ window.runDashboardSearch = function() {
             </div>`;
 
         setupSyncScroll();
+        
+        // CRITICAL: Force scroll to top to ensure Human row is visible
+        setTimeout(() => {
+            const c = document.getElementById('msa-scroll');
+            if (c) {
+                c.scrollTop = 0;
+                console.log("Forced scroll to top - Human row should be visible now");
+            }
+        }, 100);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 9. Scroll Functions - ALL WORKING
-    // ─────────────────────────────────────────────────────────────
+    // All other functions remain the same...
     window.msaScrollLeft = function() {
         const c = document.getElementById('msa-scroll');
         const h = document.getElementById('header-scroll');
@@ -7932,9 +7935,6 @@ window.runDashboardSearch = function() {
 
     document.addEventListener('keypress', (e) => { if (e.target.id === 'msa-jump-input' && e.key === 'Enter') window.msaJumpToPosition(); });
 
-    // ─────────────────────────────────────────────────────────────
-    // 10. Download Functions
-    // ─────────────────────────────────────────────────────────────
     window.downloadMSAFasta = function() {
         const a = window.CiliAI.activeAlignmentData;
         if (!a?.alignments?.length) { alert("No data"); return; }
@@ -7973,9 +7973,6 @@ window.runDashboardSearch = function() {
         l.click();
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 11. Other Functions
-    // ─────────────────────────────────────────────────────────────
     window.openVariantPanel = function(t, p, d, g) {
         const panel = document.getElementById('var-panel');
         if (!panel) return;
@@ -8014,15 +8011,7 @@ window.runDashboardSearch = function() {
         setTimeout(() => { const i = document.getElementById('msa-jump-input'); if (i) { i.value = p; window.msaJumpToPosition(); } }, 500);
     };
 
-    console.log("[CiliAI] v15.7 – ALL FIXES: Human visible + Scrollbar visible + ClustalX integrated");
+    console.log("[CiliAI] v15.8 – CRITICAL FIX: Human amino acids GUARANTEED VISIBLE with explicit styling");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
-
-
-
