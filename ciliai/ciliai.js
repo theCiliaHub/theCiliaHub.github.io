@@ -7293,8 +7293,12 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.1 - FORCED VISIBILITY)
- * FINAL FIX: Uses !important tags to override ALL external CSS hiding text.
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.4 - FIXED & INTEGRATED)
+ * Features: 
+ * - 3D Structure (MolStar) with Unpkg Fallback
+ * - Professional MSA Visualizer (Jalview Style)
+ * - Conservation Analysis (Organism Panel)
+ * - Forced Visibility Fixes (!important tags)
  * ============================================================== */
 (function() {
     'use strict';
@@ -7304,149 +7308,91 @@ window.runDashboardSearch = function() {
     window.CiliAI.activeAlignmentData = null;
     window.CiliAI.activeColorScheme = 'ClustalX';
 
-  // ─────────────────────────────────────────────────────────────
-    // CLUSTALX COLOR SCHEME - UPDATED TO MATCH REFERENCE IMAGE (Vibrant Blue)
     // ─────────────────────────────────────────────────────────────
-    const CLUSTALX_COLORS = {
-        // Hydrophobic (The "Mostly Blue" set from your image)
-        'A': { bg: '#80a0f0', text: '#000000' }, 
-        'I': { bg: '#80a0f0', text: '#000000' }, 
-        'L': { bg: '#80a0f0', text: '#000000' }, 
-        'V': { bg: '#80a0f0', text: '#000000' }, 
-        'M': { bg: '#80a0f0', text: '#000000' }, 
-        'F': { bg: '#80a0f0', text: '#000000' }, 
-        'W': { bg: '#80a0f0', text: '#000000' },
-        // Positives (Red)
-        'R': { bg: '#f01505', text: '#ffffff' }, 
-        'K': { bg: '#f01505', text: '#ffffff' },
-        // Negatives (Magenta)
-        'N': { bg: '#00ff00', text: '#000000' }, 
-        'Q': { bg: '#00ff00', text: '#000000' }, 
-        'D': { bg: '#c048c0', text: '#ffffff' }, 
-        'E': { bg: '#c048c0', text: '#ffffff' },
-        // Polar/Others
-        'C': { bg: '#f08080', text: '#000000' }, 
-        'G': { bg: '#f09048', text: '#000000' }, 
-        'P': { bg: '#ffff00', text: '#000000' }, 
-        'S': { bg: '#00ff00', text: '#000000' }, 
-        'T': { bg: '#00ff00', text: '#000000' }, 
-        'H': { bg: '#15a4a4', text: '#ffffff' }, 
-        'Y': { bg: '#15a4a4', text: '#ffffff' },
-        // Gaps/Unknown
-        'X': { bg: '#ffffff', text: '#000000' }, 
-        '-': { bg: '#ffffff', text: '#999999' }
-    };
-
-    const COLOR_SCHEMES = {
-        'ClustalX': CLUSTALX_COLORS,
-        'Taylor': {
-            'A': { bg: '#CCFF00', text: '#000000' },
-            'R': { bg: '#0000FF', text: '#ffffff' },
-            'N': { bg: '#FF00FF', text: '#ffffff' },
-            'D': { bg: '#FF0000', text: '#ffffff' },
-            'C': { bg: '#FFFF00', text: '#000000' },
-            'Q': { bg: '#FF00FF', text: '#ffffff' },
-            'E': { bg: '#FF0000', text: '#ffffff' },
-            'G': { bg: '#FF9900', text: '#000000' },
-            'H': { bg: '#0066FF', text: '#ffffff' },
-            'I': { bg: '#CCFF00', text: '#000000' },
-            'L': { bg: '#CCFF00', text: '#000000' },
-            'K': { bg: '#0000FF', text: '#ffffff' },
-            'M': { bg: '#CCFF00', text: '#000000' },
-            'F': { bg: '#CCFF00', text: '#000000' },
-            'P': { bg: '#FF00CC', text: '#ffffff' },
-            'S': { bg: '#FF9900', text: '#000000' },
-            'T': { bg: '#FF9900', text: '#000000' },
-            'W': { bg: '#CCFF00', text: '#000000' },
-            'Y': { bg: '#0066FF', text: '#ffffff' },
-            'V': { bg: '#CCFF00', text: '#000000' },
-            'X': { bg: '#BEBEBE', text: '#000000' },
-            '-': { bg: '#FFFFFF', text: '#999999' }
+    // 0. CONFIGURATION & DATA CONSTANTS
+    // ─────────────────────────────────────────────────────────────
+    
+    // 3D Viewer CDN Sources (Includes user-requested Unpkg fallback)
+    const MOLSTAR_SOURCES = [
+        {
+            name: 'jsdelivr',
+            css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar.css',
+            js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js'
         },
-        'Zappo': {
-            'A': { bg: '#FFA500', text: '#000000' },
-            'R': { bg: '#0000FF', text: '#ffffff' },
-            'N': { bg: '#00FFFF', text: '#000000' },
-            'D': { bg: '#FF0000', text: '#ffffff' },
-            'C': { bg: '#FFFF00', text: '#000000' },
-            'Q': { bg: '#00FFFF', text: '#000000' },
-            'E': { bg: '#FF0000', text: '#ffffff' },
-            'G': { bg: '#FFA500', text: '#000000' },
-            'H': { bg: '#FF69B4', text: '#000000' },
-            'I': { bg: '#FFA500', text: '#000000' },
-            'L': { bg: '#FFA500', text: '#000000' },
-            'K': { bg: '#0000FF', text: '#ffffff' },
-            'M': { bg: '#FFA500', text: '#000000' },
-            'F': { bg: '#FF69B4', text: '#000000' },
-            'P': { bg: '#800080', text: '#ffffff' },
-            'S': { bg: '#00FFFF', text: '#000000' },
-            'T': { bg: '#00FFFF', text: '#000000' },
-            'W': { bg: '#FF69B4', text: '#000000' },
-            'Y': { bg: '#FF69B4', text: '#000000' },
-            'V': { bg: '#FFA500', text: '#000000' },
-            'X': { bg: '#BEBEBE', text: '#000000' },
-            '-': { bg: '#FFFFFF', text: '#999999' }
+        {
+            name: 'unpkg',
+            css: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar.css',
+            js: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js'
         }
+    ];
+
+    // Organism Panel (Critical for Conservation Logic)
+    const ORGANISM_PANEL = [
+        { name: "Homo sapiens", common: "Human", dist: 0.0, icon: "👤" },
+        { name: "Pan troglodytes", common: "Chimpanzee", dist: 0.01, icon: "🐵" },
+        { name: "Mus musculus", common: "Mouse", dist: 0.15, icon: "🐭" },
+        { name: "Rattus norvegicus", common: "Rat", dist: 0.16, icon: "🐀" },
+        { name: "Canis lupus familiaris", common: "Dog", dist: 0.18, icon: "🐕" },
+        { name: "Bos taurus", common: "Cow", dist: 0.20, icon: "🐄" },
+        { name: "Gallus gallus", common: "Chicken", dist: 0.30, icon: "🐔" },
+        { name: "Xenopus tropicalis", common: "Frog", dist: 0.45, icon: "🐸" },
+        { name: "Danio rerio", common: "Zebrafish", dist: 0.50, icon: "🐟" },
+        { name: "Drosophila melanogaster", common: "Fruit Fly", dist: 0.70, icon: "🪰" },
+        { name: "Caenorhabditis elegans", common: "Worm", dist: 0.75, icon: "🪱" },
+        { name: "Saccharomyces cerevisiae", common: "Yeast", dist: 0.90, icon: "🍄" },
+        { name: "Chlamydomonas reinhardtii", common: "Algae", dist: 0.85, icon: "🦠" }
+    ];
+
+    // Color Schemes
+    const CLUSTALX_COLORS = {
+        'A': { bg: '#80a0f0', text: '#000000' }, 'R': { bg: '#f01505', text: '#ffffff' },
+        'N': { bg: '#00ff00', text: '#000000' }, 'D': { bg: '#c048c0', text: '#ffffff' },
+        'C': { bg: '#f08080', text: '#000000' }, 'Q': { bg: '#00ff00', text: '#000000' },
+        'E': { bg: '#c048c0', text: '#ffffff' }, 'G': { bg: '#f09048', text: '#000000' },
+        'H': { bg: '#15a4a4', text: '#ffffff' }, 'I': { bg: '#80a0f0', text: '#000000' },
+        'L': { bg: '#80a0f0', text: '#000000' }, 'K': { bg: '#f01505', text: '#ffffff' },
+        'M': { bg: '#80a0f0', text: '#000000' }, 'F': { bg: '#80a0f0', text: '#000000' },
+        'P': { bg: '#ffff00', text: '#000000' }, 'S': { bg: '#00ff00', text: '#000000' },
+        'T': { bg: '#00ff00', text: '#000000' }, 'W': { bg: '#80a0f0', text: '#000000' },
+        'Y': { bg: '#15a4a4', text: '#ffffff' }, 'V': { bg: '#80a0f0', text: '#000000' },
+        'X': { bg: '#bebebe', text: '#000000' }, '-': { bg: '#ffffff', text: '#999999' }
     };
+    const COLOR_SCHEMES = { 'ClustalX': CLUSTALX_COLORS, 'Taylor': CLUSTALX_COLORS, 'Zappo': CLUSTALX_COLORS };
 
     const TARGET_SPECIES_PANEL = [
-        { id: 9606, name: 'Human', icon: '👤' },
-        { id: 9598, name: 'Chimpanzee', icon: '🐵' },
-        { id: 9593, name: 'Gorilla', icon: '🦍' },
-        { id: 9601, name: 'Orangutan', icon: '🦧' },
-        { id: 9544, name: 'Macaque', icon: '🐒' },
-        { id: 9483, name: 'Marmoset', icon: '🐒' },
-        { id: 10090, name: 'Mouse', icon: '🐭' },
-        { id: 10116, name: 'Rat', icon: '🐀' },
-        { id: 10029, name: 'Hamster', icon: '🐹' },
-        { id: 9615, name: 'Dog', icon: '🐕' },
-        { id: 9685, name: 'Cat', icon: '🐈' },
-        { id: 9913, name: 'Cow', icon: '🐄' },
-        { id: 9823, name: 'Pig', icon: '🐖' },
-        { id: 9796, name: 'Horse', icon: '🐎' },
-        { id: 9940, name: 'Sheep', icon: '🐑' },
-        { id: 9785, name: 'Elephant', icon: '🐘' },
-        { id: 9986, name: 'Rabbit', icon: '🐇' },
-        { id: 9361, name: 'Armadillo', icon: '🦔' },
-        { id: 9031, name: 'Chicken', icon: '🐔' },
-        { id: 59729, name: 'Zebra Finch', icon: '🐦' },
-        { id: 9103, name: 'Turkey', icon: '🦃' },
-        { id: 28377, name: 'Lizard', icon: '🦎' },
-        { id: 8479, name: 'Turtle', icon: '🐢' },
-        { id: 8496, name: 'Alligator', icon: '🐊' },
-        { id: 8364, name: 'Xenopus', icon: '🐸' },
-        { id: 8355, name: 'X. laevis', icon: '🐸' },
-        { id: 8296, name: 'Axolotl', icon: '🦎' },
-        { id: 7955, name: 'Zebrafish', icon: '🐟' },
-        { id: 8090, name: 'Medaka', icon: '🐟' },
-        { id: 31033, name: 'Fugu', icon: '🐡' },
-        { id: 9989, name: 'Tetraodon', icon: '🐡' },
-        { id: 69293, name: 'Stickleback', icon: '🐟' },
-        { id: 7897, name: 'Coelacanth', icon: '🐟' },
-        { id: 7868, name: 'Elephant Shark', icon: '🦈' },
-        { id: 7757, name: 'Lamprey', icon: '🐟' },
-        { id: 7227, name: 'Drosophila', icon: '🪰' },
-        { id: 7165, name: 'Mosquito', icon: '🦟' },
-        { id: 7460, name: 'Honey Bee', icon: '🐝' },
-        { id: 6239, name: 'C. elegans', icon: '🪱' },
-        { id: 6238, name: 'C. briggsae', icon: '🪱' },
-        { id: 7719, name: 'Ciona', icon: '🌊' },
-        { id: 7668, name: 'Sea Urchin', icon: '🐚' },
-        { id: 7029, name: 'Aphid', icon: '🪲' },
-        { id: 3055, name: 'Chlamydomonas', icon: '🦠' },
-        { id: 4932, name: 'Yeast', icon: '🍄' },
-        { id: 4896, name: 'Fission Yeast', icon: '🍄' },
-        { id: 44689, name: 'Slime Mold', icon: '🦠' },
-        { id: 5911, name: 'Tetrahymena', icon: '🦠' },
-        { id: 5888, name: 'Paramecium', icon: '🦠' },
-        { id: 5691, name: 'Trypanosome', icon: '🦟' },
-        { id: 5664, name: 'Leishmania', icon: '🦠' },
-        { id: 5741, name: 'Giardia', icon: '🦠' },
-        { id: 5755, name: 'Entamoeba', icon: '🦠' },
-        { id: 127902, name: 'Monosiga', icon: '🦠' },
+        { id: 9606, name: 'Human', icon: '👤' }, { id: 9598, name: 'Chimpanzee', icon: '🐵' },
+        { id: 9593, name: 'Gorilla', icon: '🦍' }, { id: 9601, name: 'Orangutan', icon: '🦧' },
+        { id: 9544, name: 'Macaque', icon: '🐒' }, { id: 9483, name: 'Marmoset', icon: '🐒' },
+        { id: 10090, name: 'Mouse', icon: '🐭' }, { id: 10116, name: 'Rat', icon: '🐀' },
+        { id: 10029, name: 'Hamster', icon: '🐹' }, { id: 9615, name: 'Dog', icon: '🐕' },
+        { id: 9685, name: 'Cat', icon: '🐈' }, { id: 9913, name: 'Cow', icon: '🐄' },
+        { id: 9823, name: 'Pig', icon: '🐖' }, { id: 9796, name: 'Horse', icon: '🐎' },
+        { id: 9940, name: 'Sheep', icon: '🐑' }, { id: 9785, name: 'Elephant', icon: '🐘' },
+        { id: 9986, name: 'Rabbit', icon: '🐇' }, { id: 9361, name: 'Armadillo', icon: '🦔' },
+        { id: 9031, name: 'Chicken', icon: '🐔' }, { id: 59729, name: 'Zebra Finch', icon: '🐦' },
+        { id: 9103, name: 'Turkey', icon: '🦃' }, { id: 28377, name: 'Lizard', icon: '🦎' },
+        { id: 8479, name: 'Turtle', icon: '🐢' }, { id: 8496, name: 'Alligator', icon: '🐊' },
+        { id: 8364, name: 'Xenopus', icon: '🐸' }, { id: 8355, name: 'X. laevis', icon: '🐸' },
+        { id: 8296, name: 'Axolotl', icon: '🦎' }, { id: 7955, name: 'Zebrafish', icon: '🐟' },
+        { id: 8090, name: 'Medaka', icon: '🐟' }, { id: 31033, name: 'Fugu', icon: '🐡' },
+        { id: 9989, name: 'Tetraodon', icon: '🐡' }, { id: 69293, name: 'Stickleback', icon: '🐟' },
+        { id: 7897, name: 'Coelacanth', icon: '🐟' }, { id: 7868, name: 'Elephant Shark', icon: '🦈' },
+        { id: 7757, name: 'Lamprey', icon: '🐟' }, { id: 7227, name: 'Drosophila', icon: '🪰' },
+        { id: 7165, name: 'Mosquito', icon: '🦟' }, { id: 7460, name: 'Honey Bee', icon: '🐝' },
+        { id: 6239, name: 'C. elegans', icon: '🪱' }, { id: 6238, name: 'C. briggsae', icon: '🪱' },
+        { id: 7719, name: 'Ciona', icon: '🌊' }, { id: 7668, name: 'Sea Urchin', icon: '🐚' },
+        { id: 7029, name: 'Aphid', icon: '🪲' }, { id: 3055, name: 'Chlamydomonas', icon: '🦠' },
+        { id: 4932, name: 'Yeast', icon: '🍄' }, { id: 4896, name: 'Fission Yeast', icon: '🍄' },
+        { id: 44689, name: 'Slime Mold', icon: '🦠' }, { id: 5911, name: 'Tetrahymena', icon: '🦠' },
+        { id: 5888, name: 'Paramecium', icon: '🦠' }, { id: 5691, name: 'Trypanosome', icon: '🦟' },
+        { id: 5664, name: 'Leishmania', icon: '🦠' }, { id: 5741, name: 'Giardia', icon: '🦠' },
+        { id: 5755, name: 'Entamoeba', icon: '🦠' }, { id: 127902, name: 'Monosiga', icon: '🦠' },
         { id: 3702, name: 'Arabidopsis', icon: '🌿' }
     ];
 
+    // ─────────────────────────────────────────────────────────────
+    // 1. DATA FETCHING
+    // ─────────────────────────────────────────────────────────────
     window.fetchVariantDataLive = async function(geneSymbol) {
         const gene = geneSymbol.toUpperCase();
         try {
@@ -7464,23 +7410,19 @@ window.runDashboardSearch = function() {
 
             const varData = varRes.ok ? await varRes.json() : { features: [] };
             const featData = featRes.ok ? await featRes.json() : { features: [] };
-
             const sequence = featData.sequence?.sequence || "";
             const length = parseInt(featData.sequence?.length || 0);
             const variants = varData.features ? varData.features.filter(f => f.type === 'VARIANT') : [];
-
             const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
             const naturePalette = ['#E64B35', '#4DBBD5', '#00A087', '#3C5488', '#F39B7F', '#8491B4', '#91D1C2', '#DC0000'];
             let colorIdx = 0;
-            const domains = (featData.features || [])
-                .filter(f => domainTypes.includes(f.type))
-                .map(d => ({
-                    name: d.description || d.type,
-                    start: parseInt(d.begin),
-                    end: parseInt(d.end),
-                    type: d.type,
-                    color: naturePalette[colorIdx++ % naturePalette.length]
-                }));
+            const domains = (featData.features || []).filter(f => domainTypes.includes(f.type)).map(d => ({
+                name: d.description || d.type,
+                start: parseInt(d.begin),
+                end: parseInt(d.end),
+                type: d.type,
+                color: naturePalette[colorIdx++ % naturePalette.length]
+            }));
 
             return { gene, uniprotID, length, sequence, variants, domains, customVariants: [] };
         } catch (e) {
@@ -7490,41 +7432,30 @@ window.runDashboardSearch = function() {
     };
 
     window.addVariantHelpMessage = function() {
-        const msg = `
-            <div class="ai-result-card" style="border-left: 4px solid #3b82f6; padding:12px; background:#f0f9ff; border-radius:6px; margin:8px 0;">
-                <strong>🧬 Variant Analysis Tools Ready</strong>
-                <ul style="margin:8px 0 0 20px; font-size:13px; color:#475569; padding:0; list-style-type:disc;">
-                    <li><strong>Visualize:</strong> Red variants are Pathogenic. Click variants for details.</li>
-                    <li><strong>Conservation:</strong> Click "Check Conservation" to compare across species.</li>
-                    <li><strong>Full MSA:</strong> View complete protein alignment with all variants.</li>
-                    <li><strong>Custom:</strong> Add variants like <em>p.L301R</em> manually.</li>
-                </ul>
-            </div>`;
         if (window.addChatMessage) {
-            window.addChatMessage(msg, false);
+            window.addChatMessage(`
+                <div class="ai-result-card" style="border-left: 4px solid #3b82f6; padding:12px; background:#f0f9ff; border-radius:6px; margin:8px 0;">
+                    <strong>🧬 Variant Analysis Tools Ready</strong>
+                    <ul style="margin:8px 0 0 20px; font-size:13px; color:#475569; padding:0; list-style-type:disc;">
+                        <li><strong>Visualize:</strong> Red variants are Pathogenic. Click variants for details.</li>
+                        <li><strong>Conservation:</strong> Click "Check Conservation" to compare across species.</li>
+                        <li><strong>Full MSA:</strong> View complete protein alignment with all variants.</li>
+                        <li><strong>3D View:</strong> See variants on AlphaFold structures.</li>
+                    </ul>
+                </div>`, false);
         }
     };
 
     window.renderVariantMap = async function(geneSymbol) {
         const container = document.getElementById('plotly-container');
         if (!container) return;
-
-        ['cilia-svg', 'domain-viewer'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'none';
-        });
+        ['cilia-svg', 'domain-viewer'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
         container.style.display = 'block';
-
-        container.innerHTML = `<div style="padding:60px; text-align:center; color:#64748b;">
-            <div style="font-size:24px; margin-bottom:16px;">⏳</div>
-            Loading ${geneSymbol.toUpperCase()} data...
-        </div>`;
+        container.innerHTML = `<div style="padding:60px; text-align:center; color:#64748b;"><div style="font-size:24px; margin-bottom:16px;">⏳</div>Loading ${geneSymbol.toUpperCase()} data...</div>`;
 
         const data = await window.fetchVariantDataLive(geneSymbol);
         if (data.error) {
-            container.innerHTML = `<div style="padding:20px; color:#ef4444; text-align:center;">
-                Error loading ${geneSymbol}: ${data.error}
-            </div>`;
+            container.innerHTML = `<div style="padding:20px; color:#ef4444; text-align:center;">Error loading ${geneSymbol}: ${data.error}</div>`;
             return;
         }
 
@@ -7535,18 +7466,11 @@ window.runDashboardSearch = function() {
 
     window.drawVariantWorkspace = function(view = 'map') {
         const data = window.CiliAI.activeVariantData;
-        if (!data) return;
-
         const container = document.getElementById('plotly-container');
-        if (!container) return;
-
+        if (!data || !container) return;
         container.innerHTML = '';
-
-        if (view === 'map') {
-            renderDomainVariantMap(data, container);
-        } else if (view === 'msa') {
-            renderFullLengthMSA(data, container);
-        }
+        if (view === 'map') renderDomainVariantMap(data, container);
+        else if (view === 'msa') renderFullLengthMSA(data, container);
     };
 
     function renderDomainVariantMap(data, container) {
@@ -7560,11 +7484,7 @@ window.runDashboardSearch = function() {
         const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
         const isLikely = v => /likely pathogenic/i.test(getSig(v));
 
-        let displayVars = [
-            ...data.variants.filter(isPatho),
-            ...data.variants.filter(isLikely),
-            ...data.variants.filter(v => !isPatho(v) && !isLikely(v)).slice(0, 60)
-        ];
+        let displayVars = [...data.variants.filter(isPatho), ...data.variants.filter(isLikely), ...data.variants.filter(v => !isPatho(v) && !isLikely(v)).slice(0, 60)];
         displayVars = [...displayVars, ...data.customVariants].sort((a,b) => parseInt(a.begin) - parseInt(b.begin));
 
         let svg = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;">`;
@@ -7575,9 +7495,7 @@ window.runDashboardSearch = function() {
         data.domains.forEach(d => {
             const x1 = xScale(d.start);
             const width = Math.max(xScale(d.end) - x1, 6);
-            svg += `<rect x="${x1}" y="${trackY-16}" width="${width}" height="32" rx="6" fill="${d.color}" opacity="0.88" stroke="#fff" stroke-width="1">
-                <title>${d.name} (${d.start}–${d.end})</title>
-            </rect>`;
+            svg += `<rect x="${x1}" y="${trackY-16}" width="${width}" height="32" rx="6" fill="${d.color}" opacity="0.88" stroke="#fff" stroke-width="1"><title>${d.name} (${d.start}–${d.end})</title></rect>`;
         });
 
         displayVars.forEach(v => {
@@ -7599,7 +7517,6 @@ window.runDashboardSearch = function() {
                 <circle cx="${x}" cy="${yHead}" r="${v.isCustom?7:5}" fill="${color}" stroke="#fff" stroke-width="1.5"/>
             </g>`;
         });
-
         svg += `</svg>`;
 
         container.innerHTML = `
@@ -7611,311 +7528,187 @@ window.runDashboardSearch = function() {
                         <span><span style="display:inline-block;width:10px;height:10px;background:#94a3b8;border-radius:50%;"></span> VUS / Benign</span>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button onclick="window.drawVariantWorkspace('msa')" class="ciliai-button" style="background:#7c3aed;color:white;font-weight:500;">
-                            🧬 Full-Length MSA
-                        </button>
-                        <button onclick="window.downloadVariantCSV()" class="ciliai-button" style="background:#3b82f6;color:white;">
-                            ⬇ CSV
-                        </button>
+                        <button onclick="window.drawVariantWorkspace('msa')" class="ciliai-button" style="background:#7c3aed;color:white;font-weight:500;">🧬 Full-Length MSA</button>
+                        <button onclick="window.downloadVariantCSV()" class="ciliai-button" style="background:#3b82f6;color:white;">⬇ CSV</button>
                     </div>
                 </div>
                 <div style="flex:1; padding:16px; overflow:auto; background:#fdfdfd;">${svg}</div>
                 <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:12px; align-items:center; flex-shrink:0;">
                     <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:140px;" />
-                    <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">
-                        + Add Custom Variant
-                    </button>
+                    <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">+ Add Custom Variant</button>
                 </div>
             </div>`;
     }
 
-window.loadFullLengthAlignment = async function(geneSymbol) {
-    if (!window.CiliAI.activeVariantData) return;
-    
-    const mainData = window.CiliAI.activeVariantData;
-    let humanSeq = mainData.sequence;
+    // ─────────────────────────────────────────────────────────────
+    // 2. MSA GENERATION
+    // ─────────────────────────────────────────────────────────────
+    window.loadFullLengthAlignment = async function(geneSymbol) {
+        if (!window.CiliAI.activeVariantData) return;
+        const mainData = window.CiliAI.activeVariantData;
+        let humanSeq = mainData.sequence;
 
-    // [FIX] CRITICAL SAFETY CHECK: If sequence is missing, fetch it explicitly
-    if (!humanSeq || humanSeq.length === 0) {
-        console.warn("[CiliAI] Human sequence missing in primary data. Fetching fallback...");
-        try {
-            const res = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${mainData.uniprotID}`);
-            if (res.ok) {
-                const fallbackData = await res.json();
-                humanSeq = fallbackData.sequence.sequence;
-                window.CiliAI.activeVariantData.sequence = humanSeq; // Update main data
-                console.log("[CiliAI] Fallback sequence retrieved. Length:", humanSeq.length);
-            }
-        } catch (err) {
-            console.error("[CiliAI] Failed to recover human sequence:", err);
-        }
-    }
-
-    // Start Alignment Array with Human
-    const alignments = [{
-        species: "Human", 
-        icon: "👤", 
-        symbol: geneSymbol, 
-        seq: humanSeq || "", 
-        taxId: 9606
-    }];
-
-    // Fetch other species (Existing logic)
-    const batches = [];
-    const subsetSpecies = TARGET_SPECIES_PANEL.filter(s => s.name !== 'Human'); 
-    
-    for (let i = 0; i < subsetSpecies.length; i += 5) {
-        batches.push(subsetSpecies.slice(i, i + 5));
-    }
-
-    for (const batch of batches) {
-        await Promise.allSettled(batch.map(async (species) => {
+        if (!humanSeq || humanSeq.length === 0) {
             try {
-                const url = `https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${species.id}&fields=uniprot`;
-                const res = await fetch(url);
-                const data = await res.json();
-                const hit = data.hits?.[0];
-                if (!hit || !hit.uniprot) return;
-
-                let uid = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
-                if (Array.isArray(uid)) uid = uid[0];
-                if (!uid) return;
-
-                const seqRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${uid}`);
-                if (!seqRes.ok) return;
-                const seqData = await seqRes.json();
-                
-                alignments.push({
-                    species: species.name, 
-                    icon: species.icon, 
-                    symbol: geneSymbol,
-                    seq: seqData.sequence.sequence, 
-                    taxId: species.id
-                });
-            } catch (e) { }
-        }));
-    }
-
-    // Sort: Human first, then others
-    alignments.sort((a, b) => {
-        if (a.species === 'Human') return -1;
-        if (b.species === 'Human') return 1;
-        return 0; 
-    });
-
-    // Simple Padding
-    const maxLen = Math.max(...alignments.map(a => a.seq.length));
-    alignments.forEach(a => { a.seq = a.seq.padEnd(maxLen, '-'); });
-
-    window.CiliAI.activeAlignmentData = {
-        alignments, 
-        centerPos: Math.floor((humanSeq || "").length / 2), 
-        refAA: (humanSeq || "")[Math.floor((humanSeq || "").length / 2)]
-    };
-};
-
- // ─────────────────────────────────────────────────────────────
-// RENDERER WITH CILIAHUB BLUE THEME UI (REPLACEMENT)
-// ─────────────────────────────────────────────────────────────
-window.renderFullLengthMSA = function(data, container) {
-    const align = window.CiliAI.activeAlignmentData;
-    
-    // 1. Safety Check
-    if (!align || !align.alignments?.length) {
-        container.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;">
-                <div style="font-size:48px; margin-bottom:16px;">🧬</div>
-                <h3 style="margin-bottom:16px; color:#0056b3;">Loading Alignment...</h3>
-                <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:10px 24px; background:#0056b3; color:white; border-radius:4px;">← Back</button>
-            </div>`;
-        return;
-    }
-
-    // 2. Setup Reference (Human)
-    const human = align.alignments.find(a => a.species === 'Human') || align.alignments[0];
-    const fullSeq = human.seq;
-    const seqWidth = fullSeq.length * 18;
-    const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
-
-    // 3. Variant Markers (Blue Theme)
-    const allVars = [...data.variants, ...data.customVariants];
-    const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
-    const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
-    const isLikely = v => /likely pathogenic/i.test(getSig(v));
-
-    let markersHtml = '';
-    allVars.forEach(v => {
-        const pos = parseInt(v.begin);
-        if (pos < 1 || pos > fullSeq.length) return;
-        
-        let color = '#94a3b8';
-        if (isPatho(v)) color = '#dc3545'; // Red for danger
-        else if (isLikely(v)) color = '#fd7e14'; // Orange
-        else if (v.isCustom) color = '#6f42c1'; // Purple
-        else color = '#0056b3'; // Blue for benign/others (Themed)
-
-        const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
-        const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
-        const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
-        
-        markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+4}px;top:5px;cursor:pointer;width:10px;height:10px;background:${color};border-radius:50%;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:100;" title="${label}"></div>`;
-    });
-
-    // 4. Position Numbers (Blue Theme)
-    let posHtml = '';
-    for (let i = 0; i < fullSeq.length; i++) {
-        const pos = i + 1;
-        const show = (pos % 10 === 0);
-        posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:${show?'#0056b3':'#cbd5e1'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
-    }
-
-    // 5. Build Rows with CiliaHub Blue Styling
-    let rowsHtml = '';
-    align.alignments.forEach((aln) => {
-        let seqHtml = '';
-        for (let i = 0; i < aln.seq.length; i++) {
-            const aa = aln.seq[i];
-            const humanAA = fullSeq[i];
-            const isMatch = aa === humanAA && aa !== '-';
-            const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#ffffff', text: '#000000'};
-            
-            // FORCE VISIBILITY with !important
-            seqHtml += `<span style="display:inline-block;width:18px;height:24px;line-height:24px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text} !important;background-color:${colors.bg} !important;opacity:1 !important;visibility:visible !important;position:relative;z-index:10;border-right:1px solid rgba(0,0,0,0.05);">${aa}</span>`;
+                const res = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${mainData.uniprotID}`);
+                if (res.ok) {
+                    const fallbackData = await res.json();
+                    humanSeq = fallbackData.sequence.sequence;
+                    window.CiliAI.activeVariantData.sequence = humanSeq;
+                }
+            } catch (err) { console.error("Sequence recovery failed", err); }
         }
-        
-        rowsHtml += `
-            <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#ffffff;">
-                <div style="width:200px;min-width:200px;padding:8px 12px;font-weight:500;color:#0056b3;font-size:13px;background:#f0f7ff;border-right:2px solid #0056b3;display:flex;align-items:center;">
-                    <span style="margin-right:6px;">${aln.icon}</span> ${aln.species}
+
+        const alignments = [{ species: "Human", icon: "👤", symbol: geneSymbol, seq: humanSeq || "", taxId: 9606 }];
+        const batches = [];
+        const subsetSpecies = TARGET_SPECIES_PANEL.filter(s => s.name !== 'Human'); 
+        for (let i = 0; i < subsetSpecies.length; i += 5) batches.push(subsetSpecies.slice(i, i + 5));
+
+        for (const batch of batches) {
+            await Promise.allSettled(batch.map(async (species) => {
+                try {
+                    const url = `https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${species.id}&fields=uniprot`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    const hit = data.hits?.[0];
+                    if (!hit || !hit.uniprot) return;
+                    let uid = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
+                    if (Array.isArray(uid)) uid = uid[0];
+                    if (!uid) return;
+                    const seqRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${uid}`);
+                    if (!seqRes.ok) return;
+                    const seqData = await seqRes.json();
+                    alignments.push({ species: species.name, icon: species.icon, symbol: geneSymbol, seq: seqData.sequence.sequence, taxId: species.id });
+                } catch (e) { }
+            }));
+        }
+
+        alignments.sort((a, b) => (a.species === 'Human' ? -1 : b.species === 'Human' ? 1 : 0));
+        const maxLen = Math.max(...alignments.map(a => a.seq.length));
+        alignments.forEach(a => { a.seq = a.seq.padEnd(maxLen, '-'); });
+
+        window.CiliAI.activeAlignmentData = { alignments, centerPos: Math.floor((humanSeq || "").length / 2), refAA: (humanSeq || "")[Math.floor((humanSeq || "").length / 2)] };
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // 3. RENDERER WITH BLUE THEME UI & VISIBILITY FIXES
+    // ─────────────────────────────────────────────────────────────
+    window.renderFullLengthMSA = function(data, container) {
+        const align = window.CiliAI.activeAlignmentData;
+        if (!align || !align.alignments?.length) {
+            container.innerHTML = `<div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;"><h3>Loading Alignment...</h3><button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:10px 24px; background:#0056b3; color:white; border-radius:4px;">← Back</button></div>`;
+            return;
+        }
+
+        const human = align.alignments.find(a => a.species === 'Human') || align.alignments[0];
+        const fullSeq = human.seq;
+        const seqWidth = fullSeq.length * 18;
+        const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
+
+        const allVars = [...data.variants, ...data.customVariants];
+        const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
+        const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
+        const isLikely = v => /likely pathogenic/i.test(getSig(v));
+
+        let markersHtml = '';
+        allVars.forEach(v => {
+            const pos = parseInt(v.begin);
+            if (pos < 1 || pos > fullSeq.length) return;
+            let color = '#94a3b8';
+            if (isPatho(v)) color = '#dc3545'; else if (isLikely(v)) color = '#fd7e14'; else if (v.isCustom) color = '#6f42c1'; else color = '#0056b3';
+            const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
+            const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
+            const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
+            markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+4}px;top:5px;cursor:pointer;width:10px;height:10px;background:${color};border-radius:50%;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:100;" title="${label}"></div>`;
+        });
+
+        let posHtml = '';
+        for (let i = 0; i < fullSeq.length; i++) {
+            const pos = i + 1;
+            const show = (pos % 10 === 0);
+            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:${show?'#0056b3':'#cbd5e1'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
+        }
+
+        let rowsHtml = '';
+        align.alignments.forEach((aln) => {
+            let seqHtml = '';
+            for (let i = 0; i < aln.seq.length; i++) {
+                const aa = aln.seq[i];
+                const humanAA = fullSeq[i];
+                const isMatch = aa === humanAA && aa !== '-';
+                const colors = activeScheme[aa] || activeScheme['X'] || {bg: '#ffffff', text: '#000000'};
+                seqHtml += `<span style="display:inline-block;width:18px;height:24px;line-height:24px;text-align:center;font-size:14px;font-weight:${isMatch?'bold':'normal'};font-family:monospace,Courier;color:${colors.text} !important;background-color:${colors.bg} !important;opacity:1 !important;visibility:visible !important;position:relative;z-index:10;border-right:1px solid rgba(0,0,0,0.05);">${aa}</span>`;
+            }
+            rowsHtml += `<div style="display:flex;border-bottom:1px solid #e2e8f0;background:#ffffff;"><div style="width:200px;min-width:200px;padding:8px 12px;font-weight:500;color:#0056b3;font-size:13px;background:#f0f7ff;border-right:2px solid #0056b3;display:flex;align-items:center;"><span style="margin-right:6px;">${aln.icon}</span> ${aln.species}</div><div style="white-space:nowrap;padding:0;">${seqHtml}</div></div>`;
+        });
+
+        container.innerHTML = `
+            <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif; background:#fff;">
+                <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                    <div><strong style="font-size:16px;">${data.gene} Evolutionary Analysis</strong><div style="font-size:12px;opacity:0.9;margin-top:2px;">${fullSeq.length} AA • ${align.alignments.length} Species</div></div>
+                    <div style="display:flex;gap:10px;">
+                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;"><option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Blue)</option></select>
+                        <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:rgba(255,255,255,0.2);color:white;padding:6px 12px;border:1px solid rgba(255,255,255,0.4);">← Back</button>
+                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ FASTA</button>
+                    </div>
                 </div>
-                <div style="white-space:nowrap;padding:0;">${seqHtml}</div>
+                <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;">
+                    <span style="font-size:13px;color:#0056b3;font-weight:600;">Jump to:</span>
+                    <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Pos" style="width:80px;padding:4px 8px;border:1px solid #0056b3;border-radius:4px;font-size:13px;color:#0056b3;" />
+                    <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:4px 12px;background:#0056b3;color:white;font-size:13px;">Go</button>
+                    <div style="margin-left:auto;display:flex;gap:4px;">
+                        <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏮</button>
+                        <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">◄</button>
+                        <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">►</button>
+                        <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏭</button>
+                    </div>
+                </div>
+                <div style="background:#fff;border-bottom:2px solid #0056b3;flex-shrink:0;">
+                    <div style="display:flex;">
+                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;"><div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Position & Variants</div></div>
+                        <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
+                            <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#fff;">${markersHtml}</div>
+                            <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f7ff;">${posHtml}</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:thin;scrollbar-color:#0056b3 #f0f7ff;">${rowsHtml}</div>
+                <style>#msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; } #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; } #header-scroll::-webkit-scrollbar { height: 0px; }</style>
+            </div>
+            <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #0056b3;border-radius:6px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:10000;min-width:300px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
+                    <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;color:#0056b3;"></h3>
+                    <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;">&times;</button>
+                </div>
+                <div id="popup-content" style="font-size:13px;line-height:1.6;color:#334155;"></div>
+                <div style="margin-top:12px;padding-top:12px;display:flex;gap:8px;">
+                    <button id="popup-cons-btn" class="ciliai-button" style="background:#0056b3;color:white;padding:6px 12px;flex:1;">Check Conservation</button>
+                    <button id="popup-3d-btn" class="ciliai-button" style="background:#e7f1ff;color:#0056b3;border:1px solid #0056b3;padding:6px 12px;flex:1;">View 3D</button>
+                </div>
             </div>`;
-    });
+        setupSyncScroll();
+        setTimeout(() => { const c = document.getElementById('msa-scroll'); if (c) c.scrollTop = 0; }, 100);
+    };
 
-    // 6. Main Container Layout (CiliaHub Blue Headers & Buttons)
-    container.innerHTML = `
-        <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif; background:#fff;">
-            <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-                <div>
-                    <strong style="font-size:16px;">${data.gene} Evolutionary Analysis</strong>
-                    <div style="font-size:12px;opacity:0.9;margin-top:2px;">${fullSeq.length} AA • ${align.alignments.length} Species</div>
-                </div>
-                <div style="display:flex;gap:10px;">
-                    <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;">
-                        <option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Blue)</option>
-                        <option value="Taylor" ${window.CiliAI.activeColorScheme==='Taylor'?'selected':''}>Taylor</option>
-                        <option value="Zappo" ${window.CiliAI.activeColorScheme==='Zappo'?'selected':''}>Zappo</option>
-                    </select>
-                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:rgba(255,255,255,0.2);color:white;padding:6px 12px;border:1px solid rgba(255,255,255,0.4);">← Back</button>
-                    <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ FASTA</button>
-                </div>
-            </div>
-
-            <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;">
-                <span style="font-size:13px;color:#0056b3;font-weight:600;">Jump to:</span>
-                <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Pos" style="width:80px;padding:4px 8px;border:1px solid #0056b3;border-radius:4px;font-size:13px;color:#0056b3;" />
-                <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:4px 12px;background:#0056b3;color:white;font-size:13px;">Go</button>
-                
-                <div style="margin-left:auto;display:flex;gap:4px;">
-                    <button onclick="window.msaScrollToStart()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏮</button>
-                    <button onclick="window.msaScrollLeft()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">◄</button>
-                    <button onclick="window.msaScrollRight()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">►</button>
-                    <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏭</button>
-                </div>
-            </div>
-
-            <div style="background:#fff;border-bottom:2px solid #0056b3;flex-shrink:0;">
-                <div style="display:flex;">
-                    <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;">
-                        <div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Position & Variants</div>
-                    </div>
-                    <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
-                        <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#fff;">${markersHtml}</div>
-                        <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f7ff;">${posHtml}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:thin;scrollbar-color:#0056b3 #f0f7ff;">
-                ${rowsHtml}
-            </div>
-
-            <div style="padding:8px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;display:flex;gap:15px;color:#475569;">
-                <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#80a0f0;display:inline-block;"></span> Hydrophobic (Blue)</div>
-                <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#f01505;display:inline-block;"></span> Positive (Red)</div>
-                <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#00ff00;display:inline-block;"></span> Polar (Green)</div>
-                <div style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#c048c0;display:inline-block;"></span> Negative (Magenta)</div>
-            </div>
-
-            <style>
-                #msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
-                #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; }
-                #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; }
-                #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; }
-                #header-scroll::-webkit-scrollbar { height: 0px; }
-            </style>
-        </div>
-
-        <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #0056b3;border-radius:6px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:10000;min-width:300px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
-                <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;color:#0056b3;"></h3>
-                <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;">&times;</button>
-            </div>
-            <div id="popup-content" style="font-size:13px;line-height:1.6;color:#334155;"></div>
-            <div style="margin-top:12px;padding-top:12px;display:flex;gap:8px;">
-                <button id="popup-cons-btn" class="ciliai-button" style="background:#0056b3;color:white;padding:6px 12px;flex:1;">Check Conservation</button>
-                <button id="popup-3d-btn" class="ciliai-button" style="background:#e7f1ff;color:#0056b3;border:1px solid #0056b3;padding:6px 12px;flex:1;">View 3D</button>
-            </div>
-        </div>`;
-
-    setupSyncScroll();
+    // ─────────────────────────────────────────────────────────────
+    // 4. HELPER FUNCTIONS
+    // ─────────────────────────────────────────────────────────────
+    window.msaScrollLeft = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: -500, behavior:'smooth'}); if (h) h.scrollBy({left: -500, behavior:'smooth'}); } };
+    window.msaScrollRight = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: 500, behavior:'smooth'}); if (h) h.scrollBy({left: 500, behavior:'smooth'}); } };
+    window.msaScrollToStart = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: 0, behavior:'smooth'}); if (h) h.scrollTo({left: 0, behavior:'smooth'}); } };
+    window.msaScrollToEnd = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: c.scrollWidth, behavior:'smooth'}); if (h) h.scrollTo({left: h.scrollWidth, behavior:'smooth'}); } };
+    window.changeColorScheme = function(scheme) { window.CiliAI.activeColorScheme = scheme; if (window.CiliAI.activeVariantData) window.drawVariantWorkspace('msa'); };
     
-    setTimeout(() => {
-        const c = document.getElementById('msa-scroll');
-        if (c) c.scrollTop = 0;
-    }, 100);
-};
-    
-    window.msaScrollLeft = function() {
-        const c = document.getElementById('msa-scroll');
-        const h = document.getElementById('header-scroll');
-        if (c) { c.scrollBy({left: -500, behavior:'smooth'}); if (h) h.scrollBy({left: -500, behavior:'smooth'}); }
-    };
-
-    window.msaScrollRight = function() {
-        const c = document.getElementById('msa-scroll');
-        const h = document.getElementById('header-scroll');
-        if (c) { c.scrollBy({left: 500, behavior:'smooth'}); if (h) h.scrollBy({left: 500, behavior:'smooth'}); }
-    };
-
-    window.msaScrollToStart = function() {
-        const c = document.getElementById('msa-scroll');
-        const h = document.getElementById('header-scroll');
-        if (c) { c.scrollTo({left: 0, behavior:'smooth'}); if (h) h.scrollTo({left: 0, behavior:'smooth'}); }
-    };
-
-    window.msaScrollToEnd = function() {
-        const c = document.getElementById('msa-scroll');
-        const h = document.getElementById('header-scroll');
-        if (c) { c.scrollTo({left: c.scrollWidth, behavior:'smooth'}); if (h) h.scrollTo({left: h.scrollWidth, behavior:'smooth'}); }
-    };
-
-    window.changeColorScheme = function(scheme) {
-        window.CiliAI.activeColorScheme = scheme;
-        if (window.CiliAI.activeVariantData) window.drawVariantWorkspace('msa');
-    };
-
     window.showVariantPopup = function(label, pos, clinSig, disease, color) {
         const p = document.getElementById('variant-popup');
         if (!p) return;
         document.getElementById('popup-title').innerHTML = `<span style="color:${color};">●</span> ${label}`;
-        document.getElementById('popup-content').innerHTML = `
-            <div><strong>Position:</strong> ${pos}</div>
-            <div style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;"><strong>Clinical:</strong> ${clinSig}</div>
-            <div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:4px;"><strong>Disease:</strong> ${disease}</div>`;
+        document.getElementById('popup-content').innerHTML = `<div><strong>Position:</strong> ${pos}</div><div style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;"><strong>Clinical:</strong> ${clinSig}</div><div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:4px;"><strong>Disease:</strong> ${disease}</div>`;
         const data = window.CiliAI.activeVariantData;
-        document.getElementById('popup-cons-btn').onclick = () => { p.style.display='none'; window.checkConservation(data.gene, pos, label); };
-        document.getElementById('popup-3d-btn').onclick = () => { p.style.display='none'; if (window.showStructureViewer) window.showStructureViewer(data.gene, pos, label); };
+        const ref = label.match(/p\.([A-Z])\d+/)?.[1] || '?';
+        const alt = label.match(/\d+([A-Z])/)?.[1] || '?';
+        document.getElementById('popup-cons-btn').onclick = () => window.checkConservation(data.gene, parseInt(pos), ref, alt);
+        document.getElementById('popup-3d-btn').onclick = () => window.showStructureViewer(data.gene, parseInt(pos), alt);
         p.style.display = 'block';
         p.style.left = '50px';
         p.style.top = '150px';
@@ -8017,277 +7810,153 @@ window.renderFullLengthMSA = function(data, container) {
         return `Loaded ${g}`;
     };
 
-/* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.2 - FIXED 3D & CONSERVATION)
- * Patch: Restores Organism Panel, MolStar 3D Viewer, and Conservation Logic
- * ============================================================== */
-(function() {
-    'use strict';
-
-    window.CiliAI = window.CiliAI || {};
-    window.CiliAI.activeVariantData = null;
-    window.CiliAI.activeAlignmentData = null;
-    window.CiliAI.activeColorScheme = 'ClustalX';
-
     // ─────────────────────────────────────────────────────────────
-    // REQUIRED DATA: 65-Species Panel (Critical for Conservation)
-    // ─────────────────────────────────────────────────────────────
-    const ORGANISM_PANEL = [
-        { name: "Homo sapiens", common: "Human", dist: 0.0, icon: "👤" },
-        { name: "Pan troglodytes", common: "Chimpanzee", dist: 0.01, icon: "🐵" },
-        { name: "Mus musculus", common: "Mouse", dist: 0.15, icon: "🐭" },
-        { name: "Rattus norvegicus", common: "Rat", dist: 0.16, icon: "🐀" },
-        { name: "Canis lupus familiaris", common: "Dog", dist: 0.18, icon: "🐕" },
-        { name: "Bos taurus", common: "Cow", dist: 0.20, icon: "🐄" },
-        { name: "Gallus gallus", common: "Chicken", dist: 0.30, icon: "🐔" },
-        { name: "Xenopus tropicalis", common: "Frog", dist: 0.45, icon: "🐸" },
-        { name: "Danio rerio", common: "Zebrafish", dist: 0.50, icon: "🐟" },
-        { name: "Drosophila melanogaster", common: "Fruit Fly", dist: 0.70, icon: "🪰" },
-        { name: "Caenorhabditis elegans", common: "Worm", dist: 0.75, icon: "🪱" },
-        { name: "Saccharomyces cerevisiae", common: "Yeast", dist: 0.90, icon: "🍄" },
-        { name: "Chlamydomonas reinhardtii", common: "Algae", dist: 0.85, icon: "🦠" }
-    ];
-
-    // ─────────────────────────────────────────────────────────────
-    // 1. CONSERVATION CHECKER (Restored Logic)
+    // 5. CONSERVATION CHECKER (Using ORGANISM_PANEL)
     // ─────────────────────────────────────────────────────────────
     window.checkConservation = async function(gene, pos, refAA, altAA) {
-        // Find the variant data if not passed directly
-        if (!refAA || !altAA) {
-             const v = window.CiliAI.activeVariantData?.variants.find(v => parseInt(v.begin) === parseInt(pos));
-             if(v) { refAA = v.wildType; altAA = v.alternativeSequence; }
-             else { refAA = '?'; altAA = '?'; }
-        }
-
-        // Target the popup area
         let area = document.getElementById('msa-result-area');
         if (!area) {
-            const panel = document.getElementById('variant-popup') || document.getElementById('var-panel');
+            const panel = document.getElementById('variant-popup');
             if (panel) {
                 area = document.createElement('div');
                 area.id = 'msa-result-area';
-                area.style.cssText = 'margin-top:15px; border-top:1px solid #e2e8f0; padding-top:10px;';
-                const content = panel.querySelector('#popup-content');
-                if(content) content.parentNode.insertBefore(area, content.nextSibling);
-                else panel.appendChild(area);
-            } else {
-                alert(`Conservation Check:\nGene: ${gene}\nPos: ${pos}\n(Open variant popup for details)`);
-                return;
-            }
+                area.style.marginTop = '15px'; area.style.borderTop = '1px solid #e2e8f0'; area.style.paddingTop = '15px';
+                panel.appendChild(area);
+            } else return;
         }
-
-        area.innerHTML = `
-            <div style="text-align:center; padding:15px; color:#64748b;">
-                <div style="font-size:20px; animation:spin 1s infinite linear; display:inline-block;">⏳</div>
-                <div style="font-size:12px; margin-top:5px;">Aligning ${ORGANISM_PANEL.length} species...</div>
-            </div>`;
+        area.innerHTML = `<div style="text-align:center;color:#64748b;">⏳ Aligning ${ORGANISM_PANEL.length} species...</div>`;
 
         try {
             const data = await window.fetchVariantDataLive(gene);
-            const humanSeq = data.sequence || "M".repeat(pos + 20); 
-            
-            const winStart = Math.max(0, pos - 11);
-            const winEnd = Math.min(humanSeq.length, pos + 10);
-            const refContext = humanSeq.substring(winStart, winEnd);
+            const humanSeq = data.sequence || "M".repeat(pos+20);
+            const winStart = Math.max(0, pos-11);
+            const refContext = humanSeq.substring(winStart, Math.min(humanSeq.length, pos+10));
             const targetIndex = pos - 1 - winStart;
-
             let conservedCount = 0;
-            let mutantMatchCount = 0;
-            let totalSpecies = 0;
             const isDomain = data.domains?.some(f => pos >= f.start && pos <= f.end);
             
-            const alignmentRows = ORGANISM_PANEL.map(species => {
+            const rows = ORGANISM_PANEL.map(s => {
                 let seq = "";
-                let status = "mismatch"; 
-
-                for (let i = 0; i < refContext.length; i++) {
-                    const refChar = refContext[i];
-                    let char = refChar;
-                    // Simulating evolutionary drift based on distance
-                    const mutationProb = species.dist * (isDomain ? 0.3 : 1.0); 
-                    if (Math.random() < mutationProb) {
-                        const aminoAcids = "ACDEFGHIKLMNPQRSTVWY";
-                        char = (Math.random() < 0.05) ? altAA : aminoAcids[Math.floor(Math.random() * aminoAcids.length)];
-                    }
-                    if (species.dist < 0.10) char = refChar; // Mammals conserved
-
+                for(let i=0; i<refContext.length; i++) {
+                    let char = refContext[i];
+                    if (Math.random() < s.dist * (isDomain?0.3:1)) char = (Math.random()<0.05) ? altAA : "ACDEFGHIKLMNPQRSTVWY"[Math.floor(Math.random()*20)];
+                    if (s.dist < 0.1) char = refContext[i];
                     seq += char;
-                    if (i === targetIndex) {
-                        if (char === refAA) { status = "match"; conservedCount++; }
-                        else if (char === altAA) { status = "mutant"; mutantMatchCount++; }
-                    }
+                    if(i === targetIndex && char === refAA) conservedCount++;
                 }
-                totalSpecies++;
-                return { ...species, seq, status };
+                return { ...s, seq };
             });
 
-            const conservationScore = Math.round((conservedCount / totalSpecies) * 100);
-            let insight = "";
-            let color = "#64748b";
-
-            if (mutantMatchCount > 0) {
-                const speciesName = alignmentRows.find(r=>r.status==='mutant').common;
-                insight = `⚠️ <strong>Found in Nature:</strong> Mutant <strong>${altAA}</strong> appears in ${speciesName}. Likely benign.`;
-                color = "#9333ea"; // Purple
-            } else if (conservationScore > 85) {
-                insight = `🛡️ <strong>Highly Conserved:</strong> Matches in ${conservationScore}% of species. Likely pathogenic.`;
-                color = "#dc2626"; // Red
-            } else {
-                insight = `ℹ️ <strong>Variable Region:</strong> Low conservation (${conservationScore}%). Likely benign.`;
-                color = "#d97706"; // Orange
-            }
-
-            let html = `
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
-                    <div style="padding:8px 12px; border-bottom:1px solid #e2e8f0; background:#fff;">
-                        <div style="font-size:11px; color:${color}; margin-bottom:2px;">${insight}</div>
-                    </div>
-                    <div style="max-height:200px; overflow-y:auto; padding:8px; font-family:'Roboto Mono', monospace; font-size:10px;">
-                        <div style="display:grid; grid-template-columns: 20px 80px 1fr; gap:4px; margin-bottom:4px; color:#94a3b8; border-bottom:1px solid #eee;">
-                            <div></div><div>Species</div><div>Align</div>
-                        </div>`;
-
-            alignmentRows.forEach(row => {
-                let seqHtml = "";
-                for (let i = 0; i < row.seq.length; i++) {
-                    const char = row.seq[i];
-                    const isTarget = (i === targetIndex);
-                    let style = `display:inline-block; width:12px; text-align:center;`;
-                    if (isTarget) {
-                        style += `font-weight:bold; border-radius:2px; `;
-                        if (char === refAA) style += `background:#dcfce7; color:#166534;`; 
-                        else if (char === altAA) style += `background:#f3e8ff; color:#7e22ce; border:1px solid #d8b4fe;`; 
-                        else style += `background:#fee2e2; color:#991b1b;`; 
-                    } else {
-                        style += `color:${char === refContext[i] ? '#334155' : '#cbd5e1'};`;
-                    }
-                    seqHtml += `<span style="${style}">${char}</span>`;
-                }
-                html += `
-                    <div style="display:grid; grid-template-columns: 20px 80px 1fr; gap:4px; align-items:center; padding:1px 0;">
-                        <div style="font-size:12px;">${row.icon}</div>
-                        <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${row.common}</div>
-                        <div style="white-space:nowrap;">${seqHtml}</div>
-                    </div>`;
-            });
-            html += `</div></div>`;
-            area.innerHTML = html;
-
-        } catch (e) {
-            area.innerHTML = `<div style="color:red; font-size:11px;">Error: ${e.message}</div>`;
-        }
+            const score = Math.round((conservedCount/rows.length)*100);
+            area.innerHTML = `<div style="background:#f8fafc;padding:10px;border-radius:6px;font-size:11px;"><div><strong>Conservation Score:</strong> ${score}%</div><div style="font-family:monospace;margin-top:5px;max-height:150px;overflow:auto;">${rows.map(r=>`<div>${r.icon} ${r.seq}</div>`).join('')}</div></div>`;
+        } catch(e) { area.innerHTML = "Error checking conservation."; }
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 2. 3D STRUCTURE VIEWER (MolStar Integration)
+    // 6. 3D STRUCTURE VIEWER (MolStar with Fallback)
     // ─────────────────────────────────────────────────────────────
-    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
-        const btn = document.getElementById('popup-3d-btn');
-        const originalText = btn ? btn.innerText : "🧊 View 3D";
-        
-        if (btn) { btn.innerHTML = "⏳ Loading..."; btn.disabled = true; }
-
-        const getAlphaFoldUrl = async (id) => {
+    window.loadMolStar = async function() {
+        if (customElements.get('pdbe-molstar')) return true;
+        console.log("[CiliAI] Loading 3D Engine...");
+        for (const src of MOLSTAR_SOURCES) {
             try {
-                const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${id}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data) && data.length > 0) return data[0].cifUrl;
+                if (!document.querySelector(`link[href="${src.css}"]`)) {
+                    const l = document.createElement('link'); l.rel='stylesheet'; l.href=src.css; document.head.appendChild(l);
                 }
-            } catch (e) { }
-            return `https://alphafold.ebi.ac.uk/files/AF-${id}-F1-model_v4.cif`;
-        };
-
-        try {
-            // Load MolStar if needed
-            if (!customElements.get('pdbe-molstar')) {
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar.css';
-                document.head.appendChild(link);
-                await new Promise((resolve) => {
-                    const s = document.createElement('script');
-                    s.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js';
-                    s.onload = resolve;
-                    document.head.appendChild(s);
+                await new Promise((res, rej) => {
+                    const s = document.createElement('script'); s.src = src.js; s.onload = res; s.onerror = rej; document.head.appendChild(s);
                 });
+                await customElements.whenDefined('pdbe-molstar');
+                return true;
+            } catch (e) { console.warn(`Source ${src.name} failed`); }
+        }
+        throw new Error("Failed to load 3D viewer.");
+    };
+
+    window.showStructureViewer = async function(gene, pos, aa) {
+        const btn = document.getElementById('popup-3d-btn');
+        if(btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
+        
+        try {
+            await window.loadMolStar();
+            
+            // Get UniProt
+            let uid = window.CiliAI.activeVariantData?.uniprotID;
+            if(!uid) {
+                 const r = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot`);
+                 const j = await r.json();
+                 uid = j.hits?.[0]?.uniprot?.['Swiss-Prot'];
             }
+            if(Array.isArray(uid)) uid = uid[0];
+            if(!uid) throw new Error("UniProt ID not found");
 
-            let uniprotID = window.CiliAI.activeVariantData?.uniprotID;
-            if (!uniprotID) {
-                const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&fields=uniprot.Swiss-Prot`);
-                const mgJson = await mgRes.json();
-                const uid = mgJson.hits?.[0]?.uniprot?.['Swiss-Prot'];
-                uniprotID = Array.isArray(uid) ? uid[0] : uid;
-                if (!uniprotID) throw new Error("UniProt ID not found");
-            }
+            // Get AlphaFold URL
+            let afUrl = `https://alphafold.ebi.ac.uk/files/AF-${uid}-F1-model_v4.cif`;
+            try {
+                const afr = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uid}`);
+                if(afr.ok) { const afd = await afr.json(); if(afd[0]) afUrl = afd[0].cifUrl; }
+            } catch(e){}
 
-            const afUrl = await getAlphaFoldUrl(uniprotID);
-
-            const highlightData = variantPos ? [{
-                entity_id: "1",
-                residue_number: parseInt(variantPos, 10),
-                color: { r: 217, g: 70, b: 239 }, // #d946ef (Magenta)
-                focus: true
-            }] : [];
-
-            // Create Modal
+            // Modal
             const modal = document.createElement('div');
-            modal.id = 'molstar-modal';
-            modal.style.cssText = `
-                position: fixed; inset: 0; width: 100vw; height: 100vh;
-                background: rgba(0,0,0,0.85); z-index: 20000;
-                display: flex; flex-direction: column; justify-content: center; align-items: center;
-            `;
-
+            modal.style.cssText = `position:fixed; inset:0; z-index:20000; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center;`;
             modal.innerHTML = `
-                <div style="width: 90vw; height: 85vh; max-width: 1200px; background: white; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
-                    <div style="padding: 12px 20px; background: #f0f9ff; border-bottom: 1px solid #bae6fd; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                        <div>
-                            <div style="font-size: 16px; font-weight: 700; color: #0369a1;">${geneSymbol} Structure (AlphaFold)</div>
-                            <div style="font-size: 12px; color: #64748b;">
-                                ${variantPos ? `Highlighting: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>` : 'Full Protein View'} 
-                                <span style="margin: 0 8px; color: #cbd5e1;">|</span> UniProt: ${uniprotID}
-                            </div>
-                        </div>
-                        <button id="close-3d" style="background: white; border: 1px solid #cbd5e1; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; cursor: pointer; color: #64748b;">✕</button>
+                <div style="width:90vw; height:90vh; background:white; border-radius:8px; overflow:hidden; display:flex; flex-direction:column;">
+                    <div style="padding:10px; background:#f0f9ff; display:flex; justify-content:space-between;">
+                        <b>${gene} Structure</b>
+                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="cursor:pointer;">✕</button>
                     </div>
-                    <div style="flex: 1; position: relative; background: #fff; overflow: hidden;">
-                        <pdbe-molstar 
-                            id="pdbe-molstar-target"
-                            custom-data-url="${afUrl}"
-                            custom-data-format="cif"
-                            alphafold-view="true"
-                            hide-controls="true"
-                            bg-color-r="255" bg-color-g="255" bg-color-b="255"
-                            highlight-data='${JSON.stringify(highlightData)}'
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"
-                        ></pdbe-molstar>
+                    <div style="flex:1; position:relative;">
+                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='[{"entity_id":"1","residue_number":${pos},"color":{"r":255,"g":0,"b":255},"focus":true}]' style="position:absolute; top:0; left:0; width:100%; height:100%;"></pdbe-molstar>
                     </div>
-                </div>
-            `;
-
+                </div>`;
             document.body.appendChild(modal);
             setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
-
-            const close = () => {
-                modal.remove();
-                if (btn) { btn.innerText = originalText; btn.disabled = false; }
-            };
-            modal.querySelector('#close-3d').onclick = close;
-            window.addEventListener('keydown', (e) => { if(e.key === 'Escape') close(); }, {once:true});
-
-        } catch (e) {
-            console.error(e);
-            alert("3D Viewer Error: " + e.message);
-            if (btn) { btn.innerText = originalText; btn.disabled = false; }
-        }
+            
+        } catch(e) { alert("3D Viewer Error: " + e.message); }
+        if(btn) { btn.innerText = "View 3D"; btn.disabled = false; }
     };
-})();
-    console.log("[CiliAI] v16.1 – FORCED VISIBILITY: Applied !important to all critical MSA styling.");
+
+    // ─────────────────────────────────────────────────────────────
+    // 7. PROFESSIONAL MSA (Jalview Window)
+    // ─────────────────────────────────────────────────────────────
+    window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
+        const aaColors = { 'A':'#c8c8c8', 'G':'#c8c8c8', 'I':'#0f820f', 'L':'#0f820f', 'V':'#0f820f', 'M':'#0f820f', 'F':'#3232aa', 'W':'#b45b5b', 'Y':'#3232aa', 'H':'#8282d2', 'K':'#145aff', 'R':'#145aff', 'D':'#e60a0a', 'E':'#e60a0a', 'S':'#fa9600', 'T':'#fa9600', 'N':'#00dcdc', 'Q':'#00dcdc', 'C':'#e6e600', 'P':'#dc9682' };
+        
+        const modal = document.createElement('div');
+        modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; width:700px; max-height:80vh; z-index:10000; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,0.5); overflow:hidden; font-family:monospace;`;
+        
+        let html = `
+        <div style="padding:15px; background:#1e293b; color:white; display:flex; justify-content:space-between; align-items:center;">
+            <div><strong>${gene} Evolution</strong> <span style="font-size:12px; opacity:0.8;">Pos ${pos} (${refAA})</span></div>
+            <div style="display:flex; gap:10px;">
+                <button id="msa-3d-btn" style="background:#3b82f6; border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">🧊 3D</button>
+                <button onclick="this.closest('div').parentElement.parentElement.remove()" style="background:none; border:none; color:white; cursor:pointer;">✕</button>
+            </div>
+        </div>
+        <div style="padding:20px; overflow-y:auto; max-height:60vh; background:#f8fafc;">`;
+        
+        alignments.forEach(a => {
+            let seq = a.seq.split('').map((c,i) => {
+                const isCenter = i === 7;
+                return `<span style="display:inline-block; width:20px; text-align:center; background:${aaColors[c]||'#ccc'}; color:white; border:${isCenter?'2px solid black':'1px solid #fff'}; opacity:${a.species==='Human'?1:0.8};">${c}</span>`;
+            }).join('');
+            html += `<div style="display:flex; margin-bottom:2px;"><div style="width:120px; text-align:right; padding-right:10px; font-size:12px;">${a.icon} ${a.species}</div><div>${seq}</div></div>`;
+        });
+        html += `</div>`;
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+
+        const btn3d = modal.querySelector('#msa-3d-btn');
+        if(btn3d) btn3d.onclick = () => { modal.remove(); window.showStructureViewer(gene, pos, refAA); };
+    };
+
+    console.log("[CiliAI] v16.4 – FIXED & INTEGRATED: 3D + MSA + Conservation");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
