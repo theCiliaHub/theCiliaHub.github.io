@@ -7293,12 +7293,12 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.5 - COMPLETE INTEGRATION)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.6 - FINAL INTEGRATION)
  * Features: 
+ * - Conservation Checker (User Defined Logic)
+ * - 3D Structure (MolStar with Fallback)
  * - Full MSA (Blue Theme)
- * - 3D Structure (MolStar with Unpkg/JsDelivr)
- * - Conservation Analysis (Organism Panel)
- * - Professional Jalview-style MSA
+ * - Professional Jalview MSA
  * ============================================================== */
 (function() {
     'use strict';
@@ -7312,21 +7312,11 @@ window.runDashboardSearch = function() {
     // 1. DATA CONSTANTS & CONFIGURATION
     // ─────────────────────────────────────────────────────────────
     
-    // 3D Viewer CDN Sources (User Requested Configuration)
     const MOLSTAR_SOURCES = [
-        {
-            name: 'jsdelivr',
-            css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar.css',
-            js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar-component.js'
-        },
-        {
-            name: 'unpkg',
-            css: 'https://unpkg.com/pdbe-molstar@3.10.0/build/pdbe-molstar.css',
-            js: 'https://unpkg.com/pdbe-molstar@3.10.0/build/pdbe-molstar-component.js'
-        }
+        { name: 'jsdelivr', css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar.css', js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.10.0/build/pdbe-molstar-component.js' },
+        { name: 'unpkg', css: 'https://unpkg.com/pdbe-molstar@3.10.0/build/pdbe-molstar.css', js: 'https://unpkg.com/pdbe-molstar@3.10.0/build/pdbe-molstar-component.js' }
     ];
 
-    // Conservation Panel (65 Species)
     const ORGANISM_PANEL = [
         { name: "Homo sapiens", common: "Human", dist: 0.0, icon: "👤" },
         { name: "Pan troglodytes", common: "Chimpanzee", dist: 0.01, icon: "🐵" },
@@ -7343,29 +7333,51 @@ window.runDashboardSearch = function() {
         { name: "Chlamydomonas reinhardtii", common: "Algae", dist: 0.85, icon: "🦠" }
     ];
 
-    // Colors
     const CLUSTALX_COLORS = {
-        'A': { bg: '#80a0f0', text: '#000000' }, 'I': { bg: '#80a0f0', text: '#000000' }, 'L': { bg: '#80a0f0', text: '#000000' }, 
-        'V': { bg: '#80a0f0', text: '#000000' }, 'M': { bg: '#80a0f0', text: '#000000' }, 'F': { bg: '#80a0f0', text: '#000000' }, 
-        'W': { bg: '#80a0f0', text: '#000000' }, 'R': { bg: '#f01505', text: '#ffffff' }, 'K': { bg: '#f01505', text: '#ffffff' }, 
-        'N': { bg: '#00ff00', text: '#000000' }, 'Q': { bg: '#00ff00', text: '#000000' }, 'D': { bg: '#c048c0', text: '#ffffff' }, 
-        'E': { bg: '#c048c0', text: '#ffffff' }, 'C': { bg: '#f08080', text: '#000000' }, 'G': { bg: '#f09048', text: '#000000' }, 
-        'P': { bg: '#ffff00', text: '#000000' }, 'S': { bg: '#00ff00', text: '#000000' }, 'T': { bg: '#00ff00', text: '#000000' }, 
-        'H': { bg: '#15a4a4', text: '#ffffff' }, 'Y': { bg: '#15a4a4', text: '#ffffff' }, 'X': { bg: '#ffffff', text: '#000000' }, 
+        'A': { bg: '#80a0f0', text: '#000000' }, 'R': { bg: '#f01505', text: '#ffffff' }, 'N': { bg: '#00ff00', text: '#000000' },
+        'D': { bg: '#c048c0', text: '#ffffff' }, 'C': { bg: '#f08080', text: '#000000' }, 'Q': { bg: '#00ff00', text: '#000000' },
+        'E': { bg: '#c048c0', text: '#ffffff' }, 'G': { bg: '#f09048', text: '#000000' }, 'H': { bg: '#15a4a4', text: '#ffffff' },
+        'I': { bg: '#80a0f0', text: '#000000' }, 'L': { bg: '#80a0f0', text: '#000000' }, 'K': { bg: '#f01505', text: '#ffffff' },
+        'M': { bg: '#80a0f0', text: '#000000' }, 'F': { bg: '#80a0f0', text: '#000000' }, 'P': { bg: '#ffff00', text: '#000000' },
+        'S': { bg: '#00ff00', text: '#000000' }, 'T': { bg: '#00ff00', text: '#000000' }, 'W': { bg: '#80a0f0', text: '#000000' },
+        'Y': { bg: '#15a4a4', text: '#ffffff' }, 'V': { bg: '#80a0f0', text: '#000000' }, 'X': { bg: '#bebebe', text: '#000000' },
         '-': { bg: '#ffffff', text: '#999999' }
     };
     const COLOR_SCHEMES = { 'ClustalX': CLUSTALX_COLORS, 'Taylor': CLUSTALX_COLORS, 'Zappo': CLUSTALX_COLORS };
 
-    // Alignment Targets
     const TARGET_SPECIES_PANEL = [
-        { id: 9606, name: 'Human', icon: '👤' }, { id: 9598, name: 'Chimpanzee', icon: '🐵' }, { id: 9593, name: 'Gorilla', icon: '🦍' }, 
-        { id: 10090, name: 'Mouse', icon: '🐭' }, { id: 10116, name: 'Rat', icon: '🐀' }, { id: 9615, name: 'Dog', icon: '🐕' }, 
-        { id: 9913, name: 'Cow', icon: '🐄' }, { id: 7955, name: 'Zebrafish', icon: '🐟' }, { id: 7227, name: 'Drosophila', icon: '🪰' }, 
-        { id: 6239, name: 'C. elegans', icon: '🪱' }, { id: 3055, name: 'Chlamydomonas', icon: '🦠' }
+        { id: 9606, name: 'Human', icon: '👤' }, { id: 9598, name: 'Chimpanzee', icon: '🐵' },
+        { id: 9593, name: 'Gorilla', icon: '🦍' }, { id: 9601, name: 'Orangutan', icon: '🦧' },
+        { id: 9544, name: 'Macaque', icon: '🐒' }, { id: 9483, name: 'Marmoset', icon: '🐒' },
+        { id: 10090, name: 'Mouse', icon: '🐭' }, { id: 10116, name: 'Rat', icon: '🐀' },
+        { id: 10029, name: 'Hamster', icon: '🐹' }, { id: 9615, name: 'Dog', icon: '🐕' },
+        { id: 9685, name: 'Cat', icon: '🐈' }, { id: 9913, name: 'Cow', icon: '🐄' },
+        { id: 9823, name: 'Pig', icon: '🐖' }, { id: 9796, name: 'Horse', icon: '🐎' },
+        { id: 9940, name: 'Sheep', icon: '🐑' }, { id: 9785, name: 'Elephant', icon: '🐘' },
+        { id: 9986, name: 'Rabbit', icon: '🐇' }, { id: 9361, name: 'Armadillo', icon: '🦔' },
+        { id: 9031, name: 'Chicken', icon: '🐔' }, { id: 59729, name: 'Zebra Finch', icon: '🐦' },
+        { id: 9103, name: 'Turkey', icon: '🦃' }, { id: 28377, name: 'Lizard', icon: '🦎' },
+        { id: 8479, name: 'Turtle', icon: '🐢' }, { id: 8496, name: 'Alligator', icon: '🐊' },
+        { id: 8364, name: 'Xenopus', icon: '🐸' }, { id: 8355, name: 'X. laevis', icon: '🐸' },
+        { id: 8296, name: 'Axolotl', icon: '🦎' }, { id: 7955, name: 'Zebrafish', icon: '🐟' },
+        { id: 8090, name: 'Medaka', icon: '🐟' }, { id: 31033, name: 'Fugu', icon: '🐡' },
+        { id: 9989, name: 'Tetraodon', icon: '🐡' }, { id: 69293, name: 'Stickleback', icon: '🐟' },
+        { id: 7897, name: 'Coelacanth', icon: '🐟' }, { id: 7868, name: 'Elephant Shark', icon: '🦈' },
+        { id: 7757, name: 'Lamprey', icon: '🐟' }, { id: 7227, name: 'Drosophila', icon: '🪰' },
+        { id: 7165, name: 'Mosquito', icon: '🦟' }, { id: 7460, name: 'Honey Bee', icon: '🐝' },
+        { id: 6239, name: 'C. elegans', icon: '🪱' }, { id: 6238, name: 'C. briggsae', icon: '🪱' },
+        { id: 7719, name: 'Ciona', icon: '🌊' }, { id: 7668, name: 'Sea Urchin', icon: '🐚' },
+        { id: 7029, name: 'Aphid', icon: '🪲' }, { id: 3055, name: 'Chlamydomonas', icon: '🦠' },
+        { id: 4932, name: 'Yeast', icon: '🍄' }, { id: 4896, name: 'Fission Yeast', icon: '🍄' },
+        { id: 44689, name: 'Slime Mold', icon: '🦠' }, { id: 5911, name: 'Tetrahymena', icon: '🦠' },
+        { id: 5888, name: 'Paramecium', icon: '🦠' }, { id: 5691, name: 'Trypanosome', icon: '🦟' },
+        { id: 5664, name: 'Leishmania', icon: '🦠' }, { id: 5741, name: 'Giardia', icon: '🦠' },
+        { id: 5755, name: 'Entamoeba', icon: '🦠' }, { id: 127902, name: 'Monosiga', icon: '🦠' },
+        { id: 3702, name: 'Arabidopsis', icon: '🌿' }
     ];
 
     // ─────────────────────────────────────────────────────────────
-    // 2. DATA FETCHING & UI SETUP
+    // 1. DATA FETCHING
     // ─────────────────────────────────────────────────────────────
     window.fetchVariantDataLive = async function(geneSymbol) {
         const gene = geneSymbol.toUpperCase();
@@ -7426,7 +7438,7 @@ window.runDashboardSearch = function() {
         ['cilia-svg', 'domain-viewer'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
         container.style.display = 'block';
         container.innerHTML = `<div style="padding:60px; text-align:center; color:#64748b;"><div style="font-size:24px; margin-bottom:16px;">⏳</div>Loading ${geneSymbol.toUpperCase()} data...</div>`;
-        
+
         const data = await window.fetchVariantDataLive(geneSymbol);
         if (data.error) {
             container.innerHTML = `<div style="padding:20px; color:#ef4444; text-align:center;">Error loading ${geneSymbol}: ${data.error}</div>`;
@@ -7515,7 +7527,7 @@ window.runDashboardSearch = function() {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 4. MSA GENERATION
+    // 2. MSA GENERATION
     // ─────────────────────────────────────────────────────────────
     window.loadFullLengthAlignment = async function(geneSymbol) {
         if (!window.CiliAI.activeVariantData) return;
@@ -7565,7 +7577,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 5. RENDERER WITH BLUE THEME UI
+    // 3. RENDERER WITH BLUE THEME UI & VISIBILITY FIXES
     // ─────────────────────────────────────────────────────────────
     window.renderFullLengthMSA = function(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7576,6 +7588,7 @@ window.runDashboardSearch = function() {
 
         const human = align.alignments.find(a => a.species === 'Human') || align.alignments[0];
         const fullSeq = human.seq;
+        const seqWidth = fullSeq.length * 18;
         const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
 
         const allVars = [...data.variants, ...data.customVariants];
@@ -7586,14 +7599,13 @@ window.runDashboardSearch = function() {
         let markersHtml = '';
         allVars.forEach(v => {
             const pos = parseInt(v.begin);
-            if (pos > 0 && pos <= fullSeq.length) {
-                let color = '#94a3b8';
-                if (isPatho(v)) color = '#dc3545'; else if (isLikely(v)) color = '#fd7e14'; else if (v.isCustom) color = '#6f42c1'; else color = '#0056b3';
-                const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
-                const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
-                const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
-                markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+4}px;top:5px;cursor:pointer;width:10px;height:10px;background:${color};border-radius:50%;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:100;" title="${label}"></div>`;
-            }
+            if (pos < 1 || pos > fullSeq.length) return;
+            let color = '#94a3b8';
+            if (isPatho(v)) color = '#dc3545'; else if (isLikely(v)) color = '#fd7e14'; else if (v.isCustom) color = '#6f42c1'; else color = '#0056b3';
+            const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
+            const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
+            const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
+            markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+4}px;top:5px;cursor:pointer;width:10px;height:10px;background:${color};border-radius:50%;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:100;" title="${label}"></div>`;
         });
 
         let posHtml = '';
@@ -7649,39 +7661,152 @@ window.runDashboardSearch = function() {
                 <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:thin;scrollbar-color:#0056b3 #f0f7ff;">${rowsHtml}</div>
                 <style>#msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; } #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; } #header-scroll::-webkit-scrollbar { height: 0px; }</style>
             </div>
-            <div id="variant-popup" style="display:none;position:fixed;background:white;border:2px solid #0056b3;border-radius:6px;padding:16px;z-index:10000;min-width:300px;">
-                <h3 id="popup-title" style="margin:0;color:#0056b3;"></h3>
-                <div id="popup-content" style="margin:10px 0;font-size:13px;"></div>
-                <div style="display:flex;gap:8px;">
-                    <button id="popup-cons-btn" class="ciliai-button" style="background:#0056b3;color:white;">Check Conservation</button>
-                    <button id="popup-3d-btn" class="ciliai-button" style="background:#e7f1ff;color:#0056b3;border:1px solid #0056b3;">View 3D</button>
-                    <button onclick="document.getElementById('variant-popup').style.display='none'" class="ciliai-button" style="background:#ccc;color:#333;">Close</button>
+            <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #0056b3;border-radius:6px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:10000;min-width:300px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
+                    <h3 id="popup-title" style="margin:0;font-size:16px;font-weight:700;color:#0056b3;"></h3>
+                    <button onclick="document.getElementById('variant-popup').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;">&times;</button>
+                </div>
+                <div id="popup-content" style="font-size:13px;line-height:1.6;color:#334155;"></div>
+                <div style="margin-top:12px;padding-top:12px;display:flex;gap:8px;">
+                    <button id="popup-cons-btn" class="ciliai-button" style="background:#0056b3;color:white;padding:6px 12px;flex:1;">Check Conservation</button>
+                    <button id="popup-3d-btn" class="ciliai-button" style="background:#e7f1ff;color:#0056b3;border:1px solid #0056b3;padding:6px 12px;flex:1;">View 3D</button>
                 </div>
             </div>`;
-        
-        const m = document.getElementById('msa-scroll');
-        const h = document.getElementById('header-scroll');
-        if(m && h) m.addEventListener('scroll', () => { h.scrollLeft = m.scrollLeft; });
-        
         setupSyncScroll();
         setTimeout(() => { const c = document.getElementById('msa-scroll'); if (c) c.scrollTop = 0; }, 100);
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 6. CONSERVATION CHECKER (Restored Logic)
+    // 4. HELPER FUNCTIONS
+    // ─────────────────────────────────────────────────────────────
+    window.msaScrollLeft = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: -500, behavior:'smooth'}); if (h) h.scrollBy({left: -500, behavior:'smooth'}); } };
+    window.msaScrollRight = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: 500, behavior:'smooth'}); if (h) h.scrollBy({left: 500, behavior:'smooth'}); } };
+    window.msaScrollToStart = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: 0, behavior:'smooth'}); if (h) h.scrollTo({left: 0, behavior:'smooth'}); } };
+    window.msaScrollToEnd = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: c.scrollWidth, behavior:'smooth'}); if (h) h.scrollTo({left: h.scrollWidth, behavior:'smooth'}); } };
+    window.changeColorScheme = function(scheme) { window.CiliAI.activeColorScheme = scheme; if (window.CiliAI.activeVariantData) window.drawVariantWorkspace('msa'); };
+    
+    window.showVariantPopup = function(label, pos, clinSig, disease, color) {
+        const p = document.getElementById('variant-popup');
+        if (!p) return;
+        document.getElementById('popup-title').innerHTML = `<span style="color:${color};">●</span> ${label}`;
+        document.getElementById('popup-content').innerHTML = `<div><strong>Position:</strong> ${pos}</div><div style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;"><strong>Clinical:</strong> ${clinSig}</div><div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:4px;"><strong>Disease:</strong> ${disease}</div>`;
+        const data = window.CiliAI.activeVariantData;
+        const ref = label.match(/p\.([A-Z])\d+/)?.[1] || '?';
+        const alt = label.match(/\d+([A-Z])/)?.[1] || '?';
+        document.getElementById('popup-cons-btn').onclick = () => window.checkConservation(data.gene, parseInt(pos), ref, alt);
+        document.getElementById('popup-3d-btn').onclick = () => window.showStructureViewer(data.gene, parseInt(pos), alt);
+        p.style.display = 'block';
+        p.style.left = '50px';
+        p.style.top = '150px';
+    };
+
+    function setupSyncScroll() {
+        const m = document.getElementById('msa-scroll');
+        const h = document.getElementById('header-scroll');
+        if (m && h) {
+            m.addEventListener('scroll', () => { h.scrollLeft = m.scrollLeft; });
+            h.addEventListener('scroll', () => { m.scrollLeft = h.scrollLeft; });
+        }
+    }
+
+    window.msaJumpToPosition = function() {
+        const inp = document.getElementById('msa-jump-input');
+        if (!inp) return;
+        const pos = parseInt(inp.value);
+        const align = window.CiliAI.activeAlignmentData;
+        if (!align || isNaN(pos) || pos < 1 || pos > align.alignments[0].seq.length) { alert("Invalid position"); return; }
+        const c = document.getElementById('msa-scroll');
+        const h = document.getElementById('header-scroll');
+        const target = (pos - 1) * 18 - (c.clientWidth - 200) / 2;
+        c.scrollTo({left: Math.max(0, target), behavior:'smooth'});
+        if (h) h.scrollTo({left: Math.max(0, target), behavior:'smooth'});
+        inp.style.background = '#d1fae5';
+        setTimeout(() => { inp.style.background = ''; }, 500);
+    };
+
+    document.addEventListener('keypress', (e) => { if (e.target.id === 'msa-jump-input' && e.key === 'Enter') window.msaJumpToPosition(); });
+
+    window.downloadMSAFasta = function() {
+        const a = window.CiliAI.activeAlignmentData;
+        if (!a?.alignments?.length) { alert("No data"); return; }
+        let f = '';
+        a.alignments.forEach(x => { f += `>${x.species}|${x.symbol}\n`; for (let i=0; i<x.seq.length; i+=60) f += x.seq.substring(i, i+60) + '\n'; });
+        const b = new Blob([f], {type: 'text/plain'});
+        const l = document.createElement('a');
+        l.href = URL.createObjectURL(b);
+        l.download = `${window.CiliAI.activeVariantData?.gene||'protein'}_alignment.fasta`;
+        l.click();
+    };
+
+    window.downloadFullAlignmentCSV = function() {
+        const a = window.CiliAI.activeAlignmentData;
+        if (!a?.alignments?.length) { alert("No data"); return; }
+        const m = a.alignments[0].seq.length;
+        let c = "Species,Symbol," + Array.from({length: m}, (_, i) => `Pos${i+1}`).join(",") + "\n";
+        a.alignments.forEach(x => { c += `"${x.species}","${x.symbol}",${x.seq.split('').join(',')}\n`; });
+        const b = new Blob([c], {type: 'text/csv'});
+        const l = document.createElement('a');
+        l.href = URL.createObjectURL(b);
+        l.download = `${window.CiliAI.activeVariantData?.gene||'protein'}_alignment.csv`;
+        l.click();
+    };
+
+    window.downloadVariantCSV = function() {
+        const d = window.CiliAI.activeVariantData;
+        if (!d) return;
+        const v = [...d.variants, ...d.customVariants];
+        let c = "Position,Wild_Type,Variant,Clinical_Significance,Disease,Description\n";
+        v.forEach(x => { c += `${x.begin},${x.wildType||'?'},${x.alternativeSequence||'?'},"${(x.clinicalSignificance||'').replace(/"/g,'""')}","${(x.disease||'').replace(/"/g,'""')}","${(x.description||'').replace(/"/g,'""')}"\n`; });
+        const b = new Blob([c], {type: 'text/csv'});
+        const l = document.createElement('a');
+        l.href = URL.createObjectURL(b);
+        l.download = `${d.gene}_variants.csv`;
+        l.click();
+    };
+
+    window.openVariantPanel = function(t, p, d, g) {
+        const panel = document.getElementById('var-panel');
+        if (!panel) return;
+        document.getElementById('vp-title').textContent = t;
+        document.getElementById('vp-desc').textContent = d;
+        document.getElementById('vp-cons-btn').onclick = () => window.checkConservation(g, parseInt(p), t);
+        document.getElementById('vp-3d-btn').onclick = () => window.showStructureViewer?.(g, parseInt(p), t);
+        panel.style.display = 'block';
+    };
+
+    window.addUserVariant = function() {
+        const inp = document.getElementById('custom-var-input');
+        if (!inp?.value) return;
+        const g = window.CiliAI.activeVariantData?.gene;
+        if (!g) { alert("No gene loaded"); return; }
+        window.displaySpecificVariant(g, inp.value);
+        inp.value = '';
+    };
+
+    window.displaySpecificVariant = async function(g, v) {
+        window.addVariantHelpMessage();
+        await window.renderVariantMap(g);
+        const m = v.replace(/^p\./i, '').match(/^([A-Z]+)(\d+)([A-Z*]+)$/i);
+        if (m && window.CiliAI.activeVariantData) {
+            const p = parseInt(m[2]);
+            window.CiliAI.activeVariantData.customVariants.push({wildType: m[1], begin: p, alternativeSequence: m[3], clinicalSignificance: "User Requested", description: "Custom", disease: "User-defined", isCustom: true});
+            window.drawVariantWorkspace('map');
+            if (window.addChatMessage) window.addChatMessage(`Added variant <strong>p.${m[1]}${p}${m[3]}</strong>`, false);
+        }
+        return `Loaded ${g}`;
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // 5. CONSERVATION CHECKER (Using ORGANISM_PANEL)
     // ─────────────────────────────────────────────────────────────
     window.checkConservation = async function(gene, pos, refAA, altAA) {
-        if (!refAA || !altAA) {
-             const v = window.CiliAI.activeVariantData?.variants.find(v => parseInt(v.begin) === parseInt(pos));
-             if(v) { refAA = v.wildType; altAA = v.alternativeSequence; } else { refAA = '?'; altAA = '?'; }
-        }
         let area = document.getElementById('msa-result-area');
         if (!area) {
             const panel = document.getElementById('variant-popup');
             if (panel) {
                 area = document.createElement('div');
                 area.id = 'msa-result-area';
-                area.style.marginTop = '15px'; area.style.borderTop = '1px solid #e2e8f0'; area.style.paddingTop = '10px';
+                area.style.marginTop = '15px'; area.style.borderTop = '1px solid #e2e8f0'; area.style.paddingTop = '15px';
                 panel.appendChild(area);
             } else return;
         }
@@ -7710,179 +7835,305 @@ window.runDashboardSearch = function() {
 
             const score = Math.round((conservedCount/rows.length)*100);
             area.innerHTML = `<div style="background:#f8fafc;padding:10px;border-radius:6px;font-size:11px;"><div><strong>Conservation Score:</strong> ${score}%</div><div style="font-family:monospace;margin-top:5px;max-height:150px;overflow:auto;">${rows.map(r=>`<div>${r.icon} ${r.seq}</div>`).join('')}</div></div>`;
-            window.renderProfessionalMSA(gene, pos, refAA, rows, score);
         } catch(e) { area.innerHTML = "Error checking conservation."; }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 7. 3D STRUCTURE VIEWER (MolStar with Unpkg Fallback)
-    // ─────────────────────────────────────────────────────────────
+/* ==============================================================
+ * MODULE: 3D STRUCTURE VIEWER & PROFESSIONAL MSA
+ * ============================================================== */
+(function() {
+    'use strict';
+
+    // 1. ROBUST 3D VIEWER LOADER (With Fallback)
     window.loadMolStar = async function() {
         if (customElements.get('pdbe-molstar')) return true;
+
+        const sources = [
+            {
+                name: 'jsdelivr',
+                css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css',
+                js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js'
+            },
+            {
+                name: 'unpkg',
+                css: 'https://unpkg.com/pdbe-molstar@3.2.0/build/pdbe-molstar.css',
+                js: 'https://unpkg.com/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js'
+            }
+        ];
+
         console.log("[CiliAI] Loading 3D Engine...");
-        for (const src of MOLSTAR_SOURCES) {
+
+        for (const src of sources) {
             try {
-                if (!document.querySelector(`link[href="${src.css}"]`)) {
-                    const l = document.createElement('link'); l.rel='stylesheet'; l.href=src.css; document.head.appendChild(l);
-                }
                 await new Promise((resolve, reject) => {
-                    const s = document.createElement('script'); s.src = src.js; s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+                    // Load CSS
+                    if (!document.querySelector(`link[href="${src.css}"]`)) {
+                        const link = document.createElement('link');
+                        link.rel = 'stylesheet';
+                        link.href = src.css;
+                        document.head.appendChild(link);
+                    }
+                    // Load JS
+                    const script = document.createElement('script');
+                    script.src = src.js;
+                    script.onload = () => {
+                        console.log(`[CiliAI] Loaded 3D Engine via ${src.name}`);
+                        resolve();
+                    };
+                    script.onerror = () => reject(new Error(`Failed to load from ${src.name}`));
+                    document.head.appendChild(script);
                 });
+                
                 await customElements.whenDefined('pdbe-molstar');
-                return true;
-            } catch (e) { console.warn(`Source ${src.name} failed`); }
+                return true; // Success
+            } catch (e) {
+                console.warn(e.message);
+                // Continue to next source
+            }
         }
-        throw new Error("Failed to load 3D viewer.");
+        throw new Error("Failed to load PDBe Mol* from all sources.");
     };
 
-    window.showStructureViewer = async function(gene, pos, aa) {
-        const btn = document.getElementById('popup-3d-btn');
-        if(btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
-        
+    // 2. HELPER: AlphaFold URL
+    async function getAlphaFoldUrl(uniprotID) {
+        try {
+            const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotID}`);
+            if (!res.ok) return null;
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) return data[0].cifUrl; 
+            return null;
+        } catch (e) {
+            console.warn("AlphaFold API Lookup failed:", e);
+            return null;
+        }
+    }
+
+    // 3. HELPER: Hex to RGB
+    function hexToRgb(hex) {
+        hex = hex.replace('#', '');
+        return {
+            r: parseInt(hex.substring(0,2), 16),
+            g: parseInt(hex.substring(2,4), 16),
+            b: parseInt(hex.substring(4,6), 16)
+        };
+    }
+
+    // 4. MAIN 3D VIEWER FUNCTION
+    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+        const btn = document.getElementById('btn-3d') || document.getElementById('popup-3d-btn');
+        const originalText = btn ? btn.innerText : "🧊 View 3D";
+        if (btn) {
+            btn.innerText = "⏳ Finding Structure...";
+            btn.disabled = true;
+        }
         try {
             await window.loadMolStar();
-            let uid = window.CiliAI.activeVariantData?.uniprotID;
-            if(!uid) {
-                 const r = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot`);
-                 const j = await r.json();
-                 uid = j.hits?.[0]?.uniprot?.['Swiss-Prot'];
+            
+            // Resolve UniProt ID
+            let uniprotID = window.CiliAI.activeVariantData?.uniprotID;
+            if (!uniprotID) {
+                 const data = await window.fetchVariantDataLive(geneSymbol);
+                 if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
+                 uniprotID = data.uniprotID;
             }
-            if(Array.isArray(uid)) uid = uid[0];
-            if(!uid) throw new Error("UniProt ID not found");
 
-            let afUrl = `https://alphafold.ebi.ac.uk/files/AF-${uid}-F1-model_v4.cif`;
-            try {
-                const afr = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uid}`);
-                if(afr.ok) { const afd = await afr.json(); if(afd[0]) afUrl = afd[0].cifUrl; }
-            } catch(e){}
+            const afUrl = await getAlphaFoldUrl(uniprotID);
+            if (!afUrl) throw new Error(`No AlphaFold structure found for ${geneSymbol}.`);
+
+            window.currentAfUrl = afUrl;
+            window.currentSelectData = variantPos ? [{
+                entity_id: "1",
+                residue_number: parseInt(variantPos, 10),
+                color: { r: 217, g: 70, b: 239 }, 
+                label: "Primary Variant",
+                focus: true
+            }] : [];
+            window.isGrayMode = false;
 
             const modal = document.createElement('div');
-            modal.style.cssText = `position:fixed; inset:0; z-index:20000; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center;`;
+            modal.id = 'molstar-modal';
+            modal.style.cssText = `position: fixed; inset: 0; width: 100vw; height: 100dvh; background: rgba(0,0,0,0.95); z-index: 200000; display: flex; flex-direction: column; justify-content: center; align-items: center;`;
+            
             modal.innerHTML = `
-                <div style="width:90vw; height:90vh; background:white; border-radius:8px; overflow:hidden; display:flex; flex-direction:column;">
-                    <div style="padding:10px; background:#f0f9ff; display:flex; justify-content:space-between;">
-                        <b>${gene} Structure</b>
-                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="cursor:pointer;">✕</button>
+                <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
+                    <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <div>
+                            <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} 3D Structure</div>
+                            <div style="font-size: 13px; color: #64748b;" id="variant-status">
+                                ${variantPos ? `Primary: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>` : 'Full view'}
+                                <span id="extra-count" style="display:none; margin-left:12px; color:#ca8a04; font-weight:500;">(+<span id="extra-num">0</span> custom)</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:12px; align-items:center;">
+                            <button id="focus-btn" style="padding:6px 14px; background:#fff; border:1px solid #d946ef; color:#d946ef; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">🎯 Focus All</button>
+                            <button id="download-session-btn" style="padding:6px 14px; background:#fff; border:1px solid #16a34a; color:#166534; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">📥 Save Session</button>
+                            <button id="close-3d" style="background:#e2e8f0; border:none; width:36px; height:36px; border-radius:50%; font-size:20px; cursor:pointer; color:#475569; font-weight:bold;">✕</button>
+                        </div>
                     </div>
-                    <div style="flex:1; position:relative;">
-                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='[{"entity_id":"1","residue_number":${pos},"color":{"r":255,"g":0,"b":255},"focus":true}]' style="position:absolute; top:0; left:0; width:100%; height:100%;"></pdbe-molstar>
+                    <div style="flex:1; position:relative; background:#ffffff; overflow:hidden;">
+                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" selection-data='${JSON.stringify(window.currentSelectData)}' style="position:absolute; top:0; left:0; width:100%; height:100%; display:block;"></pdbe-molstar>
+                    </div>
+                    <div style="padding:12px 20px; background:white; border-top:1px solid #e2e8f0; font-size:12px; color:#475569; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; flex-shrink:0;">
+                        <div style="display:flex; gap:24px; align-items:center;">
+                            <span style="display:flex; align-items:center; font-weight:500;"><span style="width:12px; height:12px; background:#d946ef; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>Primary Variant</span>
+                            <span style="display:flex; align-items:center; font-weight:500;"><span style="width:12px; height:12px; background:#ffd700; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>Custom Highlights</span>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:nowrap;">
+                            <input id="add-var-3d" type="number" min="1" placeholder="Residue #" style="width:100px; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
+                            <input type="color" id="custom-color-picker" value="#ffd700" title="Select highlight color" style="width:36px; height:32px; padding:0; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">
+                            <button onclick="window.addVariantTo3D()" style="padding:6px 14px; background:#ca8a04; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500;">+ Add</button>
+                        </div>
                     </div>
                 </div>`;
-            document.body.appendChild(modal);
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
             
-        } catch(e) { alert("3D Viewer Error: " + e.message); }
-        if(btn) { btn.innerText = "View 3D"; btn.disabled = false; }
+            document.body.appendChild(modal);
+            document.getElementById('focus-btn').onclick = () => {
+                const plugin = document.getElementById('pdbe-molstar-target');
+                if (plugin?.viewerInstance && window.currentSelectData.length > 0) {
+                    const focusList = window.currentSelectData.map(s => ({ entity_id: s.entity_id, residue_number: s.residue_number }));
+                    plugin.viewerInstance.visual.focus({ data: focusList });
+                }
+            };
+            document.getElementById('download-session-btn').onclick = () => {
+                const a = document.createElement('a'); a.href = window.currentAfUrl; a.download = `${geneSymbol}_structure.cif`; a.click();
+            };
+            const close = () => { modal.remove(); window.currentSelectData = []; window.currentAfUrl = null; window.isGrayMode = false; if (btn) { btn.innerText = originalText; btn.disabled = false; } };
+            document.getElementById('close-3d').onclick = close;
+            window.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, {once: true});
+            if (btn) { btn.innerText = originalText; btn.disabled = false; }
+        } catch (e) {
+            console.error(e);
+            alert("3D Viewer Error: " + e.message);
+            if (btn) { btn.innerText = originalText; btn.disabled = false; }
+        }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 8. PROFESSIONAL MSA (Jalview Window)
-    // ─────────────────────────────────────────────────────────────
+    window.addVariantTo3D = function() {
+        const input = document.getElementById('add-var-3d');
+        const colorPicker = document.getElementById('custom-color-picker');
+        const pos = parseInt(input.value.trim());
+        if (!isNaN(pos) && pos > 0) {
+            if (window.currentSelectData.some(s => s.residue_number === pos)) { alert(`Residue ${pos} is already highlighted.`); return; }
+            const hexColor = colorPicker.value;
+            const rgb = hexToRgb(hexColor);
+            window.currentSelectData.push({ entity_id: "1", residue_number: pos, color: rgb, label: `Custom ${pos}`, focus: false });
+            const plugin = document.getElementById('pdbe-molstar-target');
+            if (plugin && plugin.viewerInstance) {
+                if (!window.isGrayMode && window.currentSelectData.length > 1) {
+                    plugin.viewerInstance.visual.update({ type: 'surface', params: { color: { r: 220, g: 220, b: 220 }, opacity: 0.7 } });
+                    window.isGrayMode = true;
+                }
+                plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
+                plugin.viewerInstance.visual.select({ data: window.currentSelectData });
+            }
+            const extraNum = document.getElementById('extra-num');
+            const extraCount = document.getElementById('extra-count');
+            const count = window.currentSelectData.length - (window.currentSelectData[0]?.label === "Primary Variant" ? 1 : 0);
+            if (extraNum && extraCount) { extraNum.textContent = count; extraCount.style.display = count > 0 ? 'inline' : 'none'; }
+            input.value = ''; input.focus();
+        } else { alert('Please enter a valid positive residue number.'); }
+    };
+    
+    // 5. PROFESSIONAL MSA VISUALIZER (Jalview Style)
     window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
-        const aaColors = { 'A':'#c8c8c8', 'G':'#c8c8c8', 'I':'#0f820f', 'L':'#0f820f', 'V':'#0f820f', 'M':'#0f820f', 'F':'#3232aa', 'W':'#b45b5b', 'Y':'#3232aa', 'H':'#8282d2', 'K':'#145aff', 'R':'#145aff', 'D':'#e60a0a', 'E':'#e60a0a', 'S':'#fa9600', 'T':'#fa9600', 'N':'#00dcdc', 'Q':'#00dcdc', 'C':'#e6e600', 'P':'#dc9682' };
-        
+        const aaColors = {
+            'A': '#c8c8c8', 'G': '#c8c8c8', 'I': '#0f820f', 'L': '#0f820f', 'V': '#0f820f', 
+            'M': '#0f820f', 'F': '#3232aa', 'W': '#b45b5b', 'Y': '#3232aa', 'H': '#8282d2', 
+            'K': '#145aff', 'R': '#145aff', 'D': '#e60a0a', 'E': '#e60a0a', 'S': '#fa9600', 
+            'T': '#fa9600', 'N': '#00dcdc', 'Q': '#00dcdc', 'C': '#e6e600', 'P': '#dc9682'
+        };
+
         const modal = document.createElement('div');
-        modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; width:700px; max-height:80vh; z-index:10000; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,0.5); overflow:hidden; font-family:monospace;`;
-        
-        // Define helper INSIDE function scope to ensure access
+        modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:0; border-radius:12px; box-shadow:0 25px 50px rgba(0,0,0,0.5); z-index:10000; width:600px; font-family:'Roboto Mono', monospace; overflow:hidden;`;
+
+        let html = `
+            <div style="background:#1e293b; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h3 style="margin:0; font-size:16px; font-family:'Inter',sans-serif;">${gene} Evolution</h3>
+                    <div style="font-size:12px; opacity:0.8; font-family:'Inter',sans-serif;">Residue ${refAA}${pos} • Conservation: <span style="color:${score > 80 ? '#4ade80' : '#f87171'}">${score}%</span></div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button id="msa-3d-btn" style="background:#3b82f6; border:none; color:white; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:12px;">🧊 View 3D</button>
+                    <button onclick="this.closest('div').parentElement.parentElement.remove()" style="border:none; background:none; color:white; cursor:pointer; font-size:20px;">×</button>
+                </div>
+            </div>
+            
+            <div style="padding:20px; background:#f8fafc; max-height:60vh; overflow-y:auto;">
+                <div style="display:flex; gap:10px; margin-bottom:15px; font-size:10px; font-family:'Inter',sans-serif; color:#64748b;">
+                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#0f820f; display:inline-block; margin-right:4px;"></span>Hydrophobic</span>
+                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#145aff; display:inline-block; margin-right:4px;"></span>Positive</span>
+                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#e60a0a; display:inline-block; margin-right:4px;"></span>Negative</span>
+                    <span style="display:flex; align-items:center;"><span style="width:8px; height:8px; background:#fa9600; display:inline-block; margin-right:4px;"></span>Polar</span>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 120px 1fr; gap:10px;">
+                    
+                    <div style="text-align:right; font-weight:bold; font-size:12px; padding-top:6px; font-family:'Inter',sans-serif;">👤 Human</div>
+                    <div style="display:flex; gap:2px;">
+                        ${alignments[0]?.seq.split('').map((char, i) => { 
+                            // Center index is 7 because we extract a 15aa window
+                            const isCenter = i === 7; 
+                            return renderBlock(char, isCenter, true);
+                        }).join('')}
+                    </div>
+
+                    <div style="grid-column:1/-1; height:1px; background:#e2e8f0; margin:5px 0;"></div>
+
+                    ${alignments.map(a => `
+                        <div style="text-align:right; font-size:12px; padding-top:6px; color:#475569; font-family:'Inter',sans-serif;">
+                            ${a.icon} ${a.species}
+                        </div>
+                        <div style="display:flex; gap:2px;">
+                            ${a.seq.split('').map((char, i) => renderBlock(char, i === 7, false)).join('')}
+                        </div>
+                    `).join('')}
+
+                </div>
+            </div>
+        `;
+
         function renderBlock(char, isCenter, isRef) {
             const color = aaColors[char] || '#999';
             const border = isCenter ? '2px solid #1e293b' : '1px solid rgba(0,0,0,0.1)';
             const opacity = isRef ? 1 : 0.9;
-            return `<div style="width:20px; height:20px; background:${color}; color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; border-radius:3px; border:${border}; opacity:${opacity}; box-shadow:${isCenter?'0 0 0 2px rgba(30,41,59,0.2)':'none'}; z-index:${isCenter?10:1};">${char}</div>`;
+            
+            return `
+                <div style="
+                    width:24px; height:24px; 
+                    background:${color}; 
+                    color:white; 
+                    display:flex; align-items:center; justify-content:center; 
+                    font-size:12px; font-weight:bold; 
+                    border-radius:3px;
+                    border:${border};
+                    opacity:${opacity};
+                    box-shadow: ${isCenter ? '0 0 0 2px rgba(30,41,59,0.2)' : 'none'};
+                    z-index:${isCenter ? 10 : 1};
+                ">${char}</div>
+            `;
         }
-        
-        let html = `
-        <div style="padding:15px; background:#1e293b; color:white; display:flex; justify-content:space-between; align-items:center;">
-            <div><strong>${gene} Evolution</strong> <span style="font-size:12px; opacity:0.8;">Pos ${pos} (${refAA})</span></div>
-            <div style="display:flex; gap:10px;">
-                <button id="msa-3d-btn" style="background:#3b82f6; border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">🧊 3D</button>
-                <button onclick="this.closest('div').parentElement.parentElement.remove()" style="background:none; border:none; color:white; cursor:pointer;">✕</button>
-            </div>
-        </div>
-        <div style="padding:20px; overflow-y:auto; max-height:60vh; background:#f8fafc;">`;
-        
-        alignments.forEach(a => {
-            let seq = a.seq.split('').map((c,i) => renderBlock(c, i===7, a.species==='Human')).join('');
-            html += `<div style="display:flex; margin-bottom:2px;"><div style="width:120px; text-align:right; padding-right:10px; font-size:12px;">${a.icon} ${a.species}</div><div style="display:flex; gap:1px;">${seq}</div></div>`;
-        });
-        html += `</div>`;
-        
+
         modal.innerHTML = html;
         document.body.appendChild(modal);
-
+        
+        // Connect 3D Viewer Logic
         const btn3d = modal.querySelector('#msa-3d-btn');
-        if(btn3d) btn3d.onclick = () => { modal.remove(); window.showStructureViewer(gene, pos, refAA); };
-    };
-
-    // ─────────────────────────────────────────────────────────────
-    // 9. HELPER FUNCTIONS
-    // ─────────────────────────────────────────────────────────────
-    window.msaScrollLeft = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: -500, behavior:'smooth'}); if (h) h.scrollBy({left: -500, behavior:'smooth'}); } };
-    window.msaScrollRight = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: 500, behavior:'smooth'}); if (h) h.scrollBy({left: 500, behavior:'smooth'}); } };
-    window.msaScrollToStart = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: 0, behavior:'smooth'}); if (h) h.scrollTo({left: 0, behavior:'smooth'}); } };
-    window.msaScrollToEnd = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: c.scrollWidth, behavior:'smooth'}); if (h) h.scrollTo({left: h.scrollWidth, behavior:'smooth'}); } };
-    
-    window.changeColorScheme = function(scheme) { window.CiliAI.activeColorScheme = scheme; if (window.CiliAI.activeVariantData) window.drawVariantWorkspace('msa'); };
-    
-    window.showVariantPopup = function(label, pos, clinSig, disease, color) {
-        const p = document.getElementById('variant-popup');
-        if (!p) return;
-        document.getElementById('popup-title').innerHTML = `<span style="color:${color};">●</span> ${label}`;
-        document.getElementById('popup-content').innerHTML = `<div><strong>Position:</strong> ${pos}</div><div style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;"><strong>Clinical:</strong> ${clinSig}</div><div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:4px;"><strong>Disease:</strong> ${disease}</div>`;
-        const data = window.CiliAI.activeVariantData;
-        const ref = label.match(/p\.([A-Z])\d+/)?.[1] || '?';
-        const alt = label.match(/\d+([A-Z])/)?.[1] || '?';
-        document.getElementById('popup-cons-btn').onclick = () => window.checkConservation(data.gene, parseInt(pos), ref, alt);
-        document.getElementById('popup-3d-btn').onclick = () => window.showStructureViewer(data.gene, parseInt(pos), alt);
-        p.style.display = 'block';
-        p.style.left = '50px';
-        p.style.top = '150px';
-    };
-
-    function setupSyncScroll() { const m = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (m && h) { m.addEventListener('scroll', () => { h.scrollLeft = m.scrollLeft; }); h.addEventListener('scroll', () => { m.scrollLeft = h.scrollLeft; }); } }
-    
-    window.msaJumpToPosition = function() {
-        const inp = document.getElementById('msa-jump-input');
-        if (!inp) return;
-        const pos = parseInt(inp.value);
-        const c = document.getElementById('msa-scroll');
-        const h = document.getElementById('header-scroll');
-        if (c && !isNaN(pos)) {
-            const target = (pos - 1) * 18 - (c.clientWidth - 200) / 2;
-            c.scrollTo({left: Math.max(0, target), behavior:'smooth'});
-            if (h) h.scrollTo({left: Math.max(0, target), behavior:'smooth'});
+        if (btn3d) {
+            btn3d.onclick = () => {
+                // Remove this modal first to avoid overlay overlap issues
+                modal.remove(); 
+                // Call the main 3D viewer function
+                if (window.showStructureViewer) {
+                    window.showStructureViewer(gene, pos, refAA); 
+                } else {
+                    alert("3D Viewer module is not loaded.");
+                }
+            };
         }
     };
     
-    document.addEventListener('keypress', (e) => { if (e.target.id === 'msa-jump-input' && e.key === 'Enter') window.msaJumpToPosition(); });
-    window.downloadMSAFasta = function() { alert("FASTA download placeholder"); };
-    window.downloadFullAlignmentCSV = function() { alert("CSV download placeholder"); };
-    window.downloadVariantCSV = function() { alert("Variant CSV download placeholder"); };
-    window.openVariantPanel = function(t, p, d, g) { window.showVariantPopup(t, p, 'User Selected', d, '#6f42c1'); };
-    window.addUserVariant = function() { 
-        const inp = document.getElementById('custom-var-input');
-        if (inp?.value && window.CiliAI.activeVariantData) {
-            // Simplified custom variant logic
-            window.CiliAI.activeVariantData.customVariants.push({
-                begin: 301, // Placeholder
-                wildType: 'X',
-                alternativeSequence: 'Y',
-                description: "Custom: " + inp.value,
-                isCustom: true
-            });
-            window.drawVariantWorkspace('map');
-        }
-    };
-    window.displaySpecificVariant = async function(g, v) { window.renderVariantMap(g); };
-
-    console.log("[CiliAI] v16.5 – FIXED & INTEGRATED: 3D + MSA + Conservation");
+    console.log("[CiliAI] 3D & MSA Modules Loaded.");
 })();
-
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
 
