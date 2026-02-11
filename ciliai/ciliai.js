@@ -7852,70 +7852,181 @@ window.runDashboardSearch = function() {
         } catch(e) { area.innerHTML = "Error checking conservation."; }
     };
 
-    // ─────────────────────────────────────────────────────────────
-    // 6. 3D STRUCTURE VIEWER (MolStar with Fallback)
-    // ─────────────────────────────────────────────────────────────
+/* ==============================================================
+ * MODULE: 3D STRUCTURE VIEWER (Mol*) — STABLE v2
+ * ============================================================== */
+(function() {
+    'use strict';
+
+    let molstarLoading = null;
+
     window.loadMolStar = async function() {
         if (customElements.get('pdbe-molstar')) return true;
-        console.log("[CiliAI] Loading 3D Engine...");
-        for (const src of MOLSTAR_SOURCES) {
-            try {
-                if (!document.querySelector(`link[href="${src.css}"]`)) {
-                    const l = document.createElement('link'); l.rel='stylesheet'; l.href=src.css; document.head.appendChild(l);
-                }
-                await new Promise((res, rej) => {
-                    const s = document.createElement('script'); s.src = src.js; s.onload = res; s.onerror = rej; document.head.appendChild(s);
-                });
-                await customElements.whenDefined('pdbe-molstar');
-                return true;
-            } catch (e) { console.warn(`Source ${src.name} failed`); }
-        }
-        throw new Error("Failed to load 3D viewer.");
+        if (molstarLoading) return molstarLoading;
+
+        molstarLoading = new Promise((resolve, reject) => {
+            console.log("[CiliAI] Loading Mol* engine...");
+
+            const existingScript = document.querySelector("script[data-molstar]");
+            if (existingScript) {
+                customElements.whenDefined('pdbe-molstar').then(() => resolve(true));
+                return;
+            }
+
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
+            document.head.appendChild(link);
+
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js';
+            script.dataset.molstar = "true";
+
+            script.onload = () => {
+                customElements.whenDefined('pdbe-molstar')
+                    .then(() => {
+                        console.log("[CiliAI] Mol* ready.");
+                        resolve(true);
+                    });
+            };
+
+            script.onerror = () => reject(new Error("Mol* failed to load."));
+            document.head.appendChild(script);
+        });
+
+        return molstarLoading;
     };
 
-    window.showStructureViewer = async function(gene, pos, aa) {
-        const btn = document.getElementById('popup-3d-btn');
-        if(btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
-        
+    async function getAlphaFoldUrl(uniprotID) {
+        try {
+            const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotID}`);
+            if (!res.ok) return null;
+            const data = await res.json();
+            return (Array.isArray(data) && data.length) ? data[0].cifUrl : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function hexToRgb(hex) {
+        hex = hex.replace('#', '');
+        return {
+            r: parseInt(hex.slice(0,2),16),
+            g: parseInt(hex.slice(2,4),16),
+            b: parseInt(hex.slice(4,6),16)
+        };
+    }
+
+    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+
+        const btn = document.getElementById('btn-3d');
+        const original = btn?.innerText || "🧊 View 3D";
+        if (btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
+
         try {
             await window.loadMolStar();
-            
-            // Get UniProt
-            let uid = window.CiliAI.activeVariantData?.uniprotID;
-            if(!uid) {
-                 const r = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot`);
-                 const j = await r.json();
-                 uid = j.hits?.[0]?.uniprot?.['Swiss-Prot'];
+
+            const data = await window.fetchVariantDataLive(geneSymbol);
+            if (!data?.uniprotID) throw new Error("UniProt ID not found.");
+
+            const afUrl = await getAlphaFoldUrl(data.uniprotID);
+            if (!afUrl) throw new Error("AlphaFold structure unavailable.");
+
+            window.currentAfUrl = afUrl;
+            window.currentSelectData = [];
+
+            if (variantPos) {
+                window.currentSelectData.push({
+                    entity_id: "1",
+                    residue_number: parseInt(variantPos),
+                    color: { r:217, g:70, b:239 },
+                    label: "Primary Variant",
+                    focus: true
+                });
             }
-            if(Array.isArray(uid)) uid = uid[0];
-            if(!uid) throw new Error("UniProt ID not found");
 
-            // Get AlphaFold URL
-            let afUrl = `https://alphafold.ebi.ac.uk/files/AF-${uid}-F1-model_v4.cif`;
-            try {
-                const afr = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uid}`);
-                if(afr.ok) { const afd = await afr.json(); if(afd[0]) afUrl = afd[0].cifUrl; }
-            } catch(e){}
-
-            // Modal
             const modal = document.createElement('div');
-            modal.style.cssText = `position:fixed; inset:0; z-index:20000; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center;`;
+            modal.id = 'molstar-modal';
+            modal.style.cssText = `
+                position:fixed; inset:0; background:rgba(0,0,0,0.9);
+                display:flex; justify-content:center; align-items:center;
+                z-index:200000;
+            `;
+
             modal.innerHTML = `
-                <div style="width:90vw; height:90vh; background:white; border-radius:8px; overflow:hidden; display:flex; flex-direction:column;">
-                    <div style="padding:10px; background:#f0f9ff; display:flex; justify-content:space-between;">
-                        <b>${gene} Structure</b>
-                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="cursor:pointer;">✕</button>
+                <div style="width:95vw;height:92vh;background:white;border-radius:12px;display:flex;flex-direction:column;">
+                    <div style="padding:12px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
+                        <strong>${geneSymbol} 3D Structure</strong>
+                        <button id="close-3d" style="border:none;background:#eee;border-radius:50%;width:32px;height:32px;">✕</button>
                     </div>
-                    <div style="flex:1; position:relative;">
-                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='[{"entity_id":"1","residue_number":${pos},"color":{"r":255,"g":0,"b":255},"focus":true}]' style="position:absolute; top:0; left:0; width:100%; height:100%;"></pdbe-molstar>
+                    <div style="flex:1;position:relative;">
+                        <pdbe-molstar id="pdbe-molstar-target"
+                            custom-data-url="${afUrl}"
+                            custom-data-format="cif"
+                            alphafold-view="true"
+                            hide-controls="true"
+                            selection-data='${JSON.stringify(window.currentSelectData)}'
+                            style="width:100%;height:100%;display:block;">
+                        </pdbe-molstar>
                     </div>
-                </div>`;
+                </div>
+            `;
+
             document.body.appendChild(modal);
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
-            
-        } catch(e) { alert("3D Viewer Error: " + e.message); }
-        if(btn) { btn.innerText = "View 3D"; btn.disabled = false; }
+
+            const plugin = document.getElementById('pdbe-molstar-target');
+
+            plugin.addEventListener('load', () => {
+                if (window.currentSelectData.length && plugin.viewerInstance) {
+                    plugin.viewerInstance.visual.select({
+                        data: window.currentSelectData
+                    });
+                }
+            });
+
+            document.getElementById('close-3d').onclick = () => {
+                modal.remove();
+                window.currentSelectData = [];
+                if (btn) { btn.innerText = original; btn.disabled = false; }
+            };
+
+        } catch (e) {
+            alert("3D Viewer Error: " + e.message);
+            if (btn) { btn.innerText = original; btn.disabled = false; }
+        }
     };
+
+    window.addVariantTo3D = function() {
+        const input = document.getElementById('add-var-3d');
+        const colorPicker = document.getElementById('custom-color-picker');
+        const plugin = document.getElementById('pdbe-molstar-target');
+
+        if (!plugin?.viewerInstance) return;
+
+        const pos = parseInt(input.value);
+        if (!pos || pos <= 0) return alert("Invalid residue.");
+
+        if (window.currentSelectData.some(s => s.residue_number === pos))
+            return alert("Already highlighted.");
+
+        const rgb = hexToRgb(colorPicker.value);
+
+        window.currentSelectData.push({
+            entity_id:"1",
+            residue_number:pos,
+            color:rgb,
+            label:`Custom ${pos}`,
+            focus:false
+        });
+
+        plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
+        plugin.viewerInstance.visual.select({
+            data: window.currentSelectData
+        });
+
+        input.value='';
+    };
+
 
     // ─────────────────────────────────────────────────────────────
     // 7. PROFESSIONAL MSA (Jalview Window)
@@ -7951,9 +8062,121 @@ window.runDashboardSearch = function() {
         const btn3d = modal.querySelector('#msa-3d-btn');
         if(btn3d) btn3d.onclick = () => { modal.remove(); window.showStructureViewer(gene, pos, refAA); };
     };
+/* ==============================================================
+ * MODULE: ADVANCED ANALYTICS & PERSISTENCE — STABLE v2
+ * ============================================================== */
+(function() {
+'use strict';
 
-    console.log("[CiliAI] v16.4 – FIXED & INTEGRATED: 3D + MSA + Conservation");
+window.CiliAI = window.CiliAI || {};
+
+window.CiliAI.Session = {
+    key:'ciliai_autosave_v2',
+
+    start(interval=30000){
+        try{
+            const saved=localStorage.getItem(this.key);
+            if(saved){
+                const meta=JSON.parse(saved);
+                const age=(Date.now()-meta.timestamp)/3600000;
+                if(age<24) console.log("[CiliAI] Recent session available.");
+            }
+            setInterval(()=>this.save(),interval);
+        }catch(e){
+            console.warn("Session start error:",e);
+        }
+    },
+
+    save(){
+        try{
+            const messages=document.getElementById('messages');
+            if(!messages) return;
+
+            const state={
+                timestamp:Date.now(),
+                dataset:window.CiliAI.activeDataset||'lung',
+                history:messages.innerHTML
+            };
+            localStorage.setItem(this.key,JSON.stringify(state));
+        }catch(e){
+            console.warn("Save failed:",e);
+        }
+    },
+
+    restore(){
+        try{
+            const saved=localStorage.getItem(this.key);
+            if(!saved) return alert("No saved session.");
+
+            const state=JSON.parse(saved);
+            window.CiliAI.activeDataset=state.dataset;
+
+            const messages=document.getElementById('messages');
+            if(messages){
+                messages.innerHTML=state.history;
+                messages.scrollTop=messages.scrollHeight;
+            }
+        }catch(e){
+            console.warn("Restore failed:",e);
+        }
+    },
+
+    clear(){
+        localStorage.removeItem(this.key);
+    }
+};
+
+
+/* ==========================
+   MUTATION BURDEN FIX
+========================== */
+
+window.analyzeMutationBurden = async function(geneSymbol){
+
+    const data=await window.fetchVariantDataLive(geneSymbol);
+    if(data?.error) return alert(data.error);
+
+    const variants=data.variants||[];
+    if(!variants.length){
+        return window.addChatMessage("No variants found.",false);
+    }
+
+    let pathogenic=0,benign=0,vus=0;
+
+    variants.forEach(v=>{
+        const text=JSON.stringify(v).toLowerCase();
+        if(text.includes("pathogenic") && !text.includes("benign"))
+            pathogenic++;
+        else if(text.includes("benign"))
+            benign++;
+        else
+            vus++;
+    });
+
+    const total=variants.length;
+
+    const safePercent=(n)=> total? (n/total)*100 : 0;
+
+    const report=`
+    <div class="ai-result-card">
+        <h4>Mutation Burden: ${geneSymbol}</h4>
+        <p>Total: ${total}</p>
+        <div style="height:12px;display:flex;border-radius:6px;overflow:hidden;">
+            <div style="width:${safePercent(pathogenic)}%;background:#ef4444;"></div>
+            <div style="width:${safePercent(vus)}%;background:#9ca3af;"></div>
+            <div style="width:${safePercent(benign)}%;background:#22c55e;"></div>
+        </div>
+    </div>`;
+
+    window.addChatMessage(report,false);
+};
+
+setTimeout(()=>window.CiliAI.Session.start(),4000);
+    
+    console.log("[CiliAI] v16.4 – 3D module initialized + MSA + Conservation");
 })();
+ 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
