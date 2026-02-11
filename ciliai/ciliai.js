@@ -6445,29 +6445,6 @@ const intentHandlers = [
     }
 ];
 
-// --- MAIN DISPATCHER (Sorts by ASCENDING priority 1..45) ---
-window.handleAIQuery = async function (query) {
-    const qLower = window.CiliAI.utils.normalizeQuery(query);
-    if(window.log) window.log(`Routing query: ${query}`);
-
-    try {
-        // Sort: Priority 1 comes FIRST (Ascending order)
-        const sortedHandlers = intentHandlers.sort((a,b) => a.priority - b.priority);
-
-        for (const intent of sortedHandlers) {
-            if (intent.matcher(qLower)) {
-                const result = await intent.handler(query);
-                if (result) {
-                    window.addChatMessage(result, false);
-                    return;
-                }
-            }
-        }
-    } catch (e) {
-        console.error("AI Error:", e);
-        window.addChatMessage("An internal routing error occurred.", false);
-    }
-};
 
 // Correct: Priority 1 comes FIRST (Ascending)
 const sortedHandlers = [...intentHandlers].sort((a,b) => a.priority - b.priority);
@@ -7911,92 +7888,74 @@ window.runDashboardSearch = function() {
     function hexToRgb(hex) {
         hex = hex.replace('#', '');
         return {
-            r: parseInt(hex.slice(0,2),16),
-            g: parseInt(hex.slice(2,4),16),
-            b: parseInt(hex.slice(4,6),16)
+            r: parseInt(hex.slice(0, 2), 16),
+            g: parseInt(hex.slice(2, 4), 16),
+            b: parseInt(hex.slice(4, 6), 16)
         };
     }
 
-    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+    window.showStructureViewer = async function(gene, position, altAA) {
+        const data = window.CiliAI.activeVariantData;
+        if (!data?.uniprotID) {
+            alert("No UniProt ID available.");
+            return;
+        }
 
-        const btn = document.getElementById('btn-3d');
-        const original = btn?.innerText || "🧊 View 3D";
-        if (btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
+        const popup = document.getElementById('variant-popup');
+        if (!popup) return;
+
+        let viewerContainer = document.getElementById('molstar-container');
+        if (!viewerContainer) {
+            viewerContainer = document.createElement('div');
+            viewerContainer.id = 'molstar-container';
+            viewerContainer.style.marginTop = '15px';
+            viewerContainer.style.height = '400px';
+            popup.appendChild(viewerContainer);
+        }
+
+        viewerContainer.innerHTML = "Loading 3D structure...";
 
         try {
             await window.loadMolStar();
 
-            const data = await window.fetchVariantDataLive(geneSymbol);
-            if (!data?.uniprotID) throw new Error("UniProt ID not found.");
-
-            const afUrl = await getAlphaFoldUrl(data.uniprotID);
-            if (!afUrl) throw new Error("AlphaFold structure unavailable.");
-
-            window.currentAfUrl = afUrl;
-            window.currentSelectData = [];
-
-            if (variantPos) {
-                window.currentSelectData.push({
-                    entity_id: "1",
-                    residue_number: parseInt(variantPos),
-                    color: { r:217, g:70, b:239 },
-                    label: "Primary Variant",
-                    focus: true
-                });
+            const cifUrl = await getAlphaFoldUrl(data.uniprotID);
+            if (!cifUrl) {
+                viewerContainer.innerHTML = "AlphaFold model not found.";
+                return;
             }
 
-            const modal = document.createElement('div');
-            modal.id = 'molstar-modal';
-            modal.style.cssText = `
-                position:fixed; inset:0; background:rgba(0,0,0,0.9);
-                display:flex; justify-content:center; align-items:center;
-                z-index:200000;
-            `;
+            viewerContainer.innerHTML = `<pdbe-molstar 
+                id="molstar-viewer"
+                molecule-id="${data.uniprotID}"
+                custom-data-url="${cifUrl}"
+                custom-data-format="cif"
+                hide-controls="false"
+                style="width:100%;height:100%;">
+            </pdbe-molstar>`;
 
-            modal.innerHTML = `
-                <div style="width:95vw;height:92vh;background:white;border-radius:12px;display:flex;flex-direction:column;">
-                    <div style="padding:12px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
-                        <strong>${geneSymbol} 3D Structure</strong>
-                        <button id="close-3d" style="border:none;background:#eee;border-radius:50%;width:32px;height:32px;">✕</button>
-                    </div>
-                    <div style="flex:1;position:relative;">
-                        <pdbe-molstar id="pdbe-molstar-target"
-                            custom-data-url="${afUrl}"
-                            custom-data-format="cif"
-                            alphafold-view="true"
-                            hide-controls="true"
-                            selection-data='${JSON.stringify(window.currentSelectData)}'
-                            style="width:100%;height:100%;display:block;">
-                        </pdbe-molstar>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(modal);
-
-            const plugin = document.getElementById('pdbe-molstar-target');
-
-            plugin.addEventListener('load', () => {
-                if (window.currentSelectData.length && plugin.viewerInstance) {
-                    plugin.viewerInstance.visual.select({
-                        data: window.currentSelectData
+            setTimeout(() => {
+                const viewer = document.getElementById('molstar-viewer');
+                if (viewer?.viewerInstance?.visual?.select) {
+                    viewer.viewerInstance.visual.select({
+                        data: [{
+                            struct_asym_id: 'A',
+                            start_residue_number: position,
+                            end_residue_number: position
+                        }],
+                        color: { r: 255, g: 0, b: 0 }
                     });
                 }
-            });
-
-            document.getElementById('close-3d').onclick = () => {
-                modal.remove();
-                window.currentSelectData = [];
-                if (btn) { btn.innerText = original; btn.disabled = false; }
-            };
+            }, 2000);
 
         } catch (e) {
-            alert("3D Viewer Error: " + e.message);
-            if (btn) { btn.innerText = original; btn.disabled = false; }
+            console.error(e);
+            viewerContainer.innerHTML = "Failed to load structure.";
         }
     };
 
-    window.addVariantTo3D = function() {
+})();  
+    
+window.addVariantTo3D = function() {
         const input = document.getElementById('add-var-3d');
         const colorPicker = document.getElementById('custom-color-picker');
         const plugin = document.getElementById('pdbe-molstar-target');
@@ -8178,5 +8137,6 @@ setTimeout(()=>window.CiliAI.Session.start(),4000);
  
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
