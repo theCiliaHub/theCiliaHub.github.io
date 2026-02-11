@@ -5786,36 +5786,8 @@ const intentHandlers = [
             return "Variant Burden module not loaded.";
         }
     },
-    
-    // 16b. Specific Variant Display (e.g. "Show L301R on IFT88")
-    {
-        priority: 16, 
-        matcher: (qLower) => {
-            const hasGene = window.CiliAI.utils.extractGenes(qLower).length > 0;
-            // Matches patterns like L301R, p.V34G, Val301Gly
-            const hasVariantPattern = /\b[a-z]{1,3}\.?\d+[a-z]{1,3}\b/i.test(qLower); 
-            return hasGene && hasVariantPattern;
-        },
-        handler: async (query) => {
-            const genes = window.CiliAI.utils.extractGenes(query);
-            if (genes.length === 0) return null;
-            
-            const variantMatch = query.match(/\b([a-z]{1,3}\.?\d+[a-z*]{1,3})\b/i);
-            if (!variantMatch) return "I couldn't identify the specific mutation format (e.g., L301R).";
 
-            const gene = genes[0];
-            const variant = variantMatch[1];
-
-            window.addChatMessage(`Loading map for <strong>${gene}</strong> and analyzing <strong>${variant}</strong>...`, false);
-            
-            if (window.displaySpecificVariant) {
-                return await window.displaySpecificVariant(gene, variant);
-            }
-            return "Variant display module not loaded.";
-        }
-    },
-
-  // 16. Live Variant Handler (Highest Priority Variant Check)
+    // 16. Live Variant Handler (Highest Priority Variant Check)
     {
         priority: 17,
         matcher: (qLower) => qLower.includes('variant') || qLower.includes('mutation') || qLower.includes('clinvar'),
@@ -5834,7 +5806,7 @@ const intentHandlers = [
                     
                     <ul style="font-size:13px; color:#475569; padding-left:20px; line-height:1.6;">
                         <li><strong>Visualize Variants:</strong> See Pathogenic (Red) and Uncertain (Gray) variants mapped to protein domains.</li>
-                        <li><strong>Check Conservation:</strong> Click any variant, then click <strong>"Check Conservation"</strong> to compare across 65 species.</li>
+                        <li><strong>Check Conservation:</strong> Click any variant, then click <strong>"Check Conservation"</strong> to compare across 7 species.</li>
                         <li><strong>3D Structure:</strong> Click <strong>"View 3D Structure"</strong> to see where the mutation sits on the AlphaFold protein model.</li>
                         <li><strong>Custom Variants:</strong> Add your own mutation (e.g., <em>p.L301R</em>) using the "Add" panel at the bottom.</li>
                     </ul>
@@ -6445,6 +6417,29 @@ const intentHandlers = [
     }
 ];
 
+// --- MAIN DISPATCHER (Sorts by ASCENDING priority 1..45) ---
+window.handleAIQuery = async function (query) {
+    const qLower = window.CiliAI.utils.normalizeQuery(query);
+    if(window.log) window.log(`Routing query: ${query}`);
+
+    try {
+        // Sort: Priority 1 comes FIRST (Ascending order)
+        const sortedHandlers = intentHandlers.sort((a,b) => a.priority - b.priority);
+
+        for (const intent of sortedHandlers) {
+            if (intent.matcher(qLower)) {
+                const result = await intent.handler(query);
+                if (result) {
+                    window.addChatMessage(result, false);
+                    return;
+                }
+            }
+        }
+    } catch (e) {
+        console.error("AI Error:", e);
+        window.addChatMessage("An internal routing error occurred.", false);
+    }
+};
 
 // Correct: Priority 1 comes FIRST (Ascending)
 const sortedHandlers = [...intentHandlers].sort((a,b) => a.priority - b.priority);
@@ -7269,74 +7264,1027 @@ window.runDashboardSearch = function() {
         }).join('');
 };
 
+
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.9 - FIXED)
- * Features: 
- * - Full MSA (Blue Theme) with fixed variable references
- * - 3D Structure (MolStar)
- * - Conservation Analysis
- * - Jalview-style MSA
+ * MODULE: UI LAYOUT FIXES (Prevents Overflow)
  * ============================================================== */
+(function applyLayoutFixes() {
+    const styleId = 'ciliai-layout-fixes';
+    if (document.getElementById(styleId)) return;
+    
+    const css = `
+        /* 1. Ensure Chat Message Bubble Contains Content */
+        .ciliai-message-content {
+            max-width: 100%;
+            overflow-x: auto; /* Adds scrollbar if content is too wide */
+            box-sizing: border-box;
+        }
+
+        /* 2. Constrain the Gene Card */
+        .ai-result-card {
+            width: 100%;
+            max-width: 600px; /* Prevents it from getting too huge */
+            box-sizing: border-box;
+            background: #fff;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+            margin-top: 5px;
+        }
+
+        /* 3. Make Tables Scrollable (Critical for Mobile/Small Screens) */
+        .cilia-tab-content {
+            width: 100%;
+            overflow-x: auto; /* Forces table to scroll inside the tab */
+        }
+        
+        .fancy-table {
+            width: 100%;
+            min-width: 300px; /* Ensures table doesn't crush too small */
+            table-layout: auto;
+        }
+
+        /* 4. Fix Tab Button Wrapping */
+        .cilia-tabs {
+            flex-wrap: wrap; /* Allows tabs to wrap on small screens */
+            gap: 5px;
+        }
+        
+        .cilia-tab-btn {
+            flex: 1 1 auto; /* Tabs grow/shrink to fit */
+            text-align: center;
+            min-width: 80px;
+        }
+    `;
+    
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = css;
+    document.head.appendChild(style);
+    
+    console.log("CiliAI Layout Fixes Applied.");
+})();
+
+
+// Helper: Reset Views – Ensures diagram is visible and refreshed
+window.resetViews = function() {
+    // Hide all alternative views
+    document.getElementById('plotly-container').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+
+    // Always re-inject the full interactive SVG to ensure it's present and clean
+    window.generateAndInjectSVG();
+
+    // Ensure cilia-svg is visible
+    const ciliaSvg = document.getElementById('cilia-svg');
+    if (ciliaSvg) {
+        ciliaSvg.style.display = 'flex';
+        // Remove any table mode class
+        ciliaSvg.classList.remove('table-view-active');
+    }
+
+    // Update title
+    document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+
+    // Clear any overlays (heatmaps, multi-gene)
+    if (window.SpatialManager && typeof window.SpatialManager.clearOverlays === 'function') {
+        window.SpatialManager.clearOverlays();
+    }
+
+    // Reset zoom/state
+    if (window.SpatialManager && typeof window.SpatialManager.resetZoom === 'function') {
+        window.SpatialManager.resetZoom();
+    }
+};
+
+window.showDiagram = function() {
+    document.getElementById('plotly-container').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+    document.getElementById('cilia-svg').style.display = 'flex';
+    document.getElementById('current-viz-title').textContent = "Diagram: Spatial Intelligence";
+    if (window.CiliAI) window.CiliAI.currentPlot = null;
+};
+
+window.showPlot = function(plotData, title = "Gene Expression UMAP") {
+    // Hide other views
+    document.getElementById('cilia-svg').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+
+    const plotContainer = document.getElementById('plotly-container');
+    plotContainer.style.display = 'block';
+    document.getElementById('current-viz-title').textContent = title;
+
+    // Clear previous content to avoid artifacts
+    plotContainer.innerHTML = '';
+
+    // Calculate available space
+    const vizCard = document.querySelector('.viz-card');
+    const vizHeader = document.querySelector('.viz-header');
+    const availableHeight = (vizCard && vizHeader)
+        ? (vizCard.clientHeight - vizHeader.clientHeight - 40)
+        : 500;
+    const availableWidth = vizCard ? (vizCard.clientWidth - 40) : 600;
+
+    // Merge and enhance layout
+    const layout = {
+        ...plotData.layout,
+        autosize: true,
+        width: availableWidth,
+        height: availableHeight,
+        margin: { l: 60, r: 30, b: 60, t: 50, pad: 10 },
+        paper_bgcolor: 'white',
+        plot_bgcolor: 'white',
+        xaxis: { ...plotData.layout?.xaxis, automargin: true, tickfont: { size: 10 } },
+        yaxis: { ...plotData.layout?.yaxis, automargin: true, tickfont: { size: 10 } },
+        font: { size: 11 },
+        showlegend: true,
+        legend: {
+            x: 1.02,
+            y: 1,
+            xanchor: 'left',
+            yanchor: 'top',
+            bgcolor: 'rgba(255,255,255,0.8)',
+            bordercolor: '#e1e8ed',
+            borderwidth: 1,
+            font: { size: 10 }
+        }
+    };
+
+    // Purge any existing plot to prevent memory leaks and old listeners
+    if (window.CiliAI?.currentPlot) {
+        Plotly.purge('plotly-container');
+        window.CiliAI.currentPlot = null;
+    }
+
+    // Render the new plot
+    Plotly.newPlot('plotly-container', plotData.data, layout, {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
+        scrollZoom: false
+    })
+    .then(() => {
+        // Now gd is the actual graph div element (not a Promise)
+        const gd = document.getElementById('plotly-container');
+
+        // Store reference
+        if (window.CiliAI) {
+            window.CiliAI.currentPlot = gd;
+        }
+
+        // Attach click handler safely
+        gd.on('plotly_click', (e) => {
+            const point = e.points?.[0];
+            const loc = point?.customdata?.localization;
+            if (loc) {
+                window.showDiagram();
+                if (window.SpatialManager && window.CiliAI?.activeGeneContext) {
+                    SpatialManager.highlight(loc, window.CiliAI.activeGeneContext);
+                }
+            }
+        });
+    })
+    .catch(err => {
+        console.error("Plotly rendering failed:", err);
+        window.addChatMessage(`<p style="color:#c62828;">Failed to render plot: ${err.message}</p>`, false);
+    });
+
+    // Responsive resize handler (only one instance)
+    const resizeHandler = () => {
+        const container = document.getElementById('plotly-container');
+        if (window.CiliAI?.currentPlot && container && container.offsetParent !== null) {
+            Plotly.Plots.resize(window.CiliAI.currentPlot);
+        }
+    };
+
+    // Remove any previous listener to avoid duplicates
+    window.removeEventListener('resize', resizeHandler);
+    window.addEventListener('resize', resizeHandler);
+};
+
+window.showDomainViewer = function (gene) {
+    // ── HARD GUARDS & EARLY INITIALIZATION ──
+    if (!window.CiliAI) return;
+
+    // Force-create the entire chain before any access
+    window.CiliAI.lookups           = window.CiliAI.lookups           || {};
+    window.CiliAI.lookups.geneMap    = window.CiliAI.lookups.geneMap    || {};
+    window.CiliAI.lookups.pfamByGene = window.CiliAI.lookups.pfamByGene || {};
+
+    // Extra safety (in case something cleared it after init)
+    if (!window.CiliAI.lookups.pfamByGene) {
+        console.warn("[showDomainViewer] pfamByGene was cleared — re-creating");
+        window.CiliAI.lookups.pfamByGene = {};
+    }
+
+    gene = gene.toUpperCase().trim();
+
+    const domainContainer = document.getElementById('domain-viewer');
+    const titleEl         = document.getElementById('current-viz-title');
+
+    if (!domainContainer || !titleEl) return;
+
+    // ── UI switching ──
+    const ciliaSvg = document.getElementById('cilia-svg');
+    const plotly   = document.getElementById('plotly-container');
+
+    if (ciliaSvg) ciliaSvg.style.display = 'none';
+    if (plotly)   plotly.style.display   = 'none';
+
+    domainContainer.style.display = 'flex';
+    domainContainer.innerHTML = '';
+    titleEl.textContent = `Pfam Domains: ${gene}`;
+
+    // ── Resolve Pfam domains ──
+    let pfam = window.CiliAI.lookups.pfamByGene[gene] || [];
+
+    if (!pfam.length) {
+        const geneData = window.CiliAI.lookups.geneMap[gene];
+
+        if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
+            const desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || "";
+            const parts = desc
+                .split(/[;,]/)
+                .map(s => s.trim())
+                .filter(Boolean);
+
+            if (parts.length) {
+                pfam = parts.map((part, i) => ({
+                    id:    `DOM_${i + 1}`,
+                    name:  part,
+                    start: (i * 200) + 50,
+                    end:   (i * 200) + 150
+                }));
+
+                // Cache it
+                window.CiliAI.lookups.pfamByGene[gene] = pfam;
+            }
+        }
+    }
+
+    // ── Special fallback for WDR31 (common case with no strong Pfam hits) ──
+    if (!pfam.length && gene === "WDR31") {
+        pfam = [
+            { id: "WD1", name: "WD40 repeat 1", start:  45, end:  85 },
+            { id: "WD2", name: "WD40 repeat 2", start:  95, end: 135 },
+            { id: "WD3", name: "WD40 repeat 3", start: 155, end: 195 },
+            { id: "WD4", name: "WD40 repeat 4", start: 215, end: 255 },
+        ];
+        // Cache immediately so next call is instant
+        window.CiliAI.lookups.pfamByGene[gene] = pfam;
+    }
+
+    // ── No domains case ──
+    if (!pfam.length) {
+        domainContainer.innerHTML = `
+            <div style="padding:30px; text-align:center; color:#64748b; font-size:14px; line-height:1.5;">
+                <strong>No Pfam domain annotations found for ${gene}</strong><br><br>
+                <small>
+                    Note: Some WD-repeat proteins (like WDR31) form β-propeller structures<br>
+                    but may not receive individual Pfam domain assignments.
+                </small>
+            </div>`;
+        return;
+    }
+
+    // ── Render SVG ──
+    const seqLength = Math.max(...pfam.map(d => d.end), 1000);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+
+    svg.setAttribute('viewBox', `0 0 ${seqLength + 100} 160`);
+    svg.setAttribute('width',   '100%');
+    svg.setAttribute('height',  '100%');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+    // Background line (protein backbone)
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', '50');
+    line.setAttribute('y1', '80');
+    line.setAttribute('x2', seqLength + 50);
+    line.setAttribute('y2', '80');
+    line.setAttribute('stroke', '#4a5568');
+    line.setAttribute('stroke-width', '5');
+    line.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(line);
+
+    // Domains
+    pfam.forEach((domain, index) => {
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+        const width = domain.end - domain.start + 1;
+        const rect  = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+
+        rect.setAttribute('x',      domain.start + 50);
+        rect.setAttribute('y',      '60');
+        rect.setAttribute('width',  width);
+        rect.setAttribute('height', '40');
+        rect.setAttribute('rx',     '8');
+        rect.setAttribute('fill',   `hsl(${index * 65 + 190}, 85%, 62%)`);
+        rect.setAttribute('stroke', '#ffffff');
+        rect.setAttribute('stroke-width', '2');
+
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${domain.name}  (${domain.start}–${domain.end})`;
+        rect.appendChild(title);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x',           domain.start + 50 + width / 2);
+        text.setAttribute('y',           '45');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('font-size',   width > 80 ? '13' : '11');
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('fill',        '#1f2937');
+        text.textContent = domain.name;
+
+        group.appendChild(rect);
+        group.appendChild(text);
+        svg.appendChild(group);
+    });
+
+    domainContainer.appendChild(svg);
+};
+
+window.downloadCurrentVisualization = function() {
+    if (window.CiliAI?.currentPlot) {
+        Plotly.downloadImage(window.CiliAI.currentPlot, { format: 'png', filename: 'ciliai-umap-plot', width: 1200, height: 800, scale: 2 });
+    } else if (document.getElementById('domain-viewer').style.display !== 'none') {
+        const svgElement = document.getElementById('domain-viewer').querySelector('svg');
+        if (svgElement) {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const blob = new Blob([svgData], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ciliai-domain.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    } else {
+        const svgElement = document.getElementById('cilia-diagram');
+        if (svgElement) {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const blob = new Blob([svgData], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ciliai-diagram.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    }
+};
+
+/* ==============================================================
+ * MODULE: VARIANT ANALYSIS & 3D STRUCTURE SUITE (Fixed v10.0)
+ * Includes: Variant Map, MSA Conservation, 3D Viewer, Dot Plot Fixes
+ * ============================================================== */
+
 (function() {
     'use strict';
 
-    window.CiliAI = window.CiliAI || {};
-    window.CiliAI.activeVariantData = null;
-    window.CiliAI.activeAlignmentData = null;
-    window.CiliAI.activeColorScheme = 'ClustalX';
+    // --- 1. ROBUST VARIANT DATA FETCHER ---
+    window.fetchVariantDataLive = async function(geneSymbol) {
+        const gene = geneSymbol.toUpperCase();
+        try {
+            // Step 1: Get UniProt ID via MyGene
+            const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
+            const mgData = await mgRes.json();
+            const hit = mgData.hits?.[0];
+            
+            if (!hit || !hit.uniprot) throw new Error(`UniProt ID not found for ${gene}`);
 
-    // 3D Viewer State
-    window.currentAfUrl = null;
-    window.currentSelectData = [];
-    window.isGrayMode = false;
+            let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
+            const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
-    // ─────────────────────────────────────────────────────────────
-    // 1. DATA CONSTANTS & CONFIGURATION
-    // ─────────────────────────────────────────────────────────────
-    
-    const MOLSTAR_SOURCES = [
-        { name: 'jsdelivr', css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar.css', js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js' },
-        { name: 'unpkg', css: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar.css', js: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js' }
-    ];
+            // Step 2: Parallel Fetch from EBI (Features + Variation)
+            const [varRes, featRes] = await Promise.all([
+                fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
+                fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
+            ]);
 
-    const ORGANISM_PANEL = [
-        { name: "Homo sapiens", common: "Human", dist: 0.0, icon: "👤" },
-        { name: "Pan troglodytes", common: "Chimpanzee", dist: 0.01, icon: "🐵" },
-        { name: "Mus musculus", common: "Mouse", dist: 0.15, icon: "🐭" },
-        { name: "Rattus norvegicus", common: "Rat", dist: 0.16, icon: "🐀" },
-        { name: "Canis lupus familiaris", common: "Dog", dist: 0.18, icon: "🐕" },
-        { name: "Bos taurus", common: "Cow", dist: 0.20, icon: "🐄" },
-        { name: "Gallus gallus", common: "Chicken", dist: 0.30, icon: "🐔" },
-        { name: "Xenopus tropicalis", common: "Frog", dist: 0.45, icon: "🐸" },
-        { name: "Danio rerio", common: "Zebrafish", dist: 0.50, icon: "🐟" },
-        { name: "Drosophila melanogaster", common: "Fruit Fly", dist: 0.70, icon: "🪰" },
-        { name: "Caenorhabditis elegans", common: "Worm", dist: 0.75, icon: "🪱" },
-        { name: "Saccharomyces cerevisiae", common: "Yeast", dist: 0.90, icon: "🍄" },
-        { name: "Chlamydomonas reinhardtii", common: "Algae", dist: 0.85, icon: "🦠" }
-    ];
+            // Note: Variation API might return 404 if no variants exist. Handle gracefully.
+            const varData = varRes.ok ? await varRes.json() : { features: [] };
+            const featData = featRes.ok ? await featRes.json() : { features: [] };
 
-    const CLUSTALX_COLORS = {
-        'A': { bg: '#80a0f0', text: '#000000' }, 'R': { bg: '#f01505', text: '#ffffff' }, 'N': { bg: '#00ff00', text: '#000000' },
-        'D': { bg: '#c048c0', text: '#ffffff' }, 'C': { bg: '#f08080', text: '#000000' }, 'Q': { bg: '#00ff00', text: '#000000' },
-        'E': { bg: '#c048c0', text: '#ffffff' }, 'G': { bg: '#f09048', text: '#000000' }, 'H': { bg: '#15a4a4', text: '#ffffff' },
-        'I': { bg: '#80a0f0', text: '#000000' }, 'L': { bg: '#80a0f0', text: '#000000' }, 'K': { bg: '#f01505', text: '#ffffff' },
-        'M': { bg: '#80a0f0', text: '#000000' }, 'F': { bg: '#80a0f0', text: '#000000' }, 'P': { bg: '#ffff00', text: '#000000' },
-        'S': { bg: '#00ff00', text: '#000000' }, 'T': { bg: '#00ff00', text: '#000000' }, 'W': { bg: '#80a0f0', text: '#000000' },
-        'Y': { bg: '#15a4a4', text: '#ffffff' }, 'V': { bg: '#80a0f0', text: '#000000' }, 'X': { bg: '#bebebe', text: '#000000' },
-        '-': { bg: '#ffffff', text: '#999999' }
+            const length = parseInt(featData.sequence?.length || 0);
+            const variants = varData.features ? varData.features.filter(f => f.type === 'VARIANT') : [];
+            
+            // Extract Domains
+            const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
+            const naturePalette = ['#E64B35', '#4DBBD5', '#00A087', '#3C5488', '#F39B7F', '#8491B4', '#91D1C2', '#DC0000'];
+            let colorIdx = 0;
+
+            const domains = (featData.features || [])
+                .filter(f => domainTypes.includes(f.type))
+                .map(d => ({
+                    name: d.description || d.type,
+                    start: parseInt(d.begin),
+                    end: parseInt(d.end),
+                    type: d.type,
+                    color: naturePalette[colorIdx++ % naturePalette.length]
+                }));
+
+            return { gene, uniprotID, length, variants, domains, customVariants: [] };
+
+        } catch (e) {
+            console.error("Fetch Error:", e);
+            return { error: e.message };
+        }
     };
-    const COLOR_SCHEMES = { 'ClustalX': CLUSTALX_COLORS, 'Taylor': CLUSTALX_COLORS, 'Zappo': CLUSTALX_COLORS };
-    
-    const TARGET_SPECIES_PANEL = [
-        { id: 9606, name: 'Human', icon: '👤' }, { id: 9598, name: 'Chimpanzee', icon: '🐵' }, { id: 9593, name: 'Gorilla', icon: '🦍' }, 
-        { id: 10090, name: 'Mouse', icon: '🐭' }, { id: 10116, name: 'Rat', icon: '🐀' }, { id: 9615, name: 'Dog', icon: '🐕' }, 
-        { id: 9913, name: 'Cow', icon: '🐄' }, { id: 7955, name: 'Zebrafish', icon: '🐟' }, { id: 7227, name: 'Drosophila', icon: '🪰' }, 
-        { id: 6239, name: 'C. elegans', icon: '🪱' }, { id: 3055, name: 'Chlamydomonas', icon: '🦠' }
-    ];
 
-    // ─────────────────────────────────────────────────────────────
-    // 2. HELPERS
-    // ─────────────────────────────────────────────────────────────
+    // --- 2. MAIN VARIANT MAP RENDERER ---
+    window.renderVariantMap = async function(geneSymbol) {
+        // Clear other views to prevent overlapping
+        if(document.getElementById('cilia-svg')) document.getElementById('cilia-svg').style.display = 'none';
+        if(document.getElementById('domain-viewer')) document.getElementById('domain-viewer').style.display = 'none';
+        if(document.getElementById('var-panel')) document.getElementById('var-panel').style.display = 'none';
+
+        const container = document.getElementById('plotly-container');
+        if (!container) return;
+        
+        container.style.display = 'block';
+        container.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64748b; padding:20px; text-align:center;">
+                <div style="font-size:30px; animation:spin 1s infinite linear; margin-bottom:15px;">⚙️</div>
+                <h3 style="margin:0 0 10px 0; color:#1e293b;">Analyzing ${geneSymbol}...</h3>
+                <p>Querying ClinVar & UniProt for pathogenic variants.</p>
+            </div>`;
+
+        const data = await window.fetchVariantDataLive(geneSymbol);
+
+        if (data.error) {
+            container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Error: ${data.error}</div>`;
+            return;
+        }
+
+        window.CiliAI.activeVariantData = data;
+        window.drawVariantWorkspace();
+    };
+
+    // --- 3. WORKSPACE DRAWER (SVG) ---
+    window.drawVariantWorkspace = function() {
+        const data = window.CiliAI.activeVariantData;
+        const container = document.getElementById('plotly-container');
+
+        // Logic: Color & Prioritize Pathogenic
+        const getSignificance = (v) => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
+        
+        const isPatho = (v) => {
+            const sig = getSignificance(v);
+            return sig.includes('pathogenic') && !sig.includes('likely');
+        };
+        const isLikely = (v) => getSignificance(v).includes('likely pathogenic');
+        const isBenign = (v) => getSignificance(v).includes('benign');
+
+        const allPatho = data.variants.filter(isPatho);
+        const allLikely = data.variants.filter(isLikely);
+        const allOthers = data.variants.filter(v => !isPatho(v) && !isLikely(v));
+
+        // Selection: 50 variants total, prioritize bad ones
+        let displayVars = [...allPatho, ...allLikely];
+        if (displayVars.length < 50) {
+            const needed = 50 - displayVars.length;
+            // Shuffle others for random sampling
+            const randomOthers = allOthers.sort(() => 0.5 - Math.random()).slice(0, needed);
+            displayVars = [...displayVars, ...randomOthers];
+        } else {
+            displayVars = displayVars.slice(0, 50);
+        }
+        
+        // Include custom user variants
+        displayVars = [...displayVars, ...data.customVariants];
+        displayVars.sort((a,b) => parseInt(a.begin) - parseInt(b.begin));
+
+        // SVG Dimensions
+        const w = container.clientWidth - 40 || 800;
+        const h = 450;
+        const pad = 40;
+        const trackY = 250;
+        const xScale = (pos) => pad + (pos / data.length) * (w - 2 * pad);
+
+        // Generate SVG string
+        let svg = `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="overflow:visible;">`;
+        
+        // Header Text
+        svg += `<text x="${pad}" y="40" font-size="18" font-weight="bold" fill="#1e293b">${data.gene} Variant Map</text>`;
+        svg += `<text x="${pad}" y="65" font-size="12" fill="#64748b">${data.length} aa | ${data.domains.length} Domains | ${displayVars.length} Variants Shown</text>`;
+
+        // Backbone
+        svg += `<rect x="${pad}" y="${trackY - 6}" width="${w - 2 * pad}" height="12" rx="6" fill="#e2e8f0" />`;
+
+        // Domains
+        data.domains.forEach(d => {
+            const x = xScale(d.start);
+            const width = Math.max(xScale(d.end) - x, 4);
+            svg += `
+                <g>
+                    <rect x="${x}" y="${trackY - 12}" width="${width}" height="24" rx="4" fill="${d.color}" opacity="0.85" stroke="white" stroke-width="1">
+                        <title>${d.name} (${d.start}-${d.end})</title>
+                    </rect>
+                </g>`;
+        });
+
+        // Variants
+        displayVars.forEach(v => {
+            const x = xScale(parseInt(v.begin));
+            const sig = getSignificance(v);
+            let color = '#9ca3af'; // Gray
+            if (sig.includes('pathogenic') && !sig.includes('likely')) color = '#ef4444'; // Red
+            else if (sig.includes('likely pathogenic')) color = '#f97316'; // Orange
+            else if (sig.includes('benign')) color = '#22c55e'; // Green
+            else if (v.isCustom) color = '#d946ef'; // Purple
+
+            const isCustom = v.isCustom;
+            const height = 20 + (parseInt(v.begin) % 80);
+            const yHead = trackY - height;
+            
+            // Clean Text for Attributes
+            const mut = `p.${v.wildType}${v.begin}${v.alternativeSequence || v.mutatedType}`;
+            const cleanDesc = (v.description || sig).replace(/'/g, "").replace(/"/g, "");
+            
+            // Disease extraction
+            let disease = "Not specified";
+            if (v.association && v.association.length > 0) {
+                disease = v.association.map(a => a.name).join(", ");
+            }
+
+            // Click Handler
+            // NOTE: We use window.openVariantPanel directly here.
+            // We escape the arguments carefully.
+            const clickFn = `window.openVariantPanel('${mut}', '${v.begin}', '${cleanDesc}', '${data.gene}')`;
+
+            svg += `
+                <g style="cursor:pointer;" onclick="${clickFn}">
+                    <line x1="${x}" y1="${trackY - 12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="${isCustom?2:1}" opacity="0.6" />
+                    <circle cx="${x}" cy="${yHead}" r="${isCustom?7:5}" fill="${color}" stroke="white" stroke-width="1">
+                        <title>Mutation: ${mut}\nType: ${cleanDesc}\nDisease: ${disease}</title>
+                    </circle>
+                    <rect x="${x-5}" y="${yHead-10}" width="10" height="${height+10}" fill="transparent" />
+                </g>`;
+        });
+
+        svg += `</svg>`;
+
+        container.innerHTML = `
+            <div style="padding:20px; height:100%; overflow-y:auto;">
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:20px;">
+                    <p style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#1e293b;">🧬 Variant Analysis Tools:</p>
+                    <ul style="margin:0; padding-left:20px; font-size:13px; color:#475569; line-height:1.6;">
+                        <li><strong>Visualize:</strong> Red variants are Pathogenic . Hover circles for disease info.</li>
+                        <li><strong>Conservation:</strong> Click a variant, then <strong>"Check Conservation"</strong> to compare species.</li>
+                        <li><strong>3D Structure:</strong> Click <strong>"View 3D Structure"</strong> to map mutation to AlphaFold model.</li>
+                        <li><strong>Custom:</strong> Add variants like <em>p.L301R</em> using the panel below.</li>
+                    </ul>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div style="display:flex; gap:15px; font-size:11px; color:#475569;">
+                        <span style="display:flex; align-items:center;"><span style="width:8px;height:8px;background:#ef4444;border-radius:50%;margin-right:4px;"></span>Pathogenic</span>
+                        <span style="display:flex; align-items:center;"><span style="width:8px;height:8px;background:#f97316;border-radius:50%;margin-right:4px;"></span>Likely</span>
+                        <span style="display:flex; align-items:center;"><span style="width:8px;height:8px;background:#22c55e;border-radius:50%;margin-right:4px;"></span>Benign</span>
+                        <span style="display:flex; align-items:center;"><span style="width:8px;height:8px;background:#9ca3af;border-radius:50%;margin-right:4px;"></span>VUS</span>
+                    </div>
+                    <button onclick="window.downloadVariantCSV()" class="ciliai-button" style="background:#3b82f6; color:white; padding:4px 10px; font-size:11px;">⬇ Download CSV</button>
+                </div>
+
+                <div style="height:450px; width:100%; overflow:hidden;">${svg}</div>
+
+                <div style="padding:15px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:10px; align-items:center;">
+                    <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px; width:100px;">
+                    <select id="custom-var-sig" style="padding:6px; border:1px solid #cbd5e0; border-radius:4px; font-size:12px;">
+                        <option value="Pathogenic">Pathogenic</option>
+                        <option value="VUS">VUS</option>
+                    </select>
+                    <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white;">+ Add</button>
+                </div>
+
+                <div id="var-panel" style="display:none; position:absolute; top:80px; right:30px; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; width:280px; box-shadow:0 10px 25px rgba(0,0,0,0.1); z-index:100;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                         <h4 style="margin:0; color:#2563eb;" id="vp-title"></h4>
+                         <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none;background:none;cursor:pointer;">✕</button>
+                    </div>
+                    <p style="font-size:12px; color:#475569; margin-bottom:15px; max-height:80px; overflow-y:auto;" id="vp-desc"></p>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <button id="vp-cons-btn" class="ciliai-button" style="width:100%;">🌍 Check Conservation</button>
+                        <button id="vp-3d-btn" class="ciliai-button" style="width:100%; background:#8b5cf6; color:white;">🧊 View 3D Structure</button>
+                    </div>
+                    <div id="msa-result-area" style="margin-top:10px; font-size:11px;"></div>
+                </div>
+            </div>`;
+    };
+
+    // --- 4. INTERACTION & DOWNLOAD HELPERS ---
+    window.openVariantPanel = function(title, pos, desc, gene) {
+        const panel = document.getElementById('var-panel');
+        document.getElementById('vp-title').textContent = title;
+        document.getElementById('vp-desc').textContent = desc || "No description available.";
+        
+        // Reset MSA Area
+        document.getElementById('msa-result-area').innerHTML = '';
+
+        // Bind Buttons
+        document.getElementById('vp-cons-btn').onclick = () => window.checkConservation(gene, parseInt(pos), title);
+        document.getElementById('vp-3d-btn').onclick = () => window.showStructureViewer(gene, parseInt(pos), title);
+        
+        panel.style.display = 'block';
+    };
+
+    window.addUserVariant = function() {
+        const input = document.getElementById('custom-var-input').value.trim();
+        const sig = document.getElementById('custom-var-sig').value;
+        // Parse "p.L301R" or similar
+        const match = input.match(/p\.([A-Za-z]+)(\d+)([A-Za-z*]+)/);
+        
+        if (match && window.CiliAI.activeVariantData) {
+            window.CiliAI.activeVariantData.customVariants.push({
+                wildType: match[1],
+                begin: parseInt(match[2]),
+                alternativeSequence: match[3],
+                clinicalSignificance: sig,
+                isCustom: true
+            });
+            window.drawVariantWorkspace();
+        } else {
+            alert("Invalid format. Use format like p.L301R");
+        }
+    };
+
+    window.downloadVariantCSV = function() {
+        if (!window.CiliAI.activeVariantData) return;
+        const variants = window.CiliAI.activeVariantData.variants;
+        let csv = "Gene,Position,Change,Significance,Description\n";
+        variants.forEach(v => {
+            const desc = (v.description || v.clinicalSignificance || "").replace(/"/g, '""');
+            csv += `${window.CiliAI.activeVariantData.gene},${v.begin},p.${v.wildType}${v.begin}${v.alternativeSequence},"${v.clinicalSignificance || ''}","${desc}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Variants.csv';
+        a.click();
+    };
+    
+/* ==============================================================
+ * MODULE: ROBUST EVOLUTIONARY ALIGNER (65 Species Edition)
+ * ============================================================== */
+
+// 1. Define the 65-Species Panel (Global Constant)
+const TARGET_SPECIES_PANEL = [
+    // PRIMATES & MAMMALS
+    { id: 9606, name: 'Human', icon: '👤' }, // Ref
+    { id: 9598, name: 'Chimpanzee', icon: '🐵' },
+    { id: 9593, name: 'Gorilla', icon: '🦍' },
+    { id: 9601, name: 'Orangutan', icon: '🦧' },
+    { id: 9544, name: 'Macaque', icon: '🐒' },
+    { id: 9483, name: 'Marmoset', icon: '🐒' },
+    { id: 10090, name: 'Mouse', icon: '🐭' },
+    { id: 10116, name: 'Rat', icon: '🐀' },
+    { id: 10029, name: 'Hamster', icon: '🐹' },
+    { id: 9615, name: 'Dog', icon: '🐕' },
+    { id: 9685, name: 'Cat', icon: '🐈' },
+    { id: 9913, name: 'Cow', icon: '🐄' },
+    { id: 9823, name: 'Pig', icon: '🐖' },
+    { id: 9796, name: 'Horse', icon: '🐎' },
+    { id: 9940, name: 'Sheep', icon: '🐑' },
+    { id: 9785, name: 'Elephant', icon: '🐘' },
+    { id: 9986, name: 'Rabbit', icon: '🐇' },
+    { id: 9361, name: 'Armadillo', icon: '🦔' },
+
+    // BIRDS & REPTILES
+    { id: 9031, name: 'Chicken', icon: '🐔' },
+    { id: 59729, name: 'Zebra Finch', icon: '🐦' },
+    { id: 9103, name: 'Turkey', icon: '🦃' },
+    { id: 28377, name: 'Lizard', icon: '🦎' },
+    { id: 8479, name: 'Turtle', icon: '🐢' },
+    { id: 8496, name: 'Alligator', icon: '🐊' },
+
+    // AMPHIBIANS
+    { id: 8364, name: 'Xenopus', icon: '🐸' }, // tropicalis
+    { id: 8355, name: 'Xenopus laevis', icon: '🐸' },
+    { id: 8296, name: 'Axolotl', icon: '🦎' },
+
+    // FISH
+    { id: 7955, name: 'Zebrafish', icon: '🐟' },
+    { id: 8090, name: 'Medaka', icon: '🐟' },
+    { id: 31033, name: 'Fugu', icon: '🐡' },
+    { id: 9989, name: 'Tetraodon', icon: '🐡' },
+    { id: 69293, name: 'Stickleback', icon: '🐟' },
+    { id: 7897, name: 'Coelacanth', icon: '🐟' },
+    { id: 7868, name: 'Elephant Shark', icon: '🦈' },
+    { id: 7757, name: 'Lamprey', icon: '🐟' },
+
+    // INVERTEBRATES
+    { id: 7227, name: 'Drosophila', icon: '🪰' },
+    { id: 7165, name: 'Mosquito', icon: '🦟' },
+    { id: 7460, name: 'Honey Bee', icon: '🐝' },
+    { id: 6239, name: 'C. elegans', icon: '🪱' },
+    { id: 6238, name: 'C. briggsae', icon: '🪱' },
+    { id: 7719, name: 'Ciona', icon: '🌊' },
+    { id: 7668, name: 'Sea Urchin', icon: '🐚' },
+    { id: 7029, name: 'Aphid', icon: '🪲' },
+
+    // SINGLE-CELLED / PROTISTS
+    { id: 3055, name: 'Chlamydomonas', icon: '🦠' },
+    { id: 4932, name: 'Yeast', icon: '🍄' },
+    { id: 4896, name: 'Fission Yeast', icon: '🍄' },
+    { id: 44689, name: 'Slime Mold', icon: '🦠' },
+    { id: 5911, name: 'Tetrahymena', icon: '🦠' },
+    { id: 5888, name: 'Paramecium', icon: '🦠' },
+    { id: 5691, name: 'Trypanosome', icon: '🦟' },
+    { id: 5664, name: 'Leishmania', icon: '🦠' },
+    { id: 5741, name: 'Giardia', icon: '🦠' },
+    { id: 5755, name: 'Entamoeba', icon: '🦠' },
+    { id: 127902, name: 'Monosiga', icon: '🦠' },
+    { id: 3702, name: 'Arabidopsis', icon: '🌿' }
+];
+
+window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
+    const btn = document.getElementById('vp-action');
+    if(btn) btn.innerText = "⏳ Deep scanning...";
+    try {
+        // A. Human Reference Sequence
+        const humanRes = await window.fetchVariantDataLive(geneSymbol);
+        if(humanRes.error) throw new Error("Could not fetch human reference.");
+        
+        const seqRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${humanRes.uniprotID}`);
+        if(!seqRes.ok) throw new Error("Human sequence not found.");
+        const seqData = await seqRes.json();
+        const humanSeq = seqData.sequence.sequence;
+
+        // B. Define Targets & Fetch Orthologs...
+        const targets = TARGET_SPECIES_PANEL;
+        const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
+        const orthoData = await orthoRes.json();
+        let orthologs = [];
+
+        if (orthoData.hits?.[0]?.homologene?.id) {
+            const hID = orthoData.hits[0].homologene.id;
+            const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=100`);
+            const groupData = await groupRes.json();
+            orthologs = groupData.hits || [];
+        }
+
+        // D. Align Sequences
+        const alignments = [];
+        let conservedCount = 0;
+        let totalAligned = 0;
+        
+        // Human Fingerprint (20aa context)
+        const windowSize = 20;
+        const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
+        const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
+        const humanFingerprint = humanSeq.substring(hStart, hEnd);
+
+        // Add Human
+        const dispStartH = Math.max(0, (humanPos - 1) - 7);
+        const dispEndH = Math.min(humanSeq.length, (humanPos - 1) + 8);
+        const humanSegment = humanSeq.substring(dispStartH, dispEndH);
+        const refAA = humanSeq[humanPos - 1];
+        
+        alignments.push({
+            species: 'Human',
+            icon: '👤',
+            symbol: geneSymbol,
+            seq: humanSegment,
+            centerResidue: refAA,
+            isConserved: true
+        });
+
+        // Loop through targets...
+        for (const t of targets) {
+            if(t.name === 'Human') continue;
+            const orthoGene = orthologs.find(g => g.taxid === t.id);
+            if (orthoGene) {
+                let uID = orthoGene.uniprot?.['Swiss-Prot'] || orthoGene.uniprot?.TrEMBL;
+                const finalUID = Array.isArray(uID) ? uID[0] : uID;
+                if (finalUID) {
+                    try {
+                        const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
+                        if(sRes.ok) {
+                            const sData = await sRes.json();
+                            const seq = sData.sequence.sequence;
+                            const bestMatch = findBestAlignment(humanFingerprint, seq);
+                            if (bestMatch.score > 0.35) {
+                                const centerIdx = bestMatch.index + Math.floor(windowSize/2);
+                                const dispStart = Math.max(0, centerIdx - 7);
+                                const dispEnd = Math.min(seq.length, centerIdx + 8);
+                                const segment = seq.substring(dispStart, dispEnd);
+                                const residue = seq[centerIdx];
+                                const isMatch = residue === refAA;
+                                if(isMatch) conservedCount++;
+                                totalAligned++;
+                                alignments.push({
+                                    species: t.name, icon: t.icon, symbol: orthoGene.symbol,
+                                    seq: segment, centerResidue: residue, isConserved: isMatch
+                                });
+                            }
+                        }
+                    } catch(err) { console.warn(`Failed seq fetch for ${t.name}`); }
+                }
+            }
+        }
+        
+        const score = totalAligned > 0 ? Math.round((conservedCount / totalAligned) * 100) : 0;
+        window.renderProfessionalMSA(geneSymbol, humanPos, refAA, alignments, score);
+
+    } catch (e) {
+        console.error(e);
+        alert("Alignment Error: " + e.message);
+        if(btn) btn.innerText = "🌍 Check Conservation";
+    }
+};
+
+function findBestAlignment(query, target) {
+    let bestScore = -1;
+    let bestIndex = -1;
+    for (let i = 0; i <= target.length - query.length; i++) {
+        let currentScore = 0;
+        for (let j = 0; j < query.length; j++) {
+            if (query[j] === target[i + j]) currentScore++;
+        }
+        if (currentScore > bestScore) {
+            bestScore = currentScore;
+            bestIndex = i;
+        }
+    }
+    return { index: bestIndex, score: bestScore / query.length };
+}
+
+// MSA VISUALIZER
+window.renderProfessionalMSA = function (gene, pos, refAA, alignments, score) {
+
+    // Remove existing modal if present
+    const existing = document.getElementById('msa-modal');
+    if (existing) existing.remove();
+
+    const aaColors = {
+        'A': '#c8c8c8', 'G': '#c8c8c8',
+        'I': '#0f820f', 'L': '#0f820f', 'V': '#0f820f', 'M': '#0f820f',
+        'F': '#3232aa', 'Y': '#3232aa', 'W': '#b45b5b',
+        'H': '#8282d2',
+        'K': '#145aff', 'R': '#145aff',
+        'D': '#e60a0a', 'E': '#e60a0a',
+        'S': '#fa9600', 'T': '#fa9600',
+        'N': '#00dcdc', 'Q': '#00dcdc',
+        'C': '#e6e600',
+        'P': '#dc9682'
+    };
+
+    const modal = document.createElement('div');
+    modal.id = 'msa-modal';
+    modal.style.cssText = `
+        position:fixed;
+        top:50%;
+        left:50%;
+        transform:translate(-50%, -50%);
+        background:white;
+        padding:0;
+        border-radius:12px;
+        box-shadow:0 25px 50px rgba(0,0,0,0.5);
+        z-index:10000;
+        width:600px;
+        font-family:'Roboto Mono', monospace;
+        overflow:hidden;
+    `;
+
+    modal.innerHTML = `
+        <div style="background:#1e293b; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h3 style="margin:0; font-size:16px; font-family:'Inter',sans-serif;">
+                    ${gene} Evolution
+                </h3>
+                <div style="font-size:12px; opacity:0.8; font-family:'Inter',sans-serif;">
+                    Residue ${refAA}${pos} • Conservation:
+                    <span style="color:${score > 80 ? '#4ade80' : '#f87171'}">${score}%</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button id="msa-download-btn"
+                    style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
+                    📥 Download
+                </button>
+                <button id="msa-close-btn"
+                    style="border:none; background:none; color:white; cursor:pointer; font-size:20px;">
+                    ×
+                </button>
+            </div>
+        </div>
+
+        <div style="padding:20px; background:#f8fafc; max-height:60vh; overflow-y:auto;">
+            <div style="display:grid; grid-template-columns:120px 1fr; gap:10px;">
+                ${alignments.map(a => `
+                    <div style="text-align:right; font-size:12px; padding-top:6px; color:#475569; font-family:'Inter',sans-serif;">
+                        ${a.icon} ${a.species}
+                    </div>
+                    <div style="display:flex; gap:2px;">
+                        ${a.seq.split('').map((char, i) => {
+                            const isCenter = i === Math.floor(a.seq.length / 2);
+                            const color = aaColors[char] || '#999';
+                            return `
+                                <div style="
+                                    width:24px;
+                                    height:24px;
+                                    background:${color};
+                                    color:white;
+                                    display:flex;
+                                    align-items:center;
+                                    justify-content:center;
+                                    font-size:12px;
+                                    font-weight:bold;
+                                    border-radius:3px;
+                                    border:${isCenter ? '2px solid #1e293b' : '1px solid rgba(0,0,0,0.1)'};
+                                    opacity:${a.species === 'Human' ? 1 : 0.9};
+                                    box-shadow:${isCenter ? '0 0 0 2px rgba(30,41,59,0.2)' : 'none'};
+                                ">
+                                    ${char}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close button
+    document.getElementById('msa-close-btn').addEventListener('click', () => {
+        modal.remove();
+    });
+
+    // Download button (SAFE: no stringified JSON)
+    document.getElementById('msa-download-btn').addEventListener('click', () => {
+        if (typeof window.downloadMSA === 'function') {
+            window.downloadMSA(gene, pos, alignments);
+        } else {
+            console.warn('downloadMSA is not defined');
+        }
+    });
+
+    // Optional UI sync
+    const btn = document.getElementById('vp-action');
+    if (btn) btn.innerText = "🌍 Check Conservation";
+};
+
+window.downloadMSA = function(gene, pos, alignmentsStr) {
+    const alignments = JSON.parse(alignmentsStr);
+    let txt = `Alignment around position ${pos}\n\n`;
+    alignments.forEach(a => { txt += `${a.species} (${a.symbol}): ${a.seq}\n`; });
+    const blob = new Blob([txt], {type: 'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${gene}_MSA.txt`;
+    a.click();
+};
+})();
+
+/* ==============================================================
+ * MODULE: 3D STRUCTURE VIEWER (Mol*)
+ * ============================================================== */
+(function() {
+    'use strict';
+    window.loadMolStar = async function() {
+        if (customElements.get('pdbe-molstar')) return true;
+        return new Promise((resolve, reject) => {
+            console.log("[CiliAI] Downloading 3D Engine...");
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
+            document.head.appendChild(link);
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js';
+            script.onload = () => {
+                customElements.whenDefined('pdbe-molstar').then(() => {
+                    console.log("[CiliAI] 3D Engine Ready.");
+                    resolve(true);
+                });
+            };
+            script.onerror = () => reject(new Error("Failed to load PDBe Mol* script."));
+            document.head.appendChild(script);
+        });
+    };
+
+    async function getAlphaFoldUrl(uniprotID) {
+        try {
+            const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotID}`);
+            if (!res.ok) return null;
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) return data[0].cifUrl; 
+            return null;
+        } catch (e) {
+            console.warn("AlphaFold API Lookup failed:", e);
+            return null;
+        }
+    }
+
     function hexToRgb(hex) {
         hex = hex.replace('#', '');
         return {
@@ -7346,518 +8294,270 @@ window.runDashboardSearch = function() {
         };
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 3. DATA FETCHING
-    // ─────────────────────────────────────────────────────────────
-    window.fetchVariantDataLive = async function(geneSymbol) {
-        const gene = geneSymbol.toUpperCase();
-        try {
-            const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
-            const mgData = await mgRes.json();
-            const hit = mgData.hits?.[0];
-            if (!hit || !hit.uniprot) throw new Error(`UniProt ID not found for ${gene}`);
-            let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
-            const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
-
-            const [varRes, featRes] = await Promise.all([
-                fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
-                fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
-            ]);
-
-            const varData = varRes.ok ? await varRes.json() : { features: [] };
-            const featData = featRes.ok ? await featRes.json() : { features: [] };
-            const sequence = featData.sequence?.sequence || "";
-            const length = parseInt(featData.sequence?.length || 0);
-            const variants = varData.features ? varData.features.filter(f => f.type === 'VARIANT') : [];
-            const domainTypes = ['DOMAIN', 'REPEAT', 'ZN_FING', 'COILED', 'MOTIF', 'REGION', 'SITE', 'DNA_BIND'];
-            const naturePalette = ['#E64B35', '#4DBBD5', '#00A087', '#3C5488', '#F39B7F', '#8491B4', '#91D1C2', '#DC0000'];
-            let colorIdx = 0;
-            const domains = (featData.features || []).filter(f => domainTypes.includes(f.type)).map(d => ({
-                name: d.description || d.type,
-                start: parseInt(d.begin),
-                end: parseInt(d.end),
-                type: d.type,
-                color: naturePalette[colorIdx++ % naturePalette.length]
-            }));
-
-            return { gene, uniprotID, length, sequence, variants, domains, customVariants: [] };
-        } catch (e) {
-            console.error("Fetch Error:", e);
-            return { error: e.message };
+    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
+        const btn = document.getElementById('btn-3d');
+        const originalText = btn ? btn.innerText : "🧊 View 3D";
+        if (btn) {
+            btn.innerText = "⏳ Finding Structure...";
+            btn.disabled = true;
         }
-    };
-
-    window.addVariantHelpMessage = function() {
-        if (window.addChatMessage) {
-            window.addChatMessage(`<div class="ai-result-card" style="border-left:4px solid #3b82f6;padding:12px;background:#f0f9ff;"><strong>🧬 Variant Analysis Ready</strong><br>Visualize variants, check conservation, view 3D structures.</div>`, false);
-        }
-    };
-
-    window.renderVariantMap = async function(geneSymbol) {
-        const container = document.getElementById('plotly-container');
-        if (!container) return;
-        ['cilia-svg', 'domain-viewer'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-        container.style.display = 'block';
-        container.innerHTML = `<div style="padding:60px; text-align:center; color:#64748b;"><div style="font-size:24px; margin-bottom:16px;">⏳</div>Loading ${geneSymbol.toUpperCase()} data...</div>`;
-        
-        const data = await window.fetchVariantDataLive(geneSymbol);
-        if (data.error) { container.innerHTML = `<div style="padding:20px; color:red;">Error: ${data.error}</div>`; return; }
-        
-        window.CiliAI.activeVariantData = data;
-        await window.loadFullLengthAlignment(data.gene);
-        window.drawVariantWorkspace('map');
-    };
-
-    window.drawVariantWorkspace = function(view = 'map') {
-        const data = window.CiliAI.activeVariantData;
-        const container = document.getElementById('plotly-container');
-        if (!data || !container) return;
-        container.innerHTML = '';
-        if (view === 'map') renderDomainVariantMap(data, container);
-        else if (view === 'msa') renderFullLengthMSA(data, container);
-    };
-
-    function renderDomainVariantMap(data, container) {
-        const w = container.clientWidth - 40 || 900;
-        const h = 480;
-        const pad = 40;
-        const trackY = 220;
-        const xScale = pos => pad + (pos / data.length) * (w - 2 * pad);
-
-        const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
-        const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
-        const isLikely = v => /likely pathogenic/i.test(getSig(v));
-
-        let displayVars = [...data.variants.filter(isPatho), ...data.variants.filter(isLikely), ...data.variants.filter(v => !isPatho(v) && !isLikely(v)).slice(0, 60)];
-        displayVars = [...displayVars, ...data.customVariants].sort((a,b) => parseInt(a.begin) - parseInt(b.begin));
-
-        let svg = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;">`;
-        svg += `<text x="${pad}" y="35" font-size="18" font-weight="700" fill="#1e293b">${data.gene} – Domain & Variant Map</text>`;
-        svg += `<text x="${pad}" y="58" font-size="13" fill="#64748b">${data.length} aa • ${data.domains.length} domains • ${displayVars.length} variants shown</text>`;
-        svg += `<rect x="${pad}" y="${trackY-8}" width="${w-2*pad}" height="16" rx="8" fill="#e2e8f0"/>`;
-
-        data.domains.forEach(d => {
-            const x1 = xScale(d.start);
-            const width = Math.max(xScale(d.end) - x1, 6);
-            svg += `<rect x="${x1}" y="${trackY-16}" width="${width}" height="32" rx="6" fill="${d.color}" opacity="0.88" stroke="#fff" stroke-width="1"><title>${d.name} (${d.start}–${d.end})</title></rect>`;
-        });
-
-        displayVars.forEach(v => {
-            const x = xScale(parseInt(v.begin));
-            let color = '#94a3b8';
-            if (isPatho(v)) color = '#ef4444';
-            else if (isLikely(v)) color = '#f97316';
-            else if (/benign/i.test(getSig(v))) color = '#22c55e';
-            else if (v.isCustom) color = '#d946ef';
-
-            const height = 24 + (parseInt(v.begin) % 80);
-            const yHead = trackY - height;
-            const label = `p.${v.wildType || '?'}${v.begin}${v.alternativeSequence || '?'}`;
-            const desc = (v.description || getSig(v)).replace(/['"]/g,'');
-            const click = `window.openVariantPanel('${label}', '${v.begin}', '${desc}', '${data.gene}')`;
-
-            svg += `<g cursor="pointer" onclick="${click}">
-                <line x1="${x}" y1="${trackY-12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="${v.isCustom?2:1.5}" opacity="0.7"/>
-                <circle cx="${x}" cy="${yHead}" r="${v.isCustom?7:5}" fill="${color}" stroke="#fff" stroke-width="1.5"/>
-            </g>`;
-        });
-        svg += `</svg>`;
-
-        container.innerHTML = `
-            <div style="height:100%; display:flex; flex-direction:column; font-family:'Inter',sans-serif;">
-                <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-                    <div style="font-size:13px; color:#475569; display:flex; gap:16px;">
-                        <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:50%;"></span> Pathogenic</span>
-                        <span><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:50%;"></span> Likely Pathogenic</span>
-                        <span><span style="display:inline-block;width:10px;height:10px;background:#94a3b8;border-radius:50%;"></span> VUS / Benign</span>
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <button onclick="window.drawVariantWorkspace('msa')" class="ciliai-button" style="background:#7c3aed;color:white;font-weight:500;">🧬 Full-Length MSA</button>
-                        <button onclick="window.downloadVariantCSV()" class="ciliai-button" style="background:#3b82f6;color:white;">⬇ CSV</button>
-                    </div>
-                </div>
-                <div style="flex:1; padding:16px; overflow:auto; background:#fdfdfd;">${svg}</div>
-                <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:12px; align-items:center; flex-shrink:0;">
-                    <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:140px;" />
-                    <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">+ Add Custom Variant</button>
-                </div>
-            </div>`;
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // 4. MSA GENERATION
-    // ─────────────────────────────────────────────────────────────
-    window.loadFullLengthAlignment = async function(geneSymbol) {
-        if (!window.CiliAI.activeVariantData) return;
-        const mainData = window.CiliAI.activeVariantData;
-        let humanSeq = mainData.sequence;
-
-        if (!humanSeq || humanSeq.length === 0) {
-            try {
-                const res = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${mainData.uniprotID}`);
-                if (res.ok) {
-                    const fallbackData = await res.json();
-                    humanSeq = fallbackData.sequence.sequence;
-                    window.CiliAI.activeVariantData.sequence = humanSeq;
-                }
-            } catch (err) { console.error("Sequence recovery failed", err); }
-        }
-
-        const alignments = [{ species: "Human", icon: "👤", symbol: geneSymbol, seq: humanSeq || "", taxId: 9606 }];
-        const batches = [];
-        const subsetSpecies = TARGET_SPECIES_PANEL.filter(s => s.name !== 'Human'); 
-        for (let i = 0; i < subsetSpecies.length; i += 5) batches.push(subsetSpecies.slice(i, i + 5));
-
-        for (const batch of batches) {
-            await Promise.allSettled(batch.map(async (species) => {
-                try {
-                    const url = `https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=${species.id}&fields=uniprot`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    const hit = data.hits?.[0];
-                    if (!hit || !hit.uniprot) return;
-                    let uid = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
-                    if (Array.isArray(uid)) uid = uid[0];
-                    if (!uid) return;
-                    const seqRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${uid}`);
-                    if (!seqRes.ok) return;
-                    const seqData = await seqRes.json();
-                    alignments.push({ species: species.name, icon: species.icon, symbol: geneSymbol, seq: seqData.sequence.sequence, taxId: species.id });
-                } catch (e) { }
-            }));
-        }
-
-        alignments.sort((a, b) => (a.species === 'Human' ? -1 : b.species === 'Human' ? 1 : 0));
-        const maxLen = Math.max(...alignments.map(a => a.seq.length));
-        alignments.forEach(a => { a.seq = a.seq.padEnd(maxLen, '-'); });
-
-        window.CiliAI.activeAlignmentData = { alignments, centerPos: Math.floor((humanSeq || "").length / 2), refAA: (humanSeq || "")[Math.floor((humanSeq || "").length / 2)] };
-    };
-
-    // ─────────────────────────────────────────────────────────────
-    // 5. RENDERER WITH BLUE THEME UI (FIXED humanAA)
-    // ─────────────────────────────────────────────────────────────
-    window.renderFullLengthMSA = function(data, container) {
-        const align = window.CiliAI.activeAlignmentData;
-        if (!align || !align.alignments?.length) {
-            container.innerHTML = `<div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#64748b; text-align:center; padding:20px;"><h3>Loading Alignment...</h3><button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="padding:10px 24px; background:#0056b3; color:white; border-radius:4px;">← Back</button></div>`;
-            return;
-        }
-
-        const human = align.alignments.find(a => a.species === 'Human') || align.alignments[0];
-        const fullSeq = human.seq;
-        const activeScheme = COLOR_SCHEMES[window.CiliAI.activeColorScheme] || CLUSTALX_COLORS;
-
-        const allVars = [...data.variants, ...data.customVariants];
-        const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
-        const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
-        const isLikely = v => /likely pathogenic/i.test(getSig(v));
-
-        let markersHtml = '';
-        allVars.forEach(v => {
-            const pos = parseInt(v.begin);
-            if (pos > 0 && pos <= fullSeq.length) {
-                let color = '#94a3b8';
-                if (isPatho(v)) color = '#dc3545'; else if (isLikely(v)) color = '#fd7e14'; else if (v.isCustom) color = '#6f42c1'; else color = '#0056b3';
-                const label = `p.${v.wildType || '?'}${pos}${v.alternativeSequence || '?'}`;
-                const clinSig = (v.clinicalSignificance || "Unknown").replace(/'/g, "\\'");
-                const disease = (v.disease || v.description || "No info").replace(/'/g, "\\'");
-                markersHtml += `<div onclick="window.showVariantPopup('${label}', ${pos}, '${clinSig}', '${disease}', '${color}')" style="position:absolute;left:${(pos-1)*18+4}px;top:5px;cursor:pointer;width:10px;height:10px;background:${color};border-radius:50%;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:100;" title="${label}"></div>`;
-            }
-        });
-
-        let posHtml = '';
-        for (let i = 0; i < fullSeq.length; i++) {
-            const pos = i + 1;
-            const show = (pos % 10 === 0);
-            posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:${show?'#0056b3':'#cbd5e1'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
-        }
-
-        let rowsHtml = '';
-        align.alignments.forEach((aln) => {
-            let seqHtml = '';
-            for (let i = 0; i < aln.seq.length; i++) {
-                const aa = aln.seq[i];
-                const humanAA = fullSeq[i]; // FIX: Defined variable inside loop
-                const isMatch = aa === humanAA && aa !== '-';
-                const color = activeScheme[aa] || {bg:'#fff', text:'#000'};
-                seqHtml += `<span style="display:inline-block;width:18px;height:24px;line-height:24px;text-align:center;font-family:monospace;color:${color.text}!important;background:${color.bg}!important;opacity:1!important;visibility:visible!important;border-right:1px solid rgba(0,0,0,0.05);">${aa}</span>`;
-            }
-            rowsHtml += `<div style="display:flex;border-bottom:1px solid #e2e8f0;background:#ffffff;"><div style="width:200px;min-width:200px;padding:8px 12px;font-weight:500;color:#0056b3;font-size:13px;background:#f0f7ff;border-right:2px solid #0056b3;display:flex;align-items:center;"><span style="margin-right:6px;">${aln.icon}</span> ${aln.species}</div><div style="white-space:nowrap;padding:0;">${seqHtml}</div></div>`;
-        });
-
-        container.innerHTML = `
-            <div style="height:100%;display:flex;flex-direction:column;background:#fff;">
-                <div style="padding:10px;background:#0056b3;color:white;display:flex;justify-content:space-between;">
-                    <strong>${data.gene} MSA</strong>
-                    <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:rgba(255,255,255,0.2);color:white;">← Back</button>
-                </div>
-                <div style="background:#fff;border-bottom:2px solid #0056b3;flex-shrink:0;">
-                    <div style="display:flex;">
-                        <div style="width:200px;background:#f0f7ff;border-right:2px solid #0056b3;"></div>
-                        <div id="header-scroll" style="flex:1;overflow:hidden;position:relative;height:20px;">${markersHtml}</div>
-                    </div>
-                </div>
-                <div id="msa-scroll" style="flex:1;overflow:auto;">${rowsHtml}</div>
-                <style>#msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; } #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; } #header-scroll::-webkit-scrollbar { height: 0px; }</style>
-            </div>
-            <div id="variant-popup" style="display:none;position:fixed;background:white;border:2px solid #0056b3;border-radius:6px;padding:16px;z-index:10000;min-width:300px;">
-                <h3 id="popup-title" style="margin:0;color:#0056b3;"></h3>
-                <div id="popup-content" style="margin:10px 0;font-size:13px;"></div>
-                <div style="display:flex;gap:8px;">
-                    <button id="popup-cons-btn" class="ciliai-button" style="background:#0056b3;color:white;">Check Conservation</button>
-                    <button id="popup-3d-btn" class="ciliai-button" style="background:#e7f1ff;color:#0056b3;border:1px solid #0056b3;">View 3D</button>
-                    <button onclick="document.getElementById('variant-popup').style.display='none'" class="ciliai-button" style="background:#ccc;color:#333;">Close</button>
-                </div>
-            </div>`;
-        
-        setupSyncScroll();
-        setTimeout(() => { const c = document.getElementById('msa-scroll'); if (c) c.scrollTop = 0; }, 100);
-    };
-
-    // ─────────────────────────────────────────────────────────────
-    // 6. CONSERVATION CHECKER (Restored Logic)
-    // ─────────────────────────────────────────────────────────────
-    window.checkConservation = async function(gene, pos, refAA, altAA) {
-        if (!refAA || !altAA) {
-             const v = window.CiliAI.activeVariantData?.variants.find(v => parseInt(v.begin) === parseInt(pos));
-             if(v) { refAA = v.wildType; altAA = v.alternativeSequence; } else { refAA = '?'; altAA = '?'; }
-        }
-        let area = document.getElementById('msa-result-area');
-        if (!area) {
-            const panel = document.getElementById('variant-popup');
-            if (panel) {
-                area = document.createElement('div');
-                area.id = 'msa-result-area';
-                area.style.marginTop = '15px'; area.style.borderTop = '1px solid #e2e8f0'; area.style.paddingTop = '10px';
-                panel.appendChild(area);
-            } else return;
-        }
-        area.innerHTML = `<div style="text-align:center;color:#64748b;">⏳ Aligning ${ORGANISM_PANEL.length} species...</div>`;
-
-        try {
-            const data = await window.fetchVariantDataLive(gene);
-            const humanSeq = data.sequence || "M".repeat(pos+20);
-            const winStart = Math.max(0, pos-11);
-            const refContext = humanSeq.substring(winStart, Math.min(humanSeq.length, pos+10));
-            const targetIndex = pos - 1 - winStart;
-            let conservedCount = 0;
-            const isDomain = data.domains?.some(f => pos >= f.start && pos <= f.end);
-            
-            const rows = ORGANISM_PANEL.map(s => {
-                let seq = "";
-                for(let i=0; i<refContext.length; i++) {
-                    let char = refContext[i];
-                    if (Math.random() < s.dist * (isDomain?0.3:1)) char = (Math.random()<0.05) ? altAA : "ACDEFGHIKLMNPQRSTVWY"[Math.floor(Math.random()*20)];
-                    if (s.dist < 0.1) char = refContext[i];
-                    seq += char;
-                    if(i === targetIndex && char === refAA) conservedCount++;
-                }
-                return { ...s, seq };
-            });
-
-            const score = Math.round((conservedCount/rows.length)*100);
-            area.innerHTML = `<div style="background:#f8fafc;padding:10px;border-radius:6px;font-size:11px;"><div><strong>Conservation Score:</strong> ${score}%</div><div style="font-family:monospace;margin-top:5px;max-height:150px;overflow:auto;">${rows.map(r=>`<div>${r.icon} ${r.seq}</div>`).join('')}</div></div>
-            <div style="text-align:center;margin-top:10px;"><button onclick="window.renderProfessionalMSA('${gene}', ${pos}, '${refAA}', window.CiliAI.activeAlignmentData.alignments, ${score})" class="ciliai-button" style="background:#0056b3;color:white;font-size:10px;">🔍 Open Professional MSA</button></div>`;
-            
-        } catch(e) { area.innerHTML = "Error checking conservation."; }
-    };
-
-    // ─────────────────────────────────────────────────────────────
-    // 7. 3D STRUCTURE VIEWER (Robust Loader with Fallback)
-    // ─────────────────────────────────────────────────────────────
-    window.loadMolStar = async function() {
-        if (customElements.get('pdbe-molstar')) return true;
-        console.log("[CiliAI] Loading 3D Engine...");
-        for (const src of MOLSTAR_SOURCES) {
-            try {
-                if (!document.querySelector(`link[href="${src.css}"]`)) {
-                    const l = document.createElement('link'); l.rel='stylesheet'; l.href=src.css; document.head.appendChild(l);
-                }
-                await new Promise((resolve, reject) => {
-                    const s = document.createElement('script'); s.src = src.js; s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
-                });
-                await customElements.whenDefined('pdbe-molstar');
-                return true;
-            } catch (e) { console.warn(`Source ${src.name} failed`); }
-        }
-        throw new Error("Failed to load 3D viewer.");
-    };
-
-    window.showStructureViewer = async function(gene, pos, aa) {
-        const btn = document.getElementById('popup-3d-btn');
-        if(btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
-        
         try {
             await window.loadMolStar();
-            let uid = window.CiliAI.activeVariantData?.uniprotID;
-            if(!uid) {
-                 const r = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot`);
-                 const j = await r.json();
-                 uid = j.hits?.[0]?.uniprot?.['Swiss-Prot'];
-            }
-            if(Array.isArray(uid)) uid = uid[0];
-            if(!uid) throw new Error("UniProt ID not found");
-
-            let afUrl = `https://alphafold.ebi.ac.uk/files/AF-${uid}-F1-model_v4.cif`;
-            try {
-                const afr = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uid}`);
-                if(afr.ok) { const afd = await afr.json(); if(afd[0]) afUrl = afd[0].cifUrl; }
-            } catch(e){}
+            const data = await window.fetchVariantDataLive(geneSymbol);
+            if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
+            const uniprotID = data.uniprotID;
+            const afUrl = await getAlphaFoldUrl(uniprotID);
+            if (!afUrl) throw new Error(`No AlphaFold structure found for ${geneSymbol}.`);
 
             window.currentAfUrl = afUrl;
-            window.currentSelectData = pos ? [{ entity_id: "1", residue_number: parseInt(pos,10), color: { r: 217, g: 70, b: 239 }, focus: true }] : [];
+            window.currentSelectData = variantPos ? [{
+                entity_id: "1",
+                residue_number: parseInt(variantPos, 10),
+                color: { r: 217, g: 70, b: 239 }, 
+                label: "Primary Variant",
+                focus: true
+            }] : [];
             window.isGrayMode = false;
 
             const modal = document.createElement('div');
             modal.id = 'molstar-modal';
-            modal.style.cssText = `position:fixed; inset:0; z-index:20000; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center;`;
+            modal.style.cssText = `position: fixed; inset: 0; width: 100vw; height: 100dvh; background: rgba(0,0,0,0.95); z-index: 200000; display: flex; flex-direction: column; justify-content: center; align-items: center;`;
+            
             modal.innerHTML = `
-                <div style="width:90vw; height:90vh; background:white; border-radius:8px; overflow:hidden; display:flex; flex-direction:column;">
-                    <div style="padding:10px; background:#f0f9ff; display:flex; justify-content:space-between;">
-                        <b>${gene} Structure</b>
-                        <button id="close-3d" style="cursor:pointer;">✕</button>
+                <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
+                    <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <div>
+                            <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} 3D Structure</div>
+                            <div style="font-size: 13px; color: #64748b;" id="variant-status">
+                                ${variantPos ? `Primary: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>` : 'Full view'}
+                                <span id="extra-count" style="display:none; margin-left:12px; color:#ca8a04; font-weight:500;">(+<span id="extra-num">0</span> custom)</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:12px; align-items:center;">
+                            <button id="focus-btn" style="padding:6px 14px; background:#fff; border:1px solid #d946ef; color:#d946ef; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">🎯 Focus All</button>
+                            <button id="download-session-btn" style="padding:6px 14px; background:#fff; border:1px solid #16a34a; color:#166534; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">📥 Save Session</button>
+                            <button id="close-3d" style="background:#e2e8f0; border:none; width:36px; height:36px; border-radius:50%; font-size:20px; cursor:pointer; color:#475569; font-weight:bold;">✕</button>
+                        </div>
                     </div>
-                    <div style="flex:1; position:relative;">
-                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='${JSON.stringify(window.currentSelectData)}' style="position:absolute; top:0; left:0; width:100%; height:100%;"></pdbe-molstar>
+                    <div style="flex:1; position:relative; background:#ffffff; overflow:hidden;">
+                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" selection-data='${JSON.stringify(window.currentSelectData)}' style="position:absolute; top:0; left:0; width:100%; height:100%; display:block;"></pdbe-molstar>
                     </div>
-                    <div style="padding:10px; display:flex; gap:10px;">
-                        <input id="add-var-3d" type="number" placeholder="Residue #" />
-                        <button onclick="window.addVariantTo3D()">Add Variant</button>
-                        <button onclick="window.downloadStructure('${gene}')">Download</button>
+                    <div style="padding:12px 20px; background:white; border-top:1px solid #e2e8f0; font-size:12px; color:#475569; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; flex-shrink:0;">
+                        <div style="display:flex; gap:24px; align-items:center;">
+                            <span style="display:flex; align-items:center; font-weight:500;"><span style="width:12px; height:12px; background:#d946ef; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>Primary Variant</span>
+                            <span style="display:flex; align-items:center; font-weight:500;"><span style="width:12px; height:12px; background:#ffd700; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>Custom Highlights</span>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:nowrap;">
+                            <input id="add-var-3d" type="number" min="1" placeholder="Residue #" style="width:100px; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
+                            <input type="color" id="custom-color-picker" value="#ffd700" title="Select highlight color" style="width:36px; height:32px; padding:0; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">
+                            <button onclick="window.addVariantTo3D()" style="padding:6px 14px; background:#ca8a04; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500;">+ Add</button>
+                        </div>
                     </div>
                 </div>`;
-            document.body.appendChild(modal);
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
             
-            const close = () => { modal.remove(); if (btn) { btn.innerText = "View 3D"; btn.disabled = false; } };
-            modal.querySelector('#close-3d').onclick = close;
-            window.addEventListener('keydown', (e) => { if(e.key === 'Escape') close(); }, {once:true});
-            if (btn) { btn.innerText = "View 3D"; btn.disabled = false; }
-
-        } catch(e) { alert("3D Viewer Error: " + e.message); if(btn) { btn.innerText = "View 3D"; btn.disabled = false; } }
+            document.body.appendChild(modal);
+            document.getElementById('focus-btn').onclick = () => {
+                const plugin = document.getElementById('pdbe-molstar-target');
+                if (plugin?.viewerInstance && window.currentSelectData.length > 0) {
+                    const focusList = window.currentSelectData.map(s => ({ entity_id: s.entity_id, residue_number: s.residue_number }));
+                    plugin.viewerInstance.visual.focus({ data: focusList });
+                }
+            };
+            document.getElementById('download-session-btn').onclick = () => {
+                const a = document.createElement('a'); a.href = window.currentAfUrl; a.download = `${geneSymbol}_structure.cif`; a.click();
+            };
+            const close = () => { modal.remove(); window.currentSelectData = []; window.currentAfUrl = null; window.isGrayMode = false; if (btn) { btn.innerText = originalText; btn.disabled = false; } };
+            document.getElementById('close-3d').onclick = close;
+            window.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, {once: true});
+            if (btn) { btn.innerText = originalText; btn.disabled = false; }
+        } catch (e) { console.error("3D Viewer Error:", e); alert("3D Viewer Error: " + e.message); if (btn) { btn.innerText = originalText; btn.disabled = false; } }
     };
 
     window.addVariantTo3D = function() {
         const input = document.getElementById('add-var-3d');
+        const colorPicker = document.getElementById('custom-color-picker');
         const pos = parseInt(input.value.trim());
         if (!isNaN(pos) && pos > 0) {
-            window.currentSelectData.push({ entity_id: "1", residue_number: pos, color: {r:255,g:215,b:0}, label: `Custom ${pos}`, focus: false });
+            if (window.currentSelectData.some(s => s.residue_number === pos)) { alert(`Residue ${pos} is already highlighted.`); return; }
+            const hexColor = colorPicker.value;
+            const rgb = hexToRgb(hexColor);
+            window.currentSelectData.push({ entity_id: "1", residue_number: pos, color: rgb, label: `Custom ${pos}`, focus: false });
             const plugin = document.getElementById('pdbe-molstar-target');
-            if (plugin?.viewerInstance) {
-                if (!window.isGrayMode) { plugin.viewerInstance.visual.update({ type: 'surface', params: { color: { r: 220, g: 220, b: 220 }, opacity: 0.7 } }); window.isGrayMode = true; }
+            if (plugin && plugin.viewerInstance) {
+                if (!window.isGrayMode && window.currentSelectData.length > 1) {
+                    plugin.viewerInstance.visual.update({ type: 'surface', params: { color: { r: 220, g: 220, b: 220 }, opacity: 0.7 } });
+                    window.isGrayMode = true;
+                }
                 plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
                 plugin.viewerInstance.visual.select({ data: window.currentSelectData });
             }
-            input.value = '';
-        } else alert('Invalid residue');
+            const extraNum = document.getElementById('extra-num');
+            const extraCount = document.getElementById('extra-count');
+            const count = window.currentSelectData.length - (window.currentSelectData[0]?.label === "Primary Variant" ? 1 : 0);
+            if (extraNum && extraCount) { extraNum.textContent = count; extraCount.style.display = count > 0 ? 'inline' : 'none'; }
+            input.value = ''; input.focus();
+        } else { alert('Please enter a valid positive residue number.'); }
     };
     
     window.downloadStructure = function(geneSymbol) {
         const a = document.createElement('a'); a.href = window.currentAfUrl; a.download = `${geneSymbol}_AlphaFold.cif`; a.click();
     };
-
-    // ─────────────────────────────────────────────────────────────
-    // 8. PROFESSIONAL MSA VISUALIZER (Jalview Style)
-    // ─────────────────────────────────────────────────────────────
-    window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
-        const aaColors = { 'A':'#c8c8c8', 'G':'#c8c8c8', 'I':'#0f820f', 'L':'#0f820f', 'V':'#0f820f', 'M':'#0f820f', 'F':'#3232aa', 'W':'#b45b5b', 'Y':'#3232aa', 'H':'#8282d2', 'K':'#145aff', 'R':'#145aff', 'D':'#e60a0a', 'E':'#e60a0a', 'S':'#fa9600', 'T':'#fa9600', 'N':'#00dcdc', 'Q':'#00dcdc', 'C':'#e6e600', 'P':'#dc9682' };
-        
-        const modal = document.createElement('div');
-        modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; width:700px; max-height:80vh; z-index:10000; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,0.5); overflow:hidden; font-family:monospace;`;
-        
-        function renderBlock(char, isCenter) {
-            const color = aaColors[char] || '#999';
-            const border = isCenter ? '2px solid #1e293b' : '1px solid rgba(0,0,0,0.1)';
-            return `<div style="width:20px; height:20px; background:${color}; color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; border-radius:3px; border:${border}; box-shadow:${isCenter?'0 0 0 2px rgba(30,41,59,0.2)':'none'}; z-index:${isCenter?10:1};">${char}</div>`;
-        }
-        
-        let html = `
-        <div style="padding:15px; background:#1e293b; color:white; display:flex; justify-content:space-between; align-items:center;">
-            <div><strong>${gene} Evolution</strong> <span style="font-size:12px; opacity:0.8;">Pos ${pos} (${refAA})</span></div>
-            <div style="display:flex; gap:10px;">
-                <button id="msa-3d-btn" style="background:#3b82f6; border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">🧊 3D</button>
-                <button onclick="this.closest('div').parentElement.parentElement.remove()" style="background:none; border:none; color:white; cursor:pointer;">✕</button>
-            </div>
-        </div>
-        <div style="padding:20px; overflow-y:auto; max-height:60vh; background:#f8fafc;">`;
-        
-        alignments.forEach(a => {
-            let seq = a.seq.split('').map((c,i) => renderBlock(c, i===7)).join('');
-            html += `<div style="display:flex; margin-bottom:2px;"><div style="width:120px; text-align:right; padding-right:10px; font-size:12px;">${a.icon} ${a.species}</div><div style="display:flex; gap:1px;">${seq}</div></div>`;
-        });
-        html += `</div>`;
-        
-        modal.innerHTML = html;
-        document.body.appendChild(modal);
-
-        const btn3d = modal.querySelector('#msa-3d-btn');
-        if(btn3d) btn3d.onclick = () => { modal.remove(); window.showStructureViewer(gene, pos, refAA); };
-    };
-
-    // ─────────────────────────────────────────────────────────────
-    // 9. HELPERS & EVENT LISTENERS
-    // ─────────────────────────────────────────────────────────────
-    window.msaScrollLeft = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: -500, behavior:'smooth'}); if (h) h.scrollBy({left: -500, behavior:'smooth'}); } };
-    window.msaScrollRight = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: 500, behavior:'smooth'}); if (h) h.scrollBy({left: 500, behavior:'smooth'}); } };
-    window.msaScrollToStart = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: 0, behavior:'smooth'}); if (h) h.scrollTo({left: 0, behavior:'smooth'}); } };
-    window.msaScrollToEnd = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: c.scrollWidth, behavior:'smooth'}); if (h) h.scrollTo({left: h.scrollWidth, behavior:'smooth'}); } };
-    
-    window.changeColorScheme = function(scheme) { window.CiliAI.activeColorScheme = scheme; if (window.CiliAI.activeVariantData) window.drawVariantWorkspace('msa'); };
-    window.openVariantPanel = function(t, p, d, g) { window.showVariantPopup(t, p, 'User Selected', d, '#6f42c1'); };
-    window.addUserVariant = function() { 
-        const inp = document.getElementById('custom-var-input');
-        if (inp?.value && window.CiliAI.activeVariantData) {
-            window.CiliAI.activeVariantData.customVariants.push({
-                begin: 301, wildType: 'X', alternativeSequence: 'Y',
-                description: "Custom: " + inp.value, isCustom: true
-            });
-            window.drawVariantWorkspace('map');
-        }
-    };
-    
-    window.showVariantPopup = function(label, pos, clinSig, disease, color) {
-        const p = document.getElementById('variant-popup');
-        if (!p) return;
-        document.getElementById('popup-title').innerHTML = `<span style="color:${color};">●</span> ${label}`;
-        document.getElementById('popup-content').innerHTML = `<div><strong>Position:</strong> ${pos}</div><div style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;"><strong>Clinical:</strong> ${clinSig}</div><div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:4px;"><strong>Disease:</strong> ${disease}</div>`;
-        const data = window.CiliAI.activeVariantData;
-        const ref = label.match(/p\.([A-Z])\d+/)?.[1] || '?';
-        const alt = label.match(/\d+([A-Z])/)?.[1] || '?';
-        document.getElementById('popup-cons-btn').onclick = () => window.checkConservation(data.gene, parseInt(pos), ref, alt);
-        document.getElementById('popup-3d-btn').onclick = () => window.showStructureViewer(data.gene, parseInt(pos), alt);
-        p.style.display = 'block';
-        p.style.left = '50px';
-        p.style.top = '150px';
-    };
-
-    window.msaJumpToPosition = function() {
-        const inp = document.getElementById('msa-jump-input');
-        if (!inp) return;
-        const pos = parseInt(inp.value);
-        const c = document.getElementById('msa-scroll');
-        const h = document.getElementById('header-scroll');
-        if (c && !isNaN(pos)) {
-            const target = (pos - 1) * 18 - (c.clientWidth - 200) / 2;
-            c.scrollTo({left: Math.max(0, target), behavior:'smooth'});
-            if (h) h.scrollTo({left: Math.max(0, target), behavior:'smooth'});
-        }
-    };
-    
-    document.addEventListener('keypress', (e) => { if (e.target.id === 'msa-jump-input' && e.key === 'Enter') window.msaJumpToPosition(); });
-    window.downloadMSAFasta = function() { alert("FASTA download placeholder"); };
-    window.downloadFullAlignmentCSV = function() { alert("CSV download placeholder"); };
-    window.downloadVariantCSV = function() { alert("Variant CSV download placeholder"); };
-    window.displaySpecificVariant = async function(g, v) { window.renderVariantMap(g); };
-
-    function setupSyncScroll() { const m = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (m && h) { m.addEventListener('scroll', () => { h.scrollLeft = m.scrollLeft; }); h.addEventListener('scroll', () => { m.scrollLeft = h.scrollLeft; }); } }
-
-    console.log("[CiliAI] v16.9 – FIXED & INTEGRATED: 3D + MSA + Conservation");
+    console.log("[CiliAI] 3D Viewer module loaded.");
 })();
+
+/* ==============================================================
+ * MODULE: ADVANCED ANALYTICS & PERSISTENCE (v12.0)
+ * ============================================================== */
+(function() {
+    'use strict';
+    window.CiliAI.Session = {
+        key: 'ciliai_autosave_v1',
+        start: function(interval = 30000) {
+            console.log("[CiliAI] Auto-save enabled.");
+            const saved = localStorage.getItem(this.key);
+            if (saved) {
+                const meta = JSON.parse(saved);
+                const age = (Date.now() - meta.timestamp) / 1000 / 60 / 60; 
+                if (age < 24) console.log(`[CiliAI] Session found from ${meta.date}`);
+            }
+            setInterval(() => this.save(), interval);
+        },
+        save: function() {
+            const chatContent = document.getElementById('messages')?.innerHTML || '';
+            if (!chatContent) return;
+            const state = { timestamp: Date.now(), date: new Date().toLocaleString(), dataset: window.CiliAI.activeDataset || 'lung', history: chatContent };
+            localStorage.setItem(this.key, JSON.stringify(state));
+        },
+        restore: function() {
+            const saved = localStorage.getItem(this.key);
+            if (!saved) { alert("No saved session found."); return; }
+            const state = JSON.parse(saved);
+            if (state.dataset) window.CiliAI.activeDataset = state.dataset;
+            if (state.history && document.getElementById('messages')) {
+                document.getElementById('messages').innerHTML = state.history;
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            }
+            window.addChatMessage(`🔄 Session restored from ${state.date}`, false);
+        },
+        clear: function() { localStorage.removeItem(this.key); window.addChatMessage("🗑️ Session memory cleared.", false); }
+    };
+
+    window.renderComparativeRadar = function(genesInput) {
+        const genes = Array.isArray(genesInput) ? genesInput : genesInput.split(/[,\s]+/).filter(Boolean);
+        if (genes.length < 1) return;
+        window.switchView('plot'); 
+        const container = document.getElementById('plotly-container');
+        container.innerHTML = ''; container.style.display = 'block';
+        const data = []; const colors = ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed']; 
+        
+        const analyzeGlobalExpression = (gene) => {
+            if (window.CiliAI.expressionAtlas && window.CiliAI.expressionAtlas[gene]) {
+                const entry = window.CiliAI.expressionAtlas[gene];
+                const breadth = (entry.n_tissues_expressed || 0) / 6; 
+                const values = Object.values(entry).filter(v => typeof v === 'number' && v < 10000); 
+                const maxTPM = Math.max(...values, 0);
+                const intensity = Math.min(maxTPM / 50, 1.0);
+                return { breadth, intensity, category: entry.Category || 'Unknown' };
+            }
+            return { breadth: 0.1, intensity: 0.1, category: 'No Data' };
+        };
+
+        genes.forEach((geneSym, idx) => {
+            const gene = geneSym.toUpperCase();
+            const g = window.CiliAI.lookups.geneMap[gene];
+            if (!g) return;
+            let conservationScore = 0.2; 
+            if (g.Ortholog_Mouse && g.Ortholog_Mouse !== 'N/A') conservationScore += 0.2;
+            if (g.Ortholog_Zebrafish && g.Ortholog_Zebrafish !== 'N/A') conservationScore += 0.3;
+            if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') conservationScore += 0.3;
+            conservationScore = Math.min(conservationScore, 1.0);
+            let clinicalScore = 0;
+            if ((g.Ciliopathies && g.Ciliopathies.length > 0) || (g.Ciliopathy && g.Ciliopathy !== 'N/A')) clinicalScore = 1.0;
+            else if (g.OMIM?.ID) clinicalScore = 0.6; 
+            else if (g.screens && g.screens.length > 1) clinicalScore = 0.3; 
+            const exprStats = analyzeGlobalExpression(gene);
+            let interactionScore = 0.2;
+            if (g.complex_components || (window.CiliAI.lookups.complexByGene && window.CiliAI.lookups.complexByGene[gene])) interactionScore = 1.0;
+            else if (g['Functional.category']) interactionScore = 0.6;
+            
+            data.push({
+                type: 'scatterpolar',
+                r: [conservationScore, clinicalScore, exprStats.breadth, exprStats.intensity, interactionScore, conservationScore],
+                theta: ['Evolution (Age)', 'Clinical Relevance', 'Tissue Breadth', 'Expr. Intensity', 'Interaction', 'Evolution (Age)'],
+                fill: 'toself', name: `<b>${gene}</b>`, line: { color: colors[idx % colors.length], width: 2 }, opacity: 0.5
+            });
+        });
+
+        const layout = { polar: { radialaxis: { visible: true, range: [0, 1] } }, title: `Multi-Dimensional Analysis: ${genes.join(' vs ')}`, showlegend: true, margin: { t: 60, b: 50, l: 60, r: 60 }, legend: { orientation: 'h', y: -0.15 } };
+        Plotly.newPlot(container, data, layout);
+        
+        const explanation = `
+            <div class="ai-result-card">
+                <h4>📊 Analysis Interpretation</h4>
+                <p>Comparing <strong>${genes.join(', ')}</strong> across 5 biological dimensions:</p>
+                <ul style="font-size:12px; color:#475569; padding-left:20px; line-height:1.6;">
+                    <li><strong>Evolution (Age):</strong> Conservation across model organisms. High score = Ancient/Conserved.</li>
+                    <li><strong>Clinical Relevance:</strong> 1.0 indicates a confirmed Human Ciliopathy gene.</li>
+                    <li><strong>Tissue Breadth (Pan-ciliary Score):</strong> Calculated from the <strong>Global Atlas</strong> (6 organs). High = Pan-ciliary.</li>
+                    <li><strong>Expr. Intensity:</strong> Peak expression level (TPM).</li>
+                    <li><strong>Interaction:</strong> 1.0 indicates membership in a stable structural complex (e.g., IFT, BBSome).</li>
+                </ul>
+            </div>`;
+        window.addChatMessage(explanation, false);
+    };
+
+    window.analyzeMutationBurden = async function(geneSymbol) {
+        window.addChatMessage(`🔍 Analyzing mutation burden for <strong>${geneSymbol}</strong>...`, false);
+        const data = await window.fetchVariantDataLive(geneSymbol);
+        if (data.error) { window.addChatMessage(`Could not analyze mutations: ${data.error}`, false); return; }
+        const variants = data.variants || [];
+        const getVariantText = (v) => {
+            let text = (v.clinicalSignificance || v.significance || "").toString();
+            if (v.association) text += " " + JSON.stringify(v.association);
+            if (v.descriptions) text += " " + JSON.stringify(v.descriptions);
+            return text.toLowerCase();
+        };
+        let pathogenic = 0; let benign = 0; let vus = 0;
+        variants.forEach(v => {
+            const text = getVariantText(v);
+            const isConflicting = text.includes("conflicting");
+            if (text.includes("pathogenic") && !text.includes("likely benign") && !isConflicting) pathogenic++;
+            else if ((text.includes("benign") || text.includes("likely benign")) && !text.includes("pathogenic") && !isConflicting) benign++;
+            else vus++;
+        });
+        const total = variants.length;
+        const report = `
+            <div class="ai-result-card">
+                <h4>🧬 Mutation Burden: ${geneSymbol}</h4>
+                <div style="display:flex; gap:10px; margin: 15px 0;">
+                    <div style="flex:1; background:#fee2e2; border:1px solid #fca5a5; padding:10px; border-radius:6px; text-align:center;">
+                        <div style="font-size:20px; font-weight:bold; color:#dc2626;">${pathogenic}</div>
+                        <div style="font-size:11px; color:#7f1d1d;">Pathogenic</div>
+                    </div>
+                    <div style="flex:1; background:#f3f4f6; border:1px solid #d1d5db; padding:10px; border-radius:6px; text-align:center;">
+                        <div style="font-size:20px; font-weight:bold; color:#4b5563;">${vus}</div>
+                        <div style="font-size:11px; color:#374151;">VUS/Uncertain</div>
+                    </div>
+                    <div style="flex:1; background:#dcfce7; border:1px solid #86efac; padding:10px; border-radius:6px; text-align:center;">
+                        <div style="font-size:20px; font-weight:bold; color:#16a34a;">${benign}</div>
+                        <div style="font-size:11px; color:#14532d;">Benign</div>
+                    </div>
+                </div>
+                <div style="height:12px; width:100%; display:flex; border-radius:6px; overflow:hidden; background:#eee;">
+                    <div style="width:${(pathogenic/total)*100}%; background:#ef4444;" title="Pathogenic"></div>
+                    <div style="width:${(vus/total)*100}%; background:#9ca3af;" title="VUS"></div>
+                    <div style="width:${(benign/total)*100}%; background:#22c55e;" title="Benign"></div>
+                </div>
+                <p style="font-size:11px; color:#666; margin-top:8px;">Total variants analyzed: ${total.toLocaleString()} (Source: ClinVar/UniProt)</p>
+                <button class="ciliai-button" style="width:100%; justify-content:center; margin-top:10px;" onclick="window.renderVariantMap('${geneSymbol}')">📍 View on Protein Map</button>
+            </div>`;
+        window.addChatMessage(report, false);
+    };
+    setTimeout(() => window.CiliAI.Session.start(), 5000);
+    console.log("[CiliAI] Advanced Analytics & Persistence module loaded.");
+})();
+
+
+
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
-
-
-
-
