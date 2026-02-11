@@ -7270,13 +7270,12 @@ window.runDashboardSearch = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS, EVOLUTIONARY ENGINE & 3D VIEWER (v16.8 - COMPLETE)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.9 - FIXED)
  * Features: 
- * - 3D Structure (MolStar with Unpkg Fallback)
- * - Conservation Analysis (Organism Panel)
- * - Professional Jalview-style MSA
- * - Mutation Burden Analysis
- * - Session Persistence
+ * - Full MSA (Blue Theme) with fixed variable references
+ * - 3D Structure (MolStar)
+ * - Conservation Analysis
+ * - Jalview-style MSA
  * ============================================================== */
 (function() {
     'use strict';
@@ -7285,19 +7284,19 @@ window.runDashboardSearch = function() {
     window.CiliAI.activeVariantData = null;
     window.CiliAI.activeAlignmentData = null;
     window.CiliAI.activeColorScheme = 'ClustalX';
-    
+
     // 3D Viewer State
     window.currentAfUrl = null;
     window.currentSelectData = [];
     window.isGrayMode = false;
 
     // ─────────────────────────────────────────────────────────────
-    // 1. DATA CONSTANTS
+    // 1. DATA CONSTANTS & CONFIGURATION
     // ─────────────────────────────────────────────────────────────
     
     const MOLSTAR_SOURCES = [
-        { name: 'jsdelivr', css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css', js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js' },
-        { name: 'unpkg', css: 'https://unpkg.com/pdbe-molstar@3.2.0/build/pdbe-molstar.css', js: 'https://unpkg.com/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js' }
+        { name: 'jsdelivr', css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar.css', js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js' },
+        { name: 'unpkg', css: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar.css', js: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js' }
     ];
 
     const ORGANISM_PANEL = [
@@ -7327,7 +7326,7 @@ window.runDashboardSearch = function() {
         '-': { bg: '#ffffff', text: '#999999' }
     };
     const COLOR_SCHEMES = { 'ClustalX': CLUSTALX_COLORS, 'Taylor': CLUSTALX_COLORS, 'Zappo': CLUSTALX_COLORS };
-
+    
     const TARGET_SPECIES_PANEL = [
         { id: 9606, name: 'Human', icon: '👤' }, { id: 9598, name: 'Chimpanzee', icon: '🐵' }, { id: 9593, name: 'Gorilla', icon: '🦍' }, 
         { id: 10090, name: 'Mouse', icon: '🐭' }, { id: 10116, name: 'Rat', icon: '🐀' }, { id: 9615, name: 'Dog', icon: '🐕' }, 
@@ -7536,7 +7535,7 @@ window.runDashboardSearch = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 5. RENDERER WITH BLUE THEME UI
+    // 5. RENDERER WITH BLUE THEME UI (FIXED humanAA)
     // ─────────────────────────────────────────────────────────────
     window.renderFullLengthMSA = function(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7579,6 +7578,7 @@ window.runDashboardSearch = function() {
             let seqHtml = '';
             for (let i = 0; i < aln.seq.length; i++) {
                 const aa = aln.seq[i];
+                const humanAA = fullSeq[i]; // FIX: Defined variable inside loop
                 const isMatch = aa === humanAA && aa !== '-';
                 const color = activeScheme[aa] || {bg:'#fff', text:'#000'};
                 seqHtml += `<span style="display:inline-block;width:18px;height:24px;line-height:24px;text-align:center;font-family:monospace;color:${color.text}!important;background:${color.bg}!important;opacity:1!important;visibility:visible!important;border-right:1px solid rgba(0,0,0,0.05);">${aa}</span>`;
@@ -7719,7 +7719,7 @@ window.runDashboardSearch = function() {
                         <button id="close-3d" style="cursor:pointer;">✕</button>
                     </div>
                     <div style="flex:1; position:relative;">
-                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='[{"entity_id":"1","residue_number":${pos},"color":{"r":255,"g":0,"b":255},"focus":true}]' style="position:absolute; top:0; left:0; width:100%; height:100%;"></pdbe-molstar>
+                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" highlight-data='${JSON.stringify(window.currentSelectData)}' style="position:absolute; top:0; left:0; width:100%; height:100%;"></pdbe-molstar>
                     </div>
                     <div style="padding:10px; display:flex; gap:10px;">
                         <input id="add-var-3d" type="number" placeholder="Residue #" />
@@ -7766,7 +7766,6 @@ window.runDashboardSearch = function() {
         const modal = document.createElement('div');
         modal.style.cssText = `position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; width:700px; max-height:80vh; z-index:10000; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,0.5); overflow:hidden; font-family:monospace;`;
         
-        // Helper inside scope
         function renderBlock(char, isCenter) {
             const color = aaColors[char] || '#999';
             const border = isCenter ? '2px solid #1e293b' : '1px solid rgba(0,0,0,0.1)';
@@ -7853,79 +7852,11 @@ window.runDashboardSearch = function() {
 
     function setupSyncScroll() { const m = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (m && h) { m.addEventListener('scroll', () => { h.scrollLeft = m.scrollLeft; }); h.addEventListener('scroll', () => { m.scrollLeft = h.scrollLeft; }); } }
 
-    /* -------------------------------------------------------------
-       10. PERSISTENCE & ANALYTICS
-    ------------------------------------------------------------- */
-    window.CiliAI.Session = {
-        key: 'ciliai_autosave_v2',
-        start(interval=30000) {
-            const saved = localStorage.getItem(this.key);
-            if(saved) {
-                const meta = JSON.parse(saved);
-                if ((Date.now()-meta.timestamp)/3600000 < 24) console.log("[CiliAI] Session active.");
-            }
-            setInterval(() => this.save(), interval);
-        },
-        save() {
-            const messages = document.getElementById('messages');
-            if(!messages) return;
-            const state = { timestamp: Date.now(), dataset: window.CiliAI.activeDataset||'lung', history: messages.innerHTML };
-            localStorage.setItem(this.key, JSON.stringify(state));
-        },
-        restore() {
-            const saved = localStorage.getItem(this.key);
-            if(!saved) return alert("No saved session.");
-            const state = JSON.parse(saved);
-            window.CiliAI.activeDataset = state.dataset;
-            const msg = document.getElementById('messages');
-            if(msg) { msg.innerHTML = state.history; msg.scrollTop = msg.scrollHeight; }
-        },
-        clear() { localStorage.removeItem(this.key); }
-    };
-
-    window.analyzeMutationBurden = async function(geneSymbol) {
-        const data = await window.fetchVariantDataLive(geneSymbol);
-        if(data?.error) return alert(data.error);
-
-        const variants = data.variants || [];
-        if(!variants.length) return window.addChatMessage("No variants found.", false);
-
-        let pathogenic=0, benign=0, vus=0;
-        variants.forEach(v => {
-            const text = JSON.stringify(v).toLowerCase();
-            if(text.includes("pathogenic") && !text.includes("benign")) pathogenic++;
-            else if(text.includes("benign")) benign++;
-            else vus++;
-        });
-
-        const total = variants.length;
-        const safePercent = (n) => total ? (n/total)*100 : 0;
-
-        const report = `
-        <div class="ai-result-card">
-            <h4>Mutation Burden: ${geneSymbol}</h4>
-            <p>Total: ${total}</p>
-            <div style="height:12px; display:flex; border-radius:6px; overflow:hidden;">
-                <div style="width:${safePercent(pathogenic)}%; background:#ef4444;" title="Pathogenic"></div>
-                <div style="width:${safePercent(vus)}%; background:#9ca3af;" title="VUS"></div>
-                <div style="width:${safePercent(benign)}%; background:#22c55e;" title="Benign"></div>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:5px; color:#666;">
-                <span>Pathogenic: ${pathogenic}</span>
-                <span>VUS: ${vus}</span>
-                <span>Benign: ${benign}</span>
-            </div>
-        </div>`;
-
-        window.addChatMessage(report, false);
-    };
-
-    // Auto-start session
-    setTimeout(() => window.CiliAI.Session.start(), 4000);
-    console.log("[CiliAI] v16.8 – COMPLETE FIXED MODULE: 3D + MSA + Conservation");
+    console.log("[CiliAI] v16.9 – FIXED & INTEGRATED: 3D + MSA + Conservation");
 })();
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
