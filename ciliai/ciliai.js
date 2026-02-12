@@ -7669,19 +7669,23 @@ window.downloadCurrentVisualization = function() {
     // 0. CONFIGURATION & DATA CONSTANTS
     // ─────────────────────────────────────────────────────────────
 
-    const MOLSTAR_SOURCES = [
-        {
-            name: 'jsdelivr',
-            css: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar.css',
-            js: 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js'
-        },
-        {
-            name: 'unpkg',
-            css: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar.css',
-            js: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js'
-        }
-    ];
+   
+const MOLSTAR_SOURCES = [
+    {
+        name: "jsDelivr",
+        // Verified stable production paths
+        js: "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-component.js",
+        css: "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-light.css"
+    },
+    {
+        name: "PDBe-Official",
+        // Using the official EBI mirror is often more reliable for Bioinformatics tools
+        js: "https://www.ebi.ac.uk/pdbe/pdb-component/google-maps/pdbe-molstar-component-3.1.2.js",
+        css: "https://www.ebi.ac.uk/pdbe/pdb-component/google-maps/pdbe-molstar-3.1.2.css"
+    }
+];
 
+    
     const ORGANISM_PANEL = [
         { name: "Homo sapiens", common: "Human", dist: 0.0, icon: "👤" },
         { name: "Pan troglodytes", common: "Chimpanzee", dist: 0.01, icon: "🐵" },
@@ -8414,20 +8418,7 @@ window.checkConservation = async function(gene, pos, refAA, altAA) {
     }
 };
 
-const MOLSTAR_SOURCES = [
-    {
-        name: "jsDelivr",
-        // Verified stable production paths
-        js: "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-component.js",
-        css: "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-light.css"
-    },
-    {
-        name: "PDBe-Official",
-        // Using the official EBI mirror is often more reliable for Bioinformatics tools
-        js: "https://www.ebi.ac.uk/pdbe/pdb-component/google-maps/pdbe-molstar-component-3.1.2.js",
-        css: "https://www.ebi.ac.uk/pdbe/pdb-component/google-maps/pdbe-molstar-3.1.2.css"
-    }
-];
+
     
 // ─────────────────────────────────────────────────────────────
 // 6. 3D STRUCTURE VIEWER (MolStar with Fallback)
@@ -8648,6 +8639,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
