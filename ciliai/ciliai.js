@@ -8079,19 +8079,21 @@ window.downloadCurrentVisualization = function() {
         const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
         const isLikely = v => /likely pathogenic/i.test(getSig(v));
 
-        // Apply filters
+        // ─── 1. APPLY FILTERS ───────────────────────────────────────────────
         let filteredVariants = [...data.variants];
         const filters = window.CiliAI.activeFilters;
+        
         if (filters) {
             if (filters.filterText) {
+                const ft = filters.filterText.toLowerCase();
                 filteredVariants = filteredVariants.filter(v => 
-                    v.begin.toString().includes(filters.filterText) ||
-                    (v.wildType || '').toLowerCase().includes(filters.filterText) ||
-                    (v.alternativeSequence || '').toLowerCase().includes(filters.filterText) ||
-                    (v.description || '').toLowerCase().includes(filters.filterText)
+                    v.begin.toString().includes(ft) ||
+                    (v.wildType || '').toLowerCase().includes(ft) ||
+                    (v.alternativeSequence || '').toLowerCase().includes(ft) ||
+                    (v.description || '').toLowerCase().includes(ft)
                 );
             }
-            if (filters.pathoFilter !== 'all') {
+            if (filters.pathoFilter && filters.pathoFilter !== 'all') {
                 filteredVariants = filteredVariants.filter(v => {
                     switch(filters.pathoFilter) {
                         case 'patho': return isPatho(v);
@@ -8103,7 +8105,7 @@ window.downloadCurrentVisualization = function() {
                     }
                 });
             }
-            if (filters.domainFilter !== 'all') {
+            if (filters.domainFilter && filters.domainFilter !== 'all') {
                 const domain = data.domains.find(d => d.name === filters.domainFilter);
                 if (domain) {
                     filteredVariants = filteredVariants.filter(v => 
@@ -8120,6 +8122,7 @@ window.downloadCurrentVisualization = function() {
         ];
         displayVars = [...displayVars, ...data.customVariants].sort((a,b) => parseInt(a.begin) - parseInt(b.begin));
 
+        // ─── 2. GENERATE SVG ────────────────────────────────────────────────
         let svg = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;">`;
         svg += `<text x="${pad}" y="35" font-size="18" font-weight="700" fill="#1e293b">${data.gene} – Domain & Variant Map</text>`;
         svg += `<text x="${pad}" y="58" font-size="13" fill="#64748b">${data.length} aa • ${data.domains.length} domains • ${displayVars.length} variants shown (${data.variants.length} total)</text>`;
@@ -8131,12 +8134,12 @@ window.downloadCurrentVisualization = function() {
             svg += `<rect x="${x1}" y="${trackY-16}" width="${width}" height="32" rx="6" fill="${d.color}" opacity="0.88" stroke="#fff" stroke-width="1"><title>${d.name} (${d.start}–${d.end})</title></rect>`;
         });
 
-        // PTM and functional sites
+        // PTM Sites
         if (data.features) {
             data.features.filter(f => ['MOD_RES', 'LIPID', 'CARBOHYD', 'DISULFID', 'CROSSLNK'].includes(f.type)).forEach(f => {
                 const x1 = xScale(f.start);
                 const width = Math.max(xScale(f.end) - x1, 2);
-                svg += `<rect x="${x1}" y="${trackY-25}" width="${width}" height="6" fill="rgba(147, 197, 253, 0.5)" stroke="#0284c7" stroke-width="1"><title>${f.type}: ${f.description} (${f.start}-${f.end})</title></rect>`;
+                svg += `<rect x="${x1}" y="${trackY-25}" width="${width}" height="6" fill="rgba(147, 197, 253, 0.5)" stroke="#0284c7" stroke-width="1"><title>${f.type}: ${f.description}</title></rect>`;
             });
         }
 
@@ -8163,40 +8166,38 @@ window.downloadCurrentVisualization = function() {
         });
         svg += `</svg>`;
 
+        // ─── 3. RENDER HTML ─────────────────────────────────────────────────
         container.innerHTML = `
             <div style="height:100%; display:flex; flex-direction:column; font-family:'Inter',sans-serif;">
-                <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; flex-wrap:wrap; gap:10px;">
-                    <div style="font-size:13px; color:#475569; display:flex; gap:16px; flex-wrap:wrap;">
+                <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                    <div style="font-size:13px; color:#475569; display:flex; gap:16px;">
                         <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:50%;"></span> Pathogenic</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:50%;"></span> Likely Pathogenic</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#94a3b8;border-radius:50%;"></span> VUS / Benign</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#d946ef;border-radius:50%;"></span> Custom</span>
-                        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(147,197,253,0.5); border:1px solid #0284c7;"></span> PTM Sites</span>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button id="compare-mode-btn" onclick="window.toggleCompareMode()" style="background:#fff; border:1px solid #0056b3; color:#0056b3; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;">🔍 Compare Mode</button>
                         <button onclick="window.drawVariantWorkspace('msa')" class="ciliai-button" style="background:#7c3aed;color:white;font-weight:500;">🧬 Full-Length MSA</button>
                         <button onclick="window.downloadVariantCSV()" class="ciliai-button" style="background:#3b82f6;color:white;">⬇ Variant CSV</button>
                         <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#8b5cf6;color:white;">⬇ MSA FASTA</button>
                     </div>
                 </div>
 
-                <!-- Variant Filter Panel -->
-                <div style="padding:12px 20px; background:#f1f5f9; border-bottom:1px solid #e2e8f0; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <div style="padding:12px 20px; background:#f1f5f9; border-radius:8px; margin:10px 20px; display:flex; gap:15px; flex-wrap:wrap;">
+                    <div style="display:flex; gap:8px; align-items:center;">
                         <span style="font-weight:600; font-size:13px;">🔍 Filter Variants:</span>
-                        <input id="variant-filter" type="text" placeholder="Search by position, residue, disease..." style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:20px; width:220px; font-size:13px;" value="${filters?.filterText || ''}">
+                        <input id="variant-filter" type="text" placeholder="Search by position, residue, disease..." style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:20px; width:220px; font-size:13px;" value="${filters && filters.filterText ? filters.filterText : ''}">
                         <select id="patho-filter" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-                            <option value="all" ${filters?.pathoFilter === 'all' ? 'selected' : ''}>All Significance</option>
-                            <option value="patho" ${filters?.pathoFilter === 'patho' ? 'selected' : ''}>Pathogenic Only</option>
-                            <option value="likely" ${filters?.pathoFilter === 'likely' ? 'selected' : ''}>Likely Pathogenic</option>
-                            <option value="benign" ${filters?.pathoFilter === 'benign' ? 'selected' : ''}>Benign/Likely Benign</option>
-                            <option value="vus" ${filters?.pathoFilter === 'vus' ? 'selected' : ''}>VUS</option>
-                            <option value="custom" ${filters?.pathoFilter === 'custom' ? 'selected' : ''}>Custom Only</option>
+                            <option value="all" ${filters && filters.pathoFilter === 'all' ? 'selected' : ''}>All Significance</option>
+                            <option value="patho" ${filters && filters.pathoFilter === 'patho' ? 'selected' : ''}>Pathogenic Only</option>
+                            <option value="likely" ${filters && filters.pathoFilter === 'likely' ? 'selected' : ''}>Likely Pathogenic</option>
+                            <option value="benign" ${filters && filters.pathoFilter === 'benign' ? 'selected' : ''}>Benign/Likely Benign</option>
+                            <option value="vus" ${filters && filters.pathoFilter === 'vus' ? 'selected' : ''}>VUS</option>
+                            <option value="custom" ${filters && filters.pathoFilter === 'custom' ? 'selected' : ''}>Custom Only</option>
                         </select>
                         <select id="domain-filter" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
                             <option value="all">All Domains</option>
-                            ${data.domains.map(d => `<option value="${d.name}" ${filters?.domainFilter === d.name ? 'selected' : ''}>${d.name}</option>`).join('')}
+                            ${data.domains.map(d => `<option value="${d.name}" ${filters && filters.domainFilter === d.name ? 'selected' : ''}>${d.name}</option>`).join('')}
                         </select>
                         <button onclick="window.applyVariantFilters()" class="ciliai-button" style="background:#3b82f6; color:white; padding:6px 14px;">Apply</button>
                         <button onclick="window.clearVariantFilters()" style="background:transparent; border:1px solid #94a3b8; padding:6px 14px; border-radius:6px;">Clear</button>
@@ -8206,79 +8207,20 @@ window.downloadCurrentVisualization = function() {
                     </div>
                 </div>
 
-                <!-- Statistics Dashboard -->
-                <div style="background:white; border-bottom:1px solid #e2e8f0; padding:15px 20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <h4 style="margin:0; font-size:14px; font-weight:600;">📈 Variant Statistics</h4>
-                        <button onclick="document.getElementById('stats-content').style.display = document.getElementById('stats-content').style.display === 'none' ? 'grid' : 'none'" style="background:none; border:none; cursor:pointer;">▼</button>
-                    </div>
-                    <div id="stats-content" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px;">
-                        <div style="background:#f8fafc; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#64748b;">Total Variants</div>
-                            <div style="font-size:24px; font-weight:700; color:#0f172a;">${data.variants.length}</div>
-                        </div>
-                        <div style="background:#fee2e2; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#7f1d1d;">Pathogenic</div>
-                            <div style="font-size:24px; font-weight:700; color:#b91c1c;">${data.variants.filter(v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v))).length}</div>
-                        </div>
-                        <div style="background:#ffedd5; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#7c2d12;">Likely Pathogenic</div>
-                            <div style="font-size:24px; font-weight:700; color:#c2410c;">${data.variants.filter(v => /likely pathogenic/i.test(getSig(v))).length}</div>
-                        </div>
-                        <div style="background:#dcfce7; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#14532d;">Benign</div>
-                            <div style="font-size:24px; font-weight:700; color:#166534;">${data.variants.filter(v => /benign/i.test(getSig(v))).length}</div>
-                        </div>
-                        <div style="background:#f3f4f6; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#1e293b;">Hotspot Regions</div>
-                            <div style="font-size:24px; font-weight:700; color:#334155;">${window.identifyHotspots ? window.identifyHotspots(data.variants) : 'N/A'}</div>
-                        </div>
-                    </div>
-                </div>
-
                 <div style="flex:1; padding:16px; overflow:auto; background:#fdfdfd;">${svg}</div>
-                
-                <!-- Custom Variant Panel -->
-                <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:12px; align-items:center; flex-shrink:0; flex-wrap:wrap;">
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:140px;" />
-                        <select id="custom-var-sig" style="padding:8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
-                            <option value="Pathogenic">Pathogenic</option>
-                            <option value="Likely Pathogenic">Likely Pathogenic</option>
-                            <option value="VUS">VUS</option>
-                            <option value="Benign">Benign</option>
-                        </select>
-                        <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">+ Add Custom</button>
-                    </div>
-                    
-                    <!-- Batch Upload -->
-                    <details style="margin-left:auto;">
-                        <summary style="font-weight:600; font-size:13px; cursor:pointer; color:#0056b3; padding:6px 12px; background:#e7f1ff; border-radius:6px;">📤 Batch Upload</summary>
-                        <div style="margin-top:10px; padding:15px; background:white; border:1px solid #e2e8f0; border-radius:8px; position:absolute; right:20px; width:300px; z-index:1000;">
-                            <textarea id="batch-variant-input" placeholder="p.L301R, p.R402X, p.G56V&#10;One variant per line or comma-separated" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px; min-height:80px;"></textarea>
-                            <div style="display:flex; gap:8px; margin-top:8px;">
-                                <select id="batch-sig" style="flex:1; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px;">
-                                    <option value="Pathogenic">Pathogenic</option>
-                                    <option value="Likely Pathogenic">Likely Pathogenic</option>
-                                    <option value="VUS">VUS</option>
-                                    <option value="Benign">Benign</option>
-                                </select>
-                                <button onclick="window.addBatchVariants()" style="background:#0056b3; color:white; border:none; padding:6px 12px; border-radius:6px;">Add All</button>
-                                <button onclick="window.clearBatchInput()" style="background:transparent; border:1px solid #94a3b8; padding:6px 12px; border-radius:6px;">Clear</button>
-                            </div>
-                        </div>
-                    </details>
-                    
-                    <!-- Export Options -->
-                    <select id="export-format" style="padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px;">
-                        <option value="png">PNG (300 DPI)</option>
-                        <option value="svg">SVG (Vector)</option>
+
+                <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:12px; align-items:center; flex-shrink:0;">
+                    <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:140px;" />
+                    <select id="custom-var-sig" style="padding:8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+                        <option value="Pathogenic">Pathogenic</option>
+                        <option value="Likely Pathogenic">Likely Pathogenic</option>
+                        <option value="VUS">VUS</option>
+                        <option value="Benign">Benign</option>
                     </select>
-                    <button onclick="window.exportPublicationImage()" style="background:#059669; color:white; padding:6px 12px; border-radius:6px; border:none;">
-                        📸 Export Figure
-                    </button>
+                    <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">+ Add Custom Variant</button>
                 </div>
             </div>
+
             <div id="var-panel" style="display:none; position:absolute; top:80px; right:30px; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; width:280px; box-shadow:0 10px 25px rgba(0,0,0,0.1); z-index:100;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                      <h4 style="margin:0; color:#2563eb;" id="vp-title"></h4>
@@ -8292,7 +8234,6 @@ window.downloadCurrentVisualization = function() {
                 <div id="msa-result-area" style="margin-top:10px; font-size:11px;"></div>
             </div>`;
     }
-
     // ─────────────────────────────────────────────────────────────
     // 2. MSA GENERATION
     // ─────────────────────────────────────────────────────────────
@@ -9234,6 +9175,7 @@ if (typeof window.handleAIQuery !== 'function') {
 }
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
