@@ -8420,27 +8420,46 @@ window.checkConservation = async function(gene, pos, refAA, altAA) {
         if (area) area.innerHTML = "<div style='color:red;'>Error checking conservation.</div>";
     }
 };
- // ─────────────────────────────────────────────────────────────
-    // 6. 3D STRUCTURE VIEWER (MolStar with Fallback)
-    // ─────────────────────────────────────────────────────────────
-    window.loadMolStar = async function() {
-        if (customElements.get('pdbe-molstar')) return true;
-        console.log("[CiliAI] Loading 3D Engine...");
-        for (const src of MOLSTAR_SOURCES) {
-            try {
-                if (!document.querySelector(`link[href="${src.css}"]`)) {
-                    const l = document.createElement('link'); l.rel='stylesheet'; l.href=src.css; document.head.appendChild(l);
-                }
-                await new Promise((res, rej) => {
-                    const s = document.createElement('script'); s.src = src.js; s.onload = res; s.onerror = rej; document.head.appendChild(s);
-                });
-                await customElements.whenDefined('pdbe-molstar');
-                return true;
-            } catch (e) { console.warn(`Source ${src.name} failed`); }
-        }
-        throw new Error("Failed to load 3D viewer.");
-    };
+    
+// ─────────────────────────────────────────────────────────────
+// 6. 3D STRUCTURE VIEWER (MolStar with Fallback)
+// ─────────────────────────────────────────────────────────────
+window.loadMolStar = async function() {
+    if (customElements.get('pdbe-molstar')) return true;
+    
+    const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms));
 
+    for (const src of MOLSTAR_SOURCES) {
+        try {
+            console.log(`[CiliAI] Attempting to load MolStar from ${src.name}...`);
+            
+            // Add CSS if missing
+            if (!document.querySelector(`link[href="${src.css}"]`)) {
+                const l = document.createElement('link'); l.rel='stylesheet'; l.href=src.css; document.head.appendChild(l);
+            }
+
+            // Load JS
+            const scriptPromise = new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = src.js;
+                s.async = true;
+                s.onload = res;
+                s.onerror = rej;
+                document.head.appendChild(s);
+            });
+
+            // Wait for script to load OR timeout after 5 seconds
+            await Promise.race([scriptPromise, timeout(5000)]);
+            
+            // Short delay to allow component registration
+            await new Promise(r => setTimeout(r, 500));
+            return true;
+        } catch (e) { 
+            console.warn(`[CiliAI] Source ${src.name} failed or timed out.`); 
+        }
+    }
+    throw new Error("CDN blocked or network error. Please check your connection.");
+};
     window.showStructureViewer = async function(gene, pos, aa) {
         const btn = document.getElementById('popup-3d-btn');
         if(btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
@@ -8485,7 +8504,7 @@ window.checkConservation = async function(gene, pos, refAA, altAA) {
         if(btn) { btn.innerText = "View 3D"; btn.disabled = false; }
     };
 
-   // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // 7. PROFESSIONAL MSA (Jalview-Style Window)
 // ─────────────────────────────────────────────────────────────
 window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
@@ -8497,7 +8516,6 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
         '-':'#ffffff'
     };
     
-    // Remove existing modal if one is open
     const existing = document.getElementById('prof-msa-modal');
     if (existing) existing.remove();
 
@@ -8512,7 +8530,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
     <div style="padding:16px; background:#0f172a; color:white; display:flex; justify-content:space-between; align-items:center;">
         <div>
             <strong style="font-size:16px; color:#38bdf8;">${gene} Evolution Analysis</strong> 
-            <span style="font-size:12px; opacity:0.8; margin-left:10px;">Position ${pos} (${refAA}) • Score: ${score}%</span>
+            <span style="font-size:12px; opacity:0.8; margin-left:10px;">Pos ${pos} (${refAA}) • Score: ${score}%</span>
         </div>
         <div style="display:flex; gap:12px;">
             <button id="msa-3d-btn" style="background:#3b82f6; border:none; color:white; padding:6px 14px; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px;">🧊 View 3D</button>
@@ -8522,37 +8540,29 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
     <div style="padding:24px; overflow-y:auto; max-height:65vh; background:#f8fafc;">`;
     
     alignments.forEach(a => {
+        if (!a.seq) return; // Safeguard against empty sequences
         let seqHtml = a.seq.split('').map((c, i) => {
-            // The center of the window is at index 10 or 11 depending on the slice
-            // We find the exact center by checking the target position
-            const isTargetPos = (i === (alignments[0].seq.length > 20 ? 11 : 7) || c === refAA && i > 5 && i < 15); 
+            const isCenter = (i === 11 || (alignments[0].seq.length <= 15 && i === 7));
             const bgColor = aaColors[c] || '#ccc';
             return `<span style="display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; 
                                  background:${bgColor}; color:white; font-size:13px; font-weight:bold;
-                                 border:${i === 11 ? '2px solid #000' : '1px solid #fff'}; 
+                                 border:${isCenter ? '2px solid #000' : '1px solid #fff'}; 
                                  box-sizing:border-box;">${c}</span>`;
         }).join('');
 
         html += `
         <div style="display:flex; align-items:center; margin-bottom:3px;">
             <div style="width:160px; text-align:right; padding-right:15px; font-size:12px; color:#475569; font-weight:600;">
-                ${a.icon} ${a.species.split(' ')[0]}
+                ${a.icon || '🧬'} ${(a.species || 'Unknown').split(' ')[0]}
             </div>
             <div style="display:flex;">${seqHtml}</div>
         </div>`;
     });
 
-    html += `
-    </div>
-    <div style="padding:12px 24px; background:#f1f5f9; border-top:1px solid #e2e8f0; font-size:11px; color:#64748b; display:flex; justify-content:space-between;">
-        <span>Color Scheme: Zappo/Jalview</span>
-        <span>${alignments.length} Species Aligned</span>
-    </div>`;
-    
+    html += `</div>`;
     modal.innerHTML = html;
     document.body.appendChild(modal);
 
-    // Link the 3D Button inside the modal
     const btn3d = modal.querySelector('#msa-3d-btn');
     if (btn3d) {
         btn3d.onclick = () => { 
@@ -8562,9 +8572,9 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
     }
 };
     
-    // ─────────────────────────────────────────────────────────────
-    // Keyboard Shortcuts
-    // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Keyboard Shortcuts
+// ─────────────────────────────────────────────────────────────
 
     document.addEventListener('keydown', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -8602,4 +8612,5 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
