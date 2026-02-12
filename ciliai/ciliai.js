@@ -8413,6 +8413,21 @@ window.checkConservation = async function(gene, pos, refAA, altAA) {
         if (area) area.innerHTML = `<div style='color:#ef4444;'>${e.message}</div>`;
     }
 };
+
+const MOLSTAR_SOURCES = [
+    {
+        name: "jsDelivr",
+        // Verified stable production paths
+        js: "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-component.js",
+        css: "https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-light.css"
+    },
+    {
+        name: "PDBe-Official",
+        // Using the official EBI mirror is often more reliable for Bioinformatics tools
+        js: "https://www.ebi.ac.uk/pdbe/pdb-component/google-maps/pdbe-molstar-component-3.1.2.js",
+        css: "https://www.ebi.ac.uk/pdbe/pdb-component/google-maps/pdbe-molstar-3.1.2.css"
+    }
+];
     
 // ─────────────────────────────────────────────────────────────
 // 6. 3D STRUCTURE VIEWER (MolStar with Fallback)
@@ -8421,11 +8436,11 @@ window.loadMolStar = async function () {
     if (customElements.get('pdbe-molstar')) return true;
     if (window.__molstarPromise) return window.__molstarPromise;
 
-    console.log("[CiliAI] Loading Mol* 3D Engine...");
-
     window.__molstarPromise = (async () => {
         for (const src of MOLSTAR_SOURCES) {
             try {
+                console.log(`[CiliAI] Attempting 3D Engine Load: ${src.name}`);
+
                 // Inject CSS
                 if (!document.querySelector(`link[href="${src.css}"]`)) {
                     const link = document.createElement('link');
@@ -8433,42 +8448,38 @@ window.loadMolStar = async function () {
                     document.head.appendChild(link);
                 }
 
-                // Inject Script with CORS support
-                if (!document.querySelector(`script[src="${src.js}"]`)) {
-                    await new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = src.js;
-                        script.async = true;
-                        script.crossOrigin = "anonymous"; // Helps bypass some CSP/Firewall rules
+                // Inject Script
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = src.js;
+                    script.type = "text/javascript"; 
+                    script.crossOrigin = "anonymous";
 
-                        const timeout = setTimeout(() => {
-                            script.remove();
-                            reject(new Error("CDN timeout"));
-                        }, 10000);
+                    const timeout = setTimeout(() => reject(new Error("Timeout")), 10000);
 
-                        script.onload = () => { clearTimeout(timeout); resolve(); };
-                        script.onerror = () => {
-                            clearTimeout(timeout);
-                            script.remove();
-                            reject(new Error("Script failed"));
-                        };
-                        document.head.appendChild(script);
-                    });
-                }
+                    script.onload = () => { clearTimeout(timeout); resolve(); };
+                    script.onerror = (err) => { 
+                        clearTimeout(timeout); 
+                        console.error(`[CiliAI] Load error for ${src.name}`);
+                        reject(err); 
+                    };
+                    document.head.appendChild(script);
+                });
 
+                // Wait for the custom element to be registered by the script
                 await customElements.whenDefined('pdbe-molstar');
                 return true;
+
             } catch (e) {
-                console.warn(`[CiliAI] ${src.name} failed`);
+                console.warn(`[CiliAI] Source ${src.name} failed:`, e);
             }
         }
-        window.__molstarPromise = null; // Allow retry on next click
-        throw new Error("All Mol* sources failed. This is likely a firewall or CSP restriction.");
+        window.__molstarPromise = null;
+        throw new Error("All 3D sources blocked. Check your connection or try disabling tracking protection.");
     })();
 
     return window.__molstarPromise;
-};
-    
+};    
     
 window.showStructureViewer = async function (gene, pos, aa) {
     const btn = document.getElementById('popup-3d-btn');
@@ -8637,6 +8648,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
