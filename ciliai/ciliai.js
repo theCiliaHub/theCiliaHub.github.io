@@ -7326,7 +7326,6 @@ window.runDashboardSearch = function() {
     console.log("CiliAI Layout Fixes Applied.");
 })();
 
-
 // Helper: Reset Views – Ensures diagram is visible and refreshed
 window.resetViews = function() {
     // Hide all alternative views
@@ -7641,12 +7640,16 @@ window.downloadCurrentVisualization = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.4 - INTEGRATED)
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.4 - ENHANCED)
  * Features: 
  * - 3D Structure (MolStar) with Unpkg Fallback
  * - Professional MSA Visualizer (Jalview Style)
- * - Conservation Analysis (Organism Panel)
- * - Forced Visibility Fixes (!important tags)
+ * - Conservation Analysis (65 Species)
+ * - Variant Filtering & Search
+ * - Statistics Dashboard
+ * - Batch Upload
+ * - Keyboard Shortcuts
+ * - Publication-Ready Export
  * ============================================================== */
 (function() {
     'use strict';
@@ -7655,12 +7658,124 @@ window.downloadCurrentVisualization = function() {
     window.CiliAI.activeVariantData = null;
     window.CiliAI.activeAlignmentData = null;
     window.CiliAI.activeColorScheme = 'ClustalX';
+    window.CiliAI.compareMode = false;
+    window.CiliAI.comparisonSet = [];
+
+    // Global progress bar
+    const progressBar = document.createElement('div');
+    progressBar.id = 'global-progress';
+    progressBar.style.cssText = 'position:fixed; top:0; left:0; width:0%; height:3px; background:#0056b3; transition:width 0.3s; z-index:10000;';
+    document.body.appendChild(progressBar);
+
+    window.showProgress = function(percent) {
+        const bar = document.getElementById('global-progress');
+        bar.style.width = percent + '%';
+        if (percent >= 100) setTimeout(() => bar.style.width = '0%', 1000);
+    };
+
+    // Keyboard Shortcuts
+    window.initKeyboardShortcuts = function() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            switch(e.key.toLowerCase()) {
+                case 'm':
+                    if (window.CiliAI.activeVariantData) {
+                        const container = document.getElementById('plotly-container');
+                        if (container.querySelector('#msa-scroll')) {
+                            window.drawVariantWorkspace('map');
+                        } else {
+                            window.drawVariantWorkspace('msa');
+                        }
+                    }
+                    break;
+                case 'f':
+                    document.getElementById('variant-filter')?.focus();
+                    break;
+                case 'd':
+                    window.downloadCurrentVisualization();
+                    break;
+                case 'g':
+                    const pos = prompt('Enter position to jump to:');
+                    if (pos && window.CiliAI.activeAlignmentData) {
+                        document.getElementById('msa-jump-input').value = pos;
+                        window.msaJumpToPosition();
+                    }
+                    break;
+                case '?':
+                    window.toggleShortcuts();
+                    break;
+                case 'escape':
+                    document.getElementById('shortcuts-modal')?.style.display = 'none';
+                    break;
+            }
+        });
+    };
+
+    window.toggleShortcuts = function() {
+        let modal = document.getElementById('shortcuts-modal');
+        if (modal) {
+            modal.style.display = modal.style.display === 'none' ? 'block' : 'none';
+        } else {
+            modal = document.createElement('div');
+            modal.id = 'shortcuts-modal';
+            modal.style.cssText = 'display:block; position:fixed; bottom:20px; right:20px; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1); z-index:1000; max-width:300px;';
+            modal.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0; font-size:14px; font-weight:600;">⌨️ Keyboard Shortcuts</h4>
+                    <button onclick="this.parentElement.parentElement.style.display='none'" style="border:none; background:none; cursor:pointer; font-size:18px;">✕</button>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 2fr; gap:8px; font-size:12px;">
+                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">M</kbd></span><span>Toggle MSA/Map</span>
+                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">F</kbd></span><span>Focus search</span>
+                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">D</kbd></span><span>Download current</span>
+                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">G</kbd></span><span>Go to position</span>
+                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">?</kbd></span><span>Show shortcuts</span>
+                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">Esc</kbd></span><span>Close</span>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+    };
+
+    // URL State Management
+    window.updateURLState = function() {
+        if (!window.CiliAI.activeVariantData) return;
+        const state = {
+            gene: window.CiliAI.activeVariantData.gene,
+            view: document.getElementById('plotly-container').querySelector('#msa-scroll') ? 'msa' : 'map',
+            timestamp: Date.now()
+        };
+        const url = new URL(window.location);
+        url.searchParams.set('state', btoa(JSON.stringify(state)));
+        window.history.pushState({}, '', url);
+    };
+
+    window.loadStateFromURL = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const stateParam = urlParams.get('state');
+        if (stateParam) {
+            try {
+                const state = JSON.parse(atob(stateParam));
+                if (state.gene) {
+                    setTimeout(() => {
+                        window.renderVariantMap(state.gene).then(() => {
+                            if (state.view === 'msa') {
+                                setTimeout(() => window.drawVariantWorkspace('msa'), 500);
+                            }
+                        });
+                    }, 1000);
+                }
+            } catch (e) {
+                console.error('Failed to load state from URL', e);
+            }
+        }
+    };
 
     // ─────────────────────────────────────────────────────────────
     // 0. CONFIGURATION & DATA CONSTANTS
     // ─────────────────────────────────────────────────────────────
     
-    // 3D Viewer CDN Sources (Includes user-requested Unpkg fallback)
     const MOLSTAR_SOURCES = [
         {
             name: 'jsdelivr',
@@ -7674,24 +7789,6 @@ window.downloadCurrentVisualization = function() {
         }
     ];
 
-    // Organism Panel (Critical for Conservation Logic)
-    const ORGANISM_PANEL = [
-        { name: "Homo sapiens", common: "Human", dist: 0.0, icon: "👤" },
-        { name: "Pan troglodytes", common: "Chimpanzee", dist: 0.01, icon: "🐵" },
-        { name: "Mus musculus", common: "Mouse", dist: 0.15, icon: "🐭" },
-        { name: "Rattus norvegicus", common: "Rat", dist: 0.16, icon: "🐀" },
-        { name: "Canis lupus familiaris", common: "Dog", dist: 0.18, icon: "🐕" },
-        { name: "Bos taurus", common: "Cow", dist: 0.20, icon: "🐄" },
-        { name: "Gallus gallus", common: "Chicken", dist: 0.30, icon: "🐔" },
-        { name: "Xenopus tropicalis", common: "Frog", dist: 0.45, icon: "🐸" },
-        { name: "Danio rerio", common: "Zebrafish", dist: 0.50, icon: "🐟" },
-        { name: "Drosophila melanogaster", common: "Fruit Fly", dist: 0.70, icon: "🪰" },
-        { name: "Caenorhabditis elegans", common: "Worm", dist: 0.75, icon: "🪱" },
-        { name: "Saccharomyces cerevisiae", common: "Yeast", dist: 0.90, icon: "🍄" },
-        { name: "Chlamydomonas reinhardtii", common: "Algae", dist: 0.85, icon: "🦠" }
-    ];
-
-    // Color Schemes
     const CLUSTALX_COLORS = {
         'A': { bg: '#80a0f0', text: '#000000' }, 'R': { bg: '#f01505', text: '#ffffff' },
         'N': { bg: '#00ff00', text: '#000000' }, 'D': { bg: '#c048c0', text: '#ffffff' },
@@ -7742,6 +7839,7 @@ window.downloadCurrentVisualization = function() {
     // 1. DATA FETCHING
     // ─────────────────────────────────────────────────────────────
     window.fetchVariantDataLive = async function(geneSymbol) {
+        window.showProgress(20);
         const gene = geneSymbol.toUpperCase();
         try {
             const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
@@ -7751,6 +7849,7 @@ window.downloadCurrentVisualization = function() {
             let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
             const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
+            window.showProgress(50);
             const [varRes, featRes] = await Promise.all([
                 fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
                 fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
@@ -7772,11 +7871,35 @@ window.downloadCurrentVisualization = function() {
                 color: naturePalette[colorIdx++ % naturePalette.length]
             }));
 
-            return { gene, uniprotID, length, sequence, variants, domains, customVariants: [] };
+            // Extract PTM and functional sites
+            const features = (featData.features || []).map(f => ({
+                type: f.type,
+                description: f.description,
+                start: parseInt(f.begin),
+                end: parseInt(f.end)
+            }));
+
+            window.showProgress(100);
+            return { gene, uniprotID, length, sequence, variants, domains, features, customVariants: [] };
         } catch (e) {
             console.error("Fetch Error:", e);
+            window.showProgress(0);
             return { error: e.message };
         }
+    };
+
+    window.identifyHotspots = function(variants) {
+        const positions = variants.map(v => parseInt(v.begin)).filter(p => !isNaN(p));
+        if (positions.length === 0) return 'N/A';
+        
+        const density = {};
+        positions.forEach(p => {
+            const region = Math.floor(p / 50) * 50;
+            density[region] = (density[region] || 0) + 1;
+        });
+        
+        const maxRegion = Object.entries(density).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+        return `${maxRegion}-${parseInt(maxRegion)+50}`;
     };
 
     window.renderVariantMap = async function(geneSymbol) {
@@ -7795,6 +7918,7 @@ window.downloadCurrentVisualization = function() {
         window.CiliAI.activeVariantData = data;
         await window.loadFullLengthAlignment(data.gene);
         window.drawVariantWorkspace('map');
+        window.updateURLState();
     };
 
     window.drawVariantWorkspace = function(view = 'map') {
@@ -7806,9 +7930,134 @@ window.downloadCurrentVisualization = function() {
         else if (view === 'msa') renderFullLengthMSA(data, container);
     };
 
+    window.applyVariantFilters = function() {
+        const filterText = document.getElementById('variant-filter')?.value.toLowerCase() || '';
+        const pathoFilter = document.getElementById('patho-filter')?.value || 'all';
+        const domainFilter = document.getElementById('domain-filter')?.value || 'all';
+        
+        window.CiliAI.activeFilters = { filterText, pathoFilter, domainFilter };
+        window.drawVariantWorkspace('map');
+    };
+
+    window.clearVariantFilters = function() {
+        document.getElementById('variant-filter').value = '';
+        document.getElementById('patho-filter').value = 'all';
+        document.getElementById('domain-filter').value = 'all';
+        window.CiliAI.activeFilters = null;
+        window.drawVariantWorkspace('map');
+    };
+
+    window.toggleCompareMode = function() {
+        window.CiliAI.compareMode = !window.CiliAI.compareMode;
+        window.CiliAI.comparisonSet = [];
+        const btn = document.getElementById('compare-mode-btn');
+        if (btn) {
+            btn.style.background = window.CiliAI.compareMode ? '#0056b3' : '#fff';
+            btn.style.color = window.CiliAI.compareMode ? 'white' : '#0056b3';
+            btn.innerHTML = window.CiliAI.compareMode ? '✓ Compare Mode ON' : '🔍 Compare Mode';
+        }
+    };
+
+    window.addToComparisonSet = function(variant, gene) {
+        if (!window.CiliAI.compareMode) return;
+        if (window.CiliAI.comparisonSet.length >= 4) {
+            alert('Maximum 4 variants can be compared at once');
+            return;
+        }
+        window.CiliAI.comparisonSet.push({ variant, gene });
+        alert(`Added to comparison set (${window.CiliAI.comparisonSet.length}/4)`);
+    };
+
+    window.exportPublicationImage = async function() {
+        const format = document.getElementById('export-format')?.value || 'png';
+        const container = document.getElementById('plotly-container');
+        const svgElement = container.querySelector('svg');
+        
+        if (svgElement) {
+            if (format === 'svg') {
+                const svgData = new XMLSerializer().serializeToString(svgElement);
+                const blob = new Blob([svgData], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${window.CiliAI.activeVariantData?.gene}_figure.svg`;
+                a.click();
+            } else {
+                // Convert SVG to high-res PNG
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                const svgBlob = new Blob([svgElement.outerHTML], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(svgBlob);
+                
+                img.onload = function() {
+                    canvas.width = img.width * 3; // 300 DPI equivalent
+                    canvas.height = img.height * 3;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob(function(blob) {
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `${window.CiliAI.activeVariantData?.gene}_figure.png`;
+                        a.click();
+                    });
+                };
+                img.src = url;
+            }
+        }
+    };
+
+    window.addBatchVariants = function() {
+        const input = document.getElementById('batch-variant-input');
+        const significance = document.getElementById('batch-sig').value;
+        if (!input?.value) return;
+        
+        const lines = input.value.split(/[,\n]/);
+        const variants = lines.map(l => l.trim()).filter(l => l.match(/^p\.([A-Z]+)(\d+)([A-Z*]+)$/i));
+        
+        variants.forEach(v => {
+            const match = v.replace(/^p\./i, '').match(/^([A-Z]+)(\d+)([A-Z*]+)$/i);
+            if (match && window.CiliAI.activeVariantData) {
+                const pos = parseInt(match[2]);
+                window.CiliAI.activeVariantData.customVariants.push({
+                    wildType: match[1],
+                    begin: pos,
+                    alternativeSequence: match[3],
+                    clinicalSignificance: significance,
+                    description: "Batch custom variant",
+                    disease: "User-defined",
+                    isCustom: true
+                });
+            }
+        });
+        
+        window.drawVariantWorkspace('map');
+        input.value = '';
+        alert(`Added ${variants.length} variants`);
+    };
+
+    window.clearBatchInput = function() {
+        document.getElementById('batch-variant-input').value = '';
+    };
+
+    window.generateConservationHeatmap = function(alignments, length) {
+        let html = '';
+        for (let i = 0; i < length; i++) {
+            const column = alignments.map(a => a.seq[i]);
+            const refAA = alignments[0].seq[i];
+            const conservation = column.filter(aa => aa === refAA && aa !== '-').length / column.length;
+            let color = '';
+            if (conservation > 0.8) color = '#0056b3';
+            else if (conservation > 0.6) color = '#3b82f6';
+            else if (conservation > 0.4) color = '#93c5fd';
+            else color = '#e2e8f0';
+            html += `<div style="width:18px; height:8px; background:${color};" title="Position ${i+1}: ${Math.round(conservation*100)}% conserved"></div>`;
+        }
+        return html;
+    };
+
     function renderDomainVariantMap(data, container) {
         const w = container.clientWidth - 40 || 900;
-        const h = 480;
+        const h = 580;
         const pad = 40;
         const trackY = 220;
         const xScale = pos => pad + (pos / data.length) * (w - 2 * pad);
@@ -7817,12 +8066,50 @@ window.downloadCurrentVisualization = function() {
         const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
         const isLikely = v => /likely pathogenic/i.test(getSig(v));
 
-        let displayVars = [...data.variants.filter(isPatho), ...data.variants.filter(isLikely), ...data.variants.filter(v => !isPatho(v) && !isLikely(v)).slice(0, 60)];
+        // Apply filters
+        let filteredVariants = [...data.variants];
+        const filters = window.CiliAI.activeFilters;
+        if (filters) {
+            if (filters.filterText) {
+                filteredVariants = filteredVariants.filter(v => 
+                    v.begin.toString().includes(filters.filterText) ||
+                    v.wildType?.toLowerCase().includes(filters.filterText) ||
+                    v.alternativeSequence?.toLowerCase().includes(filters.filterText) ||
+                    (v.description || '').toLowerCase().includes(filters.filterText)
+                );
+            }
+            if (filters.pathoFilter !== 'all') {
+                filteredVariants = filteredVariants.filter(v => {
+                    switch(filters.pathoFilter) {
+                        case 'patho': return isPatho(v);
+                        case 'likely': return isLikely(v);
+                        case 'benign': return /benign/i.test(getSig(v));
+                        case 'vus': return !isPatho(v) && !isLikely(v) && !/benign/i.test(getSig(v));
+                        case 'custom': return v.isCustom;
+                        default: return true;
+                    }
+                });
+            }
+            if (filters.domainFilter !== 'all') {
+                const domain = data.domains.find(d => d.name === filters.domainFilter);
+                if (domain) {
+                    filteredVariants = filteredVariants.filter(v => 
+                        parseInt(v.begin) >= domain.start && parseInt(v.begin) <= domain.end
+                    );
+                }
+            }
+        }
+
+        let displayVars = [
+            ...filteredVariants.filter(isPatho),
+            ...filteredVariants.filter(isLikely),
+            ...filteredVariants.filter(v => !isPatho(v) && !isLikely(v)).slice(0, 60)
+        ];
         displayVars = [...displayVars, ...data.customVariants].sort((a,b) => parseInt(a.begin) - parseInt(b.begin));
 
         let svg = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;">`;
         svg += `<text x="${pad}" y="35" font-size="18" font-weight="700" fill="#1e293b">${data.gene} – Domain & Variant Map</text>`;
-        svg += `<text x="${pad}" y="58" font-size="13" fill="#64748b">${data.length} aa • ${data.domains.length} domains • ${displayVars.length} variants shown</text>`;
+        svg += `<text x="${pad}" y="58" font-size="13" fill="#64748b">${data.length} aa • ${data.domains.length} domains • ${displayVars.length} variants shown (${data.variants.length} total)</text>`;
         svg += `<rect x="${pad}" y="${trackY-8}" width="${w-2*pad}" height="16" rx="8" fill="#e2e8f0"/>`;
 
         data.domains.forEach(d => {
@@ -7830,6 +8117,15 @@ window.downloadCurrentVisualization = function() {
             const width = Math.max(xScale(d.end) - x1, 6);
             svg += `<rect x="${x1}" y="${trackY-16}" width="${width}" height="32" rx="6" fill="${d.color}" opacity="0.88" stroke="#fff" stroke-width="1"><title>${d.name} (${d.start}–${d.end})</title></rect>`;
         });
+
+        // PTM and functional sites
+        if (data.features) {
+            data.features.filter(f => ['MOD_RES', 'LIPID', 'CARBOHYD', 'DISULFID', 'CROSSLNK'].includes(f.type)).forEach(f => {
+                const x1 = xScale(f.start);
+                const width = Math.max(xScale(f.end) - x1, 2);
+                svg += `<rect x="${x1}" y="${trackY-25}" width="${width}" height="6" fill="rgba(147, 197, 253, 0.5)" stroke="#0284c7" stroke-width="1"><title>${f.type}: ${f.description} (${f.start}-${f.end})</title></rect>`;
+            });
+        }
 
         displayVars.forEach(v => {
             const x = xScale(parseInt(v.begin));
@@ -7843,40 +8139,131 @@ window.downloadCurrentVisualization = function() {
             const yHead = trackY - height;
             const label = `p.${v.wildType || '?'}${v.begin}${v.alternativeSequence || '?'}`;
             const desc = (v.description || getSig(v)).replace(/['"]/g,'');
-            const click = `window.openVariantPanel('${label}', '${v.begin}', '${desc}', '${data.gene}')`;
+            const click = window.CiliAI.compareMode 
+                ? `window.addToComparisonSet('${label} (${v.begin})', '${data.gene}')`
+                : `window.openVariantPanel('${label}', '${v.begin}', '${desc}', '${data.gene}')`;
 
             svg += `<g cursor="pointer" onclick="${click}">
                 <line x1="${x}" y1="${trackY-12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="${v.isCustom?2:1.5}" opacity="0.7"/>
-                <circle cx="${x}" cy="${yHead}" r="${v.isCustom?7:5}" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+                <circle class="variant-circle" cx="${x}" cy="${yHead}" r="${v.isCustom?7:5}" fill="${color}" stroke="#fff" stroke-width="1.5"/>
             </g>`;
         });
         svg += `</svg>`;
 
         container.innerHTML = `
             <div style="height:100%; display:flex; flex-direction:column; font-family:'Inter',sans-serif;">
-                <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-                    <div style="font-size:13px; color:#475569; display:flex; gap:16px;">
+                <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; flex-wrap:wrap; gap:10px;">
+                    <div style="font-size:13px; color:#475569; display:flex; gap:16px; flex-wrap:wrap;">
                         <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:50%;"></span> Pathogenic</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:50%;"></span> Likely Pathogenic</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#94a3b8;border-radius:50%;"></span> VUS / Benign</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#d946ef;border-radius:50%;"></span> Custom</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(147,197,253,0.5); border:1px solid #0284c7;"></span> PTM Sites</span>
                     </div>
                     <div style="display:flex; gap:10px;">
+                        <button id="compare-mode-btn" onclick="window.toggleCompareMode()" style="background:#fff; border:1px solid #0056b3; color:#0056b3; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;">🔍 Compare Mode</button>
                         <button onclick="window.drawVariantWorkspace('msa')" class="ciliai-button" style="background:#7c3aed;color:white;font-weight:500;">🧬 Full-Length MSA</button>
                         <button onclick="window.downloadVariantCSV()" class="ciliai-button" style="background:#3b82f6;color:white;">⬇ Variant CSV</button>
                         <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#8b5cf6;color:white;">⬇ MSA FASTA</button>
                     </div>
                 </div>
+
+                <!-- Variant Filter Panel -->
+                <div style="padding:12px 20px; background:#f1f5f9; border-bottom:1px solid #e2e8f0; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <span style="font-weight:600; font-size:13px;">🔍 Filter Variants:</span>
+                        <input id="variant-filter" type="text" placeholder="Search by position, residue, disease..." style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:20px; width:220px; font-size:13px;" value="${filters?.filterText || ''}">
+                        <select id="patho-filter" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                            <option value="all" ${filters?.pathoFilter === 'all' ? 'selected' : ''}>All Significance</option>
+                            <option value="patho" ${filters?.pathoFilter === 'patho' ? 'selected' : ''}>Pathogenic Only</option>
+                            <option value="likely" ${filters?.pathoFilter === 'likely' ? 'selected' : ''}>Likely Pathogenic</option>
+                            <option value="benign" ${filters?.pathoFilter === 'benign' ? 'selected' : ''}>Benign/Likely Benign</option>
+                            <option value="vus" ${filters?.pathoFilter === 'vus' ? 'selected' : ''}>VUS</option>
+                            <option value="custom" ${filters?.pathoFilter === 'custom' ? 'selected' : ''}>Custom Only</option>
+                        </select>
+                        <select id="domain-filter" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                            <option value="all">All Domains</option>
+                            ${data.domains.map(d => `<option value="${d.name}" ${filters?.domainFilter === d.name ? 'selected' : ''}>${d.name}</option>`).join('')}
+                        </select>
+                        <button onclick="window.applyVariantFilters()" class="ciliai-button" style="background:#3b82f6; color:white; padding:6px 14px;">Apply</button>
+                        <button onclick="window.clearVariantFilters()" style="background:transparent; border:1px solid #94a3b8; padding:6px 14px; border-radius:6px;">Clear</button>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
+                        <span style="font-size:12px; color:#64748b;">📊 Showing <span id="variant-count">${displayVars.length}</span> variants</span>
+                    </div>
+                </div>
+
+                <!-- Statistics Dashboard -->
+                <div style="background:white; border-bottom:1px solid #e2e8f0; padding:15px 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <h4 style="margin:0; font-size:14px; font-weight:600;">📈 Variant Statistics</h4>
+                        <button onclick="document.getElementById('stats-content').style.display = document.getElementById('stats-content').style.display === 'none' ? 'grid' : 'none'" style="background:none; border:none; cursor:pointer;">▼</button>
+                    </div>
+                    <div id="stats-content" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px;">
+                        <div style="background:#f8fafc; padding:10px; border-radius:6px;">
+                            <div style="font-size:11px; color:#64748b;">Total Variants</div>
+                            <div style="font-size:24px; font-weight:700; color:#0f172a;">${data.variants.length}</div>
+                        </div>
+                        <div style="background:#fee2e2; padding:10px; border-radius:6px;">
+                            <div style="font-size:11px; color:#7f1d1d;">Pathogenic</div>
+                            <div style="font-size:24px; font-weight:700; color:#b91c1c;">${data.variants.filter(v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v))).length}</div>
+                        </div>
+                        <div style="background:#ffedd5; padding:10px; border-radius:6px;">
+                            <div style="font-size:11px; color:#7c2d12;">Likely Pathogenic</div>
+                            <div style="font-size:24px; font-weight:700; color:#c2410c;">${data.variants.filter(v => /likely pathogenic/i.test(getSig(v))).length}</div>
+                        </div>
+                        <div style="background:#dcfce7; padding:10px; border-radius:6px;">
+                            <div style="font-size:11px; color:#14532d;">Benign</div>
+                            <div style="font-size:24px; font-weight:700; color:#166534;">${data.variants.filter(v => /benign/i.test(getSig(v))).length}</div>
+                        </div>
+                        <div style="background:#f3f4f6; padding:10px; border-radius:6px;">
+                            <div style="font-size:11px; color:#1e293b;">Hotspot Regions</div>
+                            <div style="font-size:24px; font-weight:700; color:#334155;">${window.identifyHotspots(data.variants)}</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div style="flex:1; padding:16px; overflow:auto; background:#fdfdfd;">${svg}</div>
-                <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:12px; align-items:center; flex-shrink:0;">
-                    <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:140px;" />
-                    <select id="custom-var-sig" style="padding:8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
-                        <option value="Pathogenic">Pathogenic</option>
-                        <option value="Likely Pathogenic">Likely Pathogenic</option>
-                        <option value="VUS">VUS</option>
-                        <option value="Benign">Benign</option>
+                
+                <!-- Custom Variant Panel -->
+                <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:12px; align-items:center; flex-shrink:0; flex-wrap:wrap;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:140px;" />
+                        <select id="custom-var-sig" style="padding:8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+                            <option value="Pathogenic">Pathogenic</option>
+                            <option value="Likely Pathogenic">Likely Pathogenic</option>
+                            <option value="VUS">VUS</option>
+                            <option value="Benign">Benign</option>
+                        </select>
+                        <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">+ Add Custom</button>
+                    </div>
+                    
+                    <!-- Batch Upload -->
+                    <details style="margin-left:auto;">
+                        <summary style="font-weight:600; font-size:13px; cursor:pointer; color:#0056b3; padding:6px 12px; background:#e7f1ff; border-radius:6px;">📤 Batch Upload</summary>
+                        <div style="margin-top:10px; padding:15px; background:white; border:1px solid #e2e8f0; border-radius:8px; position:absolute; right:20px; width:300px; z-index:1000;">
+                            <textarea id="batch-variant-input" placeholder="p.L301R, p.R402X, p.G56V&#10;One variant per line or comma-separated" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px; min-height:80px;"></textarea>
+                            <div style="display:flex; gap:8px; margin-top:8px;">
+                                <select id="batch-sig" style="flex:1; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px;">
+                                    <option value="Pathogenic">Pathogenic</option>
+                                    <option value="Likely Pathogenic">Likely Pathogenic</option>
+                                    <option value="VUS">VUS</option>
+                                    <option value="Benign">Benign</option>
+                                </select>
+                                <button onclick="window.addBatchVariants()" style="background:#0056b3; color:white; border:none; padding:6px 12px; border-radius:6px;">Add All</button>
+                                <button onclick="window.clearBatchInput()" style="background:transparent; border:1px solid #94a3b8; padding:6px 12px; border-radius:6px;">Clear</button>
+                            </div>
+                        </div>
+                    </details>
+                    
+                    <!-- Export Options -->
+                    <select id="export-format" style="padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px;">
+                        <option value="png">PNG (300 DPI)</option>
+                        <option value="svg">SVG (Vector)</option>
                     </select>
-                    <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">+ Add Custom Variant</button>
+                    <button onclick="window.exportPublicationImage()" style="background:#059669; color:white; padding:6px 12px; border-radius:6px; border:none;">
+                        📸 Export Figure
+                    </button>
                 </div>
             </div>
             <div id="var-panel" style="display:none; position:absolute; top:80px; right:30px; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; width:280px; box-shadow:0 10px 25px rgba(0,0,0,0.1); z-index:100;">
@@ -7944,7 +8331,7 @@ window.downloadCurrentVisualization = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 3. RENDERER WITH BLUE THEME UI & VISIBILITY FIXES
+    // 3. MSA RENDERER WITH ENHANCED FEATURES
     // ─────────────────────────────────────────────────────────────
     window.renderFullLengthMSA = function(data, container) {
         const align = window.CiliAI.activeAlignmentData;
@@ -7982,6 +8369,9 @@ window.downloadCurrentVisualization = function() {
             posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:${show?'#0056b3':'#cbd5e1'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
         }
 
+        // Conservation heatmap
+        const conservationHeatmap = window.generateConservationHeatmap(align.alignments, fullSeq.length);
+
         let rowsHtml = '';
         align.alignments.forEach((aln) => {
             let seqHtml = '';
@@ -7997,16 +8387,33 @@ window.downloadCurrentVisualization = function() {
 
         container.innerHTML = `
             <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif; background:#fff;">
-                <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;flex-wrap:wrap;">
                     <div><strong style="font-size:16px;">${data.gene} Evolutionary Analysis</strong><div style="font-size:12px;opacity:0.9;margin-top:2px;">${fullSeq.length} AA • ${align.alignments.length} Species • ${allVars.length} Variants</div></div>
                     <div style="display:flex;gap:10px;">
-                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;"><option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Default)</option></select>
+                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;">
+                            <option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Default)</option>
+                        </select>
                         <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:rgba(255,255,255,0.2);color:white;padding:6px 12px;border:1px solid rgba(255,255,255,0.4);">← Back to Map</button>
-                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ MSA FASTA</button>
-                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ MSA CSV</button>
+                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ FASTA</button>
+                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ CSV</button>
                     </div>
                 </div>
-                <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;">
+
+                <!-- Mini-map Navigator -->
+                <div style="padding:8px 20px; background:#e7f1ff; border-bottom:1px solid #dbeafe;">
+                    <div style="position:relative; margin-bottom:5px;">
+                        <div style="background:#e2e8f0; height:30px; border-radius:4px; position:relative; width:100%;">
+                            <div id="mini-map-viewport" style="position:absolute; height:30px; background:rgba(0,86,179,0.3); border:2px solid #0056b3; border-radius:4px; width:200px;"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-top:4px;">
+                            <span style="font-size:11px;">Position 1</span>
+                            <span style="font-size:11px;">Position ${fullSeq.length}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
                     <span style="font-size:13px;color:#0056b3;font-weight:600;">Jump to Position:</span>
                     <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Pos" style="width:80px;padding:4px 8px;border:1px solid #0056b3;border-radius:4px;font-size:13px;color:#0056b3;" />
                     <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:4px 12px;background:#0056b3;color:white;font-size:13px;">Go</button>
@@ -8017,17 +8424,42 @@ window.downloadCurrentVisualization = function() {
                         <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏭ End</button>
                     </div>
                 </div>
+
+                <!-- Conservation Heatmap Track -->
+                <div style="background:#fff; border-bottom:1px solid #e2e8f0;">
+                    <div style="display:flex;">
+                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;">
+                            <div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Conservation</div>
+                        </div>
+                        <div style="display:flex; gap:1px; flex-wrap:wrap; padding:2px 0; min-width:${seqWidth}px;">
+                            ${conservationHeatmap}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Header with Position Markers and Variants -->
                 <div style="background:#fff;border-bottom:2px solid #0056b3;flex-shrink:0;">
                     <div style="display:flex;">
-                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;"><div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Species & Variants</div></div>
+                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;">
+                            <div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Species & Variants</div>
+                        </div>
                         <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
                             <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#fff;">${markersHtml}</div>
                             <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f7ff;">${posHtml}</div>
                         </div>
                     </div>
                 </div>
+
+                <!-- MSA Rows -->
                 <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:thin;scrollbar-color:#0056b3 #f0f7ff;">${rowsHtml}</div>
-                <style>#msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; } #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; } #header-scroll::-webkit-scrollbar { height: 0px; }</style>
+                
+                <style>
+                    #msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
+                    #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; }
+                    #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; }
+                    #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; }
+                    #header-scroll::-webkit-scrollbar { height: 0px; }
+                </style>
             </div>
             <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #0056b3;border-radius:6px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:10000;min-width:300px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
@@ -8041,8 +8473,27 @@ window.downloadCurrentVisualization = function() {
                 </div>
             </div>`;
         setupSyncScroll();
+        setupMiniMap();
         setTimeout(() => { const c = document.getElementById('msa-scroll'); if (c) c.scrollTop = 0; }, 100);
     };
+
+    function setupMiniMap() {
+        const msaScroll = document.getElementById('msa-scroll');
+        const miniMap = document.getElementById('mini-map-viewport');
+        if (!msaScroll || !miniMap) return;
+        
+        const updateMiniMap = () => {
+            const scrollPercent = msaScroll.scrollLeft / (msaScroll.scrollWidth - msaScroll.clientWidth);
+            const viewportWidth = (msaScroll.clientWidth / msaScroll.scrollWidth) * 100;
+            const viewportLeft = scrollPercent * (100 - viewportWidth);
+            miniMap.style.width = viewportWidth + '%';
+            miniMap.style.left = viewportLeft + '%';
+        };
+        
+        msaScroll.addEventListener('scroll', updateMiniMap);
+        window.addEventListener('resize', updateMiniMap);
+        setTimeout(updateMiniMap, 100);
+    }
 
     // ─────────────────────────────────────────────────────────────
     // 4. HELPER FUNCTIONS
@@ -8123,8 +8574,10 @@ window.downloadCurrentVisualization = function() {
         const d = window.CiliAI.activeVariantData;
         if (!d) return;
         const v = [...d.variants, ...d.customVariants];
-        let c = "Position,Wild_Type,Variant,Clinical_Significance,Disease,Description\n";
-        v.forEach(x => { c += `${x.begin},${x.wildType||'?'},${x.alternativeSequence||'?'},"${(x.clinicalSignificance||'').replace(/"/g,'""')}","${(x.disease||'').replace(/"/g,'""')}","${(x.description||'').replace(/"/g,'""')}"\n`; });
+        let c = "Position,Wild_Type,Variant,Clinical_Significance,Disease,Description,Source\n";
+        v.forEach(x => { 
+            c += `${x.begin},${x.wildType||'?'},${x.alternativeSequence||'?'},"${(x.clinicalSignificance||'').replace(/"/g,'""')}","${(x.disease||'').replace(/"/g,'""')}","${(x.description||'').replace(/"/g,'""')}","${x.isCustom ? 'Custom' : 'ClinVar'}"\n`;
+        });
         const b = new Blob([c], {type: 'text/csv'});
         const l = document.createElement('a');
         l.href = URL.createObjectURL(b);
@@ -8393,22 +8846,9 @@ window.downloadCurrentVisualization = function() {
         if (btn) btn.innerText = "🌍 Check Conservation";
     };
 
-    window.addVariantHelpMessage = function() {
-        if (window.addChatMessage) {
-            window.addChatMessage(`
-                <div class="ai-result-card" style="border-left: 4px solid #3b82f6; padding:12px; background:#f0f9ff; border-radius:6px; margin:8px 0;">
-                    <strong>🧬 Variant Analysis Tools Ready</strong>
-                    <ul style="margin:8px 0 0 20px; font-size:13px; color:#475569; padding:0; list-style-type:disc;">
-                        <li><strong>Visualize:</strong> Red variants are Pathogenic. Click variants for details.</li>
-                        <li><strong>Conservation:</strong> Click "Check Conservation" to compare across 65 species.</li>
-                        <li><strong>Full MSA:</strong> View complete protein alignment with all variants.</li>
-                        <li><strong>3D View:</strong> See variants on AlphaFold structures.</li>
-                        <li><strong>Downloads:</strong> Export variant CSV, MSA FASTA, or alignment CSV.</li>
-                        <li><strong>Navigation:</strong> Use Go to Position to jump to specific residues.</li>
-                    </ul>
-                </div>`, false);
-        }
-    };
+    // Initialize keyboard shortcuts and load state
+    window.initKeyboardShortcuts();
+    window.loadStateFromURL();
 })();
 
 /* ==============================================================
@@ -8747,7 +9187,7 @@ window.downloadCurrentVisualization = function() {
     console.log("[CiliAI] Advanced Analytics & Persistence module loaded.");
 })();
 
-
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
