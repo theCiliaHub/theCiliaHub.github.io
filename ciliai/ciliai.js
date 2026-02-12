@@ -7710,8 +7710,9 @@ window.downloadCurrentVisualization = function() {
                     window.toggleShortcuts();
                     break;
                 case 'escape':
-                    document.getElementById('shortcuts-modal')?.style.display = 'none';
-                    break;
+    const modal = document.getElementById('shortcuts-modal');
+    if (modal) modal.style.display = 'none';
+    break;
             }
         });
     };
@@ -9175,6 +9176,7 @@ if (typeof window.handleAIQuery !== 'function') {
 }
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
