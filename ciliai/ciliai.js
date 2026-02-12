@@ -7326,6 +7326,7 @@ window.runDashboardSearch = function() {
     console.log("CiliAI Layout Fixes Applied.");
 })();
 
+
 // Helper: Reset Views – Ensures diagram is visible and refreshed
 window.resetViews = function() {
     // Hide all alternative views
@@ -7640,16 +7641,15 @@ window.downloadCurrentVisualization = function() {
 };
 
 /* ==============================================================
- * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.4 - ENHANCED)
- * Features: 
+ * MODULE: VARIANT ANALYSIS & EVOLUTIONARY ENGINE (v16.5 - ENHANCED)
+ * Features:
  * - 3D Structure (MolStar) with Unpkg Fallback
  * - Professional MSA Visualizer (Jalview Style)
- * - Conservation Analysis (65 Species)
+ * - Conservation Analysis (Organism Panel)
+ * - Forced Visibility Fixes (!important tags)
  * - Variant Filtering & Search
- * - Statistics Dashboard
- * - Batch Upload
- * - Keyboard Shortcuts
- * - Publication-Ready Export
+ * - Batch Variant Upload
+ * - Keyboard Shortcuts Help Panel
  * ============================================================== */
 (function() {
     'use strict';
@@ -7658,124 +7658,17 @@ window.downloadCurrentVisualization = function() {
     window.CiliAI.activeVariantData = null;
     window.CiliAI.activeAlignmentData = null;
     window.CiliAI.activeColorScheme = 'ClustalX';
-    window.CiliAI.compareMode = false;
-    window.CiliAI.comparisonSet = [];
 
-    // Global progress bar
-    const progressBar = document.createElement('div');
-    progressBar.id = 'global-progress';
-    progressBar.style.cssText = 'position:fixed; top:0; left:0; width:0%; height:3px; background:#0056b3; transition:width 0.3s; z-index:10000;';
-    document.body.appendChild(progressBar);
-
-    window.showProgress = function(percent) {
-        const bar = document.getElementById('global-progress');
-        bar.style.width = percent + '%';
-        if (percent >= 100) setTimeout(() => bar.style.width = '0%', 1000);
-    };
-
-    // Keyboard Shortcuts
-    window.initKeyboardShortcuts = function() {
-        document.addEventListener('keydown', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            
-            switch(e.key.toLowerCase()) {
-                case 'm':
-                    if (window.CiliAI.activeVariantData) {
-                        const container = document.getElementById('plotly-container');
-                        if (container.querySelector('#msa-scroll')) {
-                            window.drawVariantWorkspace('map');
-                        } else {
-                            window.drawVariantWorkspace('msa');
-                        }
-                    }
-                    break;
-                case 'f':
-                    document.getElementById('variant-filter')?.focus();
-                    break;
-                case 'd':
-                    window.downloadCurrentVisualization();
-                    break;
-                case 'g':
-                    const pos = prompt('Enter position to jump to:');
-                    if (pos && window.CiliAI.activeAlignmentData) {
-                        document.getElementById('msa-jump-input').value = pos;
-                        window.msaJumpToPosition();
-                    }
-                    break;
-                case '?':
-                    window.toggleShortcuts();
-                    break;
-                case 'escape':
-                    document.getElementById('shortcuts-modal')?.style.display = 'none';
-                    break;
-            }
-        });
-    };
-
-    window.toggleShortcuts = function() {
-        let modal = document.getElementById('shortcuts-modal');
-        if (modal) {
-            modal.style.display = modal.style.display === 'none' ? 'block' : 'none';
-        } else {
-            modal = document.createElement('div');
-            modal.id = 'shortcuts-modal';
-            modal.style.cssText = 'display:block; position:fixed; bottom:20px; right:20px; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1); z-index:1000; max-width:300px;';
-            modal.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h4 style="margin:0; font-size:14px; font-weight:600;">⌨️ Keyboard Shortcuts</h4>
-                    <button onclick="this.parentElement.parentElement.style.display='none'" style="border:none; background:none; cursor:pointer; font-size:18px;">✕</button>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 2fr; gap:8px; font-size:12px;">
-                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">M</kbd></span><span>Toggle MSA/Map</span>
-                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">F</kbd></span><span>Focus search</span>
-                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">D</kbd></span><span>Download current</span>
-                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">G</kbd></span><span>Go to position</span>
-                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">?</kbd></span><span>Show shortcuts</span>
-                    <span><kbd style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">Esc</kbd></span><span>Close</span>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-    };
-
-    // URL State Management
-    window.updateURLState = function() {
-        if (!window.CiliAI.activeVariantData) return;
-        const state = {
-            gene: window.CiliAI.activeVariantData.gene,
-            view: document.getElementById('plotly-container').querySelector('#msa-scroll') ? 'msa' : 'map',
-            timestamp: Date.now()
-        };
-        const url = new URL(window.location);
-        url.searchParams.set('state', btoa(JSON.stringify(state)));
-        window.history.pushState({}, '', url);
-    };
-
-    window.loadStateFromURL = function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const stateParam = urlParams.get('state');
-        if (stateParam) {
-            try {
-                const state = JSON.parse(atob(stateParam));
-                if (state.gene) {
-                    setTimeout(() => {
-                        window.renderVariantMap(state.gene).then(() => {
-                            if (state.view === 'msa') {
-                                setTimeout(() => window.drawVariantWorkspace('msa'), 500);
-                            }
-                        });
-                    }, 1000);
-                }
-            } catch (e) {
-                console.error('Failed to load state from URL', e);
-            }
-        }
+    window.CiliAI.variantFilters = {
+        searchText: '',
+        significance: 'all',
+        domain: 'all'
     };
 
     // ─────────────────────────────────────────────────────────────
     // 0. CONFIGURATION & DATA CONSTANTS
     // ─────────────────────────────────────────────────────────────
-    
+
     const MOLSTAR_SOURCES = [
         {
             name: 'jsdelivr',
@@ -7787,6 +7680,22 @@ window.downloadCurrentVisualization = function() {
             css: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar.css',
             js: 'https://unpkg.com/pdbe-molstar@3.1.0/build/pdbe-molstar-component.js'
         }
+    ];
+
+    const ORGANISM_PANEL = [
+        { name: "Homo sapiens", common: "Human", dist: 0.0, icon: "👤" },
+        { name: "Pan troglodytes", common: "Chimpanzee", dist: 0.01, icon: "🐵" },
+        { name: "Mus musculus", common: "Mouse", dist: 0.15, icon: "🐭" },
+        { name: "Rattus norvegicus", common: "Rat", dist: 0.16, icon: "🐀" },
+        { name: "Canis lupus familiaris", common: "Dog", dist: 0.18, icon: "🐕" },
+        { name: "Bos taurus", common: "Cow", dist: 0.20, icon: "🐄" },
+        { name: "Gallus gallus", common: "Chicken", dist: 0.30, icon: "🐔" },
+        { name: "Xenopus tropicalis", common: "Frog", dist: 0.45, icon: "🐸" },
+        { name: "Danio rerio", common: "Zebrafish", dist: 0.50, icon: "🐟" },
+        { name: "Drosophila melanogaster", common: "Fruit Fly", dist: 0.70, icon: "🪰" },
+        { name: "Caenorhabditis elegans", common: "Worm", dist: 0.75, icon: "🪱" },
+        { name: "Saccharomyces cerevisiae", common: "Yeast", dist: 0.90, icon: "🍄" },
+        { name: "Chlamydomonas reinhardtii", common: "Algae", dist: 0.85, icon: "🦠" }
     ];
 
     const CLUSTALX_COLORS = {
@@ -7838,8 +7747,8 @@ window.downloadCurrentVisualization = function() {
     // ─────────────────────────────────────────────────────────────
     // 1. DATA FETCHING
     // ─────────────────────────────────────────────────────────────
+
     window.fetchVariantDataLive = async function(geneSymbol) {
-        window.showProgress(20);
         const gene = geneSymbol.toUpperCase();
         try {
             const mgRes = await fetch(`https://mygene.info/v3/query?q=symbol:${gene}&fields=uniprot.Swiss-Prot,uniprot.TrEMBL&species=human`);
@@ -7849,7 +7758,6 @@ window.downloadCurrentVisualization = function() {
             let rawID = hit.uniprot['Swiss-Prot'] || hit.uniprot.TrEMBL;
             const uniprotID = Array.isArray(rawID) ? rawID[0] : rawID;
 
-            window.showProgress(50);
             const [varRes, featRes] = await Promise.all([
                 fetch(`https://www.ebi.ac.uk/proteins/api/variation/${uniprotID}`),
                 fetch(`https://www.ebi.ac.uk/proteins/api/features/${uniprotID}`)
@@ -7871,35 +7779,11 @@ window.downloadCurrentVisualization = function() {
                 color: naturePalette[colorIdx++ % naturePalette.length]
             }));
 
-            // Extract PTM and functional sites
-            const features = (featData.features || []).map(f => ({
-                type: f.type,
-                description: f.description,
-                start: parseInt(f.begin),
-                end: parseInt(f.end)
-            }));
-
-            window.showProgress(100);
-            return { gene, uniprotID, length, sequence, variants, domains, features, customVariants: [] };
+            return { gene, uniprotID, length, sequence, variants, domains, customVariants: [] };
         } catch (e) {
             console.error("Fetch Error:", e);
-            window.showProgress(0);
             return { error: e.message };
         }
-    };
-
-    window.identifyHotspots = function(variants) {
-        const positions = variants.map(v => parseInt(v.begin)).filter(p => !isNaN(p));
-        if (positions.length === 0) return 'N/A';
-        
-        const density = {};
-        positions.forEach(p => {
-            const region = Math.floor(p / 50) * 50;
-            density[region] = (density[region] || 0) + 1;
-        });
-        
-        const maxRegion = Object.entries(density).reduce((a, b) => a[1] > b[1] ? a : b)[0];
-        return `${maxRegion}-${parseInt(maxRegion)+50}`;
     };
 
     window.renderVariantMap = async function(geneSymbol) {
@@ -7918,7 +7802,6 @@ window.downloadCurrentVisualization = function() {
         window.CiliAI.activeVariantData = data;
         await window.loadFullLengthAlignment(data.gene);
         window.drawVariantWorkspace('map');
-        window.updateURLState();
     };
 
     window.drawVariantWorkspace = function(view = 'map') {
@@ -7930,134 +7813,9 @@ window.downloadCurrentVisualization = function() {
         else if (view === 'msa') renderFullLengthMSA(data, container);
     };
 
-    window.applyVariantFilters = function() {
-        const filterText = document.getElementById('variant-filter')?.value.toLowerCase() || '';
-        const pathoFilter = document.getElementById('patho-filter')?.value || 'all';
-        const domainFilter = document.getElementById('domain-filter')?.value || 'all';
-        
-        window.CiliAI.activeFilters = { filterText, pathoFilter, domainFilter };
-        window.drawVariantWorkspace('map');
-    };
-
-    window.clearVariantFilters = function() {
-        document.getElementById('variant-filter').value = '';
-        document.getElementById('patho-filter').value = 'all';
-        document.getElementById('domain-filter').value = 'all';
-        window.CiliAI.activeFilters = null;
-        window.drawVariantWorkspace('map');
-    };
-
-    window.toggleCompareMode = function() {
-        window.CiliAI.compareMode = !window.CiliAI.compareMode;
-        window.CiliAI.comparisonSet = [];
-        const btn = document.getElementById('compare-mode-btn');
-        if (btn) {
-            btn.style.background = window.CiliAI.compareMode ? '#0056b3' : '#fff';
-            btn.style.color = window.CiliAI.compareMode ? 'white' : '#0056b3';
-            btn.innerHTML = window.CiliAI.compareMode ? '✓ Compare Mode ON' : '🔍 Compare Mode';
-        }
-    };
-
-    window.addToComparisonSet = function(variant, gene) {
-        if (!window.CiliAI.compareMode) return;
-        if (window.CiliAI.comparisonSet.length >= 4) {
-            alert('Maximum 4 variants can be compared at once');
-            return;
-        }
-        window.CiliAI.comparisonSet.push({ variant, gene });
-        alert(`Added to comparison set (${window.CiliAI.comparisonSet.length}/4)`);
-    };
-
-    window.exportPublicationImage = async function() {
-        const format = document.getElementById('export-format')?.value || 'png';
-        const container = document.getElementById('plotly-container');
-        const svgElement = container.querySelector('svg');
-        
-        if (svgElement) {
-            if (format === 'svg') {
-                const svgData = new XMLSerializer().serializeToString(svgElement);
-                const blob = new Blob([svgData], {type: 'image/svg+xml'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${window.CiliAI.activeVariantData?.gene}_figure.svg`;
-                a.click();
-            } else {
-                // Convert SVG to high-res PNG
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const img = new Image();
-                const svgBlob = new Blob([svgElement.outerHTML], {type: 'image/svg+xml'});
-                const url = URL.createObjectURL(svgBlob);
-                
-                img.onload = function() {
-                    canvas.width = img.width * 3; // 300 DPI equivalent
-                    canvas.height = img.height * 3;
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    canvas.toBlob(function(blob) {
-                        const a = document.createElement('a');
-                        a.href = URL.createObjectURL(blob);
-                        a.download = `${window.CiliAI.activeVariantData?.gene}_figure.png`;
-                        a.click();
-                    });
-                };
-                img.src = url;
-            }
-        }
-    };
-
-    window.addBatchVariants = function() {
-        const input = document.getElementById('batch-variant-input');
-        const significance = document.getElementById('batch-sig').value;
-        if (!input?.value) return;
-        
-        const lines = input.value.split(/[,\n]/);
-        const variants = lines.map(l => l.trim()).filter(l => l.match(/^p\.([A-Z]+)(\d+)([A-Z*]+)$/i));
-        
-        variants.forEach(v => {
-            const match = v.replace(/^p\./i, '').match(/^([A-Z]+)(\d+)([A-Z*]+)$/i);
-            if (match && window.CiliAI.activeVariantData) {
-                const pos = parseInt(match[2]);
-                window.CiliAI.activeVariantData.customVariants.push({
-                    wildType: match[1],
-                    begin: pos,
-                    alternativeSequence: match[3],
-                    clinicalSignificance: significance,
-                    description: "Batch custom variant",
-                    disease: "User-defined",
-                    isCustom: true
-                });
-            }
-        });
-        
-        window.drawVariantWorkspace('map');
-        input.value = '';
-        alert(`Added ${variants.length} variants`);
-    };
-
-    window.clearBatchInput = function() {
-        document.getElementById('batch-variant-input').value = '';
-    };
-
-    window.generateConservationHeatmap = function(alignments, length) {
-        let html = '';
-        for (let i = 0; i < length; i++) {
-            const column = alignments.map(a => a.seq[i]);
-            const refAA = alignments[0].seq[i];
-            const conservation = column.filter(aa => aa === refAA && aa !== '-').length / column.length;
-            let color = '';
-            if (conservation > 0.8) color = '#0056b3';
-            else if (conservation > 0.6) color = '#3b82f6';
-            else if (conservation > 0.4) color = '#93c5fd';
-            else color = '#e2e8f0';
-            html += `<div style="width:18px; height:8px; background:${color};" title="Position ${i+1}: ${Math.round(conservation*100)}% conserved"></div>`;
-        }
-        return html;
-    };
-
     function renderDomainVariantMap(data, container) {
         const w = container.clientWidth - 40 || 900;
-        const h = 580;
+        const h = 480;
         const pad = 40;
         const trackY = 220;
         const xScale = pos => pad + (pos / data.length) * (w - 2 * pad);
@@ -8066,50 +7824,12 @@ window.downloadCurrentVisualization = function() {
         const isPatho = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
         const isLikely = v => /likely pathogenic/i.test(getSig(v));
 
-        // Apply filters
-        let filteredVariants = [...data.variants];
-        const filters = window.CiliAI.activeFilters;
-        if (filters) {
-            if (filters.filterText) {
-                filteredVariants = filteredVariants.filter(v => 
-                    v.begin.toString().includes(filters.filterText) ||
-                    v.wildType?.toLowerCase().includes(filters.filterText) ||
-                    v.alternativeSequence?.toLowerCase().includes(filters.filterText) ||
-                    (v.description || '').toLowerCase().includes(filters.filterText)
-                );
-            }
-            if (filters.pathoFilter !== 'all') {
-                filteredVariants = filteredVariants.filter(v => {
-                    switch(filters.pathoFilter) {
-                        case 'patho': return isPatho(v);
-                        case 'likely': return isLikely(v);
-                        case 'benign': return /benign/i.test(getSig(v));
-                        case 'vus': return !isPatho(v) && !isLikely(v) && !/benign/i.test(getSig(v));
-                        case 'custom': return v.isCustom;
-                        default: return true;
-                    }
-                });
-            }
-            if (filters.domainFilter !== 'all') {
-                const domain = data.domains.find(d => d.name === filters.domainFilter);
-                if (domain) {
-                    filteredVariants = filteredVariants.filter(v => 
-                        parseInt(v.begin) >= domain.start && parseInt(v.begin) <= domain.end
-                    );
-                }
-            }
-        }
-
-        let displayVars = [
-            ...filteredVariants.filter(isPatho),
-            ...filteredVariants.filter(isLikely),
-            ...filteredVariants.filter(v => !isPatho(v) && !isLikely(v)).slice(0, 60)
-        ];
+        let displayVars = [...data.variants.filter(isPatho), ...data.variants.filter(isLikely), ...data.variants.filter(v => !isPatho(v) && !isLikely(v)).slice(0, 60)];
         displayVars = [...displayVars, ...data.customVariants].sort((a,b) => parseInt(a.begin) - parseInt(b.begin));
 
         let svg = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;">`;
         svg += `<text x="${pad}" y="35" font-size="18" font-weight="700" fill="#1e293b">${data.gene} – Domain & Variant Map</text>`;
-        svg += `<text x="${pad}" y="58" font-size="13" fill="#64748b">${data.length} aa • ${data.domains.length} domains • ${displayVars.length} variants shown (${data.variants.length} total)</text>`;
+        svg += `<text x="${pad}" y="58" font-size="13" fill="#64748b">${data.length} aa • ${data.domains.length} domains • ${displayVars.length} variants shown</text>`;
         svg += `<rect x="${pad}" y="${trackY-8}" width="${w-2*pad}" height="16" rx="8" fill="#e2e8f0"/>`;
 
         data.domains.forEach(d => {
@@ -8117,15 +7837,6 @@ window.downloadCurrentVisualization = function() {
             const width = Math.max(xScale(d.end) - x1, 6);
             svg += `<rect x="${x1}" y="${trackY-16}" width="${width}" height="32" rx="6" fill="${d.color}" opacity="0.88" stroke="#fff" stroke-width="1"><title>${d.name} (${d.start}–${d.end})</title></rect>`;
         });
-
-        // PTM and functional sites
-        if (data.features) {
-            data.features.filter(f => ['MOD_RES', 'LIPID', 'CARBOHYD', 'DISULFID', 'CROSSLNK'].includes(f.type)).forEach(f => {
-                const x1 = xScale(f.start);
-                const width = Math.max(xScale(f.end) - x1, 2);
-                svg += `<rect x="${x1}" y="${trackY-25}" width="${width}" height="6" fill="rgba(147, 197, 253, 0.5)" stroke="#0284c7" stroke-width="1"><title>${f.type}: ${f.description} (${f.start}-${f.end})</title></rect>`;
-            });
-        }
 
         displayVars.forEach(v => {
             const x = xScale(parseInt(v.begin));
@@ -8139,95 +7850,62 @@ window.downloadCurrentVisualization = function() {
             const yHead = trackY - height;
             const label = `p.${v.wildType || '?'}${v.begin}${v.alternativeSequence || '?'}`;
             const desc = (v.description || getSig(v)).replace(/['"]/g,'');
-            const click = window.CiliAI.compareMode 
-                ? `window.addToComparisonSet('${label} (${v.begin})', '${data.gene}')`
-                : `window.openVariantPanel('${label}', '${v.begin}', '${desc}', '${data.gene}')`;
+            const click = `window.openVariantPanel('${label}', '${v.begin}', '${desc}', '${data.gene}')`;
 
             svg += `<g cursor="pointer" onclick="${click}">
                 <line x1="${x}" y1="${trackY-12}" x2="${x}" y2="${yHead}" stroke="${color}" stroke-width="${v.isCustom?2:1.5}" opacity="0.7"/>
-                <circle class="variant-circle" cx="${x}" cy="${yHead}" r="${v.isCustom?7:5}" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+                <circle cx="${x}" cy="${yHead}" r="${v.isCustom?7:5}" fill="${color}" stroke="#fff" stroke-width="1.5"/>
             </g>`;
         });
         svg += `</svg>`;
 
         container.innerHTML = `
             <div style="height:100%; display:flex; flex-direction:column; font-family:'Inter',sans-serif;">
-                <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; flex-wrap:wrap; gap:10px;">
-                    <div style="font-size:13px; color:#475569; display:flex; gap:16px; flex-wrap:wrap;">
+                <div style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                    <div style="font-size:13px; color:#475569; display:flex; gap:16px;">
                         <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:50%;"></span> Pathogenic</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:50%;"></span> Likely Pathogenic</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#94a3b8;border-radius:50%;"></span> VUS / Benign</span>
                         <span><span style="display:inline-block;width:10px;height:10px;background:#d946ef;border-radius:50%;"></span> Custom</span>
-                        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(147,197,253,0.5); border:1px solid #0284c7;"></span> PTM Sites</span>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button id="compare-mode-btn" onclick="window.toggleCompareMode()" style="background:#fff; border:1px solid #0056b3; color:#0056b3; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;">🔍 Compare Mode</button>
                         <button onclick="window.drawVariantWorkspace('msa')" class="ciliai-button" style="background:#7c3aed;color:white;font-weight:500;">🧬 Full-Length MSA</button>
                         <button onclick="window.downloadVariantCSV()" class="ciliai-button" style="background:#3b82f6;color:white;">⬇ Variant CSV</button>
                         <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#8b5cf6;color:white;">⬇ MSA FASTA</button>
                     </div>
                 </div>
 
-                <!-- Variant Filter Panel -->
-                <div style="padding:12px 20px; background:#f1f5f9; border-bottom:1px solid #e2e8f0; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
+                <div style="padding:12px 20px; background:#f1f5f9; border-radius:8px; margin:10px 20px; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                        <span style="font-weight:600; font-size:13px;">🔍 Filter Variants:</span>
-                        <input id="variant-filter" type="text" placeholder="Search by position, residue, disease..." style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:20px; width:220px; font-size:13px;" value="${filters?.filterText || ''}">
-                        <select id="patho-filter" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-                            <option value="all" ${filters?.pathoFilter === 'all' ? 'selected' : ''}>All Significance</option>
-                            <option value="patho" ${filters?.pathoFilter === 'patho' ? 'selected' : ''}>Pathogenic Only</option>
-                            <option value="likely" ${filters?.pathoFilter === 'likely' ? 'selected' : ''}>Likely Pathogenic</option>
-                            <option value="benign" ${filters?.pathoFilter === 'benign' ? 'selected' : ''}>Benign/Likely Benign</option>
-                            <option value="vus" ${filters?.pathoFilter === 'vus' ? 'selected' : ''}>VUS</option>
-                            <option value="custom" ${filters?.pathoFilter === 'custom' ? 'selected' : ''}>Custom Only</option>
+                        <span style="font-weight:600; font-size:13px; white-space:nowrap;">🔍 Filter variants:</span>
+                        <input id="variant-filter" type="text" placeholder="position / residue / disease / keyword..." 
+                               style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:9999px; width:220px; font-size:13px;">
+                        <select id="patho-filter" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                            <option value="all">All significance</option>
+                            <option value="patho">Pathogenic only</option>
+                            <option value="likely">Likely pathogenic</option>
+                            <option value="benign">Benign / likely benign</option>
+                            <option value="vus">VUS only</option>
+                            <option value="custom">Custom only</option>
                         </select>
-                        <select id="domain-filter" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-                            <option value="all">All Domains</option>
-                            ${data.domains.map(d => `<option value="${d.name}" ${filters?.domainFilter === d.name ? 'selected' : ''}>${d.name}</option>`).join('')}
+                        <select id="domain-filter" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                            <option value="all">All domains / regions</option>
+                            ${data.domains.map(d => `<option value="${d.name}">${d.name} (${d.start}–${d.end})</option>`).join('')}
                         </select>
-                        <button onclick="window.applyVariantFilters()" class="ciliai-button" style="background:#3b82f6; color:white; padding:6px 14px;">Apply</button>
-                        <button onclick="window.clearVariantFilters()" style="background:transparent; border:1px solid #94a3b8; padding:6px 14px; border-radius:6px;">Clear</button>
                     </div>
-                    <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
-                        <span style="font-size:12px; color:#64748b;">📊 Showing <span id="variant-count">${displayVars.length}</span> variants</span>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="window.applyVariantFilters()" class="ciliai-button" style="background:#3b82f6;color:white;padding:6px 14px;font-size:13px;">Apply</button>
+                        <button onclick="window.clearVariantFilters()" class="ciliai-button" style="background:transparent;border:1px solid #94a3b8;color:#475569;padding:6px 14px;font-size:13px;">Clear</button>
                     </div>
-                </div>
-
-                <!-- Statistics Dashboard -->
-                <div style="background:white; border-bottom:1px solid #e2e8f0; padding:15px 20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <h4 style="margin:0; font-size:14px; font-weight:600;">📈 Variant Statistics</h4>
-                        <button onclick="document.getElementById('stats-content').style.display = document.getElementById('stats-content').style.display === 'none' ? 'grid' : 'none'" style="background:none; border:none; cursor:pointer;">▼</button>
-                    </div>
-                    <div id="stats-content" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px;">
-                        <div style="background:#f8fafc; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#64748b;">Total Variants</div>
-                            <div style="font-size:24px; font-weight:700; color:#0f172a;">${data.variants.length}</div>
-                        </div>
-                        <div style="background:#fee2e2; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#7f1d1d;">Pathogenic</div>
-                            <div style="font-size:24px; font-weight:700; color:#b91c1c;">${data.variants.filter(v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v))).length}</div>
-                        </div>
-                        <div style="background:#ffedd5; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#7c2d12;">Likely Pathogenic</div>
-                            <div style="font-size:24px; font-weight:700; color:#c2410c;">${data.variants.filter(v => /likely pathogenic/i.test(getSig(v))).length}</div>
-                        </div>
-                        <div style="background:#dcfce7; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#14532d;">Benign</div>
-                            <div style="font-size:24px; font-weight:700; color:#166534;">${data.variants.filter(v => /benign/i.test(getSig(v))).length}</div>
-                        </div>
-                        <div style="background:#f3f4f6; padding:10px; border-radius:6px;">
-                            <div style="font-size:11px; color:#1e293b;">Hotspot Regions</div>
-                            <div style="font-size:24px; font-weight:700; color:#334155;">${window.identifyHotspots(data.variants)}</div>
-                        </div>
+                    <div style="margin-left:auto; font-size:13px; color:#64748b;">
+                        Showing <strong id="variant-count">${displayVars.length}</strong> variants
                     </div>
                 </div>
 
                 <div style="flex:1; padding:16px; overflow:auto; background:#fdfdfd;">${svg}</div>
-                
-                <!-- Custom Variant Panel -->
-                <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:12px; align-items:center; flex-shrink:0; flex-wrap:wrap;">
-                    <div style="display:flex; gap:8px; align-items:center;">
+
+                <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; flex-direction:column; gap:12px;">
+                    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
                         <input id="custom-var-input" type="text" placeholder="p.L301R" style="padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:140px;" />
                         <select id="custom-var-sig" style="padding:8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
                             <option value="Pathogenic">Pathogenic</option>
@@ -8235,54 +7913,167 @@ window.downloadCurrentVisualization = function() {
                             <option value="VUS">VUS</option>
                             <option value="Benign">Benign</option>
                         </select>
-                        <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">+ Add Custom</button>
+                        <button onclick="window.addUserVariant()" class="ciliai-button" style="background:#3b82f6; color:white; padding:8px 16px;">+ Add single</button>
                     </div>
-                    
-                    <!-- Batch Upload -->
-                    <details style="margin-left:auto;">
-                        <summary style="font-weight:600; font-size:13px; cursor:pointer; color:#0056b3; padding:6px 12px; background:#e7f1ff; border-radius:6px;">📤 Batch Upload</summary>
-                        <div style="margin-top:10px; padding:15px; background:white; border:1px solid #e2e8f0; border-radius:8px; position:absolute; right:20px; width:300px; z-index:1000;">
-                            <textarea id="batch-variant-input" placeholder="p.L301R, p.R402X, p.G56V&#10;One variant per line or comma-separated" style="width:100%; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px; min-height:80px;"></textarea>
-                            <div style="display:flex; gap:8px; margin-top:8px;">
-                                <select id="batch-sig" style="flex:1; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px;">
+
+                    <details style="margin-top:8px;">
+                        <summary style="font-weight:600; color:#0056b3; cursor:pointer; font-size:13px;">📤 Batch add variants (one per line or comma separated)</summary>
+                        <div style="margin-top:10px; padding:12px; background:#f1f5f9; border-radius:6px;">
+                            <textarea id="batch-variant-input" placeholder="p.L301R\np.R402X\np.Gly56Val, VUS\n..." 
+                                      style="width:100%; min-height:90px; padding:8px; border:1px solid #cbd5e0; border-radius:6px; font-family:monospace; font-size:13px;"></textarea>
+                            <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+                                <select id="batch-sig" style="padding:6px 8px; border:1px solid #cbd5e0; border-radius:6px;">
                                     <option value="Pathogenic">Pathogenic</option>
                                     <option value="Likely Pathogenic">Likely Pathogenic</option>
-                                    <option value="VUS">VUS</option>
+                                    <option value="VUS" selected>VUS</option>
                                     <option value="Benign">Benign</option>
                                 </select>
-                                <button onclick="window.addBatchVariants()" style="background:#0056b3; color:white; border:none; padding:6px 12px; border-radius:6px;">Add All</button>
-                                <button onclick="window.clearBatchInput()" style="background:transparent; border:1px solid #94a3b8; padding:6px 12px; border-radius:6px;">Clear</button>
+                                <button onclick="window.addBatchVariants()" class="ciliai-button" style="background:#0056b3; color:white;">Add all</button>
+                                <button onclick="document.getElementById('batch-variant-input').value=''" style="background:transparent; border:1px solid #94a3b8; padding:6px 12px; border-radius:6px;">Clear</button>
                             </div>
                         </div>
                     </details>
-                    
-                    <!-- Export Options -->
-                    <select id="export-format" style="padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px;">
-                        <option value="png">PNG (300 DPI)</option>
-                        <option value="svg">SVG (Vector)</option>
-                    </select>
-                    <button onclick="window.exportPublicationImage()" style="background:#059669; color:white; padding:6px 12px; border-radius:6px; border:none;">
-                        📸 Export Figure
-                    </button>
                 </div>
-            </div>
-            <div id="var-panel" style="display:none; position:absolute; top:80px; right:30px; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; width:280px; box-shadow:0 10px 25px rgba(0,0,0,0.1); z-index:100;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                     <h4 style="margin:0; color:#2563eb;" id="vp-title"></h4>
-                     <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none;background:none;cursor:pointer;">✕</button>
+
+                <div id="var-panel" style="display:none; position:absolute; top:80px; right:30px; background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; width:280px; box-shadow:0 10px 25px rgba(0,0,0,0.1); z-index:100;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                         <h4 style="margin:0; color:#2563eb;" id="vp-title"></h4>
+                         <button onclick="document.getElementById('var-panel').style.display='none'" style="border:none;background:none;cursor:pointer;">✕</button>
+                    </div>
+                    <p style="font-size:12px; color:#475569; margin-bottom:15px; max-height:80px; overflow-y:auto;" id="vp-desc"></p>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <button id="vp-cons-btn" class="ciliai-button" style="width:100%; background:#0056b3; color:white;">🌍 Check Conservation</button>
+                        <button id="vp-3d-btn" class="ciliai-button" style="width:100%; background:#8b5cf6; color:white;">🧊 View 3D Structure</button>
+                    </div>
+                    <div id="msa-result-area" style="margin-top:10px; font-size:11px;"></div>
                 </div>
-                <p style="font-size:12px; color:#475569; margin-bottom:15px; max-height:80px; overflow-y:auto;" id="vp-desc"></p>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                    <button id="vp-cons-btn" class="ciliai-button" style="width:100%; background:#0056b3; color:white;">🌍 Check Conservation</button>
-                    <button id="vp-3d-btn" class="ciliai-button" style="width:100%; background:#8b5cf6; color:white;">🧊 View 3D Structure</button>
+
+                <div id="shortcuts-modal" style="display:none; position:fixed; bottom:24px; right:24px; background:white; border:1px solid #cbd5e0; border-radius:8px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,0.15); z-index:2000; max-width:320px; font-size:13px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h4 style="margin:0; color:#1e293b;">⌨️ Quick Keys</h4>
+                        <button onclick="document.getElementById('shortcuts-modal').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:#64748b;">×</button>
+                    </div>
+                    <div style="display:grid; grid-template-columns: auto 1fr; gap:6px 12px;">
+                        <kbd>M</kbd><span>Toggle Map ↔ MSA</span>
+                        <kbd>G</kbd><span>Jump to position / focus search</span>
+                        <kbd>F</kbd><span>Focus variant filter</span>
+                        <kbd>?</kbd><span>Show/hide this panel</span>
+                        <kbd>Esc</kbd><span>Close panels & popups</span>
+                    </div>
                 </div>
-                <div id="msa-result-area" style="margin-top:10px; font-size:11px;"></div>
             </div>`;
     }
+
+    window.applyVariantFilters = function() {
+        const data = window.CiliAI.activeVariantData;
+        if (!data) return;
+
+        const search = document.getElementById('variant-filter')?.value?.trim().toLowerCase() || '';
+        const sig   = document.getElementById('patho-filter')?.value || 'all';
+        const dom   = document.getElementById('domain-filter')?.value || 'all';
+
+        window.CiliAI.variantFilters = { searchText: search, significance: sig, domain: dom };
+
+        const container = document.getElementById('plotly-container');
+        if (!container) return;
+
+        const getSig = v => (v.clinicalSignificance || v.significance || v.description || "").toLowerCase();
+        const isPatho   = v => /pathogenic/i.test(getSig(v)) && !/likely/i.test(getSig(v));
+        const isLikely  = v => /likely pathogenic/i.test(getSig(v));
+        const isBenign  = v => /benign/i.test(getSig(v)) || /likely benign/i.test(getSig(v));
+
+        let vars = [...data.variants, ...data.customVariants];
+
+        if (sig !== 'all') {
+            if (sig === 'patho')    vars = vars.filter(isPatho);
+            else if (sig === 'likely') vars = vars.filter(isLikely);
+            else if (sig === 'benign') vars = vars.filter(isBenign);
+            else if (sig === 'vus')  vars = vars.filter(v => !isPatho(v) && !isLikely(v) && !isBenign(v));
+            else if (sig === 'custom') vars = vars.filter(v => v.isCustom);
+        }
+
+        if (dom !== 'all') {
+            vars = vars.filter(v => {
+                const pos = parseInt(v.begin);
+                return data.domains.some(d => dom === d.name && pos >= d.start && pos <= d.end);
+            });
+        }
+
+        if (search) {
+            vars = vars.filter(v => {
+                const terms = [
+                    String(v.begin),
+                    v.wildType || '',
+                    v.alternativeSequence || '',
+                    getSig(v),
+                    v.description || '',
+                    v.disease || ''
+                ].join(' ').toLowerCase();
+                return terms.includes(search);
+            });
+        }
+
+        const countEl = document.getElementById('variant-count');
+        if (countEl) countEl.textContent = vars.length;
+
+        window.drawVariantWorkspace('map');
+    };
+
+    window.clearVariantFilters = function() {
+        const f = document.getElementById('variant-filter');
+        const p = document.getElementById('patho-filter');
+        const d = document.getElementById('domain-filter');
+        if (f) f.value = '';
+        if (p) p.value = 'all';
+        if (d) d.value = 'all';
+        window.applyVariantFilters();
+    };
+
+    window.addBatchVariants = function() {
+        const textarea = document.getElementById('batch-variant-input');
+        const sigSelect = document.getElementById('batch-sig');
+        if (!textarea?.value.trim() || !window.CiliAI.activeVariantData) return;
+
+        const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+        const gene = window.CiliAI.activeVariantData.gene;
+        let added = 0;
+
+        lines.forEach(line => {
+            const items = line.split(/[,;]\s*/).map(s => s.trim());
+            items.forEach(item => {
+                const m = item.match(/^p\.([A-Za-z*]+)(\d+)([A-Za-z*]+)$/i);
+                if (m) {
+                    const wt = m[1].toUpperCase();
+                    const pos = parseInt(m[2]);
+                    const alt = m[3].toUpperCase();
+                    window.CiliAI.activeVariantData.customVariants.push({
+                        wildType: wt,
+                        begin: pos,
+                        alternativeSequence: alt,
+                        clinicalSignificance: sigSelect.value,
+                        description: "Batch custom variant",
+                        disease: "User-defined",
+                        isCustom: true
+                    });
+                    added++;
+                }
+            });
+        });
+
+        if (added > 0) {
+            window.drawVariantWorkspace('map');
+            if (window.addChatMessage) {
+                window.addChatMessage(`Added ${added} batch variant${added === 1 ? '' : 's'} (${sigSelect.value})`, false);
+            }
+        }
+
+        textarea.value = '';
+    };
 
     // ─────────────────────────────────────────────────────────────
     // 2. MSA GENERATION
     // ─────────────────────────────────────────────────────────────
+
     window.loadFullLengthAlignment = async function(geneSymbol) {
         if (!window.CiliAI.activeVariantData) return;
         const mainData = window.CiliAI.activeVariantData;
@@ -8301,7 +8092,7 @@ window.downloadCurrentVisualization = function() {
 
         const alignments = [{ species: "Human", icon: "👤", symbol: geneSymbol, seq: humanSeq || "", taxId: 9606 }];
         const batches = [];
-        const subsetSpecies = TARGET_SPECIES_PANEL.filter(s => s.name !== 'Human'); 
+        const subsetSpecies = TARGET_SPECIES_PANEL.filter(s => s.name !== 'Human');
         for (let i = 0; i < subsetSpecies.length; i += 5) batches.push(subsetSpecies.slice(i, i + 5));
 
         for (const batch of batches) {
@@ -8331,8 +8122,9 @@ window.downloadCurrentVisualization = function() {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // 3. MSA RENDERER WITH ENHANCED FEATURES
+    // 3. RENDERER WITH BLUE THEME UI & VISIBILITY FIXES
     // ─────────────────────────────────────────────────────────────
+
     window.renderFullLengthMSA = function(data, container) {
         const align = window.CiliAI.activeAlignmentData;
         if (!align || !align.alignments?.length) {
@@ -8369,9 +8161,6 @@ window.downloadCurrentVisualization = function() {
             posHtml += `<span style="display:inline-block;width:18px;text-align:center;font-size:10px;color:${show?'#0056b3':'#cbd5e1'};font-weight:${show?'700':'400'};font-family:monospace;">${show ? pos : '·'}</span>`;
         }
 
-        // Conservation heatmap
-        const conservationHeatmap = window.generateConservationHeatmap(align.alignments, fullSeq.length);
-
         let rowsHtml = '';
         align.alignments.forEach((aln) => {
             let seqHtml = '';
@@ -8387,33 +8176,16 @@ window.downloadCurrentVisualization = function() {
 
         container.innerHTML = `
             <div style="height:100%;display:flex;flex-direction:column;font-family:'Inter',sans-serif; background:#fff;">
-                <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;flex-wrap:wrap;">
+                <div style="padding:12px 20px;background:#0056b3;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
                     <div><strong style="font-size:16px;">${data.gene} Evolutionary Analysis</strong><div style="font-size:12px;opacity:0.9;margin-top:2px;">${fullSeq.length} AA • ${align.alignments.length} Species • ${allVars.length} Variants</div></div>
                     <div style="display:flex;gap:10px;">
-                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;">
-                            <option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Default)</option>
-                        </select>
+                        <select id="color-scheme-select" onchange="window.changeColorScheme(this.value)" style="padding:6px;border:none;border-radius:4px;font-size:12px;color:#0056b3;background:white;cursor:pointer;"><option value="ClustalX" ${window.CiliAI.activeColorScheme==='ClustalX'?'selected':''}>ClustalX (Default)</option></select>
                         <button onclick="window.drawVariantWorkspace('map')" class="ciliai-button" style="background:rgba(255,255,255,0.2);color:white;padding:6px 12px;border:1px solid rgba(255,255,255,0.4);">← Back to Map</button>
-                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ FASTA</button>
-                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ CSV</button>
+                        <button onclick="window.downloadMSAFasta()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ MSA FASTA</button>
+                        <button onclick="window.downloadFullAlignmentCSV()" class="ciliai-button" style="background:#fff;color:#0056b3;padding:6px 12px;font-weight:bold;">⬇ MSA CSV</button>
                     </div>
                 </div>
-
-                <!-- Mini-map Navigator -->
-                <div style="padding:8px 20px; background:#e7f1ff; border-bottom:1px solid #dbeafe;">
-                    <div style="position:relative; margin-bottom:5px;">
-                        <div style="background:#e2e8f0; height:30px; border-radius:4px; position:relative; width:100%;">
-                            <div id="mini-map-viewport" style="position:absolute; height:30px; background:rgba(0,86,179,0.3); border:2px solid #0056b3; border-radius:4px; width:200px;"></div>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; margin-top:4px;">
-                            <span style="font-size:11px;">Position 1</span>
-                            <span style="font-size:11px;">Position ${fullSeq.length}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Navigation Controls -->
-                <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <div style="padding:8px 20px;background:#e7f1ff;border-bottom:1px solid #dbeafe;display:flex;gap:12px;align-items:center;">
                     <span style="font-size:13px;color:#0056b3;font-weight:600;">Jump to Position:</span>
                     <input id="msa-jump-input" type="number" min="1" max="${fullSeq.length}" placeholder="Pos" style="width:80px;padding:4px 8px;border:1px solid #0056b3;border-radius:4px;font-size:13px;color:#0056b3;" />
                     <button onclick="window.msaJumpToPosition()" class="ciliai-button" style="padding:4px 12px;background:#0056b3;color:white;font-size:13px;">Go</button>
@@ -8424,42 +8196,17 @@ window.downloadCurrentVisualization = function() {
                         <button onclick="window.msaScrollToEnd()" class="ciliai-button" style="padding:4px 10px;background:#fff;border:1px solid #0056b3;color:#0056b3;">⏭ End</button>
                     </div>
                 </div>
-
-                <!-- Conservation Heatmap Track -->
-                <div style="background:#fff; border-bottom:1px solid #e2e8f0;">
-                    <div style="display:flex;">
-                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;">
-                            <div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Conservation</div>
-                        </div>
-                        <div style="display:flex; gap:1px; flex-wrap:wrap; padding:2px 0; min-width:${seqWidth}px;">
-                            ${conservationHeatmap}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Header with Position Markers and Variants -->
                 <div style="background:#fff;border-bottom:2px solid #0056b3;flex-shrink:0;">
                     <div style="display:flex;">
-                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;">
-                            <div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Species & Variants</div>
-                        </div>
+                        <div style="width:200px;min-width:200px;background:#f0f7ff;padding:4px 0;border-right:2px solid #0056b3;"><div style="padding:4px 12px;font-weight:bold;color:#0056b3;font-size:12px;">Species & Variants</div></div>
                         <div style="flex:1;overflow-x:auto;overflow-y:hidden;" id="header-scroll">
                             <div style="height:20px;min-width:${seqWidth}px;position:relative;background:#fff;">${markersHtml}</div>
                             <div style="min-width:${seqWidth}px;padding:2px 0;background:#f0f7ff;">${posHtml}</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- MSA Rows -->
                 <div id="msa-scroll" style="flex:1;overflow:auto;background:#fff;scrollbar-width:thin;scrollbar-color:#0056b3 #f0f7ff;">${rowsHtml}</div>
-                
-                <style>
-                    #msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
-                    #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; }
-                    #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; }
-                    #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; }
-                    #header-scroll::-webkit-scrollbar { height: 0px; }
-                </style>
+                <style>#msa-scroll::-webkit-scrollbar { height: 12px; width: 12px; } #msa-scroll::-webkit-scrollbar-track { background: #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 6px; border: 2px solid #f0f7ff; } #msa-scroll::-webkit-scrollbar-thumb:hover { background: #004494; } #header-scroll::-webkit-scrollbar { height: 0px; }</style>
             </div>
             <div id="variant-popup" style="display:none;position:fixed;background:#fff;border:2px solid #0056b3;border-radius:6px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:10000;min-width:300px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
@@ -8473,37 +8220,19 @@ window.downloadCurrentVisualization = function() {
                 </div>
             </div>`;
         setupSyncScroll();
-        setupMiniMap();
         setTimeout(() => { const c = document.getElementById('msa-scroll'); if (c) c.scrollTop = 0; }, 100);
     };
-
-    function setupMiniMap() {
-        const msaScroll = document.getElementById('msa-scroll');
-        const miniMap = document.getElementById('mini-map-viewport');
-        if (!msaScroll || !miniMap) return;
-        
-        const updateMiniMap = () => {
-            const scrollPercent = msaScroll.scrollLeft / (msaScroll.scrollWidth - msaScroll.clientWidth);
-            const viewportWidth = (msaScroll.clientWidth / msaScroll.scrollWidth) * 100;
-            const viewportLeft = scrollPercent * (100 - viewportWidth);
-            miniMap.style.width = viewportWidth + '%';
-            miniMap.style.left = viewportLeft + '%';
-        };
-        
-        msaScroll.addEventListener('scroll', updateMiniMap);
-        window.addEventListener('resize', updateMiniMap);
-        setTimeout(updateMiniMap, 100);
-    }
 
     // ─────────────────────────────────────────────────────────────
     // 4. HELPER FUNCTIONS
     // ─────────────────────────────────────────────────────────────
+
     window.msaScrollLeft = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: -500, behavior:'smooth'}); if (h) h.scrollBy({left: -500, behavior:'smooth'}); } };
     window.msaScrollRight = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollBy({left: 500, behavior:'smooth'}); if (h) h.scrollBy({left: 500, behavior:'smooth'}); } };
     window.msaScrollToStart = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: 0, behavior:'smooth'}); if (h) h.scrollTo({left: 0, behavior:'smooth'}); } };
     window.msaScrollToEnd = function() { const c = document.getElementById('msa-scroll'); const h = document.getElementById('header-scroll'); if (c) { c.scrollTo({left: c.scrollWidth, behavior:'smooth'}); if (h) h.scrollTo({left: h.scrollWidth, behavior:'smooth'}); } };
     window.changeColorScheme = function(scheme) { window.CiliAI.activeColorScheme = scheme; if (window.CiliAI.activeVariantData) window.drawVariantWorkspace('msa'); };
-    
+
     window.showVariantPopup = function(label, pos, clinSig, disease, color) {
         const p = document.getElementById('variant-popup');
         if (!p) return;
@@ -8574,10 +8303,8 @@ window.downloadCurrentVisualization = function() {
         const d = window.CiliAI.activeVariantData;
         if (!d) return;
         const v = [...d.variants, ...d.customVariants];
-        let c = "Position,Wild_Type,Variant,Clinical_Significance,Disease,Description,Source\n";
-        v.forEach(x => { 
-            c += `${x.begin},${x.wildType||'?'},${x.alternativeSequence||'?'},"${(x.clinicalSignificance||'').replace(/"/g,'""')}","${(x.disease||'').replace(/"/g,'""')}","${(x.description||'').replace(/"/g,'""')}","${x.isCustom ? 'Custom' : 'ClinVar'}"\n`;
-        });
+        let c = "Position,Wild_Type,Variant,Clinical_Significance,Disease,Description\n";
+        v.forEach(x => { c += `${x.begin},${x.wildType||'?'},${x.alternativeSequence||'?'},"${(x.clinicalSignificance||'').replace(/"/g,'""')}","${(x.disease||'').replace(/"/g,'""')}","${(x.description||'').replace(/"/g,'""')}"\n`; });
         const b = new Blob([c], {type: 'text/csv'});
         const l = document.createElement('a');
         l.href = URL.createObjectURL(b);
@@ -8611,12 +8338,12 @@ window.downloadCurrentVisualization = function() {
         if (m && window.CiliAI.activeVariantData) {
             const p = parseInt(m[2]);
             window.CiliAI.activeVariantData.customVariants.push({
-                wildType: m[1], 
-                begin: p, 
-                alternativeSequence: m[3], 
-                clinicalSignificance: significance, 
-                description: "Custom variant", 
-                disease: "User-defined", 
+                wildType: m[1],
+                begin: p,
+                alternativeSequence: m[3],
+                clinicalSignificance: significance,
+                description: "Custom variant",
+                disease: "User-defined",
                 isCustom: true
             });
             window.drawVariantWorkspace('map');
@@ -8625,568 +8352,43 @@ window.downloadCurrentVisualization = function() {
         return `Loaded ${g}`;
     };
 
-    window.checkConservation = async function(geneSymbol, humanPos, aaChange) {
-        const btn = document.getElementById('vp-cons-btn');
-        if(btn) btn.innerText = "⏳ Scanning 65 species...";
-        try {
-            const humanRes = await window.fetchVariantDataLive(geneSymbol);
-            if(humanRes.error) throw new Error("Could not fetch human reference.");
-            
-            const seqRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${humanRes.uniprotID}`);
-            if(!seqRes.ok) throw new Error("Human sequence not found.");
-            const seqData = await seqRes.json();
-            const humanSeq = seqData.sequence.sequence;
+    // ─────────────────────────────────────────────────────────────
+    // Keyboard Shortcuts
+    // ─────────────────────────────────────────────────────────────
 
-            const targets = TARGET_SPECIES_PANEL;
-            const orthoRes = await fetch(`https://mygene.info/v3/query?q=symbol:${geneSymbol}&species=human&fields=homologene`);
-            const orthoData = await orthoRes.json();
-            let orthologs = [];
+    document.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-            if (orthoData.hits?.[0]?.homologene?.id) {
-                const hID = orthoData.hits[0].homologene.id;
-                const groupRes = await fetch(`https://mygene.info/v3/query?q=homologene:${hID}&fields=symbol,taxid,uniprot&size=100`);
-                const groupData = await groupRes.json();
-                orthologs = groupData.hits || [];
-            }
-
-            const alignments = [];
-            let conservedCount = 0;
-            let totalAligned = 0;
-            
-            const windowSize = 20;
-            const hStart = Math.max(0, humanPos - 1 - (windowSize/2));
-            const hEnd = Math.min(humanSeq.length, humanPos - 1 + (windowSize/2));
-            const humanFingerprint = humanSeq.substring(hStart, hEnd);
-
-            const dispStartH = Math.max(0, (humanPos - 1) - 7);
-            const dispEndH = Math.min(humanSeq.length, (humanPos - 1) + 8);
-            const humanSegment = humanSeq.substring(dispStartH, dispEndH);
-            const refAA = humanSeq[humanPos - 1];
-            
-            alignments.push({
-                species: 'Human',
-                icon: '👤',
-                symbol: geneSymbol,
-                seq: humanSegment,
-                centerResidue: refAA,
-                isConserved: true
-            });
-
-            for (const t of targets) {
-                if(t.name === 'Human') continue;
-                const orthoGene = orthologs.find(g => g.taxid === t.id);
-                if (orthoGene) {
-                    let uID = orthoGene.uniprot?.['Swiss-Prot'] || orthoGene.uniprot?.TrEMBL;
-                    const finalUID = Array.isArray(uID) ? uID[0] : uID;
-                    if (finalUID) {
-                        try {
-                            const sRes = await fetch(`https://www.ebi.ac.uk/proteins/api/proteins/${finalUID}`);
-                            if(sRes.ok) {
-                                const sData = await sRes.json();
-                                const seq = sData.sequence.sequence;
-                                const bestMatch = findBestAlignment(humanFingerprint, seq);
-                                if (bestMatch.score > 0.35) {
-                                    const centerIdx = bestMatch.index + Math.floor(windowSize/2);
-                                    const dispStart = Math.max(0, centerIdx - 7);
-                                    const dispEnd = Math.min(seq.length, centerIdx + 8);
-                                    const segment = seq.substring(dispStart, dispEnd);
-                                    const residue = seq[centerIdx];
-                                    const isMatch = residue === refAA;
-                                    if(isMatch) conservedCount++;
-                                    totalAligned++;
-                                    alignments.push({
-                                        species: t.name, icon: t.icon, symbol: orthoGene.symbol,
-                                        seq: segment, centerResidue: residue, isConserved: isMatch
-                                    });
-                                }
-                            }
-                        } catch(err) { console.warn(`Failed seq fetch for ${t.name}`); }
-                    }
+        switch (e.key.toLowerCase()) {
+            case 'm':
+                const currentView = window.CiliAI.activeVariantData && document.getElementById('msa-scroll') ? 'msa' : 'map';
+                window.drawVariantWorkspace(currentView === 'map' ? 'msa' : 'map');
+                break;
+            case 'g':
+                const jump = document.getElementById('msa-jump-input') || document.getElementById('variant-filter');
+                if (jump) jump.focus();
+                break;
+            case 'f':
+                const f = document.getElementById('variant-filter');
+                if (f) f.focus();
+                break;
+            case '?':
+                const modal = document.getElementById('shortcuts-modal');
+                if (modal) modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+                break;
+            case 'escape':
+                const panels = ['var-panel', 'variant-popup', 'molstar-modal', 'shortcuts-modal'];
+                for (const id of panels) {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
                 }
-            }
-            
-            const score = totalAligned > 0 ? Math.round((conservedCount / totalAligned) * 100) : 0;
-            window.renderProfessionalMSA(geneSymbol, humanPos, refAA, alignments, score);
-
-        } catch (e) {
-            console.error(e);
-            alert("Alignment Error: " + e.message);
-            if(btn) btn.innerText = "🌍 Check Conservation";
+                break;
         }
-    };
+    });
 
-    function findBestAlignment(query, target) {
-        let bestScore = -1;
-        let bestIndex = -1;
-        for (let i = 0; i <= target.length - query.length; i++) {
-            let currentScore = 0;
-            for (let j = 0; j < query.length; j++) {
-                if (query[j] === target[i + j]) currentScore++;
-            }
-            if (currentScore > bestScore) {
-                bestScore = currentScore;
-                bestIndex = i;
-            }
-        }
-        return { index: bestIndex, score: bestScore / query.length };
-    }
+    console.log("[CiliAI] Variant & Evolutionary Engine v16.5 – enhanced with filtering, batch upload & shortcuts");
 
-    window.renderProfessionalMSA = function (gene, pos, refAA, alignments, score) {
-        const existing = document.getElementById('msa-modal');
-        if (existing) existing.remove();
-
-        const aaColors = {
-            'A': '#c8c8c8', 'G': '#c8c8c8',
-            'I': '#0f820f', 'L': '#0f820f', 'V': '#0f820f', 'M': '#0f820f',
-            'F': '#3232aa', 'Y': '#3232aa', 'W': '#b45b5b',
-            'H': '#8282d2',
-            'K': '#145aff', 'R': '#145aff',
-            'D': '#e60a0a', 'E': '#e60a0a',
-            'S': '#fa9600', 'T': '#fa9600',
-            'N': '#00dcdc', 'Q': '#00dcdc',
-            'C': '#e6e600',
-            'P': '#dc9682'
-        };
-
-        const modal = document.createElement('div');
-        modal.id = 'msa-modal';
-        modal.style.cssText = `
-            position:fixed;
-            top:50%;
-            left:50%;
-            transform:translate(-50%, -50%);
-            background:white;
-            padding:0;
-            border-radius:12px;
-            box-shadow:0 25px 50px rgba(0,0,0,0.5);
-            z-index:10000;
-            width:600px;
-            font-family:'Roboto Mono', monospace;
-            overflow:hidden;
-        `;
-
-        modal.innerHTML = `
-            <div style="background:#1e293b; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <h3 style="margin:0; font-size:16px; font-family:'Inter',sans-serif;">
-                        ${gene} Evolution
-                    </h3>
-                    <div style="font-size:12px; opacity:0.8; font-family:'Inter',sans-serif;">
-                        Residue ${refAA}${pos} • Conservation:
-                        <span style="color:${score > 80 ? '#4ade80' : '#f87171'}">${score}%</span>
-                    </div>
-                </div>
-                <div style="display:flex; gap:10px;">
-                    <button id="msa-download-btn"
-                        style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
-                        📥 Download MSA
-                    </button>
-                    <button id="msa-close-btn"
-                        style="border:none; background:none; color:white; cursor:pointer; font-size:20px;">
-                        ×
-                    </button>
-                </div>
-            </div>
-
-            <div style="padding:20px; background:#f8fafc; max-height:60vh; overflow-y:auto;">
-                <div style="display:grid; grid-template-columns:120px 1fr; gap:10px;">
-                    ${alignments.map(a => `
-                        <div style="text-align:right; font-size:12px; padding-top:6px; color:#475569; font-family:'Inter',sans-serif;">
-                            ${a.icon} ${a.species}
-                        </div>
-                        <div style="display:flex; gap:2px;">
-                            ${a.seq.split('').map((char, i) => {
-                                const isCenter = i === Math.floor(a.seq.length / 2);
-                                const color = aaColors[char] || '#999';
-                                return `
-                                    <div style="
-                                        width:24px;
-                                        height:24px;
-                                        background:${color};
-                                        color:white;
-                                        display:flex;
-                                        align-items:center;
-                                        justify-content:center;
-                                        font-size:12px;
-                                        font-weight:bold;
-                                        border-radius:3px;
-                                        border:${isCenter ? '2px solid #1e293b' : '1px solid rgba(0,0,0,0.1)'};
-                                        opacity:${a.species === 'Human' ? 1 : 0.9};
-                                        box-shadow:${isCenter ? '0 0 0 2px rgba(30,41,59,0.2)' : 'none'};
-                                    ">
-                                        ${char}
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
-
-        document.getElementById('msa-close-btn').addEventListener('click', () => {
-            modal.remove();
-            const btn = document.getElementById('vp-cons-btn');
-            if (btn) btn.innerText = "🌍 Check Conservation";
-        });
-
-        document.getElementById('msa-download-btn').addEventListener('click', () => {
-            let txt = `Conservation alignment for ${gene} position ${pos}\n\n`;
-            alignments.forEach(a => { txt += `${a.species} (${a.symbol}): ${a.seq}\n`; });
-            const blob = new Blob([txt], {type: 'text/plain'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${gene}_conservation_${pos}.txt`;
-            a.click();
-        });
-
-        const btn = document.getElementById('vp-cons-btn');
-        if (btn) btn.innerText = "🌍 Check Conservation";
-    };
-
-    // Initialize keyboard shortcuts and load state
-    window.initKeyboardShortcuts();
-    window.loadStateFromURL();
-})();
-
-/* ==============================================================
- * MODULE: 3D STRUCTURE VIEWER (Mol*)
- * ============================================================== */
-(function() {
-    'use strict';
-    window.loadMolStar = async function() {
-        if (customElements.get('pdbe-molstar')) return true;
-        return new Promise((resolve, reject) => {
-            console.log("[CiliAI] Downloading 3D Engine...");
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css';
-            document.head.appendChild(link);
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-component.js';
-            script.onload = () => {
-                customElements.whenDefined('pdbe-molstar').then(() => {
-                    console.log("[CiliAI] 3D Engine Ready.");
-                    resolve(true);
-                });
-            };
-            script.onerror = () => reject(new Error("Failed to load PDBe Mol* script."));
-            document.head.appendChild(script);
-        });
-    };
-
-    async function getAlphaFoldUrl(uniprotID) {
-        try {
-            const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotID}`);
-            if (!res.ok) return null;
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) return data[0].cifUrl; 
-            return null;
-        } catch (e) {
-            console.warn("AlphaFold API Lookup failed:", e);
-            return null;
-        }
-    }
-
-    function hexToRgb(hex) {
-        hex = hex.replace('#', '');
-        return {
-            r: parseInt(hex.substring(0,2), 16),
-            g: parseInt(hex.substring(2,4), 16),
-            b: parseInt(hex.substring(4,6), 16)
-        };
-    }
-
-    window.showStructureViewer = async function(geneSymbol, variantPos, variantAA) {
-        const btn = document.getElementById('vp-3d-btn');
-        const originalText = btn ? btn.innerText : "🧊 View 3D Structure";
-        if (btn) {
-            btn.innerText = "⏳ Finding Structure...";
-            btn.disabled = true;
-        }
-        try {
-            await window.loadMolStar();
-            const data = await window.fetchVariantDataLive(geneSymbol);
-            if (data.error || !data.uniprotID) throw new Error("Could not resolve UniProt ID.");
-            const uniprotID = data.uniprotID;
-            const afUrl = await getAlphaFoldUrl(uniprotID);
-            if (!afUrl) throw new Error(`No AlphaFold structure found for ${geneSymbol}.`);
-
-            window.currentAfUrl = afUrl;
-            window.currentSelectData = variantPos ? [{
-                entity_id: "1",
-                residue_number: parseInt(variantPos, 10),
-                color: { r: 217, g: 70, b: 239 }, 
-                label: "Primary Variant",
-                focus: true
-            }] : [];
-            window.isGrayMode = false;
-
-            const modal = document.createElement('div');
-            modal.id = 'molstar-modal';
-            modal.style.cssText = `position: fixed; inset: 0; width: 100vw; height: 100dvh; background: rgba(0,0,0,0.95); z-index: 200000; display: flex; flex-direction: column; justify-content: center; align-items: center;`;
-            
-            modal.innerHTML = `
-                <div style="width: 94vw; height: 92vh; max-width: 1400px; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
-                    <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                        <div>
-                            <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${geneSymbol} 3D Structure (AlphaFold)</div>
-                            <div style="font-size: 13px; color: #64748b;" id="variant-status">
-                                ${variantPos ? `Primary: <strong style="color:#d946ef;">${variantAA}${variantPos}</strong>` : 'Full view'}
-                                <span id="extra-count" style="display:none; margin-left:12px; color:#ca8a04; font-weight:500;">(+<span id="extra-num">0</span> custom)</span>
-                            </div>
-                        </div>
-                        <div style="display:flex; gap:12px; align-items:center;">
-                            <button id="focus-btn" style="padding:6px 14px; background:#fff; border:1px solid #d946ef; color:#d946ef; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">🎯 Focus All</button>
-                            <button id="download-session-btn" style="padding:6px 14px; background:#fff; border:1px solid #16a34a; color:#166534; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;">📥 Download Structure</button>
-                            <button id="close-3d" style="background:#e2e8f0; border:none; width:36px; height:36px; border-radius:50%; font-size:20px; cursor:pointer; color:#475569; font-weight:bold;">✕</button>
-                        </div>
-                    </div>
-                    <div style="flex:1; position:relative; background:#ffffff; overflow:hidden;">
-                        <pdbe-molstar id="pdbe-molstar-target" custom-data-url="${afUrl}" custom-data-format="cif" alphafold-view="true" hide-controls="true" bg-color-r="255" bg-color-g="255" bg-color-b="255" selection-data='${JSON.stringify(window.currentSelectData)}' style="position:absolute; top:0; left:0; width:100%; height:100%; display:block;"></pdbe-molstar>
-                    </div>
-                    <div style="padding:12px 20px; background:white; border-top:1px solid #e2e8f0; font-size:12px; color:#475569; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; flex-shrink:0;">
-                        <div style="display:flex; gap:24px; align-items:center;">
-                            <span style="display:flex; align-items:center; font-weight:500;"><span style="width:12px; height:12px; background:#d946ef; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>Primary Variant</span>
-                            <span style="display:flex; align-items:center; font-weight:500;"><span style="width:12px; height:12px; background:#ffd700; border-radius:50%; margin-right:6px; border:1px solid #000;"></span>Custom Highlights</span>
-                        </div>
-                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:nowrap;">
-                            <input id="add-var-3d" type="number" min="1" placeholder="Residue #" style="width:100px; padding:6px; border:1px solid #cbd5e0; border-radius:6px; font-size:13px;">
-                            <input type="color" id="custom-color-picker" value="#ffd700" title="Select highlight color" style="width:36px; height:32px; padding:0; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">
-                            <button onclick="window.addVariantTo3D()" style="padding:6px 14px; background:#ca8a04; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500;">+ Add</button>
-                        </div>
-                    </div>
-                </div>`;
-            
-            document.body.appendChild(modal);
-            document.getElementById('focus-btn').onclick = () => {
-                const plugin = document.getElementById('pdbe-molstar-target');
-                if (plugin?.viewerInstance && window.currentSelectData.length > 0) {
-                    const focusList = window.currentSelectData.map(s => ({ entity_id: s.entity_id, residue_number: s.residue_number }));
-                    plugin.viewerInstance.visual.focus({ data: focusList });
-                }
-            };
-            document.getElementById('download-session-btn').onclick = () => {
-                const a = document.createElement('a'); a.href = window.currentAfUrl; a.download = `${geneSymbol}_AlphaFold.cif`; a.click();
-            };
-            const close = () => { 
-                modal.remove(); 
-                window.currentSelectData = []; 
-                window.currentAfUrl = null; 
-                window.isGrayMode = false; 
-                if (btn) { 
-                    btn.innerText = originalText; 
-                    btn.disabled = false; 
-                } 
-            };
-            document.getElementById('close-3d').onclick = close;
-            window.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, {once: true});
-            if (btn) { 
-                btn.innerText = originalText; 
-                btn.disabled = false; 
-            }
-        } catch (e) { 
-            console.error("3D Viewer Error:", e); 
-            alert("3D Viewer Error: " + e.message); 
-            if (btn) { 
-                btn.innerText = originalText; 
-                btn.disabled = false; 
-            } 
-        }
-    };
-
-    window.addVariantTo3D = function() {
-        const input = document.getElementById('add-var-3d');
-        const colorPicker = document.getElementById('custom-color-picker');
-        const pos = parseInt(input.value.trim());
-        if (!isNaN(pos) && pos > 0) {
-            if (window.currentSelectData.some(s => s.residue_number === pos)) { alert(`Residue ${pos} is already highlighted.`); return; }
-            const hexColor = colorPicker.value;
-            const rgb = hexToRgb(hexColor);
-            window.currentSelectData.push({ entity_id: "1", residue_number: pos, color: rgb, label: `Custom ${pos}`, focus: false });
-            const plugin = document.getElementById('pdbe-molstar-target');
-            if (plugin && plugin.viewerInstance) {
-                if (!window.isGrayMode && window.currentSelectData.length > 1) {
-                    plugin.viewerInstance.visual.update({ type: 'surface', params: { color: { r: 220, g: 220, b: 220 }, opacity: 0.7 } });
-                    window.isGrayMode = true;
-                }
-                plugin.setAttribute('selection-data', JSON.stringify(window.currentSelectData));
-                plugin.viewerInstance.visual.select({ data: window.currentSelectData });
-            }
-            const extraNum = document.getElementById('extra-num');
-            const extraCount = document.getElementById('extra-count');
-            const count = window.currentSelectData.length - (window.currentSelectData[0]?.label === "Primary Variant" ? 1 : 0);
-            if (extraNum && extraCount) { 
-                extraNum.textContent = count; 
-                extraCount.style.display = count > 0 ? 'inline' : 'none'; 
-            }
-            input.value = ''; 
-            input.focus();
-        } else { 
-            alert('Please enter a valid positive residue number.'); 
-        }
-    };
-    
-    window.downloadStructure = function(geneSymbol) {
-        const a = document.createElement('a'); a.href = window.currentAfUrl; a.download = `${geneSymbol}_AlphaFold.cif`; a.click();
-    };
-    console.log("[CiliAI] 3D Viewer module loaded.");
-})();
-
-/* ==============================================================
- * MODULE: ADVANCED ANALYTICS & PERSISTENCE (v12.0)
- * ============================================================== */
-(function() {
-    'use strict';
-    window.CiliAI.Session = {
-        key: 'ciliai_autosave_v1',
-        start: function(interval = 30000) {
-            console.log("[CiliAI] Auto-save enabled.");
-            const saved = localStorage.getItem(this.key);
-            if (saved) {
-                const meta = JSON.parse(saved);
-                const age = (Date.now() - meta.timestamp) / 1000 / 60 / 60; 
-                if (age < 24) console.log(`[CiliAI] Session found from ${meta.date}`);
-            }
-            setInterval(() => this.save(), interval);
-        },
-        save: function() {
-            const chatContent = document.getElementById('messages')?.innerHTML || '';
-            if (!chatContent) return;
-            const state = { timestamp: Date.now(), date: new Date().toLocaleString(), dataset: window.CiliAI.activeDataset || 'lung', history: chatContent };
-            localStorage.setItem(this.key, JSON.stringify(state));
-        },
-        restore: function() {
-            const saved = localStorage.getItem(this.key);
-            if (!saved) { alert("No saved session found."); return; }
-            const state = JSON.parse(saved);
-            if (state.dataset) window.CiliAI.activeDataset = state.dataset;
-            if (state.history && document.getElementById('messages')) {
-                document.getElementById('messages').innerHTML = state.history;
-                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-            }
-            window.addChatMessage(`🔄 Session restored from ${state.date}`, false);
-        },
-        clear: function() { localStorage.removeItem(this.key); window.addChatMessage("🗑️ Session memory cleared.", false); }
-    };
-
-    window.renderComparativeRadar = function(genesInput) {
-        const genes = Array.isArray(genesInput) ? genesInput : genesInput.split(/[,\s]+/).filter(Boolean);
-        if (genes.length < 1) return;
-        window.switchView('plot'); 
-        const container = document.getElementById('plotly-container');
-        container.innerHTML = ''; container.style.display = 'block';
-        const data = []; const colors = ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed']; 
-        
-        const analyzeGlobalExpression = (gene) => {
-            if (window.CiliAI.expressionAtlas && window.CiliAI.expressionAtlas[gene]) {
-                const entry = window.CiliAI.expressionAtlas[gene];
-                const breadth = (entry.n_tissues_expressed || 0) / 6; 
-                const values = Object.values(entry).filter(v => typeof v === 'number' && v < 10000); 
-                const maxTPM = Math.max(...values, 0);
-                const intensity = Math.min(maxTPM / 50, 1.0);
-                return { breadth, intensity, category: entry.Category || 'Unknown' };
-            }
-            return { breadth: 0.1, intensity: 0.1, category: 'No Data' };
-        };
-
-        genes.forEach((geneSym, idx) => {
-            const gene = geneSym.toUpperCase();
-            const g = window.CiliAI.lookups.geneMap[gene];
-            if (!g) return;
-            let conservationScore = 0.2; 
-            if (g.Ortholog_Mouse && g.Ortholog_Mouse !== 'N/A') conservationScore += 0.2;
-            if (g.Ortholog_Zebrafish && g.Ortholog_Zebrafish !== 'N/A') conservationScore += 0.3;
-            if (g.Ortholog_C_elegans && g.Ortholog_C_elegans !== 'N/A') conservationScore += 0.3;
-            conservationScore = Math.min(conservationScore, 1.0);
-            let clinicalScore = 0;
-            if ((g.Ciliopathies && g.Ciliopathies.length > 0) || (g.Ciliopathy && g.Ciliopathy !== 'N/A')) clinicalScore = 1.0;
-            else if (g.OMIM?.ID) clinicalScore = 0.6; 
-            else if (g.screens && g.screens.length > 1) clinicalScore = 0.3; 
-            const exprStats = analyzeGlobalExpression(gene);
-            let interactionScore = 0.2;
-            if (g.complex_components || (window.CiliAI.lookups.complexByGene && window.CiliAI.lookups.complexByGene[gene])) interactionScore = 1.0;
-            else if (g['Functional.category']) interactionScore = 0.6;
-            
-            data.push({
-                type: 'scatterpolar',
-                r: [conservationScore, clinicalScore, exprStats.breadth, exprStats.intensity, interactionScore, conservationScore],
-                theta: ['Evolution (Age)', 'Clinical Relevance', 'Tissue Breadth', 'Expr. Intensity', 'Interaction', 'Evolution (Age)'],
-                fill: 'toself', name: `<b>${gene}</b>`, line: { color: colors[idx % colors.length], width: 2 }, opacity: 0.5
-            });
-        });
-
-        const layout = { polar: { radialaxis: { visible: true, range: [0, 1] } }, title: `Multi-Dimensional Analysis: ${genes.join(' vs ')}`, showlegend: true, margin: { t: 60, b: 50, l: 60, r: 60 }, legend: { orientation: 'h', y: -0.15 } };
-        Plotly.newPlot(container, data, layout);
-        
-        const explanation = `
-            <div class="ai-result-card">
-                <h4>📊 Analysis Interpretation</h4>
-                <p>Comparing <strong>${genes.join(', ')}</strong> across 5 biological dimensions:</p>
-                <ul style="font-size:12px; color:#475569; padding-left:20px; line-height:1.6;">
-                    <li><strong>Evolution (Age):</strong> Conservation across model organisms. High score = Ancient/Conserved.</li>
-                    <li><strong>Clinical Relevance:</strong> 1.0 indicates a confirmed Human Ciliopathy gene.</li>
-                    <li><strong>Tissue Breadth (Pan-ciliary Score):</strong> Calculated from the <strong>Global Atlas</strong> (6 organs). High = Pan-ciliary.</li>
-                    <li><strong>Expr. Intensity:</strong> Peak expression level (TPM).</li>
-                    <li><strong>Interaction:</strong> 1.0 indicates membership in a stable structural complex (e.g., IFT, BBSome).</li>
-                </ul>
-            </div>`;
-        window.addChatMessage(explanation, false);
-    };
-
-    window.analyzeMutationBurden = async function(geneSymbol) {
-        window.addChatMessage(`🔍 Analyzing mutation burden for <strong>${geneSymbol}</strong>...`, false);
-        const data = await window.fetchVariantDataLive(geneSymbol);
-        if (data.error) { window.addChatMessage(`Could not analyze mutations: ${data.error}`, false); return; }
-        const variants = data.variants || [];
-        const getVariantText = (v) => {
-            let text = (v.clinicalSignificance || v.significance || "").toString();
-            if (v.association) text += " " + JSON.stringify(v.association);
-            if (v.descriptions) text += " " + JSON.stringify(v.descriptions);
-            return text.toLowerCase();
-        };
-        let pathogenic = 0; let benign = 0; let vus = 0;
-        variants.forEach(v => {
-            const text = getVariantText(v);
-            const isConflicting = text.includes("conflicting");
-            if (text.includes("pathogenic") && !text.includes("likely benign") && !isConflicting) pathogenic++;
-            else if ((text.includes("benign") || text.includes("likely benign")) && !text.includes("pathogenic") && !isConflicting) benign++;
-            else vus++;
-        });
-        const total = variants.length;
-        const report = `
-            <div class="ai-result-card">
-                <h4>🧬 Mutation Burden: ${geneSymbol}</h4>
-                <div style="display:flex; gap:10px; margin: 15px 0;">
-                    <div style="flex:1; background:#fee2e2; border:1px solid #fca5a5; padding:10px; border-radius:6px; text-align:center;">
-                        <div style="font-size:20px; font-weight:bold; color:#dc2626;">${pathogenic}</div>
-                        <div style="font-size:11px; color:#7f1d1d;">Pathogenic</div>
-                    </div>
-                    <div style="flex:1; background:#f3f4f6; border:1px solid #d1d5db; padding:10px; border-radius:6px; text-align:center;">
-                        <div style="font-size:20px; font-weight:bold; color:#4b5563;">${vus}</div>
-                        <div style="font-size:11px; color:#374151;">VUS/Uncertain</div>
-                    </div>
-                    <div style="flex:1; background:#dcfce7; border:1px solid #86efac; padding:10px; border-radius:6px; text-align:center;">
-                        <div style="font-size:20px; font-weight:bold; color:#16a34a;">${benign}</div>
-                        <div style="font-size:11px; color:#14532d;">Benign</div>
-                    </div>
-                </div>
-                <div style="height:12px; width:100%; display:flex; border-radius:6px; overflow:hidden; background:#eee;">
-                    <div style="width:${(pathogenic/total)*100}%; background:#ef4444;" title="Pathogenic"></div>
-                    <div style="width:${(vus/total)*100}%; background:#9ca3af;" title="VUS"></div>
-                    <div style="width:${(benign/total)*100}%; background:#22c55e;" title="Benign"></div>
-                </div>
-                <p style="font-size:11px; color:#666; margin-top:8px;">Total variants analyzed: ${total.toLocaleString()} (Source: ClinVar/UniProt)</p>
-                <button class="ciliai-button" style="width:100%; justify-content:center; margin-top:10px;" onclick="window.renderVariantMap('${geneSymbol}')">📍 View on Protein Map</button>
-            </div>`;
-        window.addChatMessage(report, false);
-    };
-    setTimeout(() => window.CiliAI.Session.start(), 5000);
-    console.log("[CiliAI] Advanced Analytics & Persistence module loaded.");
 })();
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
-
