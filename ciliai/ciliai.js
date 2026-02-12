@@ -7660,6 +7660,7 @@ window.downloadCurrentVisualization = function() {
     window.CiliAI.activeColorScheme = 'ClustalX';
     window.CiliAI.compareMode = false;
     window.CiliAI.comparisonSet = [];
+    window.CiliAI.activeFilters = null;
 
     // Global progress bar
     const progressBar = document.createElement('div');
@@ -7669,8 +7670,8 @@ window.downloadCurrentVisualization = function() {
 
     window.showProgress = function(percent) {
         const bar = document.getElementById('global-progress');
-        bar.style.width = percent + '%';
-        if (percent >= 100) setTimeout(() => bar.style.width = '0%', 1000);
+        if (bar) bar.style.width = percent + '%';
+        if (percent >= 100) setTimeout(() => { if (bar) bar.style.width = '0%'; }, 1000);
     };
 
     // Keyboard Shortcuts
@@ -7682,7 +7683,7 @@ window.downloadCurrentVisualization = function() {
                 case 'm':
                     if (window.CiliAI.activeVariantData) {
                         const container = document.getElementById('plotly-container');
-                        if (container.querySelector('#msa-scroll')) {
+                        if (container && container.querySelector('#msa-scroll')) {
                             window.drawVariantWorkspace('map');
                         } else {
                             window.drawVariantWorkspace('msa');
@@ -7698,8 +7699,11 @@ window.downloadCurrentVisualization = function() {
                 case 'g':
                     const pos = prompt('Enter position to jump to:');
                     if (pos && window.CiliAI.activeAlignmentData) {
-                        document.getElementById('msa-jump-input').value = pos;
-                        window.msaJumpToPosition();
+                        const input = document.getElementById('msa-jump-input');
+                        if (input) {
+                            input.value = pos;
+                            window.msaJumpToPosition();
+                        }
                     }
                     break;
                 case '?':
@@ -7743,7 +7747,7 @@ window.downloadCurrentVisualization = function() {
         if (!window.CiliAI.activeVariantData) return;
         const state = {
             gene: window.CiliAI.activeVariantData.gene,
-            view: document.getElementById('plotly-container').querySelector('#msa-scroll') ? 'msa' : 'map',
+            view: document.getElementById('plotly-container')?.querySelector('#msa-scroll') ? 'msa' : 'map',
             timestamp: Date.now()
         };
         const url = new URL(window.location);
@@ -7888,7 +7892,8 @@ window.downloadCurrentVisualization = function() {
         }
     };
 
-    window.identifyHotspots = function(variants) {
+    // FIXED: Proper function declaration, not assignment
+    function identifyHotspots(variants) {
         const positions = variants.map(v => parseInt(v.begin)).filter(p => !isNaN(p));
         if (positions.length === 0) return 'N/A';
         
@@ -7900,7 +7905,8 @@ window.downloadCurrentVisualization = function() {
         
         const maxRegion = Object.entries(density).reduce((a, b) => a[1] > b[1] ? a : b)[0];
         return `${maxRegion}-${parseInt(maxRegion)+50}`;
-    };
+    }
+    window.identifyHotspots = identifyHotspots;
 
     window.renderVariantMap = async function(geneSymbol) {
         const container = document.getElementById('plotly-container');
@@ -7931,7 +7937,7 @@ window.downloadCurrentVisualization = function() {
     };
 
     window.applyVariantFilters = function() {
-        const filterText = document.getElementById('variant-filter')?.value.toLowerCase() || '';
+        const filterText = document.getElementById('variant-filter')?.value?.toLowerCase() || '';
         const pathoFilter = document.getElementById('patho-filter')?.value || 'all';
         const domainFilter = document.getElementById('domain-filter')?.value || 'all';
         
@@ -7940,9 +7946,12 @@ window.downloadCurrentVisualization = function() {
     };
 
     window.clearVariantFilters = function() {
-        document.getElementById('variant-filter').value = '';
-        document.getElementById('patho-filter').value = 'all';
-        document.getElementById('domain-filter').value = 'all';
+        const filterInput = document.getElementById('variant-filter');
+        const pathoSelect = document.getElementById('patho-filter');
+        const domainSelect = document.getElementById('domain-filter');
+        if (filterInput) filterInput.value = '';
+        if (pathoSelect) pathoSelect.value = 'all';
+        if (domainSelect) domainSelect.value = 'all';
         window.CiliAI.activeFilters = null;
         window.drawVariantWorkspace('map');
     };
@@ -7971,7 +7980,7 @@ window.downloadCurrentVisualization = function() {
     window.exportPublicationImage = async function() {
         const format = document.getElementById('export-format')?.value || 'png';
         const container = document.getElementById('plotly-container');
-        const svgElement = container.querySelector('svg');
+        const svgElement = container?.querySelector('svg');
         
         if (svgElement) {
             if (format === 'svg') {
@@ -7980,8 +7989,9 @@ window.downloadCurrentVisualization = function() {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${window.CiliAI.activeVariantData?.gene}_figure.svg`;
+                a.download = `${window.CiliAI.activeVariantData?.gene || 'protein'}_figure.svg`;
                 a.click();
+                URL.revokeObjectURL(url);
             } else {
                 // Convert SVG to high-res PNG
                 const canvas = document.createElement('canvas');
@@ -7997,8 +8007,10 @@ window.downloadCurrentVisualization = function() {
                     canvas.toBlob(function(blob) {
                         const a = document.createElement('a');
                         a.href = URL.createObjectURL(blob);
-                        a.download = `${window.CiliAI.activeVariantData?.gene}_figure.png`;
+                        a.download = `${window.CiliAI.activeVariantData?.gene || 'protein'}_figure.png`;
                         a.click();
+                        URL.revokeObjectURL(url);
+                        URL.revokeObjectURL(a.href);
                     });
                 };
                 img.src = url;
@@ -8008,7 +8020,7 @@ window.downloadCurrentVisualization = function() {
 
     window.addBatchVariants = function() {
         const input = document.getElementById('batch-variant-input');
-        const significance = document.getElementById('batch-sig').value;
+        const significance = document.getElementById('batch-sig')?.value || 'VUS';
         if (!input?.value) return;
         
         const lines = input.value.split(/[,\n]/);
@@ -8036,7 +8048,8 @@ window.downloadCurrentVisualization = function() {
     };
 
     window.clearBatchInput = function() {
-        document.getElementById('batch-variant-input').value = '';
+        const input = document.getElementById('batch-variant-input');
+        if (input) input.value = '';
     };
 
     window.generateConservationHeatmap = function(alignments, length) {
@@ -8073,8 +8086,8 @@ window.downloadCurrentVisualization = function() {
             if (filters.filterText) {
                 filteredVariants = filteredVariants.filter(v => 
                     v.begin.toString().includes(filters.filterText) ||
-                    v.wildType?.toLowerCase().includes(filters.filterText) ||
-                    v.alternativeSequence?.toLowerCase().includes(filters.filterText) ||
+                    (v.wildType || '').toLowerCase().includes(filters.filterText) ||
+                    (v.alternativeSequence || '').toLowerCase().includes(filters.filterText) ||
                     (v.description || '').toLowerCase().includes(filters.filterText)
                 );
             }
@@ -8218,7 +8231,7 @@ window.downloadCurrentVisualization = function() {
                         </div>
                         <div style="background:#f3f4f6; padding:10px; border-radius:6px;">
                             <div style="font-size:11px; color:#1e293b;">Hotspot Regions</div>
-                            <div style="font-size:24px; font-weight:700; color:#334155;">${window.identifyHotspots(data.variants)}</div>
+                            <div style="font-size:24px; font-weight:700; color:#334155;">${window.identifyHotspots ? window.identifyHotspots(data.variants) : 'N/A'}</div>
                         </div>
                     </div>
                 </div>
@@ -8483,7 +8496,7 @@ window.downloadCurrentVisualization = function() {
         if (!msaScroll || !miniMap) return;
         
         const updateMiniMap = () => {
-            const scrollPercent = msaScroll.scrollLeft / (msaScroll.scrollWidth - msaScroll.clientWidth);
+            const scrollPercent = msaScroll.scrollLeft / (msaScroll.scrollWidth - msaScroll.clientWidth || 1);
             const viewportWidth = (msaScroll.clientWidth / msaScroll.scrollWidth) * 100;
             const viewportLeft = scrollPercent * (100 - viewportWidth);
             miniMap.style.width = viewportWidth + '%';
@@ -8555,6 +8568,7 @@ window.downloadCurrentVisualization = function() {
         l.href = URL.createObjectURL(b);
         l.download = `${window.CiliAI.activeVariantData?.gene||'protein'}_alignment.fasta`;
         l.click();
+        URL.revokeObjectURL(l.href);
     };
 
     window.downloadFullAlignmentCSV = function() {
@@ -8568,6 +8582,7 @@ window.downloadCurrentVisualization = function() {
         l.href = URL.createObjectURL(b);
         l.download = `${window.CiliAI.activeVariantData?.gene||'protein'}_alignment.csv`;
         l.click();
+        URL.revokeObjectURL(l.href);
     };
 
     window.downloadVariantCSV = function() {
@@ -8583,6 +8598,7 @@ window.downloadCurrentVisualization = function() {
         l.href = URL.createObjectURL(b);
         l.download = `${d.gene}_variants.csv`;
         l.click();
+        URL.revokeObjectURL(l.href);
     };
 
     window.openVariantPanel = function(t, p, d, g) {
@@ -8840,10 +8856,28 @@ window.downloadCurrentVisualization = function() {
             a.href = URL.createObjectURL(blob);
             a.download = `${gene}_conservation_${pos}.txt`;
             a.click();
+            URL.revokeObjectURL(a.href);
         });
 
         const btn = document.getElementById('vp-cons-btn');
         if (btn) btn.innerText = "🌍 Check Conservation";
+    };
+
+    window.addVariantHelpMessage = function() {
+        if (window.addChatMessage) {
+            window.addChatMessage(`
+                <div class="ai-result-card" style="border-left: 4px solid #3b82f6; padding:12px; background:#f0f9ff; border-radius:6px; margin:8px 0;">
+                    <strong>🧬 Variant Analysis Tools Ready</strong>
+                    <ul style="margin:8px 0 0 20px; font-size:13px; color:#475569; padding:0; list-style-type:disc;">
+                        <li><strong>Visualize:</strong> Red variants are Pathogenic. Click variants for details.</li>
+                        <li><strong>Conservation:</strong> Click "Check Conservation" to compare across 65 species.</li>
+                        <li><strong>Full MSA:</strong> View complete protein alignment with all variants.</li>
+                        <li><strong>3D View:</strong> See variants on AlphaFold structures.</li>
+                        <li><strong>Downloads:</strong> Export variant CSV, MSA FASTA, or alignment CSV.</li>
+                        <li><strong>Navigation:</strong> Use Go to Position to jump to specific residues.</li>
+                    </ul>
+                </div>`, false);
+        }
     };
 
     // Initialize keyboard shortcuts and load state
@@ -8970,6 +9004,7 @@ window.downloadCurrentVisualization = function() {
             };
             document.getElementById('download-session-btn').onclick = () => {
                 const a = document.createElement('a'); a.href = window.currentAfUrl; a.download = `${geneSymbol}_AlphaFold.cif`; a.click();
+                URL.revokeObjectURL(a.href);
             };
             const close = () => { 
                 modal.remove(); 
@@ -9031,6 +9066,7 @@ window.downloadCurrentVisualization = function() {
     
     window.downloadStructure = function(geneSymbol) {
         const a = document.createElement('a'); a.href = window.currentAfUrl; a.download = `${geneSymbol}_AlphaFold.cif`; a.click();
+        URL.revokeObjectURL(a.href);
     };
     console.log("[CiliAI] 3D Viewer module loaded.");
 })();
@@ -9187,7 +9223,17 @@ window.downloadCurrentVisualization = function() {
     console.log("[CiliAI] Advanced Analytics & Persistence module loaded.");
 })();
 
+// Fix for window.handleAIQuery error - add dummy function if not exists
+if (typeof window.handleAIQuery !== 'function') {
+    window.handleAIQuery = function(query) {
+        console.log('AI Query received but handler not implemented:', query);
+        if (window.addChatMessage) {
+            window.addChatMessage(`<p>AI assistant is processing: "${query}"</p><p style="color:#666;">(AI integration not fully configured)</p>`, false);
+        }
+    };
+}
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
