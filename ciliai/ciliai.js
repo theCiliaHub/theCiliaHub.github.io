@@ -8417,45 +8417,94 @@ window.checkConservation = async function(gene, pos, refAA, altAA) {
 // ─────────────────────────────────────────────────────────────
 // 6. 3D STRUCTURE VIEWER (MolStar with Fallback)
 // ─────────────────────────────────────────────────────────────
-window.loadMolStar = async function() {
-    // 1. If already defined, exit immediately
-    if (customElements.get('pdbe-molstar')) return true;
+window.loadMolStar = async function () {
 
-    for (const src of MOLSTAR_SOURCES) {
-        try {
-            console.log(`[CiliAI] Probing ${src.name}...`);
-            
-            // Add CSS if it doesn't exist
-            if (!document.querySelector(`link[href="${src.css}"]`)) {
-                const l = document.createElement('link');
-                l.rel = 'stylesheet';
-                l.href = src.css;
-                document.head.appendChild(l);
-            }
-
-            // Create and append the script
-            await new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = src.js;
-                s.async = true;
-                s.onload = resolve;
-                s.onerror = reject;
-                document.head.appendChild(s);
-                // Give it a 7-second timeout per CDN
-                setTimeout(() => reject(new Error("Timeout")), 7000);
-            });
-
-            // 2. CRITICAL: Wait for the browser to register the custom element
-            // Sometimes the script loads but the tag isn't ready for 100-200ms
-            for (let i = 0; i < 10; i++) {
-                if (customElements.get('pdbe-molstar')) return true;
-                await new Promise(r => setTimeout(r, 200));
-            }
-        } catch (e) {
-            console.warn(`[CiliAI] ${src.name} source failed, trying next...`);
-        }
+    // If already registered, exit immediately
+    if (customElements.get('pdbe-molstar')) {
+        console.log('[CiliAI] Mol* already registered.');
+        return true;
     }
-    throw new Error("CDN blocked or network error. Please check your connection.");
+
+    // Prevent duplicate parallel loading
+    if (window.__molstarLoadingPromise) {
+        return window.__molstarLoadingPromise;
+    }
+
+    window.__molstarLoadingPromise = (async () => {
+
+        for (const src of MOLSTAR_SOURCES) {
+
+            try {
+                console.log(`[CiliAI] Attempting Mol* from ${src.name}...`);
+
+                /* ------------------------------
+                 * 1️⃣ Inject CSS (if missing)
+                 * ------------------------------ */
+                if (!document.querySelector(`link[href="${src.css}"]`)) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = src.css;
+                    document.head.appendChild(link);
+                }
+
+                /* ------------------------------
+                 * 2️⃣ Inject Script (if missing)
+                 * ------------------------------ */
+                if (!document.querySelector(`script[src="${src.js}"]`)) {
+
+                    await new Promise((resolve, reject) => {
+
+                        const script = document.createElement('script');
+                        script.src = src.js;
+                        script.type = 'text/javascript';
+                        script.async = true;
+
+                        const timeout = setTimeout(() => {
+                            console.warn('[CiliAI] Mol* CDN timeout.');
+                            script.remove();
+                            reject(new Error('CDN Timeout'));
+                        }, 12000); // generous timeout
+
+                        script.onload = () => {
+                            clearTimeout(timeout);
+                            resolve();
+                        };
+
+                        script.onerror = () => {
+                            clearTimeout(timeout);
+                            script.remove();
+                            reject(new Error('Script Load Failed'));
+                        };
+
+                        document.head.appendChild(script);
+                    });
+                }
+
+                /* ------------------------------
+                 * 3️⃣ Wait for Web Component
+                 * ------------------------------ */
+                let attempts = 0;
+
+                while (attempts < 40) {
+                    if (customElements.get('pdbe-molstar')) {
+                        console.log(`[CiliAI] Mol* registered via ${src.name}`);
+                        return true;
+                    }
+                    await new Promise(r => setTimeout(r, 250));
+                    attempts++;
+                }
+
+                throw new Error('Script loaded but component not registered.');
+
+            } catch (err) {
+                console.warn(`[CiliAI] ${src.name} failed: ${err.message}`);
+            }
+        }
+
+        throw new Error('All Mol* sources failed. Possible firewall or CSP restriction.');
+    })();
+
+    return window.__molstarLoadingPromise;
 };
 
     
@@ -8611,6 +8660,7 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
 
