@@ -8360,64 +8360,57 @@ window.downloadCurrentVisualization = function() {
         return `Loaded ${g}`;
     };
 
-    // ─────────────────────────────────────────────────────────────
-   // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // 5. CONSERVATION CHECKER (Triggers Professional MSA)
 // ─────────────────────────────────────────────────────────────
 window.checkConservation = async function(gene, pos, refAA, altAA) {
     let area = document.getElementById('msa-result-area');
-    const popup = document.getElementById('variant-popup');
+    const alignData = window.CiliAI.activeAlignmentData;
 
-    // Show loading state in the variant popup if it's open
-    if (area) {
-        area.innerHTML = `<div style="text-align:center;color:#64748b;padding:10px;">⏳ Aligning ${ORGANISM_PANEL.length} species...</div>`;
-    }
+    if (area) area.innerHTML = `<div style="text-align:center;color:#64748b;padding:10px;">⏳ Analyzing Evolutionary Conservation...</div>`;
 
     try {
-        const data = await window.fetchVariantDataLive(gene);
-        const humanSeq = data.sequence || "";
-        
-        // Create a local window (21 AA) for the professional MSA view
-        const winStart = Math.max(0, pos - 11);
-        const winEnd = Math.min(humanSeq.length, pos + 10);
-        const refContext = humanSeq.substring(winStart, winEnd);
-        const targetIndexInWindow = pos - 1 - winStart;
-        
+        // 1. USE REAL DATA: Check if we have loaded alignments
+        if (!alignData || !alignData.alignments) {
+            throw new Error("No alignment data found. Please wait for MSA to load.");
+        }
+
+        const winStart = Math.max(0, pos - 8);
+        const winEnd = pos + 7;
         let conservedCount = 0;
-        const isDomain = data.domains?.some(f => pos >= f.start && pos <= f.end);
         
-        // Generate simulated alignment rows based on phylogenetic distance
-        const rows = ORGANISM_PANEL.map(s => {
-            let seq = "";
-            for (let i = 0; i < refContext.length; i++) {
-                let char = refContext[i];
-                // Mutation simulation logic based on species distance
-                if (Math.random() < s.dist * (isDomain ? 0.3 : 1)) {
-                    char = (Math.random() < 0.05) ? altAA : "ACDEFGHIKLMNPQRSTVWY"[Math.floor(Math.random() * 20)];
-                }
-                if (s.dist < 0.1) char = refContext[i]; // Keep high conservation for primates
-                seq += char;
-                if (i === targetIndexInWindow && char === refAA) conservedCount++;
-            }
-            return { ...s, seq };
+        // 2. CALCULATE REAL SCORE: Compare every species to the Human reference at 'pos'
+        const rows = alignData.alignments.map(aln => {
+            const speciesSeq = aln.seq || "";
+            // UniProt/MSA is 1-indexed, JS strings are 0-indexed
+            const actualChar = speciesSeq[pos - 1] || '-';
+            
+            if (actualChar === refAA) conservedCount++;
+
+            // Grab a small window for the professional MSA display
+            const seqWindow = speciesSeq.substring(winStart, winEnd);
+            return {
+                species: aln.species,
+                icon: aln.icon || '🧬',
+                seq: seqWindow,
+                dist: aln.species === 'Human' ? 0 : 0.5 // for display logic
+            };
         });
 
         const score = Math.round((conservedCount / rows.length) * 100);
 
-        // Update the small area in the popup
         if (area) {
             area.innerHTML = `<div style="background:#f0f9ff;padding:8px;border-radius:4px;font-size:11px;border:1px solid #bae6fd;">
-                <strong>Status:</strong> Alignment Complete (${score}%)<br>
-                <span style="color:#0369a1;">Professional View Opened</span>
+                <strong>Conservation Score:</strong> ${score}%<br>
+                <span style="color:#0369a1;">Professional View Active</span>
             </div>`;
         }
 
-        // TRIGGER THE PROFESSIONAL MSA WINDOW
         window.renderProfessionalMSA(gene, pos, refAA, rows, score);
 
     } catch (e) {
         console.error("Conservation Error:", e);
-        if (area) area.innerHTML = "<div style='color:red;'>Error checking conservation.</div>";
+        if (area) area.innerHTML = `<div style='color:#ef4444;'>${e.message}</div>`;
     }
 };
     
@@ -8425,42 +8418,48 @@ window.checkConservation = async function(gene, pos, refAA, altAA) {
 // 6. 3D STRUCTURE VIEWER (MolStar with Fallback)
 // ─────────────────────────────────────────────────────────────
 window.loadMolStar = async function() {
+    // 1. If already defined, exit immediately
     if (customElements.get('pdbe-molstar')) return true;
-    
-    const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms));
 
     for (const src of MOLSTAR_SOURCES) {
         try {
-            console.log(`[CiliAI] Attempting to load MolStar from ${src.name}...`);
+            console.log(`[CiliAI] Probing ${src.name}...`);
             
-            // Add CSS if missing
+            // Add CSS if it doesn't exist
             if (!document.querySelector(`link[href="${src.css}"]`)) {
-                const l = document.createElement('link'); l.rel='stylesheet'; l.href=src.css; document.head.appendChild(l);
+                const l = document.createElement('link');
+                l.rel = 'stylesheet';
+                l.href = src.css;
+                document.head.appendChild(l);
             }
 
-            // Load JS
-            const scriptPromise = new Promise((res, rej) => {
+            // Create and append the script
+            await new Promise((resolve, reject) => {
                 const s = document.createElement('script');
                 s.src = src.js;
                 s.async = true;
-                s.onload = res;
-                s.onerror = rej;
+                s.onload = resolve;
+                s.onerror = reject;
                 document.head.appendChild(s);
+                // Give it a 7-second timeout per CDN
+                setTimeout(() => reject(new Error("Timeout")), 7000);
             });
 
-            // Wait for script to load OR timeout after 5 seconds
-            await Promise.race([scriptPromise, timeout(5000)]);
-            
-            // Short delay to allow component registration
-            await new Promise(r => setTimeout(r, 500));
-            return true;
-        } catch (e) { 
-            console.warn(`[CiliAI] Source ${src.name} failed or timed out.`); 
+            // 2. CRITICAL: Wait for the browser to register the custom element
+            // Sometimes the script loads but the tag isn't ready for 100-200ms
+            for (let i = 0; i < 10; i++) {
+                if (customElements.get('pdbe-molstar')) return true;
+                await new Promise(r => setTimeout(r, 200));
+            }
+        } catch (e) {
+            console.warn(`[CiliAI] ${src.name} source failed, trying next...`);
         }
     }
     throw new Error("CDN blocked or network error. Please check your connection.");
 };
-    window.showStructureViewer = async function(gene, pos, aa) {
+
+    
+window.showStructureViewer = async function(gene, pos, aa) {
         const btn = document.getElementById('popup-3d-btn');
         if(btn) { btn.innerText = "⏳ Loading..."; btn.disabled = true; }
         
@@ -8612,5 +8611,6 @@ window.renderProfessionalMSA = function(gene, pos, refAA, alignments, score) {
 
 // Optional auto-run if not triggered from index.html
 // window.initCiliAI();
+
 
 
