@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — CiliaHub</title>
-    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+    <link rel="icon" type="image/png" href="assets/CiliaHub_Logo_web.png">
     
     <style>
         :root {
@@ -888,13 +888,13 @@
         window.geneLocalizationData = {};
 
         const BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-        const MASTER_DB = BASE_URL + 'ciliAI_master_database.json';
-        const LOOKUP_DB = BASE_URL + 'ciliAI_lookups.json';
-        const LI_PHYLO_MATRIX = BASE_URL + 'li_et_al_2014_matrix_optimized.json';
-        const NEVERS_PHYLO_MATRIX = BASE_URL + 'nevers_et_al_2017_matrix_optimized.json';
-        const RNA_TISSUE_TSV = BASE_URL + 'rna_tissue_consensus.tsv';
-        const UMAP_COORDINATES_DB = BASE_URL + 'umap_data.json';
-        const CELLXGENE_EXPRESSION_DB = BASE_URL + 'cellxgene_data.json';
+        const MASTER_DB = BASE_URL + 'data/genes/ciliAI_master_database.json';
+        const LOOKUP_DB = BASE_URL + 'data/genes/ciliAI_lookups.json';
+        const LI_PHYLO_MATRIX = BASE_URL + 'data/phylogeny/li_et_al_2014_matrix_optimized.json';
+        const NEVERS_PHYLO_MATRIX = BASE_URL + 'data/phylogeny/nevers_et_al_2017_matrix_optimized.json';
+        const RNA_TISSUE_TSV = BASE_URL + 'data/exports/rna_tissue_consensus.tsv';
+        const UMAP_COORDINATES_DB = BASE_URL + 'data/umap/umap_data.json';
+        const CELLXGENE_EXPRESSION_DB = BASE_URL + 'data/expression/cellxgene_data.json';
 
         const defaultGenesNames = ["IFT88", "CEP290", "ARL13B", "BBS1", "PKD2", "ACE2"];
         const allPartIds = ["ciliary-membrane", "axoneme", "basal-body", "transition-zone", "nucleus", "cell-body"];

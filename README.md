@@ -144,6 +144,66 @@ Responsive design for mobile/tablet.
 
 Requires JavaScript (ES6+).
 
+**CiliAI Assistant (DeepSeek Integration)**
+
+This repository supports a feature-flagged DeepSeek assistant. The UI defaults to the legacy rule-based assistant unless enabled.
+
+**Environment Variables**
+
+- `CILIAI_LLM_PROVIDER=deepseek`
+- `CILIAI_MODEL=deepseek-chat`
+- `CILIAI_ASSISTANT_V2=true|false`
+- `CILIAI_ASSISTANT_TEMPERATURE=0.1–0.3`
+- `CILIAI_ASSISTANT_TIMEOUT_MS=15000`
+- `CILIAI_ASSISTANT_RETRIES=2`
+- `CILIAI_ASSISTANT_PROXY_URL=https://your-proxy.example.com/api/chat`
+- `CILIAI_PROXY_SECRET=` — Optional. If set in the Worker, the frontend must send this token (Bearer or X-CiliAI-Token) to call the proxy. Keeps the API hidden from unauthorized use.
+- `CILIAI_ASSISTANT_DRY_RUN=true|false`
+- `CILIAI_ASSISTANT_FORCE_FAILURE=true|false`
+- `CILIAI_DEBUG=true|false`
+
+**Important (Static Site)**
+
+If you do not want the API key visible in the browser, you must use a proxy. The browser should **never** call `api.deepseek.com` directly.
+
+**Local Development (.env → env.js)**
+
+1. Copy `ciliai/env.example.js` to `ciliai/env.js` and set values, or create `ciliai/.env`.
+2. If using `.env`, run:
+   - `node ciliai/tools/build_env.js`
+3. Reload the page. The runtime reads `window.CILIAI_ENV` from `ciliai/env.js`.
+
+**Proxy Setup (No key in browser)**
+
+This repo includes a simple Cloudflare Worker in `serverless/cloudflare-worker.js`.
+
+Steps (plain language):
+1. Create a Cloudflare Worker.
+2. Add a secret named `DEEPSEEK_API_KEY` in the Worker settings.
+3. Deploy the Worker and copy its URL.
+4. Set `CILIAI_ASSISTANT_PROXY_URL` in `ciliai/env.js` to `https://your-worker-url/api/chat`.
+5. (Optional) In the Worker, add a secret `CILIAI_PROXY_SECRET`. In `ciliai/env.js` set the same value for `CILIAI_PROXY_SECRET`. Only requests with this token will be accepted (API stays hidden).
+6. Open the site and use the **Assistant Verification** panel.
+
+**Chatbot + database (RAG)**
+
+The assistant uses your loaded CiliAI data so the LLM can answer from the database:
+
+- On each question, relevant genes and facts are taken from `CiliAI.masterData` and `CiliAI.lookups` (geneMap, byCiliopathy).
+- This context is injected into the system prompt so DeepSeek answers using your DB (gene descriptions, localizations, Bardet–Biedl list, Gold Standard), not only general knowledge.
+- No training or fine-tuning: retrieval at query time (RAG-style).
+
+**Tests (Golden Contract)**
+
+- Run: `node --test ciliai/tests/assistant_golden.test.mjs`
+- Tests validate the `[MARKDOWN]` + `[ACTIONS_JSON]` contract and known UI targets.
+
+**Assistant Verification Mode (UI-only)**
+
+- Open the site and click **Assistant Verification** in the CiliAI panel, or go to `#verify` or `/verify.html`.
+- Click **Run Verification** to execute UI checks and view ✅/❌ results.
+- Use **Try in Assistant** buttons to replay example questions.
+
 **Performance Metrics**
 
 Initial Load: <2s

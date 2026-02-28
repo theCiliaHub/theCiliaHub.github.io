@@ -1,0 +1,103 @@
+[
+  {
+    "id": "q1",
+    "question": "What is IFT88?",
+    "response": "[MARKDOWN]\n- Question: What is IFT88?\n- Short Answer: IFT88 is a core intraflagellar transport (IFT-B) protein essential for cilia assembly.\n  It supports trafficking along the axoneme and is widely used as a cilia marker.\n- Details:\n  - Part of the IFT-B complex that moves cargo into the cilium\n  - Loss disrupts cilia formation and signaling\n  - Frequently linked to ciliopathy phenotypes in model systems\n- What I can show visually:\n  - UMAP expression plot for IFT88\n  - Ciliary diagram highlight for axoneme localization\n  - Gene details table entry\n- Next best actions:\n  - Show IFT88 expression in lung UMAP\n  - Highlight axoneme localization\n  - Compare IFT88 with another IFT gene\n\n[ACTIONS_JSON]\n{\"intent\":\"show_gene\",\"title\":\"IFT88 overview\",\"payload\":{\"gene\":\"IFT88\"},\"visual\":[{\"type\":\"highlight\",\"target\":\"cilia-diagram\",\"data\":{\"localization\":\"axoneme\",\"gene\":\"IFT88\"}}]}"
+  },
+  {
+    "id": "q2",
+    "question": "Where is CEP290 localized?",
+    "response": "[MARKDOWN]\n- Question: Where is CEP290 localized?\n- Short Answer: CEP290 localizes primarily to the transition zone of the cilium.\n  It helps regulate the ciliary gate and protein entry.\n- Details:\n  - Transition zone scaffold protein\n  - Frequently associated with Joubert syndrome and related ciliopathies\n  - Connects axoneme to the ciliary membrane\n- What I can show visually:\n  - Ciliary diagram highlight of the transition zone\n  - Gene detail card for CEP290\n- Next best actions:\n  - Highlight the transition zone on the diagram\n  - List related transition-zone genes\n\n[ACTIONS_JSON]\n{\"intent\":\"show_gene\",\"title\":\"CEP290 localization\",\"payload\":{\"gene\":\"CEP290\"},\"visual\":[{\"type\":\"highlight\",\"target\":\"cilia-diagram\",\"data\":{\"localization\":\"transition zone\",\"gene\":\"CEP290\"}}]}"
+  },
+  {
+    "id": "q3",
+    "question": "List genes in the transition zone",
+    "response": "[MARKDOWN]\n- Question: List genes in the transition zone\n- Short Answer: Here is a focused set of transition-zone genes from the curated database.\n  I can show them in a sortable table on the left panel.\n- Details:\n  - Transition-zone gate components\n  - Enriched for ciliopathy-associated genes\n  - Includes core scaffolding proteins\n- What I can show visually:\n  - Gene list table with localization and disease annotations\n  - Diagram highlight of the transition zone\n- Next best actions:\n  - Open the table view\n  - Plot expression for any listed gene\n\n[ACTIONS_JSON]\n{\"intent\":\"list_genes\",\"title\":\"Transition Zone Genes\",\"payload\":{\"genes\":[\"CEP290\",\"TMEM67\",\"NPHP1\",\"RPGRIP1L\",\"TMEM231\"]},\"visual\":[{\"type\":\"table\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"Transition Zone Genes\",\"genes\":[\"CEP290\",\"TMEM67\",\"NPHP1\",\"RPGRIP1L\",\"TMEM231\"]}}]}"
+  },
+  {
+    "id": "q4",
+    "question": "Show expression plot for ARL13B",
+    "response": "[MARKDOWN]\n- Question: Show expression plot for ARL13B\n- Short Answer: I can render a UMAP expression plot for ARL13B in the current dataset.\n  This highlights cell types with higher expression.\n- Details:\n  - ARL13B is a ciliary membrane GTPase\n  - Useful as a cilia marker in many tissues\n- What I can show visually:\n  - UMAP expression plot for ARL13B\n  - Ciliary diagram highlight for membrane localization\n- Next best actions:\n  - Render the UMAP plot now\n  - Highlight the ciliary membrane on the diagram\n\n[ACTIONS_JSON]\n{\"intent\":\"plot\",\"title\":\"ARL13B UMAP\",\"payload\":{\"gene\":\"ARL13B\"},\"visual\":[{\"type\":\"plot\",\"target\":\"plotly-container\",\"data\":{\"gene\":\"ARL13B\"}}]}"
+  },
+  {
+    "id": "q5",
+    "question": "Plot UMAP for FOXJ1 in lung",
+    "response": "[MARKDOWN]\n- Question: Plot UMAP for FOXJ1 in lung\n- Short Answer: I can plot FOXJ1 expression on the lung UMAP dataset.\n  FOXJ1 marks multiciliated cell programs.\n- Details:\n  - FOXJ1 is a master regulator of motile ciliogenesis\n  - Often enriched in multiciliated respiratory epithelium\n- What I can show visually:\n  - Lung UMAP expression plot\n- Next best actions:\n  - Render the FOXJ1 UMAP plot\n  - Compare FOXJ1 with another motile cilia gene\n\n[ACTIONS_JSON]\n{\"intent\":\"plot\",\"title\":\"FOXJ1 Lung UMAP\",\"payload\":{\"gene\":\"FOXJ1\",\"dataset\":\"lung\"},\"visual\":[{\"type\":\"plot\",\"target\":\"plotly-container\",\"data\":{\"gene\":\"FOXJ1\"}}]}"
+  },
+  {
+    "id": "q6",
+    "question": "Show domains for KIF3A",
+    "response": "[MARKDOWN]\n- Question: Show domains for KIF3A\n- Short Answer: I can open the Pfam domain viewer for KIF3A.\n  This displays domain architecture along the protein sequence.\n- Details:\n  - KIF3A is a kinesin motor subunit for anterograde IFT\n  - Domain view helps interpret functional regions\n- What I can show visually:\n  - Pfam domain panel for KIF3A\n- Next best actions:\n  - Open the domain viewer\n  - Plot expression for KIF3A\n\n[ACTIONS_JSON]\n{\"intent\":\"show_gene\",\"title\":\"KIF3A domains\",\"payload\":{\"gene\":\"KIF3A\"},\"visual\":[{\"type\":\"panel\",\"target\":\"domain-viewer\",\"data\":{\"gene\":\"KIF3A\"}}]}"
+  },
+  {
+    "id": "q7",
+    "question": "List genes associated with Joubert syndrome",
+    "response": "[MARKDOWN]\n- Question: List genes associated with Joubert syndrome\n- Short Answer: Here is a curated subset of Joubert syndrome-associated genes.\n  I can show them in the sortable table.\n- Details:\n  - Genes commonly linked to ciliopathy phenotypes\n  - Many localize to the transition zone or basal body\n- What I can show visually:\n  - Gene list table with ciliopathy annotations\n- Next best actions:\n  - Open the gene table\n  - Plot a gene from the list\n\n[ACTIONS_JSON]\n{\"intent\":\"list_genes\",\"title\":\"Joubert Syndrome Genes\",\"payload\":{\"genes\":[\"TMEM67\",\"CEP290\",\"AHI1\",\"NPHP1\",\"CPLANE1\"]},\"visual\":[{\"type\":\"table\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"Joubert Syndrome Genes\",\"genes\":[\"TMEM67\",\"CEP290\",\"AHI1\",\"NPHP1\",\"CPLANE1\"]}}]}"
+  },
+  {
+    "id": "q8",
+    "question": "Compare IFT88 vs BBS1",
+    "response": "[MARKDOWN]\n- Question: Compare IFT88 vs BBS1\n- Short Answer: I can set up a comparison dashboard for IFT88 and BBS1.\n  This summarizes localization and disease context side-by-side.\n- Details:\n  - IFT88: core IFT-B transport protein\n  - BBS1: BBSome component associated with Bardet-Biedl syndrome\n- What I can show visually:\n  - Comparison panel in the left-side view\n- Next best actions:\n  - Open the comparison dashboard\n  - Plot each gene in UMAP\n\n[ACTIONS_JSON]\n{\"intent\":\"compare\",\"title\":\"IFT88 vs BBS1\",\"payload\":{\"genes\":[\"IFT88\",\"BBS1\"]},\"visual\":[{\"type\":\"panel\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"IFT88 vs BBS1\",\"genes\":[\"IFT88\",\"BBS1\"]}}]}"
+  },
+  {
+    "id": "q9",
+    "question": "Highlight axoneme genes: DNAH5 and DNAI1",
+    "response": "[MARKDOWN]\n- Question: Highlight axoneme genes: DNAH5 and DNAI1\n- Short Answer: These are motile axonemal dynein genes.\n  I can highlight the axoneme region and show them in a table.\n- Details:\n  - DNAH5 and DNAI1 are key dynein components\n  - Often linked to primary ciliary dyskinesia\n- What I can show visually:\n  - Axoneme highlight on the ciliary diagram\n  - Gene list table\n- Next best actions:\n  - Highlight the axoneme region\n  - Open the gene table\n\n[ACTIONS_JSON]\n{\"intent\":\"list_genes\",\"title\":\"Axoneme Dynein Genes\",\"payload\":{\"genes\":[\"DNAH5\",\"DNAI1\"]},\"visual\":[{\"type\":\"highlight\",\"target\":\"cilia-diagram\",\"data\":{\"localization\":\"axoneme\"}},{\"type\":\"table\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"Axoneme Dynein Genes\",\"genes\":[\"DNAH5\",\"DNAI1\"]}}]}"
+  },
+  {
+    "id": "q10",
+    "question": "Show top ciliary genes list",
+    "response": "[MARKDOWN]\n- Question: Show top ciliary genes list\n- Short Answer: I can open a curated list of well-known ciliary genes.\n  The table includes localization and disease annotations.\n- Details:\n  - Includes core IFT and BBSome genes\n  - Useful starting set for exploration\n- What I can show visually:\n  - Gene list table in the left panel\n- Next best actions:\n  - Open the table view\n  - Plot one of the listed genes\n\n[ACTIONS_JSON]\n{\"intent\":\"list_genes\",\"title\":\"Top Ciliary Genes\",\"payload\":{\"genes\":[\"IFT88\",\"IFT172\",\"BBS1\",\"BBS2\",\"ARL13B\"]},\"visual\":[{\"type\":\"table\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"Top Ciliary Genes\",\"genes\":[\"IFT88\",\"IFT172\",\"BBS1\",\"BBS2\",\"ARL13B\"]}}]}"
+  },
+  {
+    "id": "q11",
+    "question": "Show ARL13B and TMEM67 plot",
+    "response": "[MARKDOWN]\n- Question: Show ARL13B and TMEM67 plot\n- Short Answer: I can plot ARL13B and TMEM67 on the UMAP.\n  This compares their expression patterns across cell types.\n- Details:\n  - ARL13B marks ciliary membrane\n  - TMEM67 is a transition zone protein\n- What I can show visually:\n  - Multi-gene UMAP plot\n- Next best actions:\n  - Render the plot\n  - Zoom to a specific cell type if needed\n\n[ACTIONS_JSON]\n{\"intent\":\"plot\",\"title\":\"ARL13B vs TMEM67\",\"payload\":{\"gene\":\"ARL13B\",\"genes\":[\"ARL13B\",\"TMEM67\"]},\"visual\":[{\"type\":\"plot\",\"target\":\"plotly-container\",\"data\":{\"gene\":\"ARL13B\",\"genes\":[\"ARL13B\",\"TMEM67\"]}}]}"
+  },
+  {
+    "id": "q12",
+    "question": "What ciliopathy is BBS1 associated with?",
+    "response": "[MARKDOWN]\n- Question: What ciliopathy is BBS1 associated with?\n- Short Answer: BBS1 is classically associated with Bardet-Biedl syndrome.\n  It is part of the BBSome complex involved in ciliary trafficking.\n- Details:\n  - BBS1: BBSome component\n  - Links to retinal degeneration, obesity, and kidney issues\n- What I can show visually:\n  - Gene detail card and related table entries\n- Next best actions:\n  - Show BBS1 gene details\n  - List other BBSome genes\n\n[ACTIONS_JSON]\n{\"intent\":\"show_gene\",\"title\":\"BBS1 ciliopathy\",\"payload\":{\"gene\":\"BBS1\"},\"visual\":[]}"
+  },
+  {
+    "id": "q13",
+    "question": "Show me genes in the basal body",
+    "response": "[MARKDOWN]\n- Question: Show me genes in the basal body\n- Short Answer: Here is a representative set of basal body genes.\n  I can open them in the gene list table.\n- Details:\n  - Basal body anchors the cilium\n  - Enriched for centrosomal proteins\n- What I can show visually:\n  - Gene list table\n  - Basal body highlight on the diagram\n- Next best actions:\n  - Open the gene table\n  - Highlight the basal body region\n\n[ACTIONS_JSON]\n{\"intent\":\"list_genes\",\"title\":\"Basal Body Genes\",\"payload\":{\"genes\":[\"PCM1\",\"CEP164\",\"OFD1\",\"CEP290\",\"CEP83\"]},\"visual\":[{\"type\":\"table\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"Basal Body Genes\",\"genes\":[\"PCM1\",\"CEP164\",\"OFD1\",\"CEP290\",\"CEP83\"]}},{\"type\":\"highlight\",\"target\":\"cilia-diagram\",\"data\":{\"localization\":\"basal body\"}}]}"
+  },
+  {
+    "id": "q14",
+    "question": "Open the CiliAI page",
+    "response": "[MARKDOWN]\n- Question: Open the CiliAI page\n- Short Answer: I can navigate you to the CiliAI assistant view.\n  This keeps all cilia exploration tools available.\n- Details:\n  - Route: #ciliai\n- What I can show visually:\n  - CiliAI assistant page with diagrams and plots\n- Next best actions:\n  - Navigate to the CiliAI page\n\n[ACTIONS_JSON]\n{\"intent\":\"navigate\",\"title\":\"Go to CiliAI\",\"payload\":{\"route\":\"#ciliai\"},\"visual\":[{\"type\":\"link\",\"target\":\"#ciliai\",\"data\":{\"route\":\"#ciliai\"}}]}"
+  },
+  {
+    "id": "q15",
+    "question": "Help",
+    "response": "[MARKDOWN]\n- Question: Help\n- Short Answer: I can help with gene details, localization, disease lists, and plots.\n  Ask about a gene, a localization, or a ciliopathy.\n- Details:\n  - Examples: \"What is IFT88?\", \"List genes in transition zone\"\n  - Plots: UMAP expression and domain panels\n- What I can show visually:\n  - Gene lists, UMAP plots, domain panels, diagram highlights\n- Next best actions:\n  - Ask about a specific gene\n  - Request a localization gene list\n\n[ACTIONS_JSON]\n{\"intent\":\"help\",\"title\":\"Help\",\"payload\":{},\"visual\":[]}"
+  },
+  {
+    "id": "q16",
+    "question": "Filter for localization: membrane",
+    "response": "[MARKDOWN]\n- Question: Filter for localization: membrane\n- Short Answer: I can filter to ciliary membrane-associated genes.\n  The results can be shown in the table view.\n- Details:\n  - Ciliary membrane proteins include ARL13B and GPCRs\n  - Useful for signaling-focused analysis\n- What I can show visually:\n  - Filtered gene list table\n- Next best actions:\n  - Open the filtered table\n  - Plot one of the membrane genes\n\n[ACTIONS_JSON]\n{\"intent\":\"filter\",\"title\":\"Ciliary Membrane Genes\",\"payload\":{\"localization\":\"membrane\",\"genes\":[\"ARL13B\",\"GPR161\",\"SMO\"]},\"visual\":[{\"type\":\"table\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"Ciliary Membrane Genes\",\"genes\":[\"ARL13B\",\"GPR161\",\"SMO\"]}}]}"
+  },
+  {
+    "id": "q17",
+    "question": "Show domain panel for OFD1",
+    "response": "[MARKDOWN]\n- Question: Show domain panel for OFD1\n- Short Answer: I can open the Pfam domain viewer for OFD1.\n  This displays its annotated domains and positions.\n- Details:\n  - OFD1 is a basal body protein linked to ciliopathies\n- What I can show visually:\n  - Pfam domain panel for OFD1\n- Next best actions:\n  - Open the domain viewer\n  - Show OFD1 localization on the diagram\n\n[ACTIONS_JSON]\n{\"intent\":\"show_gene\",\"title\":\"OFD1 domains\",\"payload\":{\"gene\":\"OFD1\"},\"visual\":[{\"type\":\"panel\",\"target\":\"domain-viewer\",\"data\":{\"gene\":\"OFD1\"}}]}"
+  },
+  {
+    "id": "q18",
+    "question": "List genes in the BBSome complex",
+    "response": "[MARKDOWN]\n- Question: List genes in the BBSome complex\n- Short Answer: Here is a representative set of BBSome genes.\n  I can show them in the table with disease annotations.\n- Details:\n  - BBSome mediates cargo trafficking in cilia\n  - Strongly linked to Bardet-Biedl syndrome\n- What I can show visually:\n  - Gene list table with annotations\n- Next best actions:\n  - Open the gene table\n  - Compare BBSome genes to IFT genes\n\n[ACTIONS_JSON]\n{\"intent\":\"list_genes\",\"title\":\"BBSome Genes\",\"payload\":{\"genes\":[\"BBS1\",\"BBS2\",\"BBS4\",\"BBS7\",\"BBS9\"]},\"visual\":[{\"type\":\"table\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"BBSome Genes\",\"genes\":[\"BBS1\",\"BBS2\",\"BBS4\",\"BBS7\",\"BBS9\"]}}]}"
+  },
+  {
+    "id": "q19",
+    "question": "Plot UMAP for IFT88 and IFT81",
+    "response": "[MARKDOWN]\n- Question: Plot UMAP for IFT88 and IFT81\n- Short Answer: I can plot both IFT88 and IFT81 on the UMAP.\n  This helps compare their expression patterns.\n- Details:\n  - Both are IFT-B components\n  - Useful for co-expression assessment\n- What I can show visually:\n  - Multi-gene UMAP plot\n- Next best actions:\n  - Render the UMAP plot\n  - Zoom into a specific cell type cluster\n\n[ACTIONS_JSON]\n{\"intent\":\"plot\",\"title\":\"IFT88 vs IFT81\",\"payload\":{\"gene\":\"IFT88\",\"genes\":[\"IFT88\",\"IFT81\"]},\"visual\":[{\"type\":\"plot\",\"target\":\"plotly-container\",\"data\":{\"gene\":\"IFT88\",\"genes\":[\"IFT88\",\"IFT81\"]}}]}"
+  },
+  {
+    "id": "q20",
+    "question": "Show table for genes: IFT88, CEP290, TMEM67",
+    "response": "[MARKDOWN]\n- Question: Show table for genes: IFT88, CEP290, TMEM67\n- Short Answer: I can open a table with those genes and their annotations.\n  This includes localization and disease links.\n- Details:\n  - IFT88: IFT-B transport\n  - CEP290: transition zone\n  - TMEM67: transition zone/ciliopathy gene\n- What I can show visually:\n  - Gene list table\n- Next best actions:\n  - Open the table view\n  - Plot any listed gene\n\n[ACTIONS_JSON]\n{\"intent\":\"list_genes\",\"title\":\"Selected Genes\",\"payload\":{\"genes\":[\"IFT88\",\"CEP290\",\"TMEM67\"]},\"visual\":[{\"type\":\"table\",\"target\":\"cilia-svg\",\"data\":{\"title\":\"Selected Genes\",\"genes\":[\"IFT88\",\"CEP290\",\"TMEM67\"]}}]}"
+  }
+]
+

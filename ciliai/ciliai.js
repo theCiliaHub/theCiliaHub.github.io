@@ -390,6 +390,10 @@ function extractMultipleGenes(query) {
     return result;
 }
 
+// Explicit wire: ensure the utils namespace always points to the real extractor
+window.extractMultipleGenes = extractMultipleGenes;
+window.CiliAI.utils.extractGenes = extractMultipleGenes;
+
 // 2. Cell-Type Specific Expression Helpers
 function getTPMInCellType(geneSymbol, cellType) {
     const gene = window.CiliAI.lookups.geneMap[geneSymbol.toUpperCase()];
@@ -484,7 +488,7 @@ function formatListResult(title, genes, description = "") {
                     📊 View Full Table
                 </button>
                 <button class="ciliai-button" style="flex: 1; margin: 0; background: #005b96; color: white; height:36px; display:flex; align-items:center; justify-content:center; font-weight:700;" 
-                    onclick="window.handleAIQuery('Multi: ${top5}')"
+                    onclick="window.sendQuery('Multi: ${top5}')"
                     onmouseover="this.style.background='#004577'"
                     onmouseout="this.style.background='#005b96'">
                     🎨 Visualize Top 5
@@ -1407,8 +1411,8 @@ window.median = function (arr) {
         try {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
             const [liRes, neversRes] = await Promise.all([
-                fetch(baseUrl + 'li_et_al_2014_matrix_optimized.json'),
-                fetch(baseUrl + 'nevers_et_al_2017_matrix_optimized.json')
+                fetch(baseUrl + 'data/phylogeny/li_et_al_2014_matrix_optimized.json'),
+                fetch(baseUrl + 'data/phylogeny/nevers_et_al_2017_matrix_optimized.json')
             ]);
             
             if (!liRes.ok || !neversRes.ok) {
@@ -1606,6 +1610,32 @@ window.renderGoldStandardView = function() {
     return `<div class="ai-result-card"><p>Displayed the <strong>Gold Standard Ciliary Gene Database</strong> (${totalCount} genes) in the main panel.</p></div>`;
 };
 
+// Bardet–Biedl gene list (uses same table rendering as other lists)
+window.showBBSGenes = function() {
+    const lookups = window.CiliAI?.lookups;
+    if (!lookups || !lookups.byCiliopathy) {
+        return `<div class="ai-result-card"><p>Bardet–Biedl list is not available.</p></div>`;
+    }
+    const normalize = window.CiliAI.utils?.normalizeTerm || ((t) => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const targetKeys = ['Bardet–Biedl Syndrome', 'Bardet Biedel Syndrome', 'BBS'];
+    let key = Object.keys(lookups.byCiliopathy).find(k => targetKeys.some(t => normalize(k) === normalize(t)));
+    if (!key) {
+        key = Object.keys(lookups.byCiliopathy).find(k => {
+            const n = normalize(k);
+            return n.includes('bardet') && n.includes('biedl');
+        });
+    }
+    let genes = key ? (lookups.byCiliopathy[key] || []) : [];
+    if (!genes.length) {
+        genes = ["BBS1","BBS2","BBS4","BBS5","BBS7","BBS9","BBS10","BBS12","TTC8","MKKS","CEP290","WDPCP"];
+    }
+    const rows = genes.map(g => ({ gene: g }));
+    if (typeof window.showDataInLeftPanel === 'function') {
+        window.showDataInLeftPanel('Bardet–Biedl Genes', rows);
+    }
+    return `<div class="ai-result-card"><p>Displayed <strong>Bardet–Biedl genes</strong> in the main panel.</p></div>`;
+};
+
 /**
  * Advanced Tissue Query Handler (Granular Cell Type Support)
  * Includes explicit definitions for Pan-ciliary vs Idio-ciliary genes.
@@ -1646,6 +1676,13 @@ window.handleTissueExpressionQuery = function(query) {
     let mode = 'enriched'; 
     if (qLower.includes('only') || qLower.includes('exclusive') || qLower.includes('specific')) mode = 'exclusive';
     else if (qLower.includes('not') && qLower.includes('expressed')) mode = 'excluded';
+    const enrichedRequested = mode === 'enriched';
+    if (enrichedRequested && !targetTissue) {
+        if (window.CILIAI_ENV?.CILIAI_DEBUG === 'true') {
+            console.warn('[CiliAI] Enriched filter requested but no tissue term detected; skipping enriched tissue filter.');
+        }
+        mode = 'enriched_any';
+    }
 
     // 3. Helper: Get Max Value AND Top Cell Type
     const getTissueStats = (obj) => {
@@ -1721,6 +1758,26 @@ window.handleTissueExpressionQuery = function(query) {
                     });
                 }
             }
+        } else if (mode === 'enriched_any') {
+            // Graceful fallback when "enriched" is requested without a tissue
+            const tissueObj = gene.expression.tissue;
+            let bestVal = 0;
+            let bestTissue = '';
+            Object.entries(tissueObj).forEach(([tissueName, values]) => {
+                if (!values || typeof values !== 'object') return;
+                const { max } = getTissueStats(values);
+                if (max > bestVal) {
+                    bestVal = max;
+                    bestTissue = tissueName;
+                }
+            });
+            if (bestVal > 1) {
+                results.push({
+                    gene: gene.Gene,
+                    val: bestVal,
+                    desc: `Enriched in ${bestTissue || 'ciliary tissues'}`
+                });
+            }
         }
     });
 
@@ -1728,10 +1785,11 @@ window.handleTissueExpressionQuery = function(query) {
     results.sort((a, b) => b.val - a.val);
 
     if (results.length === 0) {
-        return `<div class="ai-result-card"><p>No genes found matching criteria: <strong>${mode} ${targetTissue}</strong>.</p></div>`;
+        const label = targetTissue || 'ciliary tissues';
+        return `<div class="ai-result-card"><p>No genes found matching criteria: <strong>${mode} ${label}</strong>.</p></div>`;
     }
 
-    const title = `${mode.charAt(0).toUpperCase() + mode.slice(1)}: ${targetTissue}`;
+    const title = `${mode.charAt(0).toUpperCase() + mode.slice(1)}: ${targetTissue || 'ciliary tissues'}`;
     
     // --- NEW: Add Explanatory Card ---
     const explanationHtml = `
@@ -2748,7 +2806,7 @@ window.displayFullGeneInfo = async function(geneSymbol) {
                 ? window.renderPhyloTable(g.phylogeny) 
                 : '<p style="color:#64748b;">No phylogenetic data available.</p>'}
             <div style="margin-top:20px;">
-                <button class="ciliai-button" onclick="window.handleAIQuery('show evolution of ${geneSymbol}')">
+                <button class="ciliai-button" onclick="window.sendQuery('show evolution of ${geneSymbol}')">
                     
 
 [Image of Phylogenetic Tree]
@@ -3769,8 +3827,34 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
     // 2. Active dataset
     const datasetKey = window.CiliAI.activeDataset || 'lung';
     const dataset = window.CiliAI.datasets?.[datasetKey];
-    if (!dataset || !Array.isArray(dataset.umap)) {
-        window.addChatMessage(`Warning: ${datasetKey.charAt(0).toUpperCase() + datasetKey.slice(1)} dataset not loaded yet.`, false);
+    if (!dataset) {
+        window.addChatMessage(`Warning: Unknown dataset "${datasetKey}".`, false);
+        return;
+    }
+
+    // Lazy-load: fetch dataset on first use if not yet loaded
+    if (!dataset._loaded) {
+        if (typeof window.loadDatasetOnDemand === 'function') {
+            const loadMsgId = 'ciliai-ds-loading-' + Date.now();
+            window.addChatMessage(
+                `<div id="${loadMsgId}">Fetching <strong>${dataset.name}</strong> data — this may take a moment...</div>`,
+                false
+            );
+            await window.loadDatasetOnDemand(datasetKey);
+            const loadEl = document.getElementById(loadMsgId);
+            if (loadEl) loadEl.parentElement?.remove();
+            if (!dataset._loaded) {
+                window.addChatMessage(`Could not load ${dataset.name}. Please try again.`, false);
+                return;
+            }
+        } else {
+            window.addChatMessage(`${dataset.name} is still loading — please try again in a moment.`, false);
+            return;
+        }
+    }
+
+    if (!Array.isArray(dataset.umap) || dataset.umap.length === 0) {
+        window.addChatMessage(`Warning: No UMAP coordinates available for ${dataset.name}.`, false);
         return;
     }
 
@@ -3892,45 +3976,52 @@ window.renderUMAPPlot = async function(displayName, targetGenes = [], zoomToCell
         }
     }
 
-    // Build plot points
-    sourceData.forEach((p, i) => {
-        if (!p) return;
-        const cellType = p.cell_type;
-        cellTypes.add(cellType);
+    // Build plot arrays in chunks so the event loop stays free between batches
+    const POINT_CHUNK = 5000;
+    const primaryLocalization = window.CiliAI.lookups.geneMap[primaryGene]?.Localization || 'Cilium';
+    for (let start = 0; start < sourceData.length; start += POINT_CHUNK) {
+        const end = Math.min(start + POINT_CHUNK, sourceData.length);
+        for (let i = start; i < end; i++) {
+            const p = sourceData[i];
+            if (!p) continue;
+            const cellType = p.cell_type;
+            cellTypes.add(cellType);
 
-        if (zoomToCellType && cellType !== zoomToCellType) return;
+            if (zoomToCellType && cellType !== zoomToCellType) continue;
 
-        let px = p.x ?? p.umap_x ?? p.UMAP_1;
-        let py = p.y ?? p.umap_y ?? p.UMAP_2;
-        if (px === undefined || py === undefined) return;
+            let px = p.x ?? p.umap_x ?? p.UMAP_1;
+            let py = p.y ?? p.umap_y ?? p.UMAP_2;
+            if (px === undefined || py === undefined) continue;
 
-        x.push(parseFloat(px));
-        y.push(parseFloat(py));
+            x.push(parseFloat(px));
+            y.push(parseFloat(py));
 
-        let exprVal = 0;
-        if (!isClusterView && exprData) {
-            exprVal = exprData[i];
-            if (exprVal > maxExpr) maxExpr = exprVal;
-        }
-
-        text.push(`<b>${cellType}</b><br>${isClusterView ? '' : `Expression: ${exprVal.toFixed(2)} TPM`}`);
-        customdata.push({
-            localization: window.CiliAI.lookups.geneMap[primaryGene]?.Localization || 'Cilium',
-            gene: primaryGene
-        });
-
-        if (isClusterView) {
-            let matchColor = '#94A3B8';
-            for(const key in clusterColors) {
-                if(cellType.toLowerCase().includes(key.toLowerCase())) { matchColor = clusterColors[key]; break; }
+            let exprVal = 0;
+            if (!isClusterView && exprData) {
+                exprVal = exprData[i];
+                if (exprVal > maxExpr) maxExpr = exprVal;
             }
-            color.push(matchColor);
-            size.push(6);
-        } else {
-            color.push(exprVal);
-            size.push(exprVal > 0 ? 8 : 4);
+
+            text.push(`<b>${cellType}</b><br>${isClusterView ? '' : `Expression: ${exprVal.toFixed(2)} TPM`}`);
+            customdata.push({ localization: primaryLocalization, gene: primaryGene });
+
+            if (isClusterView) {
+                let matchColor = '#94A3B8';
+                for (const key in clusterColors) {
+                    if (cellType.toLowerCase().includes(key.toLowerCase())) { matchColor = clusterColors[key]; break; }
+                }
+                color.push(matchColor);
+                size.push(6);
+            } else {
+                color.push(exprVal);
+                size.push(exprVal > 0 ? 8 : 4);
+            }
         }
-    });
+        // Yield to the event loop between chunks so the UI remains responsive
+        if (end < sourceData.length) {
+            await new Promise(r => setTimeout(r, 0));
+        }
+    }
 
     if (x.length === 0) {
         window.addChatMessage(`⚠️ No valid UMAP coordinates found for ${dataset.name}.`, false);
@@ -4250,6 +4341,21 @@ function extractExpressionForGene(geneUpper, dataset, sourceData) {
     let nonZeroCount = 0;
     let foundAnyData = false;
 
+    const normalizeGeneKey = (value) => String(value || '').toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
+    const normKey = normalizeGeneKey(geneUpper);
+    const ensemblKey = window.CiliAI?.symbolToEnsembl?.get(normKey) || '';
+    const resolveValue = (src) => {
+        if (!src || typeof src !== 'object') return null;
+        if (src[geneUpper] !== undefined) return src[geneUpper];
+        if (src[normKey] !== undefined) return src[normKey];
+        if (ensemblKey && src[ensemblKey] !== undefined) return src[ensemblKey];
+        if (window.CiliAI?.expressionIndex) {
+            if (window.CiliAI.expressionIndex.has(normKey)) return window.CiliAI.expressionIndex.get(normKey);
+            if (ensemblKey && window.CiliAI.expressionIndex.has(ensemblKey)) return window.CiliAI.expressionIndex.get(ensemblKey);
+        }
+        return null;
+    };
+
     const trySources = [
         dataset.expression,
         dataset.expressionMatrix,
@@ -4259,9 +4365,12 @@ function extractExpressionForGene(geneUpper, dataset, sourceData) {
     for (const src of trySources) {
         if (!src) continue;
 
+        const sourceValue = resolveValue(src);
+        if (!sourceValue) continue;
+
         // Format A: gene → {cells: [...], expression: [...]}
-        if (src[geneUpper]?.cells && src[geneUpper]?.expression) {
-            const raw = src[geneUpper];
+        if (sourceValue?.cells && sourceValue?.expression) {
+            const raw = sourceValue;
             for (let k = 0; k < raw.cells.length; k++) {
                 const idx = raw.cells[k];
                 if (idx < n) {
@@ -4276,8 +4385,8 @@ function extractExpressionForGene(geneUpper, dataset, sourceData) {
         }
 
         // Format B: gene → dense or sparse array
-        if (Array.isArray(src[geneUpper])) {
-            const raw = src[geneUpper];
+        if (Array.isArray(sourceValue)) {
+            const raw = sourceValue;
             if (raw.length === n) {
                 // dense
                 for (let i = 0; i < n; i++) {
@@ -4303,12 +4412,12 @@ function extractExpressionForGene(geneUpper, dataset, sourceData) {
         }
 
         // Format C: cell-centric {cell_id: {GENE: val}}
-        if (typeof src === 'object' && !Array.isArray(src)) {
+        if (typeof sourceValue === 'object' && !Array.isArray(sourceValue)) {
             let hits = 0;
             sourceData.forEach((p, i) => {
                 const cid = p.cell_id || p.id || p.barcode;
-                if (cid && src[cid]?.[geneUpper] !== undefined) {
-                    const val = src[cid][geneUpper];
+                if (cid && sourceValue[cid]?.[geneUpper] !== undefined) {
+                    const val = sourceValue[cid][geneUpper];
                     arr[i] = val;
                     if (val > maxVal) maxVal = val;
                     if (val > 0) nonZeroCount++;
@@ -4615,36 +4724,77 @@ window.handleCellTypeQuestion = function(query) {
 // ==========================================================
 
 const intentHandlers = [
+    // Conversational small-talk handler (works without LLM)
+    {
+        priority: 220,
+        matcher: (qLower) => {
+            const q = (qLower || '').trim();
+            return /^(hi|hello|hey|hi there|selam|merhaba|good morning|good afternoon|good evening)\b/.test(q) ||
+                   /^(how are you|how are u|how r u|what'?s up|who are you|what can you do|help)\b/.test(q) ||
+                   /^(thanks|thank you|thx)\b/.test(q);
+        },
+        handler: async (query) => {
+            const q = (query || '').toLowerCase().trim();
+
+            if (/^(thanks|thank you|thx)\b/.test(q)) {
+                return `
+                    <div class="ai-result-card">
+                        <h4>You're welcome!</h4>
+                        <p>I can help with genes, localization, ciliopathies, and visual exploration.</p>
+                        <ul>
+                            <li>What is IFT88?</li>
+                            <li>Where is CEP290 localized?</li>
+                            <li>Show Gold Standard ciliary genes</li>
+                            <li>Display Bardet–Biedl genes</li>
+                            <li>Show disease associated with TMEM67</li>
+                        </ul>
+                    </div>
+                `;
+            }
+
+            if (/^(how are you|how are u|how r u|what'?s up)\b/.test(q)) {
+                return `
+                    <div class="ai-result-card">
+                        <h4>I am doing great, thank you!</h4>
+                        <p>I am your CiliaHub assistant. I can help you explore ciliary genes and visuals on this page.</p>
+                        <p>Try one of these:</p>
+                        <ul>
+                            <li>What is IFT88?</li>
+                            <li>Where is CEP290 localized?</li>
+                            <li>Show Gold Standard ciliary genes</li>
+                            <li>Display Bardet–Biedl genes</li>
+                            <li>Show disease associated with TMEM67</li>
+                        </ul>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="ai-result-card">
+                    <h4>Hello! I am CiliAI 👋</h4>
+                    <p>I can help you with gene information, localization, ciliopathy lists, and visual analysis.</p>
+                    <ul>
+                        <li>What is IFT88?</li>
+                        <li>Where is CEP290 localized?</li>
+                        <li>Show Gold Standard ciliary genes</li>
+                        <li>Display Bardet–Biedl genes</li>
+                        <li>Show disease associated with TMEM67</li>
+                    </ul>
+                </div>
+            `;
+        }
+    },
     
     {
         priority: 200,
-        matcher: (qLower) => 
-            qLower.includes('complete ciliary gene list') || 
-            qLower.includes('gold standard') || 
+        matcher: (qLower) =>
+            qLower.includes('complete ciliary gene list') ||
+            qLower.includes('gold standard') ||
+            qLower.includes('gold standart') ||
+            qLower.includes('all ciliary genes') ||
+            qLower.includes('full database') ||
             qLower.includes('database view') ||
             (qLower.includes('show') && qLower.includes('database')),
-        handler: async (query) => {
-            return window.renderGoldStandardView();
-        }
-    },
-{
-        priority: 155, // High priority
-        matcher: (qLower) => qLower.includes('gold standard') || qLower.includes('all ciliary genes'),
-        handler: async () => {
-            return window.renderGoldStandardView();
-        }
-    },
-    
-    // --- ADD THESE TO YOUR intentHandlers ARRAY ---
-
-    // 1. "Display all ciliary genes" / "Gold standard"
-    {
-        priority: 150, 
-        matcher: (qLower) => 
-            qLower.includes('all ciliary genes') || 
-            qLower.includes('gold standard') || 
-            qLower.includes('gold standart') || 
-            qLower.includes('full database'),
         handler: async (query) => {
             return window.renderGoldStandardView();
         }
@@ -5473,15 +5623,6 @@ const intentHandlers = [
         }
     },
 
-    // Greetings
-    {
-        priority: 70,
-        matcher: (qLower) => ['hello', 'hi', 'hey', 'greetings'].includes(qLower),
-        handler: async (query) => {
-            return "Hello! I'm CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.";
-        }
-    },
-
     // Terminology Queries
     {
         priority: 69,
@@ -5546,7 +5687,7 @@ const intentHandlers = [
     },
 
 {
-    priority: 68,
+    priority: 64,
     matcher: (qLower) => {
         const loc = window.extractLocalizationIntent?.(qLower);
         return !!loc && /genes?\b/.test(qLower);
@@ -5684,28 +5825,6 @@ const intentHandlers = [
             return await window.displayFullGeneInfo(match[1].toUpperCase());
         }
     },
-
-    // Ortholog Queries (Alternative Patterns)
-   {
-    priority: 61,
-    matcher: (qLower) => {
-        const match1 = qLower.match(/…/i);
-        const match2 = qLower.match(/…/i);
-        return !!(match1 || match2);           // ← boolean return, no problem
-    },
-    handler: async (query) => {                // ← this is a real async function
-        const qLower = window.CiliAI.utils?.normalizeQuery?.(query) || query.toLowerCase().trim();
-        const match1 = qLower.match(/…/i);
-        const match2 = qLower.match(/…/i);
-        const match = match1 || match2;
-        if (!match) return null;               // ← legal return inside function
-
-        const geneSymbol = (match1 ? match1[1] : match2[2]).toUpperCase();
-        const organism  = (match1 ? match1[2] : match2[1]);
-
-        return window.handleOrthologQuery?.(geneSymbol, organism) ?? null;
-    }
-},
 
   // Domain Architecture (Fixed: Handles "WDR31 domains" and "Show domains for WDR31")
     {
@@ -6261,6 +6380,66 @@ window.handleAIQuery = async function (query) {
             window.addChatMessage("Data is still loading, please wait...", false);
             return;
         }
+
+        // Greeting: let LLM handle if enabled, otherwise use static response
+        if (window.CiliAIAssistant && typeof window.CiliAIAssistant.isGreeting === 'function' && window.CiliAIAssistant.isGreeting(query)) {
+            if (!window.CiliAIAssistant.isEnabled()) {
+                const greetingResult = window.CiliAIAssistant.getGreetingResponse
+                    ? window.CiliAIAssistant.getGreetingResponse(query)
+                    : null;
+                const safeResult = greetingResult || window.CiliAIAssistant.buildFallbackResponse(query, 'greeting_fallback');
+                const finalText = window.CiliAIAssistant.finalizeAssistantOutput(safeResult, query);
+                const parsed = window.CiliAIAssistantCore.parseAssistantResponse(finalText);
+                const rendered = window.CiliAIAssistant.renderMarkdown(parsed.markdown);
+                window.addChatMessage(rendered, false);
+                window.CiliAIAssistant.dispatchActions(parsed.actions);
+                return;
+            }
+        }
+
+        // LLM path: database context is sent to the API; response is merged with DB summary
+        if (window.CiliAIAssistant && window.CiliAIAssistant.isEnabled()) {
+            const thinkingId = 'ciliai-thinking-' + Date.now();
+            window.addChatMessage('<div id="' + thinkingId + '" class="assistant-thinking"><span class="thinking-dot"></span> Thinking...</div>', false);
+            const llmResult = await window.CiliAIAssistant.ask(query);
+            const thinkingEl = document.getElementById(thinkingId);
+            if (thinkingEl) thinkingEl.remove();
+            if (llmResult) {
+                const finalText = window.CiliAIAssistant.finalizeAssistantOutput(llmResult, query);
+                let parsed = window.CiliAIAssistantCore.parseAssistantResponse(finalText);
+                if (!finalText.includes('[MARKDOWN]') || !finalText.includes('[ACTIONS_JSON]')) {
+                    const fallback = window.CiliAIAssistant.buildFallbackResponse(query, 'guard:missing_contract');
+                    const fallbackText = window.CiliAIAssistant.finalizeAssistantOutput(fallback, query);
+                    parsed = window.CiliAIAssistantCore.parseAssistantResponse(fallbackText);
+                }
+                const rendered = window.CiliAIAssistant.renderMarkdown(parsed.markdown);
+                window.addChatMessage(rendered, false);
+                window.CiliAIAssistant.dispatchActions(parsed.actions);
+                return;
+            }
+        }
+
+        // Data-only path: database + data-first rules, used when LLM is unavailable
+        if (window.CiliAIAssistant && typeof window.CiliAIAssistant.getDataOnlyResponse === 'function') {
+            const dataResult = window.CiliAIAssistant.getDataOnlyResponse(query);
+            if (dataResult) {
+                const finalText = window.CiliAIAssistant.finalizeAssistantOutput(dataResult, query);
+                const parsed = window.CiliAIAssistantCore.parseAssistantResponse(finalText);
+                const rendered = window.CiliAIAssistant.renderMarkdown(parsed.markdown);
+                window.addChatMessage(rendered, false);
+                window.CiliAIAssistant.dispatchActions(parsed.actions);
+                return;
+            }
+        }
+
+    // Legacy shortcut: Bardet–Biedl genes list
+    if (qLower.includes('bardet') || qLower.includes('biedl') || qLower.includes('bbs')) {
+        const html = window.showBBSGenes ? window.showBBSGenes() : null;
+        if (html) {
+            window.addChatMessage(html, false);
+            return;
+        }
+    }
 
         let htmlResult = null;
 
