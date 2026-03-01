@@ -41,46 +41,6 @@
             list.slice(0, 10).forEach(g => addGene(typeof g === 'string' ? g : g.Gene || g.gene));
         }
 
-        // Inject full disease gene symbol list when query asks for a ciliopathy gene list
-        if (lines.length === 0) {
-            const qNorm = q.replace(/[^a-z0-9]/g, '');
-            const matchedDiseaseKey = Object.keys(byCiliopathy).find(k => {
-                const kNorm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-                return qNorm.includes(kNorm) || kNorm.includes(qNorm.slice(0, 8));
-            });
-            if (matchedDiseaseKey) {
-                const allGenes = (byCiliopathy[matchedDiseaseKey] || []).map(g =>
-                    typeof g === 'string' ? g : g.Gene || g.gene
-                ).filter(Boolean);
-                if (allGenes.length) {
-                    lines.push(
-                        `${matchedDiseaseKey} genes (${allGenes.length} total): ${allGenes.join(', ')}`
-                    );
-                }
-            }
-        }
-
-        // Inject localization gene symbols when query asks for a compartment gene list
-        if (lines.length === 0) {
-            const byLocalization = root.CiliAI.lookups?.byLocalization || {};
-            const matchedLoc = Object.keys(byLocalization).find(loc =>
-                q.includes(loc.toLowerCase())
-            );
-            if (matchedLoc) {
-                const allGenes = (byLocalization[matchedLoc] || []).map(g =>
-                    typeof g === 'string' ? g : g.Gene || g.gene
-                ).filter(Boolean);
-                if (allGenes.length) {
-                    // Cap at 60 symbols to stay within a reasonable token budget
-                    const slice = allGenes.slice(0, 60);
-                    const suffix = allGenes.length > 60 ? ` ...[${allGenes.length - 60} more]` : '';
-                    lines.push(
-                        `${matchedLoc} genes (${allGenes.length} total): ${slice.join(', ')}${suffix}`
-                    );
-                }
-            }
-        }
-
         if (lines.length === 0) return '';
         return '\n\nDATABASE CONTEXT (use this data to answer; prefer it over general knowledge):\n' + lines.join('\n');
     }
@@ -332,6 +292,9 @@
                 invalid.push(g);
             }
         });
+        // #region agent log
+        fetch('http://127.0.0.1:7491/ingest/b99c607b-adae-4c2a-a178-1292ac376939',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e17aa'},body:JSON.stringify({sessionId:'8e17aa',location:'assistant-runtime.js:validateGenes',message:'validation result',data:{inputCount:genes.length,validCount:valid.length,invalidCount:invalid.length,firstInvalid:invalid.slice(0,5),firstValid:valid.slice(0,5),firstInput:genes.slice(0,5)},timestamp:Date.now(),hypothesisId:'C+D'})}).catch(()=>{});
+        // #endregion
         if (invalid.length && root.console && console.warn) {
             console.warn('[CiliAI] Unrecognized gene symbols removed from payload:', invalid);
         }
@@ -620,37 +583,78 @@
             }
         }
 
+        // Total ciliopathy gene count — mirrors logic in legacy ciliai.js priority-78 handler
+        if (/total.{0,15}ciliopathy|ciliopathy.{0,15}total/i.test(q)) {
+            const masterData = root.CiliAI.masterData || [];
+            const allUniqueGenes = new Set();
+            masterData.forEach(gene => {
+                const rawData = gene.Ciliopathies || gene.Ciliopathy;
+                if (!rawData) return;
+                const list = Array.isArray(rawData)
+                    ? rawData
+                    : String(rawData).split(/[;,]/).map(s => s.trim());
+                const isValid = list.some(d =>
+                    d && d.length > 2 && !['NONE', 'N/A', 'UNKNOWN'].includes(d.toUpperCase())
+                );
+                if (isValid) allUniqueGenes.add(gene.Gene);
+            });
+            const totalCount = allUniqueGenes.size;
+            const genes = [...allUniqueGenes].filter(Boolean);
+            setMeta({ dataFirstUsed: true, dataFirstSource: 'Total Ciliopathy', llmCalled: false });
+            return {
+                markdown: `There are **${totalCount} unique ciliopathy-associated genes** in the curated database.`,
+                actions: core.normalizeActions({
+                    intent: 'list_genes',
+                    title: 'Ciliopathy Genes',
+                    payload: { genes },
+                    visual: [{ type: 'table', target: 'cilia-svg',
+                                data: { title: 'Ciliopathy Genes', genes } }]
+                }),
+                raw: ''
+            };
+        }
+
         // Localization gene list: (show|list|display) + known compartment → full list from byLocalization
         const wantsLocList = (q.includes('show') || q.includes('list') || q.includes('display'))
             && !isExplainQuestion;
         if (wantsLocList) {
             const byLocalization = root.CiliAI.lookups?.byLocalization || {};
+            const geneMap = root.CiliAI.lookups?.geneMap || {};
             // Sort by length descending so "transition zone" matches before "zone"
             const sortedKeys = Object.keys(byLocalization).sort((a, b) => b.length - a.length);
-            const matchedLoc = sortedKeys.find(loc => q.includes(loc.toLowerCase()));
+            // Use word-boundary regex so "cilia" does NOT match "ciliary" or "pan-ciliary"
+            const matchedLoc = sortedKeys.find(loc => {
+                const escaped = loc.toLowerCase().replace(/[-\s]+/g, '[\\s\\-]+');
+                return new RegExp('(?:^|[^a-z])' + escaped + '(?:[^a-z]|$)').test(q);
+            });
+            // #region agent log
+            fetch('http://127.0.0.1:7491/ingest/b99c607b-adae-4c2a-a178-1292ac376939',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e17aa'},body:JSON.stringify({sessionId:'8e17aa',location:'assistant-runtime.js:tryDataFirst:locList',message:'localization list check',data:{q,wantsLocList,matchedLoc:matchedLoc||null},timestamp:Date.now(),hypothesisId:'A+B'})}).catch(()=>{});
+            // #endregion
             if (matchedLoc) {
                 const rawList = byLocalization[matchedLoc] || [];
-                const genes = rawList.map(g =>
+                const rawGenes = rawList.map(g =>
                     typeof g === 'string' ? g : g.Gene || g.gene
-                ).filter(Boolean);
-                if (genes.length) {
+                ).filter(Boolean).map(g => String(g).toUpperCase());
+                // Validate against geneMap so the markdown count matches what the table will show
+                const genes = rawGenes.filter(g => !!geneMap[g]);
+                const finalGenes = genes.length > 0 ? genes : rawGenes;
+                if (finalGenes.length) {
                     const displayName = matchedLoc.charAt(0).toUpperCase() + matchedLoc.slice(1);
                     setMeta({ dataFirstUsed: true, dataFirstSource: matchedLoc, llmCalled: false });
                     return {
                         markdown: [
-                            `Found **${genes.length} genes** localized to the **${displayName}** in the curated database.`,
+                            `Found **${finalGenes.length} genes** localized to the **${displayName}** in the curated database.`,
                             '',
-                            'Opening the full gene list table now. The diagram will highlight the compartment.'
+                            'Opening the full gene list table now.'
                         ].join('\n'),
                         actions: core.normalizeActions({
                             intent: 'list_genes',
                             title: `${displayName} Genes`,
-                            payload: { genes },
+                            payload: { genes: finalGenes },
+                            // No highlight visual — avoids showDiagram() stealing focus from the table
                             visual: [
                                 { type: 'table', target: 'cilia-svg',
-                                  data: { title: `${displayName} Genes`, genes } },
-                                { type: 'highlight', target: 'cilia-diagram',
-                                  data: { localization: matchedLoc } }
+                                  data: { title: `${displayName} Genes`, genes: finalGenes } }
                             ]
                         }),
                         raw: ''
@@ -666,8 +670,13 @@
         const q = String(query || '').toLowerCase();
         const wantsList = q.includes('display') || q.includes('show') || q.includes('list');
         const isExplain = /what is|what are|explain|tell me about|define|how do/.test(q);
+        // #region agent log
+        fetch('http://127.0.0.1:7491/ingest/b99c607b-adae-4c2a-a178-1292ac376939',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e17aa'},body:JSON.stringify({sessionId:'8e17aa',location:'assistant-runtime.js:shouldForceDataFirst',message:'entry',data:{query,q,wantsList,isExplain},timestamp:Date.now(),hypothesisId:'A+E'})}).catch(()=>{});
+        // #endregion
         if (q.includes('gold standard')) return true;
         if (q.includes('where is cep290 localized')) return true;
+        // "Total ciliopathy genes" — force data-first so legacy handler isn't blocked by LLM
+        if (/total.{0,15}ciliopathy|ciliopathy.{0,15}total/i.test(q)) return true;
         if (!isExplain && wantsList) {
             // BBS shortcut
             if (q.includes('bardet') || q.includes('biedl') || q.includes('bbs')) return true;
@@ -678,12 +687,19 @@
                 const kNorm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
                 return kNorm.length >= 5 && qNorm.includes(kNorm);
             });
+            // #region agent log
+            fetch('http://127.0.0.1:7491/ingest/b99c607b-adae-4c2a-a178-1292ac376939',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e17aa'},body:JSON.stringify({sessionId:'8e17aa',location:'assistant-runtime.js:shouldForceDataFirst:diseaseHit',message:'disease key scan',data:{qNorm,hit:hit||null},timestamp:Date.now(),hypothesisId:'C+D'})}).catch(()=>{});
+            // #endregion
             if (hit) return true;
-            // Any known localization compartment
+            // Any known localization compartment — word-boundary match to avoid "cilia" matching "ciliary"
             const byLocalization = root.CiliAI?.lookups?.byLocalization || {};
-            const locHit = Object.keys(byLocalization).find(loc =>
-                q.includes(loc.toLowerCase())
-            );
+            const locHit = Object.keys(byLocalization).find(loc => {
+                const escaped = loc.toLowerCase().replace(/[-\s]+/g, '[\\s\\-]+');
+                return new RegExp('(?:^|[^a-z])' + escaped + '(?:[^a-z]|$)').test(q);
+            });
+            // #region agent log
+            fetch('http://127.0.0.1:7491/ingest/b99c607b-adae-4c2a-a178-1292ac376939',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e17aa'},body:JSON.stringify({sessionId:'8e17aa',location:'assistant-runtime.js:shouldForceDataFirst:locHit',message:'localization key scan (word-boundary)',data:{q,locHit:locHit||null},timestamp:Date.now(),hypothesisId:'A+E'})}).catch(()=>{});
+            // #endregion
             if (locHit) return true;
         }
         return false;
@@ -778,13 +794,22 @@
             }
 
             if (Array.isArray(actions.visual)) {
+                // Only switch to diagram view if there is no competing table/plot visual
+                const hasTableOrPlot = actions.visual.some(v =>
+                    v && (v.type === 'table' || v.type === 'list' || v.type === 'plot')
+                );
+
                 actions.visual.forEach(item => {
                     if (!item || !item.type) return;
                     const type = item.type;
                     const data = item.data || {};
 
                     if (type === 'highlight' && root.SpatialManager && data.localization) {
-                        root.showDiagram && root.showDiagram();
+                        // #region agent log
+                        fetch('http://127.0.0.1:7491/ingest/b99c607b-adae-4c2a-a178-1292ac376939',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e17aa'},body:JSON.stringify({sessionId:'8e17aa',location:'assistant-runtime.js:dispatchActions:highlight',message:'highlight dispatch',data:{localization:data.localization,gene:data.gene||null,intent,hasTableOrPlot,allVisuals:actions.visual},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+                        // #endregion
+                        // Only show diagram if there is no table/plot already being displayed
+                        if (!hasTableOrPlot) root.showDiagram && root.showDiagram();
                         setMeta({ mappingAttempted: true });
                         const mapped = root.SpatialManager.highlight(data.localization, data.gene || null);
                         setMeta({ mappingSuccess: mapped });
