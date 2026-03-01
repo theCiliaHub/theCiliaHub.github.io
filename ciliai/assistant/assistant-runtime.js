@@ -41,6 +41,46 @@
             list.slice(0, 10).forEach(g => addGene(typeof g === 'string' ? g : g.Gene || g.gene));
         }
 
+        // Inject full disease gene symbol list when query asks for a ciliopathy gene list
+        if (lines.length === 0) {
+            const qNorm = q.replace(/[^a-z0-9]/g, '');
+            const matchedDiseaseKey = Object.keys(byCiliopathy).find(k => {
+                const kNorm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return qNorm.includes(kNorm) || kNorm.includes(qNorm.slice(0, 8));
+            });
+            if (matchedDiseaseKey) {
+                const allGenes = (byCiliopathy[matchedDiseaseKey] || []).map(g =>
+                    typeof g === 'string' ? g : g.Gene || g.gene
+                ).filter(Boolean);
+                if (allGenes.length) {
+                    lines.push(
+                        `${matchedDiseaseKey} genes (${allGenes.length} total): ${allGenes.join(', ')}`
+                    );
+                }
+            }
+        }
+
+        // Inject localization gene symbols when query asks for a compartment gene list
+        if (lines.length === 0) {
+            const byLocalization = root.CiliAI.lookups?.byLocalization || {};
+            const matchedLoc = Object.keys(byLocalization).find(loc =>
+                q.includes(loc.toLowerCase())
+            );
+            if (matchedLoc) {
+                const allGenes = (byLocalization[matchedLoc] || []).map(g =>
+                    typeof g === 'string' ? g : g.Gene || g.gene
+                ).filter(Boolean);
+                if (allGenes.length) {
+                    // Cap at 60 symbols to stay within a reasonable token budget
+                    const slice = allGenes.slice(0, 60);
+                    const suffix = allGenes.length > 60 ? ` ...[${allGenes.length - 60} more]` : '';
+                    lines.push(
+                        `${matchedLoc} genes (${allGenes.length} total): ${slice.join(', ')}${suffix}`
+                    );
+                }
+            }
+        }
+
         if (lines.length === 0) return '';
         return '\n\nDATABASE CONTEXT (use this data to answer; prefer it over general knowledge):\n' + lines.join('\n');
     }
@@ -111,8 +151,11 @@
             '- The [ACTIONS_JSON] section triggers UI actions. JSON MUST parse.',
             '- If nothing to do: {"intent":"none","title":"","payload":{},"visual":[]}',
             '- Do NOT invent capabilities. Only use these targets: ' + targets,
-            '- Intents: none, list_genes, show_gene, show_disease, filter, plot, compare, navigate, help, visualize_bbs_list.',
+            '- Intents: none, list_genes, show_gene, show_disease, filter, plot, compare, navigate, help, visualize_bbs_list, lookup_gene_list.',
             '- Your answer will be merged with a "From the database" section showing DB facts; use the database context below to stay consistent.',
+            '- When DATABASE CONTEXT provides a list of gene symbols for a disease or localization, copy those exact symbols into [ACTIONS_JSON] payload.genes. Do NOT substitute or supplement with genes not in the provided list.',
+            '- If the DATABASE CONTEXT states "N total" genes, use that number in your [MARKDOWN] response. Do not invent a different count.',
+            '- To show a disease gene list, use intent "lookup_gene_list" with payload { "disease": "<exact disease name>" }. The UI will look up the full gene list from the database — you do NOT need to enumerate the genes yourself.',
         ];
         if (dbContext) base.push(dbContext);
         if (fewShotText) {
@@ -185,7 +228,7 @@
             const response = await fetch('./ciliai/tests/assistant_golden_cases.json');
             if (!response.ok) throw new Error('Few-shot examples not found');
             const data = await response.json();
-            const examples = Array.isArray(data) ? data.slice(0, 4) : [];
+            const examples = Array.isArray(data) ? data : [];
             const formatted = examples.map(item => {
                 const converted = convertGoldenToTemplate(item.response || '');
                 return `User: ${item.question}\nAssistant:\n${converted}`;
@@ -275,6 +318,24 @@
             return input.split(/[,\s]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
         }
         return [];
+    }
+
+    function validateGenes(genes) {
+        const geneMap = root.CiliAI?.lookups?.geneMap;
+        if (!geneMap) return genes; // lookups not loaded yet — pass through
+        const valid = [];
+        const invalid = [];
+        genes.forEach(g => {
+            if (geneMap[g]) {
+                valid.push(g);
+            } else {
+                invalid.push(g);
+            }
+        });
+        if (invalid.length && root.console && console.warn) {
+            console.warn('[CiliAI] Unrecognized gene symbols removed from payload:', invalid);
+        }
+        return valid;
     }
 
     function normalizeTermLocal(term) {
@@ -495,6 +556,45 @@
             return buildGoldStandardResponse(query, genes);
         }
 
+        // Generic ciliopathy list: any (show|list|display) + known disease name → full list from byCiliopathy
+        const wantsDiseaseList = (q.includes('display') || q.includes('show') || q.includes('list'))
+            && !isExplainQuestion;
+        if (wantsDiseaseList) {
+            const byCiliopathy = root.CiliAI.lookups?.byCiliopathy || {};
+            const qNorm = q.replace(/[^a-z0-9]/g, '');
+            const matchedKey = Object.keys(byCiliopathy).find(k => {
+                const kNorm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return kNorm.length >= 5 && qNorm.includes(kNorm);
+            });
+            if (matchedKey) {
+                const rawList = byCiliopathy[matchedKey] || [];
+                const genes = rawList.map(g =>
+                    typeof g === 'string' ? g : g.Gene || g.gene
+                ).filter(Boolean);
+                if (genes.length) {
+                    const displayName = matchedKey
+                        .replace(/([a-z])([A-Z])/g, '$1 $2')
+                        .replace(/^([a-z])/, c => c.toUpperCase());
+                    setMeta({ dataFirstUsed: true, dataFirstSource: matchedKey, llmCalled: false });
+                    return {
+                        markdown: [
+                            `Here are the **${genes.length} ${displayName} genes** in the curated database.`,
+                            '',
+                            'Opening the full gene list table now.'
+                        ].join('\n'),
+                        actions: core.normalizeActions({
+                            intent: 'list_genes',
+                            title: `${displayName} Genes`,
+                            payload: { genes },
+                            visual: [{ type: 'table', target: 'cilia-svg',
+                                       data: { title: `${displayName} Genes`, genes } }]
+                        }),
+                        raw: ''
+                    };
+                }
+            }
+        }
+
         if (q.includes('where is') || q.includes('localized') || q.includes('localised') || q.includes('localization')) {
             const genes = root.CiliAI.utils?.extractGenes ? root.CiliAI.utils.extractGenes(query) : [];
             if (genes.length) {
@@ -520,16 +620,73 @@
             }
         }
 
+        // Localization gene list: (show|list|display) + known compartment → full list from byLocalization
+        const wantsLocList = (q.includes('show') || q.includes('list') || q.includes('display'))
+            && !isExplainQuestion;
+        if (wantsLocList) {
+            const byLocalization = root.CiliAI.lookups?.byLocalization || {};
+            // Sort by length descending so "transition zone" matches before "zone"
+            const sortedKeys = Object.keys(byLocalization).sort((a, b) => b.length - a.length);
+            const matchedLoc = sortedKeys.find(loc => q.includes(loc.toLowerCase()));
+            if (matchedLoc) {
+                const rawList = byLocalization[matchedLoc] || [];
+                const genes = rawList.map(g =>
+                    typeof g === 'string' ? g : g.Gene || g.gene
+                ).filter(Boolean);
+                if (genes.length) {
+                    const displayName = matchedLoc.charAt(0).toUpperCase() + matchedLoc.slice(1);
+                    setMeta({ dataFirstUsed: true, dataFirstSource: matchedLoc, llmCalled: false });
+                    return {
+                        markdown: [
+                            `Found **${genes.length} genes** localized to the **${displayName}** in the curated database.`,
+                            '',
+                            'Opening the full gene list table now. The diagram will highlight the compartment.'
+                        ].join('\n'),
+                        actions: core.normalizeActions({
+                            intent: 'list_genes',
+                            title: `${displayName} Genes`,
+                            payload: { genes },
+                            visual: [
+                                { type: 'table', target: 'cilia-svg',
+                                  data: { title: `${displayName} Genes`, genes } },
+                                { type: 'highlight', target: 'cilia-diagram',
+                                  data: { localization: matchedLoc } }
+                            ]
+                        }),
+                        raw: ''
+                    };
+                }
+            }
+        }
+
         return null;
     }
 
     function shouldForceDataFirst(query) {
         const q = String(query || '').toLowerCase();
-        const wantsBbsList = (q.includes('display') || q.includes('show') || q.includes('list')) &&
-            (q.includes('bardet') || q.includes('biedl') || q.includes('bbs'));
-        return q.includes('gold standard') ||
-               wantsBbsList ||
-               q.includes('where is cep290 localized');
+        const wantsList = q.includes('display') || q.includes('show') || q.includes('list');
+        const isExplain = /what is|what are|explain|tell me about|define|how do/.test(q);
+        if (q.includes('gold standard')) return true;
+        if (q.includes('where is cep290 localized')) return true;
+        if (!isExplain && wantsList) {
+            // BBS shortcut
+            if (q.includes('bardet') || q.includes('biedl') || q.includes('bbs')) return true;
+            // Any known ciliopathy key
+            const byCiliopathy = root.CiliAI?.lookups?.byCiliopathy || {};
+            const qNorm = q.replace(/[^a-z0-9]/g, '');
+            const hit = Object.keys(byCiliopathy).find(k => {
+                const kNorm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return kNorm.length >= 5 && qNorm.includes(kNorm);
+            });
+            if (hit) return true;
+            // Any known localization compartment
+            const byLocalization = root.CiliAI?.lookups?.byLocalization || {};
+            const locHit = Object.keys(byLocalization).find(loc =>
+                q.includes(loc.toLowerCase())
+            );
+            if (locHit) return true;
+        }
+        return false;
     }
 
     function dispatchActions(actions) {
@@ -540,9 +697,56 @@
         try {
             setMeta({ mappingSuccess: null, mappingAttempted: false });
             if (intent === 'list_genes' && root.showDataInLeftPanel) {
-                const genes = normalizeGenes(payload.genes);
+                const genes = validateGenes(normalizeGenes(payload.genes));
                 const title = actions.title || payload.title || 'Gene List';
-                root.showDataInLeftPanel(title, genes);
+                if (genes.length) root.showDataInLeftPanel(title, genes);
+            }
+
+            // lookup_gene_list: LLM signals a disease/localization name; client does the data lookup
+            if (intent === 'lookup_gene_list') {
+                const diseaseRaw = payload.disease || payload.localization || '';
+                const localizationRaw = payload.localization || '';
+                let resolved = false;
+
+                if (diseaseRaw && root.CiliAI?.lookups?.byCiliopathy) {
+                    const byCiliopathy = root.CiliAI.lookups.byCiliopathy;
+                    const qNorm = diseaseRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const key = Object.keys(byCiliopathy).find(k => {
+                        const kNorm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        return kNorm.length >= 5 && (qNorm.includes(kNorm) || kNorm.includes(qNorm));
+                    });
+                    if (key) {
+                        const rawList = byCiliopathy[key] || [];
+                        const genes = rawList.map(g =>
+                            typeof g === 'string' ? g : g.Gene || g.gene
+                        ).filter(Boolean);
+                        if (genes.length && root.showDataInLeftPanel) {
+                            const title = actions.title || `${diseaseRaw} Genes`;
+                            root.showDataInLeftPanel(title, genes);
+                            resolved = true;
+                        }
+                    }
+                }
+
+                if (!resolved && localizationRaw && root.CiliAI?.lookups?.byLocalization) {
+                    const byLocalization = root.CiliAI.lookups.byLocalization;
+                    const locKey = Object.keys(byLocalization).find(k =>
+                        k.toLowerCase() === localizationRaw.toLowerCase()
+                    ) || Object.keys(byLocalization).find(k =>
+                        localizationRaw.toLowerCase().includes(k.toLowerCase())
+                    );
+                    if (locKey) {
+                        const rawList = byLocalization[locKey] || [];
+                        const genes = rawList.map(g =>
+                            typeof g === 'string' ? g : g.Gene || g.gene
+                        ).filter(Boolean);
+                        if (genes.length && root.showDataInLeftPanel) {
+                            const title = actions.title || `${locKey} Genes`;
+                            root.showDataInLeftPanel(title, genes);
+                            resolved = true;
+                        }
+                    }
+                }
             }
 
             if (intent === 'plot' && root.renderUMAPPlot && payload.gene) {
@@ -559,7 +763,7 @@
             }
 
             if (intent === 'visualize_bbs_list' && root.showDataInLeftPanel) {
-                const genes = normalizeGenes(payload.genes);
+                const genes = validateGenes(normalizeGenes(payload.genes));
                 const title = actions.title || 'Bardet–Biedl Genes';
                 if (genes.length) root.showDataInLeftPanel(title, genes);
             }
@@ -596,7 +800,7 @@
                     }
 
                     if ((type === 'table' || type === 'list' || type === 'panel') && root.showDataInLeftPanel) {
-                        const genes = normalizeGenes(data.genes);
+                        const genes = validateGenes(normalizeGenes(data.genes));
                         const title = data.title || actions.title || 'Gene List';
                         if (genes.length) root.showDataInLeftPanel(title, genes);
                     }

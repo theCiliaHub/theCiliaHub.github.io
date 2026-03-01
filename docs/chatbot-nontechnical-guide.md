@@ -69,18 +69,21 @@ Is it a greeting or "help"?
         │
         ▼
 Is it a well-known query type?
-  (Gold Standard genes, Bardet–Biedl genes,
+  (Gold Standard genes, ANY ciliopathy gene list such as
+   Joubert syndrome / PCD / Nephronophthisis / etc.,
+   ANY compartment gene list such as basal body / transition zone / axoneme,
    "where is [gene] localized?", "what is [gene]?")
   Yes → CiliAI looks up the answer directly in its curated database.
         This is instant, always accurate, and uses no AI.
+        Returns the COMPLETE list from the database.
         │
         ▼
 Everything else →
   CiliAI sends your question to an AI assistant (DeepSeek)
   along with:
-    • Relevant gene descriptions from the database
-    • 4 worked examples of similar questions
-    • Instructions on how to format the answer
+    • Relevant gene descriptions or gene symbol lists from the database
+    • 20 worked examples of similar questions
+    • Instructions to use database data rather than memory
   
   The AI writes a natural-language answer AND specifies
   which visual to show (a table, a diagram highlight, a plot, etc.)
@@ -104,7 +107,8 @@ This is a hand-curated dataset of 2,365 genes from published literature, expert 
 **Used for:**
 - Gene descriptions and localizations
 - Gold Standard gene list (the best-validated ciliary genes)
-- Bardet–Biedl syndrome gene list
+- Gene lists for any of the 70+ ciliopathies in the database (Bardet–Biedl, Joubert syndrome, Primary Ciliary Dyskinesia, Nephronophthisis, Meckel–Gruber, and more) — always the complete, curated list
+- Gene lists for any ciliary compartment (basal body, transition zone, axoneme, ciliary membrane, and more) — always the complete, curated list
 - Disease associations stored in the database
 - Tissue expression values
 - Protein domain annotations
@@ -112,9 +116,9 @@ This is a hand-curated dataset of 2,365 genes from published literature, expert 
 ### Brain 2 — The AI Language Model (flexible but imperfect)
 
 This is an AI trained on scientific literature (DeepSeek's language model). It can understand natural language, infer what you mean even if your question is phrased unusually, and generate coherent explanations. However, it works from memory and can sometimes:
-- Return a partial or approximate gene list (e.g., listing 5 well-known genes instead of all 47 for a disease)
 - Phrase a description slightly differently from the primary source
-- Occasionally include a gene symbol that is not in the CiliaHub database
+- Occasionally suggest a gene symbol that is not in the CiliaHub database (these are automatically removed before displaying)
+- Give partial results for queries it does not recognise as a database lookup (e.g., tissue-specific gene lists)
 
 **Used for:**
 - Explaining gene function in plain language
@@ -173,15 +177,17 @@ A linear diagram of the protein showing all annotated Pfam domains along the ami
 | Question | What CiliAI does |
 |---|---|
 | *"Show Gold Standard ciliary genes"* | Opens a table of all curated Gold Standard genes (instant, from database) |
-| *"Display Bardet–Biedl genes"* | Opens a table of all BBS-associated genes (instant, from database) |
+| *"Display Bardet–Biedl genes"* | Opens a table of all 25 BBS-associated genes (instant, from database) |
+| *"List Joubert syndrome genes"* | Opens a table of all 47 Joubert syndrome genes (instant, from database) |
+| *"List Primary Ciliary Dyskinesia genes"* | Opens a table of all 68 PCD genes (instant, from database) |
+| *"Show transition zone genes"* | Opens a table of all 160 transition zone genes + highlights the compartment on the diagram (instant, from database) |
+| *"Display basal body genes"* | Opens a table of all 855 basal body genes (instant, from database) |
 | *"Where is CEP290 localized?"* | States "transition zone", highlights it on the diagram (instant, from database) |
 | *"What is IFT88?"* | Returns a paragraph summary with localization and disease links (instant, from database) |
-| *"List Joubert syndrome genes"* | AI returns a partial list from memory; table opens with those genes |
 | *"Show expression plot for ARL13B"* | Launches the UMAP scatter plot coloured by ARL13B expression |
 | *"Show domains for KIF3A"* | Opens the protein domain panel for KIF3A |
 | *"Compare IFT88 vs BBS1"* | Opens a side-by-side comparison panel |
 | *"Lung specific ciliary genes"* | Returns genes enriched in lung ciliated cells |
-| *"Show pan-ciliary genes"* | Lists genes expressed broadly across ciliated tissues |
 
 ---
 
@@ -192,11 +198,11 @@ It helps to know where the boundaries are:
 **It does not remember previous questions.**
 Each question is treated independently. If you ask "What is IFT88?" and then "Where is it expressed?", the word "it" will not be understood as referring to IFT88. Always name the gene explicitly.
 
-**Gene lists for diseases other than Bardet–Biedl and Gold Standard may be incomplete.**
-For queries like "List Joubert syndrome genes", the AI generates the list from its training knowledge rather than looking up the full database record. The list will contain the most well-known genes but may miss less prominent ones. The full database has 47 Joubert syndrome genes; the AI may return only the 5–10 it knows best.
+**Tissue-specific gene lists are handled by the AI, not the database.**
+Queries like "Lung specific ciliary genes" or "Show hypothalamus ciliary genes" are answered by the AI model rather than a direct database lookup. Results are generally good but may not be complete for less studied tissues.
 
-**Localization gene lists may be partial.**
-"Show all basal body genes" asks the AI to generate the list. The database has 855 basal body genes; the AI will typically name a representative set of 5–10.
+**Protein complex gene lists are handled by the AI.**
+Queries like "List IFT-B complex genes" are answered by the AI model. The database has complex membership data, but the direct lookup for complex names is not yet wired to the data-first engine.
 
 **It only knows about ciliary biology.**
 CiliAI is not a general-purpose assistant. Questions outside ciliary biology, ciliopathies, and cilia gene expression are likely to receive a generic or unhelpful response.
@@ -205,7 +211,7 @@ CiliAI is not a general-purpose assistant. Questions outside ciliary biology, ci
 If no dataset has been chosen, the default is lung. Switch datasets using the tissue selector buttons if you need kidney, liver, hypothalamus, or chondrocyte data.
 
 **The AI service requires an internet connection and an active API subscription.**
-If the AI service is temporarily unavailable, CiliAI will switch to database-only mode and still answer Gold Standard, BBS, localization, and gene-info queries.
+If the AI service is temporarily unavailable, CiliAI will switch to database-only mode. In this mode it can still answer all disease gene list queries (all 70+ ciliopathies), all compartment gene list queries, single-gene localization lookups, and gene information queries — these all run directly from the local database.
 
 ---
 

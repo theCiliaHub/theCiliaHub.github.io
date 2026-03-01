@@ -1,7 +1,8 @@
 # CiliAI Chatbot — Technical Analysis
 
 **Version:** ciliai.js v7.2.3 / assistant-runtime.js  
-**Date:** March 2026
+**Date:** March 2026  
+**Last updated:** March 2026 — accuracy improvements applied (Fixes 1–7)
 
 ---
 
@@ -180,18 +181,20 @@ window.handleAIQuery(query)
 │      └─ CiliAIAssistant.ask(query)
 │             │
 │             ├─ shouldForceDataFirst(query)?
-│             │    Patterns: 'gold standard', BBS/bardet/biedl display,
-│             │              'where is cep290 localized'
+│             │    Patterns: 'gold standard', any known ciliopathy name,
+│             │              any known localization compartment,
+│             │              BBS/bardet/biedl display, 'where is cep290 localized'
 │             │    └─ tryDataFirst(query) → returns immediately, no LLM
 │             │
 │             ├─ tryDataFirst(query)  [if chatMode = 'data_first']
 │             │
 │             ├─ loadFewShotExamples()
-│             │    Fetches assistant_golden_cases.json; uses first 4 entries
+│             │    Fetches assistant_golden_cases.json; uses all 20 entries
 │             │
 │             ├─ buildDatabaseContext(query)
-│             │    Extracts gene names from query → looks up geneMap
-│             │    Injects ≤12 gene descriptions into system prompt
+│             │    Extracts gene names from query → looks up geneMap (≤12 genes)
+│             │    Falls back to full disease gene list if ciliopathy key matched
+│             │    Falls back to localization gene list (≤60 symbols) if compartment matched
 │             │    Also handles BBS/Gold Standard context fallbacks
 │             │
 │             ├─ buildSystemPrompt(fewShotText, dbContext)
@@ -223,25 +226,38 @@ window.handleAIQuery(query)
 
 ## 5. Data-First Engine (No LLM)
 
-`tryDataFirst(query)` in `assistant-runtime.js:464` is a rule-based engine that short-circuits the LLM for well-defined query patterns. It fires **before** the LLM call when `shouldForceDataFirst()` returns true, or when `chatMode = 'data_first'`.
+`tryDataFirst(query)` in `assistant-runtime.js` is a rule-based engine that short-circuits the LLM for well-defined query patterns. It fires **before** the LLM call when `shouldForceDataFirst()` returns true, or when `chatMode = 'data_first'`.
 
 ### Covered patterns
+
+Rules are evaluated in priority order. The first match wins.
 
 | Pattern | Data source | Response builder |
 |---|---|---|
 | Greeting / "help" | — | `buildHelpResponse()` |
 | `(show\|list\|display) + bardet\|biedl\|bbs` (not "what is") | `byCiliopathy[bardet-biedl key]` | `buildBbsListResponse()` |
 | `gold standard` | `CiliAI.masterData` (all entries) | `buildGoldStandardResponse()` |
+| `(show\|list\|display) + <any known ciliopathy key>` (not "what is") | `byCiliopathy[matched key]` — full gene list | inline builder → `list_genes` intent |
 | `where is\|localized\|localised\|localization` + gene name | `geneMap[symbol].Localization` | `buildLocalizationResponse()` + `tryHighlightLocalization()` |
 | `what is\|tell me about` + known gene | `geneMap[symbol]` | `buildGeneInfoResponse()` |
+| `(show\|list\|display) + <any known localization compartment>` (not "what is") | `byLocalization[matched key]` — full gene list + diagram highlight | inline builder → `list_genes` intent |
 
-### What is NOT covered (falls through to LLM)
+The localization match uses longest-key-first ordering so that `"transition zone"` is correctly matched before `"zone"`.
 
-- Disease gene list queries other than BBS (e.g., "List Joubert syndrome genes")
-- Localization gene list queries (e.g., "Show basal body genes")
+### `shouldForceDataFirst` — updated trigger conditions
+
+`shouldForceDataFirst(query)` now returns `true` when any of these conditions are met (regardless of `chatMode`):
+- Query includes `'gold standard'`
+- Query includes `'where is cep290 localized'`
+- Query is a list request (`show|list|display`, non-explain) AND matches any key in `byCiliopathy` (≥5 chars)
+- Query is a list request AND matches any key in `byLocalization`
+
+### What is still NOT covered (falls through to LLM)
+
 - Tissue-specific queries ("Lung specific ciliary genes")
 - Comparison, plot, domain, and navigation requests
-- Complex / multi-gene queries
+- Complex / protein-complex gene list queries (e.g., "IFT-B complex genes")
+- Multi-gene or open-ended scientific questions
 
 ---
 
@@ -316,14 +332,27 @@ No conversation history is sent. Every call is a fresh two-message context (syst
    - Use only known targets: cilia-svg, plotly-container, domain-viewer,
      cilia-diagram, messages, viz-stage, tab-*, #ciliai, #gene/{SYMBOL}
    - Intents: none, list_genes, show_gene, show_disease, filter, plot,
-     compare, navigate, help, visualize_bbs_list
+     compare, navigate, help, visualize_bbs_list, lookup_gene_list
+   - When DATABASE CONTEXT provides a gene list, copy those exact symbols
+     into payload.genes — do NOT substitute or supplement
+   - If DATABASE CONTEXT states "N total" genes, use that count in [MARKDOWN]
+   - To show a disease gene list, use intent "lookup_gene_list" with
+     payload { "disease": "<exact disease name>" } — the UI will look up
+     the full list; do NOT enumerate genes yourself
 
-5. DATABASE CONTEXT  (injected by buildDatabaseContext, ≤12 genes)
+5. DATABASE CONTEXT  (injected by buildDatabaseContext)
+   Priority order of injection:
+   a) Gene descriptions for symbols named in the query (≤12 genes)
+   b) Gold Standard fallback (first 8 master genes)
+   c) BBS fallback (≤10 BBS genes)
+   d) Full ciliopathy gene list: all symbols + count for any matched disease key
+   e) Localization gene list: up to 60 symbols + count for any matched compartment
+
    "DATABASE CONTEXT (use this data to answer; prefer it over general knowledge):
-   IFT88: Intraflagellar transport protein... | Localization: axoneme
+   joubertsyndrome genes (47 total): TMEM67, CEP290, AHI1, NPHP1, ...
    ..."
 
-6. Few-shot examples  (first 4 entries from assistant_golden_cases.json)
+6. Few-shot examples  (all 20 entries from assistant_golden_cases.json)
    "User: What is IFT88?
    Assistant:
    [MARKDOWN]
@@ -334,15 +363,15 @@ No conversation history is sent. Every call is a fresh two-message context (syst
 
 ### `buildDatabaseContext` detail
 
-Located in `assistant-runtime.js:8`. Behavior:
+Located in `assistant-runtime.js:8`. Current behavior (after accuracy fixes):
 
 1. Calls `CiliAI.utils.extractGenes(query)` to find gene symbols mentioned in the query text
 2. For each (up to 12): looks up `geneMap[SYMBOL]`, formats `name: description | Localization: X`
 3. If no genes found and query mentions "gold standard" or "ciliary genes" → injects first 8 master genes
 4. If no genes found and query mentions "bardet"/"biedl"/"bbs" → injects up to 10 BBS genes from `byCiliopathy`
-5. Returns empty string if nothing found (no DB context injected)
-
-**Critical limitation**: for disease queries like "List Joubert syndrome genes", no genes are extracted from the query text (the query contains no gene symbols), and there is no fallback for non-BBS ciliopathies. The model receives zero database context and must generate the gene list from its parametric knowledge.
+5. If still nothing: scans all `byCiliopathy` keys — if the normalized query contains a key (≥5 chars), injects all gene symbols for that disease plus total count
+6. If still nothing: scans all `byLocalization` keys — if query includes the compartment name, injects up to 60 gene symbols plus total count
+7. Returns empty string if nothing found (no DB context injected)
 
 ---
 
@@ -398,8 +427,9 @@ After a successful LLM response, `buildDatabaseSummaryForDisplay(query)` (lines 
 
 | Intent | Condition | Action |
 |---|---|---|
-| `list_genes` | `showDataInLeftPanel` exists | `showDataInLeftPanel(title, genes)` — renders sortable table |
+| `list_genes` | `showDataInLeftPanel` exists | `validateGenes` + `showDataInLeftPanel(title, genes)` — renders sortable table |
 | `visualize_bbs_list` | same | same — separate intent for BBS styling |
+| `lookup_gene_list` | `payload.disease` or `payload.localization` | Resolves full gene list from `byCiliopathy` or `byLocalization` at runtime; calls `showDataInLeftPanel` — no LLM enumeration needed |
 | `plot` | `renderUMAPPlot` exists + `payload.gene` | `switchView('plot')` + `renderUMAPPlot(gene, genes, zoomToCellType)` |
 | `compare` | `handleComparativeDashboard` exists + `payload.genes.length > 1` | `handleComparativeDashboard('GENE1 vs GENE2')` |
 | `navigate` | `payload.route` | `navigateTo()` or `location.hash = route` |
@@ -412,11 +442,11 @@ Each `visual[]` item is processed after intent handlers:
 |---|---|---|
 | `highlight` | `SpatialManager` + `data.localization` | `showDiagram()` + `SpatialManager.highlight(localization, gene)` |
 | `plot` | `renderUMAPPlot` + `data.gene` | `switchView('plot')` + `renderUMAPPlot(...)` |
-| `table` / `list` / `panel` | `showDataInLeftPanel` + `data.genes.length` | `showDataInLeftPanel(title, genes)` |
+| `table` / `list` / `panel` | `showDataInLeftPanel` + `data.genes.length` | `validateGenes` + `showDataInLeftPanel(title, genes)` |
 | `panel` + target `domain-viewer` | `showDomainViewer` + `data.gene` | `switchView('domain')` + `showDomainViewer(gene)` |
 | `link` | `data.route` + `navigateTo` | `navigateTo(null, route)` |
 
-**Gene normalization**: `normalizeGenes(input)` converts all gene symbols to uppercase, handling both string arrays and comma-separated strings.
+**Gene normalization and validation**: `normalizeGenes(input)` converts all gene symbols to uppercase. `validateGenes(genes)` then cross-checks each symbol against `geneMap`; any symbol not present in the database is removed and logged as a warning. This prevents hallucinated gene symbols from appearing as empty rows in the table.
 
 ---
 
@@ -537,12 +567,12 @@ Reads all config from `window.CILIAI_ENV`. Returns a fully typed config object w
 `loadFewShotExamples()` in `assistant-runtime.js:182`:
 1. Fetches `./ciliai/tests/assistant_golden_cases.json`
 2. Caches result in `window.CiliAIFewShotCache` (fetched once per page load)
-3. **Takes only the first 4 entries** (`data.slice(0, 4)`)
+3. **Uses all 20 entries** (previously limited to first 4; fix applied)
 4. Converts each via `convertGoldenToTemplate()` which re-formats the markdown section and re-serializes the actions JSON
 5. Formats as `User: {question}\nAssistant:\n{formatted response}`
 6. Appended to system prompt under `"Examples:"`
 
-**Critical gap**: Only q1–q4 are ever used as few-shot examples (IFT88 info, CEP290 localization, transition zone list, ARL13B plot). The 16 remaining cases (compare, domains, BBS, navigate, filter, etc.) are never shown to the model at inference time.
+All 20 intent types — including compare, domain viewer, navigate, filter, multi-gene plot, and BBSome complex — are now represented as examples in every LLM call.
 
 ---
 
@@ -602,14 +632,19 @@ These handlers call older UI functions directly (HTML-returning async functions)
 
 ## 15. Known Gaps & Constraints
 
-| Gap | Location | Impact |
-|---|---|---|
-| `buildDatabaseContext` only injects genes named in the query text | `assistant-runtime.js:32` | LLM has no database context for disease/localization list queries |
-| `tryDataFirst` only covers BBS + Gold Standard + single-gene localization | `assistant-runtime.js:464` | All other ciliopathy and localization list queries hit the LLM unguided |
-| Only first 4 golden cases used as few-shot | `assistant-runtime.js:188` | 16 intents (compare, domain, filter, navigate, etc.) have no example to follow |
-| LLM has no conversation history | `assistant-runtime.js:643` | Cannot answer follow-up questions referencing previous turns |
-| Table display capped at 200 rows | `ciliai.js:771` | Large gene lists (e.g., all 1,021 cilia genes) are truncated in the UI |
-| Gene lists in golden cases are hardcoded small sets | `assistant_golden_cases.json` | Model learns to return 5 genes for Joubert syndrome instead of the full 47 |
-| `validateMarkdownTemplate` only checks non-empty | `assistant-core.js:155` | Weak validation; malformed markdown passes through |
-| No conversation memory | `ask()` | Cannot reference previous answers |
-| External API call to `mygene.info` for variant data | `ciliai.js:6473` | Subject to CORS, rate limits, network errors |
+Items marked **FIXED** were resolved by the March 2026 accuracy improvements.
+
+| Gap | Location | Status | Impact |
+|---|---|---|---|
+| `buildDatabaseContext` only injected genes named in query text | `assistant-runtime.js` | **FIXED** | Now also injects full ciliopathy and localization gene lists |
+| `tryDataFirst` only covered BBS + Gold Standard + single-gene localization | `assistant-runtime.js` | **FIXED** | Now covers all 70+ ciliopathies and all localization compartments |
+| Only first 4 golden cases used as few-shot | `assistant-runtime.js:188` | **FIXED** | All 20 entries now injected |
+| No validation of LLM-generated gene symbols | `dispatchActions` | **FIXED** | `validateGenes()` strips unknown symbols before table render |
+| LLM had no grounding instruction for gene lists | `buildSystemPrompt` | **FIXED** | Three explicit rules added; `lookup_gene_list` intent added |
+| LLM has no conversation history | `ask()` | Open | Cannot answer follow-up questions referencing previous turns |
+| Table display capped at 200 rows | `ciliai.js:771` | Open | Large gene lists (e.g., all 1,021 cilia genes) are truncated in the UI |
+| Gene lists in golden cases are hardcoded small sets | `assistant_golden_cases.json` | Open | LLM pattern for `list_genes` intent shows only 5 example genes |
+| `validateMarkdownTemplate` only checks non-empty | `assistant-core.js:155` | Open | Weak validation; malformed markdown passes through |
+| Tissue-specific gene list queries not covered by data-first | `tryDataFirst` | Open | Lung/kidney/hypothalamus specific queries still reach the LLM |
+| Protein complex gene list queries not covered | `tryDataFirst` | Open | "IFT-B complex genes" still resolved by LLM, not `complexByName` |
+| External API call to `mygene.info` for variant data | `ciliai.js:6473` | Open | Subject to CORS, rate limits, network errors |

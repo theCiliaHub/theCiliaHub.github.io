@@ -12,7 +12,8 @@
         'compare',
         'navigate',
         'help',
-        'visualize_bbs_list'
+        'visualize_bbs_list',
+        'lookup_gene_list'
     ];
 
     const KNOWN_TARGETS = [
