@@ -780,8 +780,8 @@ window.showDataInLeftPanel = function(title, geneList) {
                 <td style="padding: 10px; font-size: 12px; color: #475569; font-style: italic;">${row.Mouse_Ortholog}</td>
                 <td style="padding: 10px; text-align: center;">
                     <div style="display: flex; gap: 8px; justify-content: center;">
-                        <button onclick="window.displayFullGeneInfo('${row.Gene}')" title="View Details" style="border:none; background:none; cursor:pointer; font-size: 16px;">👁️</button>
-                        <button onclick="window.renderUMAPPlot('${row.Gene}', ['${row.Gene}'])" title="View Plot" style="border:none; background:none; cursor:pointer; font-size: 16px;">📊</button>
+                        <button onclick="window.displayFullGeneInfo('${row.Gene}')" title="View Details" style="cursor:pointer; border:none; background:#e0f2fe; color:#005b96; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                        <button onclick="window.renderUMAPPlot('${row.Gene}', ['${row.Gene}'])" title="View Plot" style="cursor:pointer; border:none; background:#f0fdf4; color:#166534; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></button>
                     </div>
                 </td>
             </tr>
@@ -1540,8 +1540,8 @@ window.renderGoldStandardView = function() {
                 <td style="padding: 10px; font-style: italic;">${mouse}</td>
                 <td style="text-align: center; padding: 10px;">
                     <div style="display: flex; gap: 5px; justify-content: center;">
-                        <button class="ciliai-button" style="padding:2px 6px; height:24px; font-size:14px;" onclick="window.displayFullGeneInfo('${g.Gene}')" title="View Details">👁️</button>
-                        <button class="ciliai-button" style="padding:2px 6px; height:24px; font-size:14px;" onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])" title="Plot Expression">📊</button>
+                        <button onclick="window.displayFullGeneInfo('${g.Gene}')" title="View Details" style="cursor:pointer; border:none; background:#e0f2fe; color:#005b96; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                        <button onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])" title="Plot Expression" style="cursor:pointer; border:none; background:#f0fdf4; color:#166534; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></button>
                     </div>
                 </td>
             </tr>
@@ -1694,11 +1694,12 @@ window.handleTissueExpressionQuery = function(query) {
         let topCell = '';
 
         Object.entries(obj).forEach(([k, v]) => {
-            if (typeof v === 'number' && !ignore.includes(k) && !k.startsWith('Pct_')) {
-                if (v > max) {
-                    max = v;
-                    topCell = k;
-                }
+            if (typeof v !== 'number' || ignore.includes(k)) return;
+            // Pct_ values are 0-100 scale; normalize to 0-1
+            const normalized = k.startsWith('Pct_') ? v / 100 : v;
+            if (normalized > max) {
+                max = normalized;
+                topCell = k;
             }
         });
         
@@ -1740,7 +1741,7 @@ window.handleTissueExpressionQuery = function(query) {
 
             // LOGIC: Exclusive / Specific
             if (mode === 'exclusive') {
-                if (targetMax > 0.5 && othersMax < 0.5) {
+                if (targetMax > 0.05 && othersMax < 0.05) {
                     results.push({ 
                         gene: gene.Gene, 
                         val: targetMax, 
@@ -5243,6 +5244,7 @@ const intentHandlers = [
             return (hasBroadClass || hasSyndrome) && qLower.includes('genes');
         },
         handler: async (query) => {
+            if (window.SpatialManager?.resetZoom) window.SpatialManager.resetZoom();
             const qLower = window.CiliAI.utils.normalizeQuery(query);
             const classificationMap = getDiseaseClassificationMap();
 
@@ -5506,6 +5508,7 @@ const intentHandlers = [
         priority: 77,
         matcher: (qLower) => new RegExp(/how many.*genes.*(in|for|are|associated with)/i).test(qLower),
         handler: async (query) => {
+            if (window.SpatialManager?.resetZoom) window.SpatialManager.resetZoom();
             const qLower = window.CiliAI.utils.normalizeQuery(query);
             let target = null;
             if (qLower.includes('joubert')) target = 'Joubert Syndrome';
@@ -5663,9 +5666,11 @@ const intentHandlers = [
             const type = window.lastQueryContext.type;
             if (type === 'list_followup') {
                 if (typeof window.showDataInLeftPanel === 'function') {
-                    window.showDataInLeftPanel(window.lastQueryContext.term || 'Gene List', window.lastQueryContext.data || []);
+                    const term = window.lastQueryContext.term || 'Gene List';
+                    const data = window.lastQueryContext.data || [];
                     window.lastQueryContext = { type: null, data: [], term: null };
-                    return `Displaying <strong>${window.lastQueryContext.term}</strong> in the main panel.`;
+                    window.showDataInLeftPanel(term, data);
+                    return `Displaying <strong>${term}</strong> in the main panel.`;
                 }
             } else if (type === 'screen_references') {
                 window.lastQueryContext = { type: null, data: [], term: null };
@@ -6047,7 +6052,9 @@ const intentHandlers = [
         window.switchView('diagram');
         window.showDiagram();
         window.SpatialManager.clearOverlays();
-        window.SpatialManager.applyMultiOverlay(validGenes);
+        if (typeof window.SpatialManager?.applyMultiOverlay === 'function') {
+            window.SpatialManager.applyMultiOverlay(validGenes);
+        }
 
         responseHtml += `
             <h4>📍 Localization Comparison</h4>
@@ -6209,7 +6216,9 @@ const intentHandlers = [
                     </p>
                 `;
             } else {
-                window.SpatialManager.applyMultiOverlay(validGenes.map(g => g.symbol));
+                if (typeof window.SpatialManager?.applyMultiOverlay === 'function') {
+                    window.SpatialManager.applyMultiOverlay(validGenes.map(g => g.symbol));
+                }
                 responseHtml += `<p><strong>Multiple genes queried:</strong></p>`;
                 validGenes.forEach(({ symbol, localization }, i) => {
                     const colors = ['#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5'];
@@ -6403,7 +6412,10 @@ window.handleAIQuery = async function (query) {
             window.addChatMessage('<div id="' + thinkingId + '" class="assistant-thinking"><span class="thinking-dot"></span> Thinking...</div>', false);
             const llmResult = await window.CiliAIAssistant.ask(query);
             const thinkingEl = document.getElementById(thinkingId);
-            if (thinkingEl) thinkingEl.remove();
+            if (thinkingEl) {
+                const bubble = thinkingEl.closest('.ciliai-message');
+                if (bubble) bubble.remove(); else thinkingEl.remove();
+            }
             if (llmResult) {
                 const finalText = window.CiliAIAssistant.finalizeAssistantOutput(llmResult, query);
                 let parsed = window.CiliAIAssistantCore.parseAssistantResponse(finalText);

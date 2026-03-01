@@ -223,6 +223,9 @@
             border-radius: 6px;
             transition: all 0.2s;
             white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         .view-tab.active { background: white; color: var(--primary-blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .viz-actions {
@@ -294,7 +297,8 @@
             display: flex;
             flex-direction: column;
             gap: 16px;
-            background: #fafafa;
+            background: #f8fafc;
+            position: relative;
         }
         /* Streaming compatible structure */
         .ciliai-message { display: flex; flex-direction: column; gap: 4px; width: 100%; }
@@ -324,11 +328,176 @@
             border: 1px solid transparent;
         }
         .gene-badge:hover { background: var(--primary-blue); color: white; transform: translateY(-1px); }
-        .input-area { padding: 16px; border-top: 1px solid #e2e8f0; background: white; flex-shrink: 0; }
+        /* EMPTY STATE — overlays messages area so init bubbles don't bleed through */
+        .empty-state {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 20px;
+            background: #f8fafc;
+            z-index: 1;
+            overflow-y: auto;
+        }
+        .empty-state-title {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            text-align: center;
+            max-width: 280px;
+        }
+        .empty-state-title strong { color: var(--primary-blue); }
+        .suggestions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            width: 100%;
+        }
+        .suggestion-card {
+            background: white;
+            border: 1px solid #e8edf4;
+            border-radius: 12px;
+            padding: 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+        .suggestion-card:hover {
+            border-color: var(--primary-blue);
+            box-shadow: 0 4px 14px rgba(0, 91, 150, 0.11);
+            transform: translateY(-2px);
+        }
+        /* Icon container */
+        .sc-icon-wrap {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .sc-icon-wrap svg { width: 14px; height: 14px; }
+        .sc-blue   { background: #eff6ff; color: #2563eb; }
+        .sc-violet { background: #f5f3ff; color: #7c3aed; }
+        .sc-rose   { background: #fff1f2; color: #e11d48; }
+        .sc-cyan   { background: #ecfeff; color: #0891b2; }
+        .sc-amber  { background: #fffbeb; color: #d97706; }
+        .sc-emerald{ background: #ecfdf5; color: #059669; }
+        .sc-title {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.35;
+        }
+        .sc-cat {
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+        }
+        /* INPUT AREA */
+        .input-area { padding: 12px 16px 10px; border-top: 1px solid #e2e8f0; background: white; flex-shrink: 0; }
         .chat-input-group { display: flex; gap: 8px; }
-        .chat-input { flex: 1; padding: 12px 16px; border: 2px solid var(--border-light); border-radius: 12px; font-size: 14px; outline: none; transition: border-color 0.2s; }
-        .chat-input:focus { border-color: var(--primary-blue); }
-        .send-btn { background: var(--primary-blue); color: white; border: none; padding: 0 24px; border-radius: 12px; font-weight: 600; cursor: pointer; }
+        .chat-input {
+            flex: 1;
+            padding: 11px 15px;
+            border: 1.5px solid #dde3ed;
+            border-radius: 12px;
+            font-size: 13.5px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background: #f8fafc;
+            color: #1e293b;
+        }
+        .chat-input::placeholder { color: #a0aec0; }
+        .chat-input:focus { border-color: var(--primary-blue); background: white; box-shadow: 0 0 0 3px rgba(0,91,150,0.08); }
+        .send-btn {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 0 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.15s, transform 0.1s;
+            flex-shrink: 0;
+        }
+        .send-btn:hover { background: #004a7f; }
+        .send-btn:active { transform: scale(0.97); }
+        .send-btn svg { width: 13px; height: 13px; }
+        /* EXAMPLES TOGGLE + DRAWER */
+        .examples-toggle {
+            text-align: center;
+            margin-top: 7px;
+            font-size: 11px;
+            color: #b0bec5;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.15s;
+            letter-spacing: 0.01em;
+        }
+        .examples-toggle:hover { color: var(--primary-blue); }
+        .examples-drawer {
+            border-top: 1px solid #edf0f5;
+            padding: 10px 16px 14px;
+            background: #f8fafc;
+            max-height: 240px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .examples-drawer.hidden { display: none; }
+        .drawer-category-label {
+            font-size: 9.5px;
+            font-weight: 700;
+            color: #b0bec5;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            margin-top: 12px;
+            margin-bottom: 6px;
+        }
+        .drawer-category-label:first-child { margin-top: 0; }
+        /* Colored dot before each category label */
+        .drawer-category-label { display: flex; align-items: center; gap: 6px; }
+        .drawer-category-label::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: currentColor;
+        }
+        .dcl-blue    { color: #2563eb; }
+        .dcl-rose    { color: #e11d48; }
+        .dcl-amber   { color: #d97706; }
+        .dcl-emerald { color: #059669; }
+        .drawer-chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
+        /* Refined chip style inside drawer (overrides generic .gene-badge) */
+        .examples-drawer .gene-badge {
+            background: white;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 5px 10px;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .examples-drawer .gene-badge:hover { transform: none; }
+        .chip-row-blue .gene-badge:hover    { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+        .chip-row-rose .gene-badge:hover    { background: #fff1f2; border-color: #fda4af; color: #be123c; }
+        .chip-row-amber .gene-badge:hover   { background: #fffbeb; border-color: #fcd34d; color: #b45309; }
+        .chip-row-emerald .gene-badge:hover { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
         .quick-action-chips {
     display: flex;
     flex-wrap: wrap;
@@ -517,15 +686,15 @@
                     <div class="viz-title-group">
                         <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
                         <div class="view-tabs">
-                            <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">📐 Diagram</button>
-                            <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')">📊 Plot</button>
-                            <button class="view-tab" id="tab-domain" onclick="window.switchView('domain')">🧬 Domains</button>
+                            <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;pointer-events:none;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>Diagram</button>
+                            <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;pointer-events:none;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Plot</button>
+                            <button class="view-tab" id="tab-domain" onclick="window.switchView('domain')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;pointer-events:none;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>Domains</button>
                         </div>
                     </div>
                     <div class="viz-actions">
-                        <button class="action-btn" onclick="window.downloadCurrentVisualization()">📷 PNG</button>
-                        <button class="action-btn" onclick="window.downloadJournalSVG()">📄 SVG</button>
-                        <button class="action-btn" onclick="window.toggleFullscreen()">⛶</button>
+                        <button class="action-btn" onclick="window.downloadCurrentVisualization()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;flex-shrink:0;pointer-events:none;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>PNG</button>
+                        <button class="action-btn" onclick="window.downloadJournalSVG()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;flex-shrink:0;pointer-events:none;"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>SVG</button>
+                        <button class="action-btn" onclick="window.toggleFullscreen()" title="Fullscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;pointer-events:none;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
                     </div>
                 </div>
                 <div class="viz-controls">
@@ -539,9 +708,9 @@
                     </div>
                     <div class="control-group">
                         <div class="zoom-controls">
-                            <button class="zoom-btn" title="Zoom In" onclick="window.zoomIn()">🔍+</button>
-                            <button class="zoom-btn" title="Zoom Out" onclick="window.zoomOut()">🔍−</button>
-                            <button class="zoom-btn" title="Reset View" onclick="window.SpatialManager.resetZoom()">↻</button>
+                            <button class="zoom-btn" title="Zoom In" onclick="window.zoomIn()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+                            <button class="zoom-btn" title="Zoom Out" onclick="window.zoomOut()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+                            <button class="zoom-btn" title="Reset View" onclick="window.SpatialManager.resetZoom()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg></button>
                         </div>
                     </div>
                     <div class="control-group">
@@ -579,134 +748,54 @@
 </div>
 
 <div class="messages-area" id="messages">
-  <div class="ciliai-message assistant">
-    <div class="message-wrapper">
-      <div class="ciliai-message-content">
-
-        👋 <strong>Welcome to CiliAI</strong><br><br>
-
-        Ask me about <strong>ciliary genes</strong>, <strong>expression categories</strong>,
-        <strong>ciliopathies</strong>, <strong>localization</strong>,
-        <strong>evolution</strong>, or <strong>functional screens</strong>.<br><br>
-
-        <strong>Quick things you can try:</strong>
-
-       <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
-          Gene & Expression
+  <div id="emptyState" class="empty-state">
+    <p class="empty-state-title">
+      Ask me about <strong>ciliary genes</strong>, <strong>ciliopathies</strong>,
+      <strong>localization</strong>, or <strong>evolution</strong>.
+    </p>
+    <div class="suggestions-grid">
+      <div class="suggestion-card" onclick="window.sendQuery('Show Gold Standard ciliary genes')">
+        <div class="sc-icon-wrap sc-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </div>
-
-        <div class="suggested-chips" style="margin-bottom:20px;">
-          <span class="gene-badge" style="background:#fffaf0; color:#b7791f; border:1px solid #ecc94b;"
-                onclick="window.renderGoldStandardView()">
-            ⭐ Show Gold Standard ciliary genes
-          </span>
-          
-          <span class="gene-badge"
-                onclick="window.sendQuery('Hypothalamus specific ciliary genes')">
-            Hypothalamus specific ciliary genes
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Lung specific ciliary genes')">
-            Lung specific ciliary genes
-          </span>
-            <span class="gene-badge" 
-                style="background:#ebf8ff; color:#2b6cb0; border:1px solid #4299e1;"
-                onclick="window.sendQuery('Dot plot of IFT88, ARL13B, BBS1, FOXJ1')">
-            📊 Dot plot of IFT88, ARL13B, BBS1, FOXJ1
-          </span>
-
-            
-          <span class="gene-badge"
-                onclick="window.sendQuery('Show  genes enriched in Proximal Tubule cells')">
-            Proximal Tubule ciliary enriched genes
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Display ARL13B scRNA-seq expression')">
-            Display ARL13B scRNA-seq expression
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Show pan-ciliary genes')">
-            Show pan-ciliary genes
-          </span>
+        <span class="sc-title">Gold Standard ciliary genes</span>
+        <span class="sc-cat">Gene &amp; Expression</span>
+      </div>
+      <div class="suggestion-card" onclick="window.sendQuery('Hypothalamus specific ciliary genes')">
+        <div class="sc-icon-wrap sc-violet">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </div>
-          
-        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
-          Ciliopathies & Diseases
+        <span class="sc-title">Hypothalamus specific genes</span>
+        <span class="sc-cat">Tissue Expression</span>
+      </div>
+      <div class="suggestion-card" onclick="window.sendQuery('Display Joubert syndrome genes')">
+        <div class="sc-icon-wrap sc-rose">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
-
-        <div class="suggested-chips" style="margin-bottom:20px;">
-          <span class="gene-badge"
-                onclick="window.sendQuery('Display Joubert syndrome genes')">
-            Display Joubert syndrome genes
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('List Primary Ciliary Dyskinesia genes')">
-            List Primary Ciliary Dyskinesia genes
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Display Bardet–Biedl genes')">
-            Display Bardet–Biedl genes
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Total ciliopathy genes')">
-            Total ciliopathy genes
-          </span>
+        <span class="sc-title">Joubert syndrome genes</span>
+        <span class="sc-cat">Ciliopathies</span>
+      </div>
+      <div class="suggestion-card" onclick="window.sendQuery('Dot plot of IFT88, ARL13B, BBS1, FOXJ1')">
+        <div class="sc-icon-wrap sc-cyan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         </div>
-
-        <div style="margin:16px 0 12px; font-weight:500; color:#4b5563;">
-          Localization & Structure
+        <span class="sc-title">Dot plot: IFT88, ARL13B, BBS1, FOXJ1</span>
+        <span class="sc-cat">Expression</span>
+      </div>
+      <div class="suggestion-card" onclick="window.sendQuery('Where is CEP290 localized?')">
+        <div class="sc-icon-wrap sc-amber">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         </div>
-
-        <div class="suggested-chips">
-          <span class="gene-badge"
-                onclick="window.sendQuery('PCM1 localization')">
-            PCM1 localization
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Where is CEP290 localized?')">
-            Where is CEP290 localized?
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Display transition zone genes')">
-            Display transition zone genes
-          </span>
+        <span class="sc-title">CEP290 localization</span>
+        <span class="sc-cat">Structure</span>
+      </div>
+      <div class="suggestion-card" onclick="window.sendQuery('Show BBS1 evolution')">
+        <div class="sc-icon-wrap sc-emerald">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
         </div>
-
-        <div style="margin:20px 0 12px; font-weight:500; color:#4b5563;">
-          Evolution, Screens & Orthologs
-        </div>
-
-        <div class="suggested-chips" style="margin-bottom:20px;">
-          <span class="gene-badge"
-                onclick="window.sendQuery('Show BBS1 evolution')">
-            Show BBS1 evolution
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Tell me about IFT88 screen')">
-            Tell me about IFT88 screen
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('Display ARL13B mouse ortholog')">
-            Display ARL13B mouse ortholog
-          </span>
-
-          <span class="gene-badge"
-                onclick="window.sendQuery('WDR31 domains')">
-            WDR31 domains
-          </span>
-        </div>
-
-      </div>    
+        <span class="sc-title">BBS1 evolution</span>
+        <span class="sc-cat">Evolution</span>
+      </div>
     </div>
   </div>
 </div>
@@ -714,7 +803,46 @@
             <div class="input-area">
                 <div class="chat-input-group">
                     <input type="text" id="chatInput" class="chat-input" placeholder="Ask about a gene, structure, or disease...">
-                    <button class="send-btn" onclick="window.handleUserSend()">Send</button>
+                    <button class="send-btn" onclick="hideEmptyState(); window.handleUserSend()">
+                        Send
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </button>
+                </div>
+                <div class="examples-toggle" id="examplesToggle" onclick="toggleExamples()">More examples ▾</div>
+            </div>
+            <div id="examplesDrawer" class="examples-drawer hidden">
+                <div class="drawer-category-label dcl-blue">Featured</div>
+                <div class="drawer-chip-row chip-row-blue">
+                    <span class="gene-badge" onclick="window.sendQuery('Show Gold Standard ciliary genes')">Gold Standard ciliary genes</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Hypothalamus specific ciliary genes')">Hypothalamus specific genes</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Display Joubert syndrome genes')">Joubert syndrome genes</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Dot plot of IFT88, ARL13B, BBS1, FOXJ1')">Dot plot: IFT88, ARL13B, BBS1, FOXJ1</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Where is CEP290 localized?')">CEP290 localization</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Show BBS1 evolution')">BBS1 evolution</span>
+                </div>
+                <div class="drawer-category-label dcl-blue">Gene &amp; Expression</div>
+                <div class="drawer-chip-row chip-row-blue">
+                    <span class="gene-badge" onclick="window.sendQuery('Lung specific ciliary genes')">Lung specific ciliary genes</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Show genes enriched in Proximal Tubule cells')">Proximal Tubule enriched genes</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Display ARL13B scRNA-seq expression')">ARL13B scRNA-seq</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Show pan-ciliary genes')">Pan-ciliary genes</span>
+                </div>
+                <div class="drawer-category-label dcl-rose">Ciliopathies &amp; Diseases</div>
+                <div class="drawer-chip-row chip-row-rose">
+                    <span class="gene-badge" onclick="window.sendQuery('List Primary Ciliary Dyskinesia genes')">Primary Ciliary Dyskinesia</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Display Bardet–Biedl genes')">Bardet–Biedl genes</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Total ciliopathy genes')">Total ciliopathy genes</span>
+                </div>
+                <div class="drawer-category-label dcl-amber">Localization &amp; Structure</div>
+                <div class="drawer-chip-row chip-row-amber">
+                    <span class="gene-badge" onclick="window.sendQuery('PCM1 localization')">PCM1 localization</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Display transition zone genes')">Transition zone genes</span>
+                </div>
+                <div class="drawer-category-label dcl-emerald">Evolution, Screens &amp; Orthologs</div>
+                <div class="drawer-chip-row chip-row-emerald">
+                    <span class="gene-badge" onclick="window.sendQuery('Tell me about IFT88 screen')">IFT88 screen</span>
+                    <span class="gene-badge" onclick="window.sendQuery('Display ARL13B mouse ortholog')">ARL13B mouse ortholog</span>
+                    <span class="gene-badge" onclick="window.sendQuery('WDR31 domains')">WDR31 domains</span>
                 </div>
             </div>
         </aside>
@@ -815,8 +943,8 @@ window.showGoldStandardTable = function() {
             <td style="padding: 8px 10px; font-style: italic; color: #64748b; vertical-align:top;">${mouse}</td>
             <td style="padding: 8px 10px; text-align: center; vertical-align:top;">
                 <div style="display: flex; gap: 8px; justify-content: center;">
-                    <button onclick="window.displayFullGeneInfo('${g.Gene}')" title="View Details" style="cursor:pointer; border:none; background: #e0f2fe; color: #005b96; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;">👁️</button>
-                    <button onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])" title="Visualize Expression" style="cursor:pointer; border:none; background: #f0fdf4; color: #166534; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;">📊</button>
+                    <button onclick="window.displayFullGeneInfo('${g.Gene}')" title="View Details" style="cursor:pointer; border:none; background: #e0f2fe; color: #005b96; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                    <button onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])" title="Visualize Expression" style="cursor:pointer; border:none; background: #f0fdf4; color: #166534; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></button>
                 </div>
             </td>
         `;
@@ -2096,9 +2224,23 @@ window.handleUserSend = function() {
             window.handleAIQuery(query);
         };
 
+        function hideEmptyState() {
+            const el = document.getElementById('emptyState');
+            if (el) el.remove();
+        }
+
+        function toggleExamples() {
+            const drawer = document.getElementById('examplesDrawer');
+            const toggle = document.getElementById('examplesToggle');
+            if (!drawer) return;
+            const isHidden = drawer.classList.toggle('hidden');
+            toggle.textContent = isHidden ? 'More examples ▾' : 'Hide examples ▴';
+        }
+
         // Wrapper used by preset buttons — shows the query in chat before processing it
         window.sendQuery = function(query) {
             if (!query) return;
+            hideEmptyState();
             window.addChatMessage(query, true);
             window.handleAIQuery(query);
         };
@@ -2202,8 +2344,10 @@ window.initCiliAI = async function() {
             window.calculateAndDisplayStatistics();
         }, 100);
 
-        // 4. Final Success State
-        window.addChatMessage("👋 CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
+        // 4. Final Success State — only show chat bubble if empty state is already gone
+        if (!document.getElementById('emptyState')) {
+            window.addChatMessage("👋 CiliAI ready! Try asking about genes, localization, or 'Multi: IFT88, FOXJ1'.", false);
+        }
         window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
     
     } else {
