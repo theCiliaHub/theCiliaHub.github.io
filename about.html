@@ -54,6 +54,20 @@
             border-right: 1px solid rgba(255,255,255,0.2);
             flex-shrink: 0;
         }
+        .brand img {
+            height: 36px;
+            border-radius: 6px;
+        }
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.15;
+        }
+        .brand-subtitle {
+            font-size: 10px;
+            opacity: 0.8;
+            font-weight: 400;
+        }
         .nav-links {
             display: flex;
             list-style: none;
@@ -332,10 +346,10 @@
 <body>
    <nav class="top-navbar">
         <div class="brand">
-            <img src="assets/CiliaHub_Logo_web.png" alt="CiliAI Logo" style="height: 36px; border-radius: 6px;">
-            <div>
+            <img src="assets/CiliaHub_Logo_web.png" alt="CiliAI Logo">
+            <div class="brand-text">
                 <div>CiliAI</div>
-                <div style="font-size: 10px; opacity: 0.8;">Gene Explorer</div>
+                <div class="brand-subtitle">Gene Explorer</div>
             </div>
         </div>
         
