@@ -3,40 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About — CiliaHub</title>
+    <title>About - CiliaHub</title>
     <link rel="icon" type="image/png" href="assets/CiliaHub_Logo_web.png">
     
     <style>
-        /* --- Root and Base Styles --- */
         :root {
             --primary-blue: #005b96;
-            --secondary-blue: #b3cde0;
+            --primary-blue-dark: #004070;
+            --primary-blue-light: #e8f2fa;
             --accent-text: #2d3748;
-            --light-bg: #f7fbff;
-            --code-bg: #f1f8ff;
-            --link-color: #6c8aa3;
+            --muted-text: #5a6a7a;
+            --light-bg: #f0f6fc;
+            --card-bg: #ffffff;
+            --border: #d4e4f0;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', system-ui, sans-serif;
             background: var(--light-bg);
             color: var(--accent-text);
-            margin: 0;
-            padding-top: 60px; /* Space for fixed navbar */
+            padding-top: 60px;
             min-height: 100vh;
-        }
-        
-        .content-wrapper {
-            max-width: 900px;
-            margin: 20px auto;
-            padding: 20px 30px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            line-height: 1.6;
         }
 
-        /* --- Navigation Bar Styles (Copied from index.html) --- */
+        /* --- Navbar --- */
         .top-navbar {
             background: var(--primary-blue);
             color: white;
@@ -44,13 +37,12 @@
             align-items: center;
             padding: 0 20px;
             height: 60px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             position: fixed;
             width: 100%;
             top: 0;
             z-index: 1000;
         }
-
         .brand {
             display: flex;
             align-items: center;
@@ -59,14 +51,12 @@
             font-size: 18px;
             font-weight: 600;
         }
-
         .nav-links {
             display: flex;
             list-style: none;
             gap: 20px;
             height: 100%;
         }
-
         .nav-links a {
             color: white;
             text-decoration: none;
@@ -78,80 +68,237 @@
             font-weight: 500;
             transition: background-color 0.3s;
         }
-
+        .nav-links a:hover { background-color: rgba(255,255,255,0.15); }
         .nav-links a.active {
-            background-color: rgba(255, 255, 255, 0.15);
-        }
-        
-        /* --- Content Styles --- */
-        h1, h2, h3 {
-            color: var(--primary-blue);
-            margin-top: 30px;
-        }
-        
-        h1 {
-            border-bottom: 2px solid var(--border-light);
-            padding-bottom: 10px;
-            margin-bottom: 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: 600;
         }
 
-        strong {
-            color: var(--secondary-blue);
+        /* --- Page Header --- */
+        .page-header {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+            color: white;
+            padding: 48px 32px 44px;
+            text-align: center;
+        }
+        .page-header h1 {
+            font-size: 2rem;
             font-weight: 700;
+            letter-spacing: -0.3px;
+            margin-bottom: 10px;
+        }
+        .page-header p {
+            font-size: 1rem;
+            opacity: 0.85;
+            max-width: 560px;
+            margin: 0 auto;
         }
 
-        code, pre {
-            background: var(--code-bg);
-            padding: 10px;
-            border-radius: 6px;
-            display: block;
-            font-size: 13px;
-            white-space: pre-line;
-            margin: 10px 0;
-            border: 1px solid #e1e8ed;
+        /* --- Main Layout --- */
+        .page-content {
+            max-width: 860px;
+            margin: 36px auto 48px;
+            padding: 0 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
         }
 
-        a {
-            color: var(--link-color);
-            text-decoration: none;
+        /* --- Cards --- */
+        .card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 10px rgba(0, 60, 120, 0.06);
+            overflow: hidden;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 22px 28px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+        .card-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            background: var(--primary-blue-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .card-icon svg {
+            width: 22px;
+            height: 22px;
+            stroke: var(--primary-blue);
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .card-header-text h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-blue);
+            line-height: 1.2;
+        }
+        .card-header-text span {
+            font-size: 0.8rem;
+            color: var(--muted-text);
+            font-weight: 400;
+        }
+        .card-body {
+            padding: 22px 28px 26px;
+        }
+        .card-body p {
+            font-size: 0.93rem;
+            color: var(--muted-text);
+            line-height: 1.7;
         }
 
-        a:hover {
-            text-decoration: underline;
+        /* --- Question chips --- */
+        .question-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--primary-blue);
+            margin: 18px 0 10px;
+        }
+        .chip-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .chip {
+            background: var(--primary-blue-light);
+            color: var(--primary-blue);
+            border: 1px solid #c2d9ed;
+            border-radius: 20px;
+            padding: 5px 13px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            white-space: nowrap;
         }
 
-        .section {
-            padding: 20px 0;
-            border-bottom: 1px dashed var(--border-light);
+        /* --- Analysis grid --- */
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 18px;
         }
-        .section:last-child {
-            border-bottom: none;
+        .analysis-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--primary-blue-light);
+            border-radius: 8px;
+            border: 1px solid #c2d9ed;
+        }
+        .analysis-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--primary-blue);
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+        .analysis-item span {
+            font-size: 0.83rem;
+            color: var(--accent-text);
+            line-height: 1.4;
         }
 
-        /* Download Button Styling */
+        /* --- Download button --- */
         .download-btn {
             display: inline-flex;
             align-items: center;
-            margin-top: 15px;
-            padding: 12px 25px;
-            background: #27ae60; /* Green color for download */
+            gap: 9px;
+            margin-top: 18px;
+            padding: 10px 22px;
+            background: #1a9e52;
             color: white;
             font-weight: 600;
+            font-size: 0.88rem;
             border-radius: 8px;
             text-decoration: none;
-            transition: background 0.3s;
-            gap: 10px;
+            transition: background 0.2s, transform 0.15s;
+            box-shadow: 0 2px 6px rgba(26, 158, 82, 0.3);
         }
         .download-btn:hover {
-            background: #219d54;
+            background: #168043;
             text-decoration: none;
+            transform: translateY(-1px);
         }
         .download-icon {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             fill: none;
             stroke: white;
             stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* --- Contact card --- */
+        .contact-card {
+            background: var(--primary-blue);
+            border-radius: 14px;
+            padding: 28px 32px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .contact-card h2 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .contact-card p {
+            font-size: 0.88rem;
+            opacity: 0.85;
+            line-height: 1.6;
+        }
+        .contact-links {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .contact-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 18px;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .contact-link:hover {
+            background: rgba(255,255,255,0.25);
+            text-decoration: none;
+        }
+        .contact-link svg {
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: white;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -173,97 +320,113 @@
         </ul>
     </nav> 
     
-    <div class="content-wrapper">
-    
-        <h1>About CiliAI & The CiliaHub Project 🔬</h1>
-    
-        <div id="intro" class="section">
-            <h2>Welcome to <strong>CiliAI</strong>!</h2>
-    
-            <p>
-                I am an **AI assistant** designed to help you explore and analyze data on ciliary biology. 
-                You can ask questions or paste full gene lists. Below are examples of what I understand:
-            </p>
-            
-        <pre><code>
-    Gene Details: <strong>"What is IFT88?"</strong> or <strong>"Describe ARL13B."</strong>
-    Localization: <strong>"List genes in the transition zone."</strong> or <strong>"Where is CEP290?"</strong>
-    Complexes: <strong>"What genes are in the BBSome?"</strong> or <strong>"Complex components of OFD1."</strong>
-    Ciliopathies: <strong>"Gene list of Joubert Syndrome."</strong> or <strong>"What genes cause PCD?"</strong>
-    Phylogeny: <strong>"Show conservation of IFT88."</strong>
-    Domains: <strong>"Which genes have WD40 domains?"</strong>
-    </code></pre>
-    
-            <p>
-                My data comes from a pre-compiled database of over 
-                **23,000 genes**,
-                enriched with **8 specialized datasets** (CORUM, UMAP, scRNA, Phylogeny, etc.).
-            </p>
+    <!-- Page header -->
+    <div class="page-header">
+        <h1>About CiliAI</h1>
+        <p>A suite of tools for exploring ciliary biology: ask plain-language questions, analyze gene lists, and browse curated data.</p>
+    </div>
+
+    <div class="page-content">
+
+        <!-- CiliAI card -->
+        <div class="card" id="ciliai">
+            <div class="card-header">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+                </div>
+                <div class="card-header-text">
+                    <h2>CiliAI: Gene Explorer</h2>
+                    <span>Ask questions about ciliary genes in plain language</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <p>CiliAI is an AI assistant for exploring ciliary biology. You can ask questions in plain language about any ciliary gene, structure, disease, or protein complex, and CiliAI will answer using a curated database of ciliary gene annotations.</p>
+                <div class="question-label">Example questions</div>
+                <div class="chip-grid">
+                    <span class="chip">What is IFT88?</span>
+                    <span class="chip">What does ARL13B do?</span>
+                    <span class="chip">Genes in the transition zone</span>
+                    <span class="chip">What is the BBSome complex?</span>
+                    <span class="chip">Joubert Syndrome gene list</span>
+                    <span class="chip">What genes cause PCD?</span>
+                    <span class="chip">Conservation of IFT88</span>
+                    <span class="chip">Genes with WD40 domains</span>
+                </div>
+            </div>
         </div>
-    
-        <div class="section">
-            <h2>What is CiliAI?</h2>
-            <p>
-                CiliAI is a specialized knowledge engine for **ciliary biology**, integrating 
-                multi-omics datasets, curated gene annotations, protein interactions, 
-                ciliopathy gene lists, and evolutionary datasets into a unified AI-assisted interface.
-            </p>
-            <p>
-                It is built to help researchers, clinicians, and students explore ciliary genes,
-                pathways, protein complexes, structures, disease associations, and 
-                cell-type–specific expression with ease.
-            </p>
+
+        <!-- Cilia Analysis card -->
+        <div class="card" id="cilia-analysis">
+            <div class="card-header">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                </div>
+                <div class="card-header-text">
+                    <h2>Cilia Analysis</h2>
+                    <span>Visualize and analyze your gene lists</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <p>Cilia Analysis lets you submit a list of genes and explore them in the context of ciliary biology. It helps you quickly understand whether your gene list is enriched in ciliary functions, and how your genes relate to known ciliary structures and diseases.</p>
+                <div class="analysis-grid">
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Ciliary gene enrichment</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Expression heatmap</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Single-cell RNA-seq (lung)</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Ciliopathy &amp; disease associations</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Subcellular localization</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Protein domain architecture</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Protein complex membership</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Phylogenetic conservation</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>Mouse phenotype enrichment</span></div>
+                    <div class="analysis-item"><div class="analysis-dot"></div><span>CRISPR &amp; siRNA screen results</span></div>
+                </div>
+            </div>
         </div>
-        
-        <div id="citations" class="section">
-            <h2>Data & Citations</h2>
-            
-            <h3 style="margin-top: 15px;">Download CiliaHub Data</h3>
-            <p>
-                Access the complete **Gold Standard Ciliary Gene List** dataset (ciliahub_data.json) directly from the CiliaHub repository.
-            </p>
-            
-            <a href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json" 
-               download="ciliahub_data.json" 
-               class="download-btn">
-                <svg class="download-icon" viewBox="0 0 24 24">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Download ciliahub_data.json
-            </a>
-            
-            <p style="margin-top: 30px;">
-                If you use CiliAI or The CiliaHub in your research, please cite relevant resources 
-                associated with the datasets you query (CORUM, Human Protein Atlas, UMAP, Phylogeny, 
-                and disease databases). A formal CiliAI citation will be provided after publication.
-            </p>
+
+        <!-- CiliaHub card -->
+        <div class="card" id="ciliahub">
+            <div class="card-header">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                </div>
+                <div class="card-header-text">
+                    <h2>CiliaHub</h2>
+                    <span>Curated database of gold standard ciliary genes</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <p>CiliaHub is a searchable database of genes with well-established roles in cilia. Search by gene name to view detailed annotations including subcellular localization, disease associations, complex memberships, and expression data. The full dataset is also available for download.</p>
+                <a href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json"
+                   download="ciliahub_data.json"
+                   class="download-btn">
+                    <svg class="download-icon" viewBox="0 0 24 24">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download ciliahub_data.json
+                </a>
+            </div>
         </div>
-    
-        <div id="feedback" class="section">
-            <h2>Feedback 💡</h2>
-            <p>
-                We welcome suggestions, corrections, feature requests, or bug reports.<br><br>
-                Please send your feedback directly to:<br>
-                <strong>
-                    <a href="mailto:Oktaykaplan@gmail.com">Oktaykaplan@gmail.com</a>
-                </strong>
-            </p>
+
+        <!-- Contact card -->
+        <div class="contact-card">
+            <div>
+                <h2>Contact &amp; Feedback</h2>
+                <p>For feedback, suggestions, or collaboration inquiries, please get in touch.</p>
+            </div>
+            <div class="contact-links">
+                <a href="mailto:Oktaykaplan@gmail.com" class="contact-link">
+                    <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    Oktaykaplan@gmail.com
+                </a>
+                <a href="https://github.com/theCiliaHub/theCiliaHub.github.io" class="contact-link" target="_blank">
+                    <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                    GitHub
+                </a>
+            </div>
         </div>
-    
-        <div id="contact" class="section">
-            <h2>Contact</h2>
-            <p>
-                For collaboration inquiries or dataset contributions, 
-                please email <strong><a href="mailto:Oktaykaplan@gmail.com">Oktaykaplan@gmail.com</a></strong>
-                or visit the project's GitHub repository:
-            </p>
-    
-            <p>
-                <a href="https://github.com/theCiliaHub/theCiliaHub.github.io">github.com/theCiliaHub</a>
-            </p>
-        </div>
-        
-    </div> </body>
+
+    </div>
+</body>
 </html>
