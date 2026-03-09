@@ -1,0 +1,112 @@
+name: Sync Gene Dataset
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggers
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    paths:
+      # Any Excel source file change triggers a full sync
+      - "data/source/genes.xlsx"
+      - "data/source/final list merged human_ciliaminer (3).xlsx"
+      # Pipeline script changes also trigger (so the output stays consistent)
+      - "scripts/sync_genes.py"
+      - "scripts/build_site_jsons.py"
+
+  # Allow triggering manually from the GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force regeneration even if no Excel changes"
+        required: false
+        default: "false"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  sync-genes:
+    name: Regenerate gene JSON datasets
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # needed to push the generated JSON files back
+
+    steps:
+      # ── 1. Checkout full history so "git push" works correctly ────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Python setup ───────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 3. Install Python dependencies ────────────────────────────────────
+      - name: Install dependencies
+        run: pip install openpyxl
+
+      # ── 4. Run the full pipeline ──────────────────────────────────────────
+      #       sync_genes.py  →  data/generated/genes.json
+      #       build_site_jsons.py (auto-called by sync_genes.py):
+      #         → ciliahub_data.json
+      #         → data/genes/ciliAI_master_database.json
+      #         → data/genes/ciliAI_lookups.json
+      - name: Run gene sync pipeline
+        run: python3 scripts/sync_genes.py
+        env:
+          PYTHONUNBUFFERED: "1"
+
+      # ── 5. Verify the output ─────────────────────────────────────────────
+      - name: Verify output
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          files = [
+              "data/generated/genes.json",
+              "ciliahub_data.json",
+              "data/genes/ciliAI_master_database.json",
+              "data/genes/ciliAI_lookups.json",
+          ]
+          errors = []
+          for path in files:
+              try:
+                  with open(path) as f:
+                      data = json.load(f)
+                  print(f"  ✅  {path}")
+              except Exception as e:
+                  errors.append(f"  ❌  {path}: {e}")
+          if errors:
+              print("\n".join(errors))
+              sys.exit(1)
+          print(f"\nAll outputs valid.")
+          EOF
+
+      # ── 6. Commit and push generated files back to the repo ───────────────
+      #       Only commits if anything actually changed (idempotent).
+      #       [skip ci] prevents an infinite loop of workflow triggers.
+      - name: Commit generated datasets
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name  "github-actions[bot]"
+
+          git add \
+            data/generated/genes.json \
+            ciliahub_data.json \
+            data/genes/ciliAI_master_database.json \
+            data/genes/ciliAI_lookups.json
+
+          # Only commit if something changed
+          if git diff --staged --quiet; then
+            echo "No changes to generated files — nothing to commit."
+          else
+            GENE_COUNT=$(python3 -c "import json; d=json.load(open('data/generated/genes.json')); print(d['meta']['total_genes'])")
+            git commit -m "🔄 Auto-sync gene dataset (${GENE_COUNT} genes) [skip ci]"
+            git push
+            echo "✅  Generated datasets committed and pushed."
+          fi

@@ -1832,16 +1832,121 @@ window.loadCiliAIData = async function() {
             cellDataCache: window.CiliAI.cellDataCache || {}
         });
 
-        // --- GROUP 1: Core metadata — the only blocking fetch ---
-        console.log("Loading core gene database...");
-        const [mainRes, lookupsRes] = await Promise.all([
-            fetchSafe(base + 'data/genes/ciliAI_master_database.json'),
-            fetchSafe(base + 'data/genes/ciliAI_lookups.json')
-        ]);
+        // --- GROUP 1: Core gene database — loaded from canonical dataset ---
+        // Primary source: data/generated/genes.json (Excel → sync_genes.py → build_site_jsons.py)
+        // Fallback:       data/genes/ciliAI_master_database.json + ciliAI_lookups.json
 
-        // Assign core data
-        window.CiliAI.masterData = mainRes?.masterData || [];
-        window.CiliAI.lookups    = lookupsRes?.lookups  || { geneMap: {} };
+        // ── Helper: build AI data structures from the canonical schema ──────────
+        function buildCiliAIFromCanonical(canonicalGenes) {
+            const normTerm = (t) => (t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const toStr    = (v) => Array.isArray(v) ? v.join(', ') : (v || '');
+            const toArr    = (v) => Array.isArray(v) ? v :
+                                    (v ? String(v).split(/[,;]/).map(s => s.trim()).filter(Boolean) : []);
+            const buildPfam = (domStr, pfamStr) => {
+                const raw = domStr || pfamStr || '';
+                if (!raw) return [];
+                return raw.split(/[;,]/).map(s => s.trim()).filter(Boolean)
+                    .map((name, i) => ({ id: `DOM_${i + 1}`, name, start: (i * 200) + 50, end: (i * 200) + 150 }));
+            };
+
+            const masterData = [];
+            const geneMap = {};
+            const byCiliopathy = {};
+            const byModuleOrComplex = {};
+            const pfamByGene = {};
+
+            for (const g of canonicalGenes) {
+                const sym = (g.name || '').toUpperCase();
+                if (!sym) continue;
+
+                const locArr   = toArr(g.localization);
+                const cilioArr = toArr(g.ciliopathy);
+                const pfamStr  = Array.isArray(g.pfam_ids) ? g.pfam_ids.join('; ') : (g.pfam_ids || '');
+                const domStr   = Array.isArray(g.domain_descriptions) ? g.domain_descriptions.join('; ') : (g.domain_descriptions || '');
+
+                const rec = {
+                    'Gene':                          sym,
+                    'Gene.Description':              g.description || '',
+                    'Ensembl ID':                    toStr(g.ensembl_id),
+                    'Ensembl.ID':                    toStr(g.ensembl_id),
+                    'Localization':                  locArr.join(', '),
+                    'Ciliopathies':                  cilioArr,
+                    'Ciliopathy':                    cilioArr.join(', '),
+                    'Functional.category':           toArr(g.functional_category).join(', '),
+                    'Functional_Summary':            g.functional_summary || '',
+                    'OMIM_ID':                       toStr(g.omim_id),
+                    'synonym':                       toStr(g.synonym),
+                    'Protein_Complexes':             g.protein_complexes || '',
+                    'PFAM_IDs':                      pfamStr,
+                    'Domain_Descriptions':           domStr,
+                    'Ortholog_Mouse':                toStr(g.ortholog_mouse),
+                    'Ortholog_C_elegans':            toStr(g.ortholog_c_elegans),
+                    'Ortholog_Xenopus':              toStr(g.ortholog_xenopus),
+                    'Ortholog_Zebrafish':            toStr(g.ortholog_zebrafish),
+                    'Ortholog_Drosophila':           toStr(g.ortholog_drosophila),
+                    'mouse_phenotype':               g.mouse_phenotype || '',
+                    'mouse_ciliopathy_phenotype':    g.mouse_ciliopathy_phenotype || '',
+                    'human_phenotype':               g.human_phenotype || '',
+                    'human_ciliopathy_phenotype':    g.human_ciliopathy_phenotype || '',
+                    'overexpression_effects':        g.overexpression_effects || '',
+                    'lof_effects':                   g.lof_effects || '',
+                    'percent_ciliated_cells_effects': g.percent_ciliated_cells_effects || '',
+                    'screens': []  // merged from cilia_screens_data.json at runtime
+                };
+
+                masterData.push(rec);
+                geneMap[sym] = rec;
+
+                // byCiliopathy index
+                for (const d of cilioArr) {
+                    const k = normTerm(d);
+                    if (k) { if (!byCiliopathy[k]) byCiliopathy[k] = []; if (!byCiliopathy[k].includes(sym)) byCiliopathy[k].push(sym); }
+                }
+
+                // byModuleOrComplex index
+                if (g.protein_complexes) {
+                    String(g.protein_complexes).split(/[;,]/).forEach(cx => {
+                        cx = cx.trim();
+                        if (cx) {
+                            const k = cx.toUpperCase();
+                            if (!byModuleOrComplex[k]) byModuleOrComplex[k] = [];
+                            if (!byModuleOrComplex[k].includes(sym)) byModuleOrComplex[k].push(sym);
+                        }
+                    });
+                }
+
+                // pfamByGene index
+                const pfamDomains = buildPfam(domStr, pfamStr);
+                if (pfamDomains.length) pfamByGene[sym] = pfamDomains;
+            }
+
+            return {
+                masterData,
+                lookups: { geneMap, byCiliopathy, byModuleOrComplex, pfamByGene }
+            };
+        }
+        // ── End helper ────────────────────────────────────────────────────────
+
+        console.log('Loading core gene database from canonical dataset...');
+        const canonicalRes = await fetchSafe(base + 'data/generated/genes.json');
+
+        if (canonicalRes && Array.isArray(canonicalRes.genes) && canonicalRes.genes.length > 0) {
+            // ✅ Primary path: build AI structures directly from the Excel-derived canonical dataset
+            console.log(`✅ Canonical dataset loaded: ${canonicalRes.genes.length} genes from data/generated/genes.json`);
+            const built = buildCiliAIFromCanonical(canonicalRes.genes);
+            window.CiliAI.masterData = built.masterData;
+            window.CiliAI.lookups    = built.lookups;
+        } else {
+            // ⚠ Fallback: pre-built AI files (themselves derived from canonical via build_site_jsons.py)
+            console.warn('Canonical dataset unavailable — loading pre-built AI files as fallback...');
+            const [mainRes, lookupsRes] = await Promise.all([
+                fetchSafe(base + 'data/genes/ciliAI_master_database.json'),
+                fetchSafe(base + 'data/genes/ciliAI_lookups.json')
+            ]);
+            window.CiliAI.masterData = mainRes?.masterData || [];
+            window.CiliAI.lookups    = lookupsRes?.lookups  || { geneMap: {} };
+        }
+
 
         // Initialize dataset stubs — each populated lazily by loadDatasetOnDemand
         window.CiliAI.datasets = {

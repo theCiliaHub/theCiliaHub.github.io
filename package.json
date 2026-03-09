@@ -1,0 +1,22 @@
+{
+    "name": "ciliahub",
+    "version": "1.0.0",
+    "description": "CiliaHub — ciliary gene database and AI question-answering system",
+    "private": true,
+    "scripts": {
+        "sync-genes": "python3 scripts/sync_genes.py",
+        "build-data": "python3 scripts/sync_genes.py",
+        "watch-genes": "python3 scripts/watch_genes.py",
+        "install-hooks": "python3 scripts/install_hooks.py",
+        "check-deps": "python3 -c \"import openpyxl; print('✅ openpyxl', openpyxl.__version__)\"",
+        "prebuild": "python3 scripts/sync_genes.py"
+    },
+    "engines": {
+        "python": ">=3.8"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/theCiliaHub/theCiliaHub.github.io"
+    },
+    "homepage": "https://theciliahub.github.io"
+}

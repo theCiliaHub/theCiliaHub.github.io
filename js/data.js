@@ -17,7 +17,19 @@ function sanitize(input) {
 async function loadAndPrepareDatabase() {
     if (geneDataCache) return true;
     try {
-        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
+        // Try the locally-generated dataset first (produced by scripts/build_site_jsons.py).
+        // This works when served from the repo root (local dev + GitHub Pages).
+        // Fall back to the GitHub raw CDN if the local file is unavailable.
+        const LOCAL_URL = 'ciliahub_data.json';
+        const REMOTE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json';
+
+        let resp;
+        try {
+            resp = await fetch(LOCAL_URL);
+            if (!resp.ok) throw new Error('local unavailable');
+        } catch (_) {
+            resp = await fetch(REMOTE_URL);
+        }
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
 
@@ -263,7 +275,7 @@ function mapLocalizationToSVG(localizationArray) {
 
     return localizationArray.flatMap(loc => {
         // If 'loc' is not a string (e.g., it's null), skip it.
-        if (typeof loc !== 'string') return []; 
+        if (typeof loc !== 'string') return [];
 
         const normalized = loc.trim().toLowerCase().replace(/[-_]/g, ' ');
         return mapping[normalized] || [];
