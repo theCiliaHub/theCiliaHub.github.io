@@ -1891,6 +1891,8 @@ window.loadCiliAIData = async function() {
                     'overexpression_effects':        g.overexpression_effects || '',
                     'lof_effects':                   g.lof_effects || '',
                     'percent_ciliated_cells_effects': g.percent_ciliated_cells_effects || '',
+                    // Needed for dashboard stats + classification-aware queries
+                    'ciliopathy_classification':      g.ciliopathy_classification || '',
                     'screens': []  // merged from cilia_screens_data.json at runtime
                 };
 
@@ -2346,13 +2348,24 @@ window.downloadJournalSVG = function() {
     }
 };
    
+// ── Global Entry Points (Final Definitions) ──────────────────────────
+// NOTE: ciliai.js Router IIFE also defines these, but this inline script
+// runs AFTER ciliai.js, so these definitions win at runtime. Both versions
+// route through window.CiliAI.Router.dispatchAction when available.
+// ──────────────────────────────────────────────────────────────────────
 window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
             const query = input.value.trim();
             if (!query) return;
-            window.addChatMessage(query, true);
             input.value = '';
-            window.handleAIQuery(query);
+            // Unified routing pipeline
+            if (window.CiliAI?.Router?.dispatchAction) {
+                window.CiliAI.Router.dispatchAction({ source: 'manual', intent: 'raw', text: query, echo: true });
+            } else {
+                // Fallback (should be rare)
+                window.addChatMessage(query, true);
+                window.handleAIQuery(query);
+            }
         };
 
         function hideEmptyState() {
@@ -2372,15 +2385,26 @@ window.handleUserSend = function() {
         window.sendQuery = function(query) {
             if (!query) return;
             hideEmptyState();
-            window.addChatMessage(query, true);
-            window.handleAIQuery(query);
+            // Unified routing pipeline
+            if (window.CiliAI?.Router?.dispatchAction) {
+                window.CiliAI.Router.dispatchAction({ source: 'preset', intent: 'raw', text: query, echo: true });
+            } else {
+                window.addChatMessage(query, true);
+                window.handleAIQuery(query);
+            }
         };
         window.searchGene = function() {
             const input = document.getElementById('geneSearch');
             const gene = input.value.trim().toUpperCase();
             if (!gene) return;
-            window.addChatMessage(`Tell me about ${gene}`, true);
-            window.handleAIQuery(`What is ${gene}?`);
+            // Unified routing pipeline (canonical gene overview query)
+            if (window.CiliAI) window.CiliAI.activeGeneContext = gene;
+            if (window.CiliAI?.Router?.dispatchAction) {
+                window.CiliAI.Router.dispatchAction({ source: 'search', intent: 'gene_overview', gene, echo: true });
+            } else {
+                window.addChatMessage(`What is ${gene}?`, true);
+                window.handleAIQuery(`What is ${gene}?`);
+            }
         };
        
 /* ==============================================================
@@ -2401,8 +2425,37 @@ window.calculateAndDisplayStatistics = function() {
     const uniqueDiseases = new Set();
     const ciliopathyGenes = new Set();
 
+    // Only count diseases for these classifications (exclude secondary)
+    const norm = (s) => String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+    // Build disease-level exclusion/inclusion sets from the classification map
+    const _dmap = (typeof getDiseaseClassificationMap === 'function') ? getDiseaseClassificationMap() : {};
+    const secondarySet = new Set(
+        (_dmap['Secondary Diseases'] || []).map(d => norm(d))
+    );
+    const allowedSet = new Set([
+        ...(_dmap['Primary Ciliopathies'] || []),
+        ...(_dmap['Motile Ciliopathies'] || []),
+        ...(_dmap['Atypical Ciliopathies'] || [])
+    ].map(d => norm(d)));
+    const isAllowedClassification = (rawClass) => {
+        const c = norm(rawClass);
+        if (!c || c === 'n/a' || c === 'na' || c === 'none' || c === 'null') return true; // treat missing as unknown (allowed)
+        if (c.includes('secondary')) return false;
+        if (c.includes('primary')) return true;
+        if (c.includes('motile')) return true;
+        if (c.includes('atypical')) return true;
+        if (c.includes('unknown')) return true;
+        // If it doesn't match any known bucket, treat as unknown (allowed) rather than silently excluding
+        return true;
+    };
+
     // 2. Iterate All Genes
     window.CiliAI.masterData.forEach(gene => {
+        // Filter by classification (exclude "secondary")
+        const classification = gene.ciliopathy_classification || gene.Ciliopathy_Classification || gene.Classification || '';
+        if (!isAllowedClassification(classification)) return;
+
         // Retrieve disease field (check both possible keys)
         let rawData = gene.Ciliopathies || gene.Ciliopathy;
         
@@ -2423,15 +2476,25 @@ window.calculateAndDisplayStatistics = function() {
         list.forEach(d => {
             if (!d || typeof d !== 'string') return;
             const name = d.trim();
+            const key = norm(name);
             
             // Filter out junk values
             if (name.length > 2 && 
                 name.toUpperCase() !== 'NONE' && 
                 name.toUpperCase() !== 'N/A' && 
                 name.toUpperCase() !== 'UNKNOWN') {
-                
-                uniqueDiseases.add(name); // Add disease name to set
-                hasValidDisease = true;
+
+                // Classification filter
+                let include = true;
+                if (key) {
+                    // Exclude only if it is secondary AND not also in allowed lists
+                    if (secondarySet.has(key) && !allowedSet.has(key)) include = false;
+                }
+
+                if (include) {
+                    uniqueDiseases.add(name); // Add disease name to set
+                    hasValidDisease = true;
+                }
             }
         });
 

@@ -72,6 +72,16 @@ window.CiliAI.utils = {
     }
 };
 
+// ==========================================================
+// ROUTER / INTENT LAYER — Architectural Contract
+// ==========================================================
+// - ALL user actions funnel to handleAIQuery(query)
+// - Router only normalizes + generates canonical query strings
+// - No hardcoded answers in click handlers
+// - The canonical Router is defined later in the file (initCiliAIRouter IIFE)
+//   which sets window.CiliAI.Router with dispatchAction, dispatchGeneCardTab, etc.
+// - Do NOT define a second router here; it would be overwritten.
+
 // Expose legacy globals just in case
 window.extractMultipleGenes = window.extractMultipleGenes || function(q) { return []; };
 window.getTPMInCellType = window.getTPMInCellType || function() { return 0; };
@@ -322,8 +332,13 @@ function setupPageEventListeners() {
                 // --- END OF UMAP FIX ---
 
                 if (query) {
-                    window.addChatMessage(query, true);
-                    window.handleAIQuery(query);
+                    // Unified routing pipeline
+                    if (window.CiliAI?.Router?.dispatchAction) {
+                        window.CiliAI.Router.dispatchAction({ source: 'ai_action', intent: 'raw', text: query, echo: true });
+                    } else {
+                        window.addChatMessage(query, true);
+                        window.handleAIQuery(query);
+                    }
                 }
                 return;
             }
@@ -1401,36 +1416,52 @@ window.median = function (arr) {
      * Helper function to lazy-load phylogeny data only when needed
      */
     async function ensurePhylogenyDataLoaded() {
-        if (window.liPhylogenyCache && window.neversPhylogenyCache) {
-            return true; // Already loaded
-        }
-        
-        addChatMessage("Loading large phylogeny datasets... this may take a moment.", false);
-        log("Lazy-loading phylogeny data...");
+        if (window.liPhylogenyCache && window.neversPhylogenyCache) return true;
 
-        try {
-            const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-            const [liRes, neversRes] = await Promise.all([
-                fetch(baseUrl + 'data/phylogeny/li_et_al_2014_matrix_optimized.json'),
-                fetch(baseUrl + 'data/phylogeny/nevers_et_al_2017_matrix_optimized.json')
-            ]);
-            
-            if (!liRes.ok || !neversRes.ok) {
-                throw new Error(`Failed to fetch phylogeny files: ${liRes.status}, ${neversRes.status}`);
+        // Single-flight: prevent parallel duplicate fetches
+        if (window.__CILIAI_PHYLO_LOADING_PROMISE__) {
+            return await window.__CILIAI_PHYLO_LOADING_PROMISE__;
+        }
+
+        window.__CILIAI_PHYLO_LOADING_PROMISE__ = (async () => {
+            addChatMessage("Loading large phylogeny datasets... this may take a moment.", false);
+            log("Lazy-loading phylogeny data (single-flight)...");
+
+            try {
+                const isLocal = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+                const baseUrl = isLocal
+                    ? './'
+                    : 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+
+                const [liRes, neversRes] = await Promise.all([
+                    fetch(baseUrl + 'data/phylogeny/li_et_al_2014_matrix_optimized.json'),
+                    fetch(baseUrl + 'data/phylogeny/nevers_et_al_2017_matrix_optimized.json')
+                ]);
+
+                if (!liRes.ok || !neversRes.ok) {
+                    throw new Error(`Failed to fetch phylogeny files: ${liRes.status}, ${neversRes.status}`);
+                }
+
+                window.liPhylogenyCache = await liRes.json();
+                window.neversPhylogenyCache = await neversRes.json();
+
+                log("Phylogeny data successfully lazy-loaded.");
+                return true;
+            } catch (e) {
+                console.error("Failed to lazy-load phylogeny data:", e);
+                addChatMessage(`Error: Could not load phylogeny data. ${e.message}`, false);
+                return false;
+            } finally {
+                // allow retry after completion/failure
+                window.__CILIAI_PHYLO_LOADING_PROMISE__ = null;
             }
-            
-            window.liPhylogenyCache = await liRes.json();
-            window.neversPhylogenyCache = await neversRes.json();
-            
-            log("Phylogeny data successfully lazy-loaded.");
-            return true;
+        })();
 
-        } catch (e) {
-            console.error("Failed to lazy-load phylogeny data:", e);
-            addChatMessage(`Error: Could not load phylogeny data. ${e.message}`, false);
-            return false;
-        }
+        return await window.__CILIAI_PHYLO_LOADING_PROMISE__;
     }
+
+    // Expose for all callers (some intent paths call window.ensurePhylogenyDataLoaded)
+    window.ensurePhylogenyDataLoaded = ensurePhylogenyDataLoaded;
 
     async function routePhylogenyAnalysis(query) {
         // This is now an async function to handle lazy-loading
@@ -2654,10 +2685,13 @@ window.openTab = function(evt, tabName) {
     document.getElementById(`tab-${tabName}`).classList.add("active");
     evt.currentTarget.classList.add("active");
     
-    // Auto-trigger UMAP if switching to Expression tab
+    // Legacy convenience: if Router isn't available, Expression tab can still show a plot.
+    // When Router is used, tab clicks should dispatch through the unified pipeline instead.
     if (tabName === 'expression') {
+        if (window.CiliAI && window.CiliAI._suppressGeneCardAutoPlot) return;
         const geneName = document.getElementById('current-gene-name')?.textContent;
-        if (geneName && window.renderUMAPPlot) {
+        if (!geneName) return;
+        if (!window.CiliAI?.Router && typeof window.renderUMAPPlot === 'function') {
             setTimeout(() => window.renderUMAPPlot(geneName, [geneName]), 100);
         }
     }
@@ -2724,13 +2758,25 @@ window.displayFullGeneInfo = async function(geneSymbol) {
             ${badge}
         </div>`;
 
-    // Tabs
+    // Tabs (routed: behaves like user-typed canonical queries)
     html += `
         <div class="cilia-tabs" style="margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:4px;">
-            <button class="cilia-tab-btn active" onclick="window.openTab(event, 'overview')">Overview</button>
-            <button class="cilia-tab-btn"        onclick="window.openTab(event, 'expression')">Expression</button>
-            <button class="cilia-tab-btn"        onclick="window.openTab(event, 'screens')">Screens</button>
-            <button class="cilia-tab-btn"        onclick="window.openTab(event, 'evolution')">Evolution</button>
+            <button class="cilia-tab-btn active"
+                onclick="return window.CiliAI?.Router?.dispatchGeneCardTab ? window.CiliAI.Router.dispatchGeneCardTab(event, '${geneSymbol}', 'overview') : window.openTab(event, 'overview');">
+                Overview
+            </button>
+            <button class="cilia-tab-btn"
+                onclick="return window.CiliAI?.Router?.dispatchGeneCardTab ? window.CiliAI.Router.dispatchGeneCardTab(event, '${geneSymbol}', 'expression') : window.openTab(event, 'expression');">
+                Expression
+            </button>
+            <button class="cilia-tab-btn"
+                onclick="return window.CiliAI?.Router?.dispatchGeneCardTab ? window.CiliAI.Router.dispatchGeneCardTab(event, '${geneSymbol}', 'screens') : window.openTab(event, 'screens');">
+                Screens
+            </button>
+            <button class="cilia-tab-btn"
+                onclick="return window.CiliAI?.Router?.dispatchGeneCardTab ? window.CiliAI.Router.dispatchGeneCardTab(event, '${geneSymbol}', 'evolution') : window.openTab(event, 'evolution');">
+                Evolution
+            </button>
         </div>`;
 
     // ── OVERVIEW TAB ──
@@ -6363,12 +6409,12 @@ const intentHandlers = [
 // 3. Sort Handlers by Priority (Descending)
 intentHandlers.sort((a, b) => b.priority - a.priority);
 
-// 4. New Dispatcher: handleAIQuery (Replaces old version)
+// 4. Dispatcher: handleAIQuery — DATA-FIRST, LLM as last resort
 window.handleAIQuery = async function (query) {
     const chatWindow = document.getElementById('messages');
     if (!chatWindow || !query) return;
 
-    // Fail-safe: Ensure utils exist (fixes "Cannot read properties of undefined")
+    // Fail-safe: Ensure utils exist
     if (!window.CiliAI.utils) {
         console.warn("CiliAI.utils was missing. Re-initializing.");
         window.CiliAI.utils = {
@@ -6379,7 +6425,6 @@ window.handleAIQuery = async function (query) {
         };
     }
 
-    // Defensive normalization
     const qLower = window.CiliAI.utils.normalizeQuery(query);
 
     if (window.log) window.log(`Routing query: ${query}`);
@@ -6390,14 +6435,13 @@ window.handleAIQuery = async function (query) {
             return;
         }
 
-        // Greeting: let LLM handle if enabled, otherwise use static response
+        // ── STEP 1: Greetings (fast, no LLM needed) ──────────────
         if (window.CiliAIAssistant && typeof window.CiliAIAssistant.isGreeting === 'function' && window.CiliAIAssistant.isGreeting(query)) {
-            if (!window.CiliAIAssistant.isEnabled()) {
-                const greetingResult = window.CiliAIAssistant.getGreetingResponse
-                    ? window.CiliAIAssistant.getGreetingResponse(query)
-                    : null;
-                const safeResult = greetingResult || window.CiliAIAssistant.buildFallbackResponse(query, 'greeting_fallback');
-                const finalText = window.CiliAIAssistant.finalizeAssistantOutput(safeResult, query);
+            const greetingResult = window.CiliAIAssistant.getGreetingResponse
+                ? window.CiliAIAssistant.getGreetingResponse(query)
+                : null;
+            if (greetingResult) {
+                const finalText = window.CiliAIAssistant.finalizeAssistantOutput(greetingResult, query);
                 const parsed = window.CiliAIAssistantCore.parseAssistantResponse(finalText);
                 const rendered = window.CiliAIAssistant.renderMarkdown(parsed.markdown);
                 window.addChatMessage(rendered, false);
@@ -6406,7 +6450,80 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-        // LLM path: database context is sent to the API; response is merged with DB summary
+        // ── STEP 2: Gene Card requests → trigger real gene card UI ──
+        // Matches: "gene card", "detailed gene card", "show/open/display gene card for X",
+        //          "full annotations for X", "show me gene info for X"
+        const geneCardPattern = /(?:gene\s*card|detailed\s+(?:gene\s+)?(?:card|info)|full\s+annotation|show\s+(?:me\s+)?gene\s+info|open\s+(?:gene\s+)?card|display\s+(?:gene\s+)?card)/i;
+        if (geneCardPattern.test(qLower)) {
+            const genes = window.CiliAI.utils.extractGenes(query);
+            // Also try extracting from "gene card for X" or "gene card X" pattern
+            let geneSymbol = genes.length > 0 ? genes[0] : null;
+            if (!geneSymbol) {
+                const match = query.match(/(?:for|of)\s+([A-Z0-9][A-Z0-9\-]{1,})/i);
+                if (match) geneSymbol = match[1].toUpperCase();
+            }
+            if (!geneSymbol) {
+                // Try last word as gene name
+                const words = query.trim().split(/\s+/);
+                const last = words[words.length - 1].replace(/[?.!]/g, '').toUpperCase();
+                if (last.length >= 3 && /^[A-Z0-9\-]+$/.test(last) && window.CiliAI.lookups?.geneMap?.[last]) {
+                    geneSymbol = last;
+                }
+            }
+            // Use active gene context as last resort
+            if (!geneSymbol && window.CiliAI.activeGeneContext) {
+                geneSymbol = window.CiliAI.activeGeneContext;
+            }
+            if (geneSymbol && typeof window.displayFullGeneInfo === 'function') {
+                window.CiliAI.activeGeneContext = geneSymbol;
+                const cardHtml = await window.displayFullGeneInfo(geneSymbol);
+                if (cardHtml) {
+                    window.addChatMessage(cardHtml, false);
+                    return;
+                }
+            }
+        }
+
+        // ── STEP 3: Intent Handlers (data-backed, priority sorted) ────
+        // These are the 80+ handlers that use real project data.
+        // They run BEFORE the LLM to ensure data-grounded answers.
+
+        // Legacy BBS shortcut
+        if (qLower.includes('bardet') || qLower.includes('biedl') || qLower.includes('bbs')) {
+            const html = window.showBBSGenes ? window.showBBSGenes() : null;
+            if (html) {
+                window.addChatMessage(html, false);
+                return;
+            }
+        }
+
+        let htmlResult = null;
+        for (const intent of intentHandlers) {
+            if (intent.matcher(qLower)) {
+                htmlResult = await intent.handler(query);
+                if (htmlResult) {
+                    window.addChatMessage(htmlResult, false);
+                    return;
+                }
+            }
+        }
+
+        // ── STEP 4: Data-first path (assistant-runtime tryDataFirst) ──
+        if (window.CiliAIAssistant && typeof window.CiliAIAssistant.getDataOnlyResponse === 'function') {
+            const dataResult = window.CiliAIAssistant.getDataOnlyResponse(query);
+            if (dataResult) {
+                const finalText = window.CiliAIAssistant.finalizeAssistantOutput(dataResult, query);
+                const parsed = window.CiliAIAssistantCore.parseAssistantResponse(finalText);
+                const rendered = window.CiliAIAssistant.renderMarkdown(parsed.markdown);
+                window.addChatMessage(rendered, false);
+                window.CiliAIAssistant.dispatchActions(parsed.actions);
+                return;
+            }
+        }
+
+        // ── STEP 5: LLM as LAST RESORT (router mode only) ────────────
+        // Only reached for queries no intent handler or data-first path matched.
+        // LLM acts as a router/interpreter, not a free-answer chatbot.
         if (window.CiliAIAssistant && window.CiliAIAssistant.isEnabled()) {
             const thinkingId = 'ciliai-thinking-' + Date.now();
             window.addChatMessage('<div id="' + thinkingId + '" class="assistant-thinking"><span class="thinking-dot"></span> Thinking...</div>', false);
@@ -6431,44 +6548,189 @@ window.handleAIQuery = async function (query) {
             }
         }
 
-        // Data-only path: database + data-first rules, used when LLM is unavailable
-        if (window.CiliAIAssistant && typeof window.CiliAIAssistant.getDataOnlyResponse === 'function') {
-            const dataResult = window.CiliAIAssistant.getDataOnlyResponse(query);
-            if (dataResult) {
-                const finalText = window.CiliAIAssistant.finalizeAssistantOutput(dataResult, query);
-                const parsed = window.CiliAIAssistantCore.parseAssistantResponse(finalText);
-                const rendered = window.CiliAIAssistant.renderMarkdown(parsed.markdown);
-                window.addChatMessage(rendered, false);
-                window.CiliAIAssistant.dispatchActions(parsed.actions);
-                return;
-            }
-        }
+        // ── STEP 6: Controlled fallback — nothing matched ──────────
+        window.addChatMessage(
+            `<div class="ai-result-card">
+                <p>I couldn't find an answer for "<strong>${query}</strong>" in the current database.</p>
+                <p>Try asking about:</p>
+                <ul>
+                    <li>A specific gene (e.g., "What is IFT88?")</li>
+                    <li>Gene localization (e.g., "Where is CEP290 localized?")</li>
+                    <li>Disease genes (e.g., "Show Joubert syndrome genes")</li>
+                    <li>Expression data (e.g., "Plot BBS1 expression")</li>
+                </ul>
+            </div>`,
+            false
+        );
 
-    // Legacy shortcut: Bardet–Biedl genes list
-    if (qLower.includes('bardet') || qLower.includes('biedl') || qLower.includes('bbs')) {
-        const html = window.showBBSGenes ? window.showBBSGenes() : null;
-        if (html) {
-            window.addChatMessage(html, false);
-            return;
-        }
-    }
-
-        let htmlResult = null;
-
-        for (const intent of intentHandlers) {
-            if (intent.matcher(qLower)) {
-                htmlResult = await intent.handler(query);
-                if (htmlResult) {
-                    window.addChatMessage(htmlResult, false);
-                    return;
-                }
-            }
-        }
     } catch (e) {
         console.error("Error in handleAIQuery:", e);
         window.addChatMessage(`An internal error occurred: ${e.message}`, false);
     }
 };
+
+/* ==============================================================
+ * ROUTER / INTENT BRIDGE (Centralized, deterministic)
+ * - Unifies ALL user actions into one query pipeline: handleAIQuery()
+ * - Generates canonical queries for debuggable routing
+ * ============================================================== */
+(function initCiliAIRouter() {
+    window.CiliAI = window.CiliAI || {};
+
+    const debugEnabled = () => {
+        try { return window.CILIAI_ENV?.CILIAI_DEBUG === 'true' || window.CILIAI_DEBUG === true; }
+        catch { return false; }
+    };
+    const dlog = (...args) => { if (debugEnabled()) console.log('[CiliAI.Router]', ...args); };
+
+    const normalizeText = (s) => String(s || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\u2013|\u2014/g, '-') // en/em dash
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'");
+
+    const coerceGene = (gene) => {
+        const g = String(gene || '').trim();
+        return g ? g.toUpperCase() : '';
+    };
+
+    const inferGeneFromContext = () => {
+        const fromCtx = window.CiliAI?.activeGeneContext || window.CiliAI?.activeGene || '';
+        return coerceGene(fromCtx);
+    };
+
+    const buildCanonicalQuery = (action) => {
+        const intent = String(action?.intent || '').toLowerCase().trim();
+        const sourceText = normalizeText(action?.text || action?.query || '');
+        const gene = coerceGene(action?.gene) || inferGeneFromContext();
+
+        // If caller already provided raw text, preserve it (but normalize whitespace)
+        if (intent === 'raw' || (!intent && sourceText)) return sourceText;
+
+        // Canonical intent→query mapping (keep short, stable phrasing)
+        if (intent === 'gene_overview' || intent === 'overview') {
+            return gene ? `What is ${gene}?` : sourceText;
+        }
+        if (intent === 'expression') {
+            return gene ? `Plot ${gene} expression` : sourceText;
+        }
+        if (intent === 'localization' || intent === 'location') {
+            return gene ? `Where is ${gene} localized?` : sourceText;
+        }
+        if (intent === 'screens' || intent === 'screen') {
+            return gene ? `Tell me about ${gene} screen` : sourceText;
+        }
+        if (intent === 'evolution' || intent === 'phylogeny') {
+            return gene ? `Show ${gene} evolution` : sourceText;
+        }
+        if (intent === 'domains' || intent === 'domain') {
+            return gene ? `${gene} domains` : sourceText;
+        }
+        if (intent === 'ortholog' || intent === 'orthologs') {
+            const organism = normalizeText(action?.organism || '').toLowerCase();
+            if (gene && organism) return `Display ${gene} ${organism} ortholog`;
+            if (gene) return `Orthologs of ${gene}`;
+            return sourceText;
+        }
+
+        return sourceText;
+    };
+
+    const dispatchCanonicalQuery = async (query, actionMeta = {}) => {
+        const q = normalizeText(query);
+        if (!q) return false;
+        if (typeof window.handleAIQuery !== 'function') {
+            console.warn('[CiliAI.Router] handleAIQuery missing; cannot dispatch.');
+            return false;
+        }
+        dlog('dispatch', { source: actionMeta.source, intent: actionMeta.intent, gene: actionMeta.gene, query: q });
+        await window.handleAIQuery(q);
+        return true;
+    };
+
+    window.CiliAI.Router = {
+        normalizeText,
+        buildCanonicalQuery,
+        dispatchAction: async function (action) {
+            const a = action || {};
+            const query = buildCanonicalQuery(a);
+            const q = normalizeText(query);
+            if (!q) {
+                if (debugEnabled()) console.warn('[CiliAI.Router] blocked empty query', a);
+                return false;
+            }
+
+            // Optional: echo user bubble (kept here so all sources behave consistently)
+            const echo = a.echo !== false; // default true
+            if (echo && typeof window.addChatMessage === 'function') {
+                window.addChatMessage(q, true);
+            }
+
+            return await dispatchCanonicalQuery(q, {
+                source: a.source || 'unknown',
+                intent: a.intent || (a.text ? 'raw' : ''),
+                gene: a.gene || inferGeneFromContext()
+            });
+        },
+        dispatchText: async function (text, source = 'manual') {
+            return await this.dispatchAction({ source, intent: 'raw', text, echo: true });
+        },
+
+        // Gene-card tabs: switch visible tab AND route through unified pipeline
+        dispatchGeneCardTab: async function (evt, gene, tab) {
+            const t = String(tab || '').toLowerCase();
+            const g = coerceGene(gene || window.CiliAI?.activeGeneContext || '');
+
+            if (g && window.CiliAI) window.CiliAI.activeGeneContext = g;
+
+            // Switch UI tab first; suppress legacy auto-plot side effects
+            try {
+                if (window.CiliAI) window.CiliAI._suppressGeneCardAutoPlot = true;
+                if (evt && typeof window.openTab === 'function') {
+                    window.openTab(evt, t);
+                }
+            } catch (_) {}
+
+            // Clear suppression shortly after
+            setTimeout(() => {
+                try { if (window.CiliAI) window.CiliAI._suppressGeneCardAutoPlot = false; } catch (_) {}
+            }, 150);
+
+            // Route through centralized pipeline (same as manual typed query)
+            return await this.dispatchAction({
+                source: 'gene_card_tab',
+                intent: t,
+                gene: g,
+                echo: true
+            });
+        }
+    };
+
+    // Global entry-point wrappers (single pipeline)
+    window.sendQuery = async function (query) {
+        // Used by preset examples and gene-card buttons
+        return await window.CiliAI.Router.dispatchAction({ source: 'preset', intent: 'raw', text: query, echo: true });
+    };
+
+    window.handleUserSend = async function () {
+        const input = document.getElementById('chatInput');
+        const raw = input ? input.value : '';
+        const q = normalizeText(raw);
+        if (!q) return;
+        if (input) input.value = '';
+        return await window.CiliAI.Router.dispatchAction({ source: 'manual', intent: 'raw', text: q, echo: true });
+    };
+
+    // Search box action should preserve gene context and route through the same pipeline
+    window.searchGene = async function (name = null) {
+        const raw = name || document.getElementById('geneSearch')?.value || '';
+        const gene = coerceGene(raw);
+        if (!gene) return;
+        window.CiliAI.activeGeneContext = gene;
+        return await window.CiliAI.Router.dispatchAction({ source: 'search', intent: 'gene_overview', gene, echo: true });
+    };
+})();
 
 window.fetchVariantData = async function(geneSymbol) {
     try {
@@ -6844,8 +7106,13 @@ function handleScreenReferenceFollowup() {
     window.searchGene = function (name) {
         const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
         if (!query) return;
-        window.addChatMessage(`Tell me about ${query}`, true);
-        window.handleGeneSearch(query, true); // Use window.handleGeneSearch
+        // Unified routing pipeline
+        if (window.CiliAI?.Router?.dispatchGene) {
+            window.CiliAI.Router.dispatchGene('search', query, 'gene_overview');
+        } else {
+            window.addChatMessage(`What is ${query}?`, true);
+            window.handleAIQuery(`What is ${query}?`);
+        }
     };
 
     // --- MODIFIED: UMAP default plot ---
@@ -6869,9 +7136,14 @@ function handleScreenReferenceFollowup() {
         if (!chatInput) return;
         const query = chatInput.value.trim();
         if (!query) return;
-        window.addChatMessage(query, true);
         chatInput.value = '';
-        window.handleAIQuery(query);
+        // Unified routing pipeline
+        if (window.CiliAI?.Router?.dispatchText) {
+            window.CiliAI.Router.dispatchText('manual', query);
+        } else {
+            window.addChatMessage(query, true);
+            window.handleAIQuery(query);
+        }
     };
     window.sendMsg = function () {
     handleUserSend();

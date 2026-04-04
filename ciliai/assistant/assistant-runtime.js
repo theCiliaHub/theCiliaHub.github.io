@@ -88,34 +88,36 @@
     function buildSystemPrompt(fewShotText, dbContext) {
         const targets = core.KNOWN_TARGETS.concat(['#ciliai', '#gene/{SYMBOL}']).join(', ');
         const base = [
-            'You are CiliAI, a friendly and knowledgeable AI assistant for ciliary biology, genes, ciliopathies, and gene expression.',
+            'You are CiliAI, a query router and interpreter for a ciliary biology database application.',
             '',
-            'HOW TO TALK:',
-            '- Write naturally, like a knowledgeable friend. No rigid templates or section headers.',
-            '- For greetings: respond warmly and briefly. Suggest a couple of things you can help with.',
-            '- For science questions: give a clear answer first, then add relevant details. Use bullet points only when listing multiple items.',
-            '- For thanks: reply warmly.',
-            '- Keep answers concise but informative. Avoid filler.',
+            'YOUR ROLE:',
+            '- You are a ROUTER / INTERPRETER, NOT a free-answer chatbot.',
+            '- Your job is to understand the user query and map it to the correct database action.',
+            '- Do NOT generate biological facts, gene annotations, disease associations, or expression patterns from your own knowledge.',
+            '- Do NOT hallucinate or invent scientific information.',
+            '- ONLY use the DATABASE CONTEXT provided below to construct your response.',
+            '- If the DATABASE CONTEXT does not contain an answer, say clearly: "This information is not available in the current CiliAI database."',
             '',
             'RESPONSE FORMAT — always respond in exactly TWO SECTIONS:',
             '',
             '[MARKDOWN]',
-            'Write your response here as natural text. No rigid headings required.',
-            'Use paragraphs, bullet lists, or bold text as appropriate.',
+            'Write a BRIEF, factual response using ONLY data from DATABASE CONTEXT below.',
+            'If no relevant data exists in the context, say the data is not available.',
+            'Do NOT elaborate with general biological knowledge.',
             '',
             '[ACTIONS_JSON]',
             '{ "intent": "...", "title": "...", "payload": { ... }, "visual": [ { "type": "...", "target": "...", "data": { ... } } ] }',
             '',
             'Rules:',
-            '- The [MARKDOWN] section is what the user sees. Write it naturally.',
+            '- The [MARKDOWN] section is what the user sees. Keep it SHORT and grounded in the DATABASE CONTEXT.',
             '- The [ACTIONS_JSON] section triggers UI actions. JSON MUST parse.',
             '- If nothing to do: {"intent":"none","title":"","payload":{},"visual":[]}',
             '- Do NOT invent capabilities. Only use these targets: ' + targets,
             '- Intents: none, list_genes, show_gene, show_disease, filter, plot, compare, navigate, help, visualize_bbs_list, lookup_gene_list.',
-            '- Your answer will be merged with a "From the database" section showing DB facts; use the database context below to stay consistent.',
-            '- When DATABASE CONTEXT provides a list of gene symbols for a disease or localization, copy those exact symbols into [ACTIONS_JSON] payload.genes. Do NOT substitute or supplement with genes not in the provided list.',
-            '- If the DATABASE CONTEXT states "N total" genes, use that number in your [MARKDOWN] response. Do not invent a different count.',
-            '- To show a disease gene list, use intent "lookup_gene_list" with payload { "disease": "<exact disease name>" }. The UI will look up the full gene list from the database — you do NOT need to enumerate the genes yourself.',
+            '- For gene card requests, use intent "show_gene" with payload { "gene": "SYMBOL" }.',
+            '- When DATABASE CONTEXT provides gene data, use ONLY those exact values. Do NOT add or supplement.',
+            '- When DATABASE CONTEXT is empty or does not contain relevant information, respond with: "This information is not available in the current CiliAI database." and use intent "none".',
+            '- Do NOT add highlight visuals unless the user explicitly asks about localization or spatial position.',
         ];
         if (dbContext) base.push(dbContext);
         if (fewShotText) {
@@ -793,6 +795,18 @@
                 }
             }
 
+            // show_gene: open the real gene card UI (not just chat text)
+            if (intent === 'show_gene' && payload.gene) {
+                const gene = String(payload.gene).toUpperCase();
+                if (typeof root.displayFullGeneInfo === 'function') {
+                    root.displayFullGeneInfo(gene).then(html => {
+                        if (html && typeof root.addChatMessage === 'function') {
+                            root.addChatMessage(html, false);
+                        }
+                    }).catch(() => {});
+                }
+            }
+
             if (Array.isArray(actions.visual)) {
                 // Only switch to diagram view if there is no competing table/plot visual
                 const hasTableOrPlot = actions.visual.some(v =>
@@ -808,8 +822,13 @@
                         // #region agent log
                         fetch('http://127.0.0.1:7491/ingest/b99c607b-adae-4c2a-a178-1292ac376939',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e17aa'},body:JSON.stringify({sessionId:'8e17aa',location:'assistant-runtime.js:dispatchActions:highlight',message:'highlight dispatch',data:{localization:data.localization,gene:data.gene||null,intent,hasTableOrPlot,allVisuals:actions.visual},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
                         // #endregion
-                        // Only show diagram if there is no table/plot already being displayed
-                        if (!hasTableOrPlot) root.showDiagram && root.showDiagram();
+                        // Only auto-zoom diagram for EXPLICIT localization requests.
+                        // Do NOT zoom for gene cards, overviews, disease queries, etc.
+                        const isLocalizationQuery = (actions.title || '').toLowerCase().includes('localization')
+                            || (actions.title || '').toLowerCase().includes('highlight');
+                        if (!hasTableOrPlot && isLocalizationQuery) {
+                            root.showDiagram && root.showDiagram();
+                        }
                         setMeta({ mappingAttempted: true });
                         const mapped = root.SpatialManager.highlight(data.localization, data.gene || null);
                         setMeta({ mappingSuccess: mapped });
