@@ -174,6 +174,7 @@ function matchLocKw(q) {
         ['centrosome',      {term:'centrosome',         label:'Centrosome'}],
         ['mitochondria',    {term:'mitochondria',       label:'Mitochondria'}],
         ['lysosom',         {term:'lysosom',            label:'Lysosomes'}],
+        ['axonemal',        {term:'axoneme',            label:'Axoneme'}],
         ['axoneme',         {term:'axoneme',            label:'Axoneme'}],
         ['flagella',        {term:'flagella',           label:'Flagella / Axoneme'}],
         ['nucleus',         {term:'nucleus',            label:'Nucleus'}],
@@ -303,6 +304,15 @@ function matchIntent(raw) {
     // LOF for single gene — must come BEFORE general loc matching
     if (genes.length === 1 && /lof|loss.of.function|knockout|knock.out|knockdown|phenotype.*of|effect.*of|what does.*do|what happen/i.test(q)) {
         return {type:'lof_gene', gene:genes[0]};
+    }
+
+    // If loc matched only because disease name contains 'cilia'/'ciliary', suppress it
+    // e.g. 'Primary Ciliary Dyskinesia' → disease=pcd AND loc=cilia (wrong)
+    if (loc && loc.term === 'cilia' && disease && tissue) {
+        loc = null; // disease+tissue wins
+    }
+    if (loc && loc.term === 'cilia' && disease && !tissue) {
+        loc = null; // disease alone, no spurious cilia loc
     }
 
     // LOC + LOF effect
@@ -637,8 +647,43 @@ function dispatch(intent) {
 
 /* === INSTALL ============================================================== */
 
+// Suppression flag: after we handle a query, block ciliai.js's
+// subsequent assistant messages for 1 second so it cannot append its
+// own error/fallback answer after ours.
+var _suppressing = false;
+var _suppressTimer = null;
+
+function startSuppression() {
+    _suppressing = true;
+    if (_suppressTimer) clearTimeout(_suppressTimer);
+    _suppressTimer = setTimeout(function () {
+        _suppressing = false;
+        _suppressTimer = null;
+    }, 1200);
+}
+
 function say(html) {
+    // Always show our own messages regardless of suppression state
     if (typeof win.addChatMessage === 'function') win.addChatMessage(html, false);
+}
+
+// Wrap addChatMessage so ciliai.js assistant messages are blocked
+// while suppression is active. User messages (isUser=true) always pass through.
+function installAddChatMessageGuard() {
+    if (!win.addChatMessage || win.addChatMessage.__guardInstalled) return;
+    var origAdd = win.addChatMessage;
+    win.addChatMessage = function(html, isUser) {
+        // Always allow: user messages, and calls from our own say()
+        if (isUser) return origAdd.call(this, html, isUser);
+        // Block ciliai.js assistant messages while we are suppressing
+        if (_suppressing) {
+            console.debug('[CiliAI Interceptor] Blocked ciliai.js message during suppression');
+            return;
+        }
+        return origAdd.call(this, html, isUser);
+    };
+    win.addChatMessage.__guardInstalled = true;
+    console.log('[CiliAI Interceptor] ✅ Installed addChatMessage guard');
 }
 
 function wrap(originalFn) {
@@ -651,7 +696,11 @@ function wrap(originalFn) {
         if (intent) {
             console.debug('[CiliAI Interceptor]', intent.type);
             var html = dispatch(intent);
-            if (html) { say(html); return; }
+            if (html) {
+                say(html);          // show our answer FIRST
+                startSuppression(); // then block ciliai.js for 1.2s
+                return;             // do NOT call original
+            }
         }
         return originalFn.apply(this, arguments);
     };
