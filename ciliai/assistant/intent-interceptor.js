@@ -25,7 +25,15 @@
 // § 1  DATA — grounded in actual CSV columns and gene counts
 // ═══════════════════════════════════════════════════════════════════════════
 
-const LOF_KEY = 'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)';
+// All possible keys ciliai.js may use for LOF — try them all
+const LOF_KEYS = [
+    'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)',
+    'lof_effects',
+    'LoF_effects',
+    'lof_effect',
+    'loF_effects',
+];
+const LOF_KEY = LOF_KEYS[0]; // kept for csvLink field list
 
 const COMPLEX_SETS = {
     ift_b: new Set(['IFT22','IFT25','IFT27','IFT46','IFT52','IFT56','IFT57',
@@ -84,6 +92,7 @@ function matchIntent(raw) {
         matchPhyloDomain(q, t)         ||  // "WD40 genes conserved in ciliates"
         matchPfamAccession(q, t)       ||  // "genes with PF13432"
         matchLofConservedTissue(q, t)  ||  // "no-effect genes conserved + lung"
+        matchLofGene(q, t)             ||  // "what is the LOF effect of KIF3A"
         matchSelfIntro(q, t)           ||  // "what can you do"
         matchDomainGene(q, t)          ||  // "what domains does IFT88 have"
         null
@@ -235,6 +244,13 @@ function matchDomainGene(q, t) {
     return { type:'domain_gene', gene:genes[0] };
 }
 
+function matchLofGene(q, t) {
+    if (!/lof|loss.of.function|knockout|knock.out|knock.down|knockdown|phenotype|effect.*of|what does.*do|what happen/i.test(q)) return null;
+    const genes = extractGenes(t);
+    if (genes.length !== 1) return null;
+    return { type:'lof_gene', gene:genes[0] };
+}
+
 // Q1, Q18: LOC + LOF (must have BOTH)
 function matchLocPhenotype(q, t) {
     const loc = matchLoc(q);
@@ -336,6 +352,35 @@ function matchSelfIntro(q, t) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function db() { return win.CiliAI?.masterData || []; }
+
+// Resolve LOF value from a gene row — tries all possible key names and value formats
+function getLOF(row) {
+    for (const key of LOF_KEYS) {
+        const v = row[key];
+        if (v && typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return '';
+}
+
+// Resolve Localization — also handles 'localization' lowercase key
+function getLoc(row) {
+    return (row['Localization'] || row['localization'] || '').toLowerCase();
+}
+
+// Broad LOF effect test — handles 'Shorter cilia', 'shorter', 'shorter_cilia', 'Shorter Cilia'
+function lofMatches(row, effect) {
+    const v = getLOF(row).toLowerCase();
+    if (!v || v.includes('not reported') || v.includes('not report')) return false;
+    switch (effect) {
+        case 'shorter':   return /shorter|short.cilia|short cilium|cilia.*short/i.test(v);
+        case 'longer':    return /longer|long.cilia|elongat/i.test(v);
+        case 'loss':      return /loss.of.cilia|no.cilia|absent.cilia|blocked|abolished|failure/i.test(v);
+        case 'no_effect': return /^no.effect$|^no_effect$/i.test(v.trim()) || v === 'no effect';
+        case 'motility':  return /motility/i.test(v);
+        case 'knockdown': return true; // any reported effect
+        default:          return v.includes(effect.toLowerCase());
+    }
+}
 
 function pill(text, color) {
     const C = { blue:['#dbeafe','#1e40af'], red:['#fee2e2','#991b1b'],
@@ -495,27 +540,18 @@ function dispatch(intent) {
     // ── LOC + PHENOTYPE — Q1, Q18 ───────────────────────────────────────
     if (type === 'loc_phenotype') {
         const { loc, effect } = intent;
-        const lofTest = {
-            shorter:  r => /shorter cilia|short cilia|shorter sperm|shorter.*flagell/i.test(r[LOF_KEY]),
-            longer:   r => /longer cilia/i.test(r[LOF_KEY]),
-            loss:     r => /loss of cilia|ciliogenesis blocked|abolished/i.test(r[LOF_KEY]),
-            no_effect:r => /no effect/i.test(r[LOF_KEY]),
-            motility: r => /motility/i.test(r[LOF_KEY]),
-            knockdown:r => r[LOF_KEY] && !/not reported/i.test(r[LOF_KEY]),
-        }[effect] || (r => /shorter cilia/i.test(r[LOF_KEY]));
-
         const matches = db().filter(r =>
-            r['Localization'].toLowerCase().includes(loc.term) && lofTest(r)
+            getLoc(r).includes(loc.term) && lofMatches(r, effect)
         );
         if (!matches.length) return `No <b>${loc.label}</b> genes found with <b>${effect.replace('_',' ')}</b> cilia phenotype.`;
         return `<b>${loc.label}</b> genes with <b>${effect.replace('_',' ')}</b> cilia phenotype — <b>${matches.length} genes</b>:<br>
                 ${table(['Gene','LoF Effect','Disease'],
                     matches.slice(0,40).map(g=>[
                         chip(g['Gene']),
-                        g[LOF_KEY]||'—',
+                        getLOF(g) || '—',
                         g['Ciliopathy']&&g['Ciliopathy']!=='N/A' ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '—'
                     ]), 40)}
-                ${csvLink(matches,['Gene','Localization',LOF_KEY,'Ciliopathy'],`${loc.term.replace(/\s/g,'_')}_${effect}.csv`)}`;
+                ${csvLink(matches,['Gene','Localization','Ciliopathy'],`${loc.term.replace(/\s/g,'_')}_${effect}.csv`)}`;
     }
 
     // ── LOC + DISEASE — Q11, Q16 ────────────────────────────────────────
@@ -523,8 +559,8 @@ function dispatch(intent) {
         const { loc, disease } = intent;
         const terms = disTerms(disease);
         const matches = db().filter(r =>
-            r['Localization'].toLowerCase().includes(loc.term) &&
-            terms.some(d => r['Ciliopathy'].toLowerCase().includes(d))
+            getLoc(r).includes(loc.term) &&
+            terms.some(d => (r['Ciliopathy']||'').toLowerCase().includes(d))
         );
         if (!matches.length) return `No <b>${loc.label}</b> genes found associated with <b>${disName(disease)}</b>.`;
         return `<b>${loc.label}</b> genes associated with <b>${disName(disease)}</b> — <b>${matches.length} genes</b>:<br>
@@ -536,7 +572,7 @@ function dispatch(intent) {
     // ── LOC + TISSUE — Q2, Q12, Q14, Q15 ────────────────────────────────
     if (type === 'loc_tissue') {
         const { loc, tissue } = intent;
-        const matches = db().filter(r => r['Localization'].toLowerCase().includes(loc.term));
+        const matches = db().filter(r => getLoc(r).includes(loc.term));
         if (!matches.length) return `No genes found with <b>${loc.label}</b> localization.`;
         return `<b>${loc.label}</b> genes (in the context of <b>${tisName(tissue)}</b>) — <b>${matches.length} genes</b>:<br>
                 ${table(['Gene','Localization','Disease'],
@@ -664,16 +700,52 @@ function dispatch(intent) {
 
     // ── LOF NO-EFFECT + CONSERVED + TISSUE — Q17 ─────────────────────────
     if (type === 'lof_conserved_tissue') {
-        const matches = db().filter(r => /no effect/i.test(r[LOF_KEY]));
+        const matches = db().filter(r => lofMatches(r, 'no_effect'));
         return `Genes with <b>no cilia length phenotype</b> on LoF — <b>${matches.length} genes</b>:<br>
                 ${table(['Gene','LoF Effect','Localization'],
-                    matches.slice(0,30).map(g=>[chip(g['Gene']), g[LOF_KEY]||'—', g['Localization']||'—']), 30)}
+                    matches.slice(0,30).map(g=>[chip(g['Gene']), getLOF(g)||'—', getLoc(g)||'—']), 30)}
                 ${intent.tissue ? tisNote(intent.tissue) : ''}
                 <div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;
                     margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">
                     ℹ️ For conservation filtering, use the <b>Phylogeny</b> tab on the Cilia Analysis page
                     and select "in_all_organisms".</div>
-                ${csvLink(matches,['Gene',LOF_KEY,'Localization','Ciliopathy'],'lof_no_effect_genes.csv')}`;
+                ${csvLink(matches,['Gene','Localization','Ciliopathy'],'lof_no_effect_genes.csv')}`;
+    }
+
+    // ── LOF EFFECT FOR SINGLE GENE — Q2: "What is the LOF effect of KIF3A?" ──
+    if (type === 'lof_gene') {
+        const gmap = win.CiliAI?.lookups?.geneMap || {};
+        const g = gmap[intent.gene.toUpperCase()];
+        if (!g) return `Gene <b>${intent.gene}</b> not found in CiliaHub.`;
+
+        const lof = getLOF(g) || 'Not reported';
+        const oe  = (g['Overexpression effects on cilia length (increase/decrease/no effect)'] ||
+                     g['overexpression_effects'] || 'Not reported');
+        const pct = (g['Percentage of ciliated cells (increase/decrease/no effect)'] ||
+                     g['percent_ciliated_cells_effects'] || 'Not reported');
+        const loc = g['Localization'] || g['localization'] || '—';
+        const dis = g['Ciliopathy'] || g['Ciliopathies'] || '—';
+        const sum = g['Functional.Summary.from.Literature'] || g['functional_summary'] ||
+                    g['Gene.Description'] || g['description'] || '';
+
+        return `<b style="font-size:15px;color:#005b96;">${intent.gene}</b>
+                — Cilia Phenotype Summary<br><br>
+                ${sum ? `<p style="font-size:12.5px;color:#334155;line-height:1.5;margin-bottom:10px;">
+                    ${sum.slice(0,250)}${sum.length>250?'…':''}</p>` : ''}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+                  <div><b style="color:#475569;">LoF → cilia length</b><br>
+                    <span style="color:#7c3aed;font-weight:600;">${lof}</span></div>
+                  <div><b style="color:#475569;">Overexpression → cilia</b><br>
+                    <span style="color:#b45309;">${oe}</span></div>
+                  <div><b style="color:#475569;">% ciliated cells</b><br>
+                    <span style="color:#065f46;">${pct}</span></div>
+                  <div><b style="color:#475569;">Localization</b><br>${loc}</div>
+                </div>
+                ${dis && dis !== '—' && dis !== 'N/A'
+                    ? `<div style="margin-top:8px;"><b style="font-size:11.5px;color:#475569;">Disease association</b><br>
+                       ${dis.split(',').slice(0,4).map(d=>pill(d.trim(),'red')).join(' ')}</div>`
+                    : ''}`;
+    }
     }
 
     // ── SELF INTRO ────────────────────────────────────────────────────────
