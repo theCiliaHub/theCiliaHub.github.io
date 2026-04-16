@@ -110,18 +110,38 @@ var _lastPhyloNames = null;
 
 function renderPhyloPlot(geneSymbols) {
     if (!geneSymbols || !geneSymbols.length) return false;
-    if (typeof win.switchView === 'function') win.switchView('plot');
-    var gmapObj = gmap();
-    var geneObjs = geneSymbols.map(function(s){ return gmapObj[s]; }).filter(Boolean);
-    if (!geneObjs.length) return false;
-    var fns = ['renderPhylogenyHeatmap','getPhylogenyAnalysis',
-               'displayPhylogenyHeatmap','showPhylogenyHeatmap','renderPhylogenetics'];
-    for (var fi = 0; fi < fns.length; fi++) {
-        var fn = win[fns[fi]] || (win.CiliAI && win.CiliAI[fns[fi]]);
-        if (typeof fn === 'function') {
-            try { fn(geneObjs, {}); return true; } catch(e) {}
-        }
+
+    // Switch to diagram/plot view — ciliai.js phylo renders in the main viz panel
+    if (typeof win.switchView === 'function') win.switchView('diagram');
+
+    // 1. getPhylogenyAnalysis(symbolArray) — ciliai.js's primary phylogeny function
+    //    Takes an array of gene SYMBOL STRINGS like ["IFT88","BBS1"]
+    if (typeof win.getPhylogenyAnalysis === 'function') {
+        try { win.getPhylogenyAnalysis(geneSymbols); return true; } catch(e) {}
     }
+
+    // 2. routePhylogenyAnalysis(queryString) — ciliai.js catch-all phylogeny router
+    if (typeof win.routePhylogenyAnalysis === 'function') {
+        try { win.routePhylogenyAnalysis('Evolutionary profile: ' + geneSymbols.join(', ')); return true; } catch(e) {}
+    }
+
+    // 3. handlePhylogenyVisualizationQuery — ciliai.js table/heatmap handler
+    if (typeof win.handlePhylogenyVisualizationQuery === 'function') {
+        try { win.handlePhylogenyVisualizationQuery(geneSymbols[0], 'nevers', 'heatmap'); return true; } catch(e) {}
+    }
+
+    // 4. CiliAI.Router fallback — send as a natural language query
+    //    This lets ciliai.js's own routing handle it
+    if (win.CiliAI && win.CiliAI.Router && typeof win.CiliAI.Router.dispatchAction === 'function') {
+        // Temporarily disable suppression so this internal call goes through
+        _suppressing = false;
+        try {
+            win.CiliAI.Router.dispatchAction.__originalFn
+                ? win.CiliAI.Router.dispatchAction.__originalFn({text:'Show evolution of '+geneSymbols.join(', '), echo:false})
+                : null;
+        } catch(e) {}
+    }
+
     return false;
 }
 
