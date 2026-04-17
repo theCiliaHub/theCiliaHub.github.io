@@ -207,64 +207,6 @@ function hasDomain(row, family) {
     return false;
 }
 
-/* ─── SVG LOCALIZATION MAPPING ───────────────────────────────────────────── */
-var CILIA_SVG_MAP = {
-    "transition zone": "transition-zone",
-    "basal body": "basal-body",
-    "axoneme": "axoneme",
-    "ciliary tip": "ciliary-tip",
-    "distal tip": "ciliary-tip",
-    "ciliary membrane": "ciliary-membrane",
-    "nucleus": "nucleus",
-    "cytoplasm": "cell-body"
-};
-
-function updateCiliaSVG(geneSymbol) {
-    var gobj = gmap()[geneSymbol.toUpperCase()];
-    if (!gobj) return;
-
-    // Reset all SVG parts to default
-    document.querySelectorAll('.cilia-part').forEach(function(el) {
-        el.classList.remove('active', 'selected', 'highlighted');
-    });
-
-    var locString = (gobj['Localization'] || gobj['localization'] || '').toLowerCase();
-    var foundMatch = false;
-
-    Object.keys(CILIA_SVG_MAP).forEach(function(keyword) {
-        if (locString.indexOf(keyword) !== -1) {
-            var svgId = CILIA_SVG_MAP[keyword];
-            var element = document.getElementById(svgId);
-            if (element) {
-                element.classList.add('active'); 
-                foundMatch = true;
-            }
-        }
-    });
-
-    if (foundMatch && typeof win.showDiagram === 'function') {
-        win.showDiagram(); // Only switch view if a ciliary part is actually found
-    }
-}  
-    
-/* ─── SVG DYNAMIC HIGHLIGHTER ────────────────────────────────────────────── */
-function highlightStructuralRegion(locData) {
-    // locData comes from your matchLocKw which contains {term, id, label}
-    var svgId = locData.id || locData.term.replace(/\s+/g, '-');
-    var element = document.getElementById(svgId);
-    
-    // Reset other parts
-    document.querySelectorAll('.cilia-part').forEach(function(el) {
-        el.classList.remove('active', 'selected');
-    });
-
-    if (element) {
-        element.classList.add('active');
-        // Ensure user is looking at the diagram
-        if (typeof win.showDiagram === 'function') win.showDiagram();
-    }
-}    
-    
 /**
  * FIX #3 — exact PFAM accession matching.
  * Uses word-boundary regex to prevent "PF1343" matching inside "PF13432".
@@ -947,28 +889,14 @@ function dispatch(intent) {
             +csvLink(matches,['Gene','lof_effects','overexpression_effects','Localization','Ciliopathy'],'lof_no_effect_genes.csv');
     }
 
-   if (type === 'loc_disease') {
-    var loc = intent.loc;
-    
-    // 1. Trigger the visual highlight for the requested structure
-    highlightStructuralRegion(loc);
-
-    // 2. Run the existing data filtering logic
-    var matches = db().filter(function(r){ 
-        return getLoc(r).indexOf(loc.term) !== -1 && diseaseMatches(r, intent.disease); 
-    });
-
-    if (!matches.length) {
-        return 'No <b>' + loc.label + '</b> genes found associated with <b>' + disName(intent.disease) + '</b>.';
+    if (type === 'loc_disease') {
+        var loc = intent.loc;
+        var matches = db().filter(function(r){ return getLoc(r).indexOf(loc.term)!==-1 && diseaseMatches(r,intent.disease); });
+        if (!matches.length) return 'No <b>'+loc.label+'</b> genes found associated with <b>'+disName(intent.disease)+'</b>.';
+        return '<b>'+loc.label+'</b> genes associated with <b>'+disName(intent.disease)+'</b> — <b>'+matches.length+' genes</b>:<br>'
+            +tbl(['Gene','Localization','Disease'],matches.map(function(g){ return [chip(g['Gene']),g['Localization']||'-',(g['Ciliopathy']||'').split(',').slice(0,2).join('; ')]; }))
+            +csvLink(matches,['Gene','Localization','Ciliopathy'],loc.term.replace(/\s/g,'_')+'_'+intent.disease+'.csv');
     }
-
-    // 3. Return the data table as normal
-    return '<b>' + loc.label + '</b> genes associated with <b>' + disName(intent.disease) + '</b> — <b>' + matches.length + ' genes</b>:<br>'
-        + tbl(['Gene', 'Localization', 'Disease'], matches.map(function(g) { 
-            return [chip(g['Gene']), g['Localization'] || '-', (g['Ciliopathy'] || '').split(',').slice(0, 2).join('; ')]; 
-        }))
-        + csvLink(matches, ['Gene', 'Localization', 'Ciliopathy'], loc.term.replace(/\s/g, '_') + '_' + intent.disease + '.csv');
-}
 
     /* ── NEW: loc_disease_tissue — 3-way intersection ───────────────────────
      * e.g. "Nephronophthisis transition zone genes expressed in proximal tubule cells"
