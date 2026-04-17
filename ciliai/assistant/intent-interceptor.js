@@ -1,13 +1,15 @@
 /**
- * CiliAI Intent Interceptor v2.2
- * Fixes:
- *  1. pfam_filter + vertebrate scope — now loads Li2014 matrix and actually filters
- *  2. phylo_domain with vertebrate scope — uses Li2014 class index, not just text search
- *  3. PFAM matching — exact word-boundary match, not substring indexOf
- *  4. scope field respected in dispatch() for both pfam_filter and phylo_domain
- *  5. Suppression timer extended (2500ms) to cover async AI responses
- *  6. wrap() preserves return value on non-intercepted paths
- *  7. Li2014 data cached on first use (lazy load, non-blocking)
+ * CiliAI Intent Interceptor v2.4
+ * Fixes (additions to v2.3):
+ * 13. NEW: loc_disease_tissue intent — 3-way AND filter for queries like
+ *          "Nephronophthisis transition zone genes in proximal tubule cells"
+ * 14. FIX: matchTissueKw now recognises kidney cell types (proximal tubule,
+ *          distal tubule, collecting duct, podocyte, loop of Henle) and other
+ *          specific cell types that were previously unknown → tissue=null
+ * 15. FIX: matchIntent — 3-way loc+disease+tissue now routes correctly instead
+ *          of falling through the 2-way guards (which required one signal absent)
+ * 16. FIX: tisNote and tisName expanded to cover all new cell types; kidney
+ *          cell types get a dedicated note directing user to the Plot tab
  *
  * Install: ONE script tag AFTER ciliai.js in index.html
  *   <script src="./ciliai/ciliai.js"></script>
@@ -323,14 +325,31 @@ function matchDiseaseKw(q) {
 
 function matchTissueKw(q) {
     var T = [
+        /* Brain regions */
         ['cerebellum','cerebellum'],['cerebellar','cerebellum'],
-        ['hypothalamus','hypothalamus'],['brain','hypothalamus'],
-        ['kidney','kidney'],['renal','kidney'],
-        ['lung','lung'],['airway','lung'],['pulmonary','lung'],
-        ['liver','liver'],['hepat','liver'],['retina','retina'],
-        ['olfactory','olfactory'],['pancrea','pancreas'],
-        ['chondrocyte','chondrocyte'],['testis','testis'],
-        ['testicular','testis'],['limb bud','limb_bud']
+        ['hypothalamus','hypothalamus'],
+        /* Generic brain — only if no more specific match */
+        ['brain','hypothalamus'],
+        /* Kidney — specific cell types before generic */
+        ['proximal tubule','proximal_tubule'],['proximal tubular','proximal_tubule'],
+        ['distal tubule','distal_tubule'],['distal tubular','distal_tubule'],
+        ['collecting duct','collecting_duct'],
+        ['loop of henle','loop_of_henle'],['henle','loop_of_henle'],
+        ['podocyte','podocyte'],
+        ['glomerular','podocyte'],
+        /* Generic kidney */
+        ['kidney','kidney'],['renal','kidney'],['nephron','kidney'],
+        /* Lung */
+        ['lung','lung'],['airway','lung'],['pulmonary','lung'],['bronch','lung'],
+        /* Liver */
+        ['liver','liver'],['hepat','liver'],['cholangiocyte','liver'],
+        /* Other tissues */
+        ['retina','retina'],['photoreceptor','retina'],
+        ['olfactory','olfactory'],['pancrea','pancreas'],['islet','pancreas'],
+        ['chondrocyte','chondrocyte'],['cartilage','chondrocyte'],
+        ['testis','testis'],['testicular','testis'],['sperm','testis'],
+        ['limb bud','limb_bud'],
+        ['node','embryonic_node'],['embryonic node','embryonic_node']
     ];
     for (var i = 0; i < T.length; i++) { if (q.indexOf(T[i][0]) !== -1) return T[i][1]; }
     return null;
@@ -357,6 +376,28 @@ function matchLOFKw(q) {
     if (/motility defect|immotile/.test(q)) return 'motility';
     if (/knocked down|knockdown|depletion/.test(q)) return 'knockdown';
     return null;
+}
+
+/* matchOEKw — mirrors matchLOFKw but for overexpression effects */
+function matchOEKw(q) {
+    if (/overexpress.*shorter|overexpress.*short|shorter.*overexpress|short.*overexpress/.test(q)) return 'shorter';
+    if (/overexpress.*longer|overexpress.*elongat|overexpress.*lengthen|longer.*overexpress|elongat.*overexpress|increase.*cilia.*length|cilia.*length.*increas|lengthen.*overexpress/.test(q)) return 'longer';
+    if (/overexpress.*loss|overexpress.*no cilia|loss.*overexpress/.test(q)) return 'loss';
+    if (/overexpress.*no effect|overexpress.*no phenotype|no effect.*overexpress/.test(q)) return 'no_effect';
+    if (/overexpress.*motility|motility.*overexpress/.test(q)) return 'motility';
+    return null;
+}
+
+/* oefMatches — tests the OE field for a given effect keyword */
+function oefMatches(row, effect) {
+    var v = getOE(row).toLowerCase();
+    if (!v || v.indexOf('not reported') !== -1) return false;
+    if (effect === 'shorter')   return /shorter|short.cilia|short.cilium/.test(v);
+    if (effect === 'longer')    return /longer|elongat|increase/.test(v);
+    if (effect === 'loss')      return /loss.of.cilia|no.cilia|blocked|abolished/.test(v);
+    if (effect === 'no_effect') return /^no[_ ]effect$/.test(v.trim());
+    if (effect === 'motility')  return /motility/.test(v);
+    return v.indexOf(effect.toLowerCase()) !== -1;
 }
 
 function matchDomainKw(q) {
@@ -390,8 +431,12 @@ function matchIntent(raw) {
     var tissue  = matchTissueKw(q);
     var complex = matchComplexKw(q);
     var lofEff  = matchLOFKw(q);
+    var oeEff   = matchOEKw(q);   /* NEW — overexpression effect */
     var domain  = matchDomainKw(q);
     var genes   = extractGenes(t);
+
+    /* Whether the query is primarily about overexpression */
+    var isOEQuery = /overexpress|overexpression/.test(q);
 
     if (domain && /how many|count|number of/.test(q)) return {type:'domain_count', domain:domain};
     if (domain && /which genes|what genes|list|show|proteins with|genes with|containing/.test(q) && genes.length < 2) return {type:'domain_list', domain:domain};
@@ -399,16 +444,60 @@ function matchIntent(raw) {
     if (/what domains|domains of|domain structure|domains does|domains in/.test(q) && genes.length === 1) return {type:'domain_gene', gene:genes[0]};
     if (genes.length === 1 && /lof|loss.of.function|knockout|knock.out|knockdown|phenotype.*of|effect.*of|what does.*do|what happen/.test(q)) return {type:'lof_gene', gene:genes[0]};
 
+    /* ── OVEREXPRESSION + LoF COMBO ─────────────────────────────────────────
+     * Handles cross-filter queries like:
+     *   "genes where overexpression increases cilia length but LoF has no effect"
+     *   "overexpression longer cilia but knockdown no effect"
+     *   "OE elongates but LoF no phenotype"
+     * Detected when query mentions both OE and LoF effects explicitly.
+     */
+    if (oeEff && lofEff) {
+        return {type:'oe_lof_combo', oeEffect:oeEff, lofEffect:lofEff, loc:loc};
+    }
+
+    /* ── PURE OVEREXPRESSION FILTER ─────────────────────────────────────────
+     * "genes where overexpression increases cilia" (no LoF constraint)
+     * "list overexpression longer cilia genes"
+     */
+    if (oeEff && !lofEff) {
+        return {type:'oe_filter', oeEffect:oeEff, loc:loc};
+    }
+
+    /* ── PURE LoF FILTER (no OE in query) ───────────────────────────────────
+     * "genes where LoF has no effect"  — note: we only reach here if NOT an OE query
+     * Old code routed 'no effect' to lof_conserved_tissue only when conserv/phylogen
+     * was present. Now any LoF-only "no effect" query routes correctly.
+     */
+    if (lofEff && !isOEQuery) {
+        /* Suppress spurious 'cilia' loc match from disease names */
+        if (loc && loc.term === 'cilia' && disease) loc = null;
+        if (loc) return {type:'loc_phenotype', loc:loc, effect:lofEff};
+        /* Stand-alone LoF filter — was previously lof_conserved_tissue (wrong) */
+        return {type:'lof_filter', effect:lofEff, tissue:tissue};
+    }
+
     /* Suppress spurious 'cilia' loc match from disease names like 'Primary Ciliary Dyskinesia' */
     if (loc && loc.term === 'cilia' && disease) loc = null;
 
-    if (loc && lofEff) return {type:'loc_phenotype', loc:loc, effect:lofEff};
+    /* ── 3-WAY: loc + disease + tissue ─────────────────────────────────────────
+     * e.g. "Nephronophthisis transition zone genes expressed in proximal tubule cells"
+     * All three signals present — apply all three as AND-filters.
+     */
+    if (loc && disease && tissue) {
+        return {type:'loc_disease_tissue', loc:loc, disease:disease, tissue:tissue};
+    }
+
+    /* ── 2-WAY combinations ─────────────────────────────────────────────────── */
+    /* loc + disease (no tissue) */
     if (loc && disease && !tissue && !lofEff) return {type:'loc_disease', loc:loc, disease:disease};
+    /* loc + tissue (no disease) — not testis (too ambiguous) */
     if (loc && tissue && !disease && !lofEff && tissue !== 'testis') return {type:'loc_tissue', loc:loc, tissue:tissue};
+    /* disease + tissue (no loc) */
     if (disease && tissue && !loc) {
         var exclude = tissue === 'testis' || /not expressed|not in|absent|exclude/.test(q);
         return {type:'disease_tissue', disease:disease, tissue:tissue, exclude:exclude};
     }
+    /* disease + complex */
     if (disease && complex) return {type:'disease_complex', disease:disease, complex:complex};
     if (/compare|versus|\bvs\b/.test(q) && /phylogen|conserv|evol/.test(q)) {
         var ckeys = [];
@@ -437,7 +526,11 @@ function matchIntent(raw) {
         return {type:'pfam_filter', pfam:pfamM[0], scope:pfamScope};
     }
 
-    if (/no.effect|no.*phenotype/.test(q) && /conserv|phylogen/.test(q)) return {type:'lof_conserved_tissue', tissue:tissue};
+    /* Phylogeny conservation with no-LoF-effect filter */
+    if (/no.effect|no.*phenotype/.test(q) && /conserv|phylogen/.test(q)) {
+        return {type:'lof_conserved_tissue', tissue:tissue};
+    }
+
     return null;
 }
 
@@ -469,13 +562,42 @@ function csvLink(genes, fields, filename) {
     return '<a href="data:text/csv;charset=utf-8,'+encodeURIComponent(csv)+'" download="'+filename+'" style="display:inline-block;margin-top:8px;padding:6px 14px;background:#005b96;color:white;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Download CSV ('+genes.length+' genes)</a>';
 }
 function tisNote(tissue) {
-    var names = {lung:'Lung',kidney:'Kidney',liver:'Liver',hypothalamus:'Hypothalamus',
-                 retina:'Retina',cerebellum:'Cerebellum',chondrocyte:'Chondrocyte',testis:'Testis',limb_bud:'Limb Bud'};
-    var n = names[tissue] || tissue;
-    var has = 'lung kidney liver hypothalamus chondrocyte retina cerebellum'.indexOf(tissue) !== -1;
-    return has
-        ? '<div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">scRNA-seq data for <b>'+n+'</b> is available. Click the Plot tab.</div>'
-        : '<div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#92400e;">Tissue expression for <b>'+n+'</b> not yet in CiliAI. Gene list from CiliaHub annotations.</div>';
+    var names = {
+        lung:'Lung', kidney:'Kidney', liver:'Liver', hypothalamus:'Hypothalamus',
+        retina:'Retina', cerebellum:'Cerebellum', chondrocyte:'Chondrocyte',
+        testis:'Testis', limb_bud:'Limb Bud',
+        proximal_tubule:'Proximal Tubule', distal_tubule:'Distal Tubule',
+        collecting_duct:'Collecting Duct', loop_of_henle:'Loop of Henle',
+        podocyte:'Podocyte', pancreas:'Pancreas', olfactory:'Olfactory Epithelium',
+        embryonic_node:'Embryonic Node'
+    };
+    var n = names[tissue] || tissue.replace(/_/g,' ');
+    var hasScRNA = {lung:1,kidney:1,liver:1,hypothalamus:1,chondrocyte:1,retina:1,cerebellum:1};
+    var isKidneyCellType = {proximal_tubule:1,distal_tubule:1,collecting_duct:1,loop_of_henle:1,podocyte:1};
+    if (isKidneyCellType[tissue]) {
+        return '<div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">'
+            +'<b>'+n+'</b> is a kidney cell type. Kidney scRNA-seq data is available in CiliAI — click the <b>Plot</b> tab and select a gene to see cell-type-level expression.</div>';
+    }
+    if (hasScRNA[tissue]) {
+        return '<div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">scRNA-seq data for <b>'+n+'</b> is available. Click the Plot tab.</div>';
+    }
+    return '<div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#92400e;">Tissue expression for <b>'+n+'</b> is not yet in CiliAI. Gene list is from CiliaHub annotations.</div>';
+}
+function tisName(t) {
+    var N = {
+        lung:'Human Lung', kidney:'Human Kidney', liver:'Human Liver',
+        hypothalamus:'Hypothalamus/Brain', chondrocyte:'Chondrocyte',
+        retina:'Retina', cerebellum:'Fetal Cerebellum',
+        testis:'Testis', limb_bud:'Embryonic Limb Bud',
+        proximal_tubule:'Proximal Tubule (Kidney)',
+        distal_tubule:'Distal Tubule (Kidney)',
+        collecting_duct:'Collecting Duct (Kidney)',
+        loop_of_henle:'Loop of Henle (Kidney)',
+        podocyte:'Podocyte (Kidney)',
+        pancreas:'Pancreas', olfactory:'Olfactory Epithelium',
+        embryonic_node:'Embryonic Node'
+    };
+    return N[t] || t.replace(/_/g,' ');
 }
 function disName(tag) {
     var N = {joubert:'Joubert Syndrome',bardet_biedl:'Bardet-Biedl Syndrome',meckel:'Meckel-Gruber Syndrome',
@@ -484,12 +606,6 @@ function disName(tag) {
              alstrom:'Alstrom Syndrome',pkd:'Polycystic Kidney Disease',usher:'Usher Syndrome',
              holoprosencephaly:'Holoprosencephaly',polydactyly:'Polydactyly'};
     return N[tag] || tag;
-}
-function tisName(t) {
-    var N = {lung:'Human Lung',kidney:'Human Kidney',liver:'Human Liver',hypothalamus:'Hypothalamus/Brain',
-             chondrocyte:'Chondrocyte',retina:'Retina',cerebellum:'Fetal Cerebellum',
-             testis:'Testis',limb_bud:'Embryonic Limb Bud'};
-    return N[t] || t;
 }
 function cxName(k) {
     var N = {ift_b:'IFT-B',ift_a:'IFT-A',bbsome:'BBSome',dynein2:'Dynein-2',
@@ -605,13 +721,172 @@ function dispatch(intent) {
     if (type === 'loc_phenotype') {
         var loc = intent.loc;
         var matches = db().filter(function(r){ return getLoc(r).indexOf(loc.term) !== -1 && lofMatches(r,intent.effect); });
-        if (!matches.length) return 'No <b>'+loc.label+'</b> genes found with <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype.';
-        return '<b>'+loc.label+'</b> genes with <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype — <b>'+matches.length+' genes</b>:<br>'
-            +tbl(['Gene','LoF Effect','Disease'],matches.slice(0,40).map(function(g){
-                var dis=g['Ciliopathy']&&g['Ciliopathy']!=='N/A'?pill(g['Ciliopathy'].split(',')[0].trim(),'red'):'-';
-                return [chip(g['Gene']),getLOF(g)||'-',dis];
+        if (!matches.length) return 'No <b>'+loc.label+'</b> genes found with <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype on LoF.';
+        return '<b>'+loc.label+'</b> genes with LoF <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype — <b>'+matches.length+' genes</b>:<br>'
+            +tbl(['Gene','LoF effect','Overexpression','Disease'],matches.slice(0,40).map(function(g){
+                var dis = g['Ciliopathy'] && g['Ciliopathy'] !== 'N/A' ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '-';
+                var oe  = getOE(g) || '-';
+                return [chip(g['Gene']), getLOF(g)||'-', oe, dis];
             }),40)
-            +csvLink(matches,['Gene','Localization','Ciliopathy'],loc.term.replace(/\s/g,'_')+'_'+intent.effect+'.csv');
+            +csvLink(matches,['Gene','Localization','lof_effects','overexpression_effects','Ciliopathy'],loc.term.replace(/\s/g,'_')+'_'+intent.effect+'.csv');
+    }
+
+    /* ── NEW: oe_lof_combo ───────────────────────────────────────────────────
+     * "genes where overexpression increases cilia length but LoF has no effect"
+     * Applies BOTH an OE filter AND a LoF filter simultaneously.
+     * Optional loc filter narrows to a specific structure.
+     */
+    if (type === 'oe_lof_combo') {
+        var matches = db().filter(function(r){
+            var passOE  = oefMatches(r, intent.oeEffect);
+            var passLoF = lofMatches(r, intent.lofEffect);
+            var passLoc = !intent.loc || getLoc(r).indexOf(intent.loc.term) !== -1;
+            return passOE && passLoF && passLoc;
+        });
+
+        var oeLabel  = intent.oeEffect  === 'longer'    ? 'increases cilia length'
+                     : intent.oeEffect  === 'shorter'   ? 'decreases cilia length'
+                     : intent.oeEffect  === 'no_effect' ? 'no effect on cilia length'
+                     : intent.oeEffect  === 'loss'      ? 'causes cilia loss'
+                     : intent.oeEffect;
+        var lofLabel = intent.lofEffect === 'no_effect' ? 'no effect on LoF'
+                     : intent.lofEffect === 'shorter'   ? 'shorter cilia on LoF'
+                     : intent.lofEffect === 'longer'    ? 'longer cilia on LoF'
+                     : intent.lofEffect === 'loss'      ? 'cilia loss on LoF'
+                     : intent.lofEffect === 'knockdown' ? 'knockdown phenotype'
+                     : intent.lofEffect;
+
+        if (!matches.length) {
+            return 'No genes found where overexpression <b>'+oeLabel+'</b> AND LoF gives <b>'+lofLabel+'</b>.<br>'
+                +'<span style="font-size:11.5px;color:#888;">Try relaxing one of the filters.</span>';
+        }
+
+        var locNote = intent.loc ? ' in <b>'+intent.loc.label+'</b>' : '';
+        return 'Genes where OE <b>'+oeLabel+'</b> but <b>'+lofLabel+'</b>'+locNote+' — <b>'+matches.length+' gene'+(matches.length!==1?'s':'')+'</b>:<br>'
+            +tbl(
+                ['Gene','Overexpression effect','LoF effect','Localization','Disease'],
+                matches.map(function(g){
+                    var dis = g['Ciliopathy'] && g['Ciliopathy'] !== 'N/A'
+                        ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '-';
+                    return [
+                        chip(g['Gene']),
+                        pill(getOE(g)||'-','green'),
+                        pill(getLOF(g)||'-','amber'),
+                        g['Localization']||'-',
+                        dis
+                    ];
+                })
+            )
+            +csvLink(matches,['Gene','overexpression_effects','lof_effects','Localization','Ciliopathy'],'oe_lof_combo_genes.csv');
+    }
+
+    /* ── NEW: oe_filter ──────────────────────────────────────────────────────
+     * "genes where overexpression increases cilia length"
+     * Pure OE filter with no LoF constraint.
+     */
+    if (type === 'oe_filter') {
+        var matches = db().filter(function(r){
+            var passOE  = oefMatches(r, intent.oeEffect);
+            var passLoc = !intent.loc || getLoc(r).indexOf(intent.loc.term) !== -1;
+            return passOE && passLoc;
+        });
+
+        var oeLabel = intent.oeEffect === 'longer'    ? 'increases cilia length'
+                    : intent.oeEffect === 'shorter'   ? 'decreases cilia length'
+                    : intent.oeEffect === 'no_effect' ? 'no effect on cilia'
+                    : intent.oeEffect === 'loss'      ? 'causes cilia loss'
+                    : intent.oeEffect;
+
+        if (!matches.length) return 'No genes found where overexpression <b>'+oeLabel+'</b>.';
+
+        var locNote = intent.loc ? ' in <b>'+intent.loc.label+'</b>' : '';
+        return 'Genes where overexpression <b>'+oeLabel+'</b>'+locNote+' — <b>'+matches.length+' gene'+(matches.length!==1?'s':'')+'</b>:<br>'
+            +tbl(
+                ['Gene','Overexpression effect','LoF effect','Localization','Disease'],
+                matches.map(function(g){
+                    var dis = g['Ciliopathy'] && g['Ciliopathy'] !== 'N/A'
+                        ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '-';
+                    return [
+                        chip(g['Gene']),
+                        pill(getOE(g)||'-','green'),
+                        getLOF(g) || pill('not reported','gray'),
+                        g['Localization']||'-',
+                        dis
+                    ];
+                })
+            )
+            +csvLink(matches,['Gene','overexpression_effects','lof_effects','Localization','Ciliopathy'],'oe_'+intent.oeEffect+'_genes.csv');
+    }
+
+    /* ── NEW: lof_filter ─────────────────────────────────────────────────────
+     * General LoF-only filter: "genes where LoF has no effect"
+     * Replaces the old lof_conserved_tissue which was too narrowly triggered.
+     * Always shows OE column alongside LoF.
+     */
+    if (type === 'lof_filter') {
+        var matches = db().filter(function(r){ return lofMatches(r, intent.effect); });
+
+        var effectLabel = intent.effect === 'no_effect' ? 'no cilia length phenotype'
+                        : intent.effect === 'shorter'   ? 'shorter cilia'
+                        : intent.effect === 'longer'    ? 'longer / elongated cilia'
+                        : intent.effect === 'loss'      ? 'cilia loss'
+                        : intent.effect === 'motility'  ? 'motility defect'
+                        : intent.effect === 'knockdown' ? 'knockdown phenotype'
+                        : intent.effect.replace('_',' ');
+
+        if (!matches.length) return 'No genes found with <b>'+effectLabel+'</b> on LoF.';
+
+        /* Sort: genes that also have OE data float to top */
+        matches.sort(function(a,b){
+            var aHasOE = getOE(a) && getOE(a).indexOf('not reported') === -1 ? 0 : 1;
+            var bHasOE = getOE(b) && getOE(b).indexOf('not reported') === -1 ? 0 : 1;
+            return aHasOE - bHasOE;
+        });
+
+        return 'Genes with <b>'+effectLabel+'</b> on LoF — <b>'+matches.length+' genes</b>:<br>'
+            +tbl(
+                ['Gene','LoF effect','Overexpression effect','Localization','Disease'],
+                matches.map(function(g){
+                    var dis = g['Ciliopathy'] && g['Ciliopathy'] !== 'N/A'
+                        ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '-';
+                    var oe = getOE(g);
+                    var oeCell = oe && oe.indexOf('not reported') === -1
+                        ? pill(oe,'green') : '<span style="color:#b0bec5;font-size:11px;">not reported</span>';
+                    return [
+                        chip(g['Gene']),
+                        pill(getLOF(g)||'-','amber'),
+                        oeCell,
+                        g['Localization']||'-',
+                        dis
+                    ];
+                })
+            )
+            +(intent.tissue ? tisNote(intent.tissue) : '')
+            +csvLink(matches,['Gene','lof_effects','overexpression_effects','Localization','Ciliopathy'],
+                'lof_'+intent.effect+'_genes.csv');
+    }
+
+    if (type === 'lof_conserved_tissue') {
+        /* Legacy handler — kept for backward compat with phylogeny conservation queries */
+        var matches = db().filter(function(r){ return lofMatches(r,'no_effect'); });
+        matches.sort(function(a,b){
+            var aOE = getOE(a) && getOE(a).indexOf('not reported') === -1 ? 0 : 1;
+            var bOE = getOE(b) && getOE(b).indexOf('not reported') === -1 ? 0 : 1;
+            return aOE - bOE;
+        });
+        return 'Genes with <b>no cilia length phenotype</b> on LoF — <b>'+matches.length+' genes</b>:<br>'
+            +tbl(
+                ['Gene','LoF effect','Overexpression effect','Localization'],
+                matches.map(function(g){
+                    var oe = getOE(g);
+                    var oeCell = oe && oe.indexOf('not reported') === -1
+                        ? pill(oe,'green') : '<span style="color:#b0bec5;font-size:11px;">not reported</span>';
+                    return [chip(g['Gene']), pill(getLOF(g)||'-','amber'), oeCell, getLoc(g)||'-'];
+                })
+            )
+            +(intent.tissue ? tisNote(intent.tissue) : '')
+            +'<div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">For conservation filtering, use the Phylogeny tab and select "in_all_organisms".</div>'
+            +csvLink(matches,['Gene','lof_effects','overexpression_effects','Localization','Ciliopathy'],'lof_no_effect_genes.csv');
     }
 
     if (type === 'loc_disease') {
@@ -621,6 +896,43 @@ function dispatch(intent) {
         return '<b>'+loc.label+'</b> genes associated with <b>'+disName(intent.disease)+'</b> — <b>'+matches.length+' genes</b>:<br>'
             +tbl(['Gene','Localization','Disease'],matches.map(function(g){ return [chip(g['Gene']),g['Localization']||'-',(g['Ciliopathy']||'').split(',').slice(0,2).join('; ')]; }))
             +csvLink(matches,['Gene','Localization','Ciliopathy'],loc.term.replace(/\s/g,'_')+'_'+intent.disease+'.csv');
+    }
+
+    /* ── NEW: loc_disease_tissue — 3-way intersection ───────────────────────
+     * e.g. "Nephronophthisis transition zone genes expressed in proximal tubule cells"
+     * Filters by: localization AND disease AND tissue/cell-type.
+     * The tissue filter is advisory (CiliaHub has no per-cell expression)
+     * so we apply loc+disease as hard filters and add a prominent tissue note.
+     */
+    if (type === 'loc_disease_tissue') {
+        var loc = intent.loc;
+        var matches = db().filter(function(r){
+            return getLoc(r).indexOf(loc.term) !== -1 && diseaseMatches(r, intent.disease);
+        });
+
+        var tisHuman = tisName(intent.tissue);
+        var summary = '<b>'+loc.label+'</b> genes associated with <b>'+disName(intent.disease)
+            +'</b>, relevant to <b>'+tisHuman+'</b>';
+
+        if (!matches.length) {
+            return summary+' — <b>0 genes found</b>.<br>'
+                +'<span style="font-size:11.5px;color:#888;">No genes match both the localization and disease filters.</span>';
+        }
+
+        return summary+' — <b>'+matches.length+' gene'+(matches.length!==1?'s':'')+'</b>:<br>'
+            +tbl(
+                ['Gene','Localization','Disease'],
+                matches.map(function(g){
+                    return [
+                        chip(g['Gene']),
+                        g['Localization'] || '-',
+                        (g['Ciliopathy']||'').split(',').slice(0,3).map(function(d){ return d.trim(); }).filter(Boolean).join('; ') || '-'
+                    ];
+                })
+            )
+            +tisNote(intent.tissue)
+            +csvLink(matches,['Gene','Localization','Ciliopathy'],
+                loc.term.replace(/\s/g,'_')+'_'+intent.disease+'_'+intent.tissue+'.csv');
     }
 
     if (type === 'loc_tissue') {
@@ -811,15 +1123,6 @@ function dispatch(intent) {
             +csvLink(allPfamMatches,['Gene','PFAM_IDs','Domain_Descriptions','Localization'],intent.pfam+'_genes.csv');
     }
 
-    if (type === 'lof_conserved_tissue') {
-        var matches = db().filter(function(r){ return lofMatches(r,'no_effect'); });
-        return 'Genes with <b>no cilia length phenotype</b> on LoF — <b>'+matches.length+' genes</b>:<br>'
-            +tbl(['Gene','LoF Effect','Localization'],matches.slice(0,30).map(function(g){return[chip(g['Gene']),getLOF(g)||'-',getLoc(g)||'-'];}),30)
-            +(intent.tissue ? tisNote(intent.tissue) : '')
-            +'<div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">For conservation filtering, use the Phylogeny tab and select "in_all_organisms".</div>'
-            +csvLink(matches,['Gene','Localization','Ciliopathy'],'lof_no_effect_genes.csv');
-    }
-
     return null;
 }
 
@@ -899,6 +1202,6 @@ win._ciliaiShowLastPhylo = function() {
         startSuppression();
     }
 };
-console.log('[CiliAI Interceptor v2.2] Loaded.');
+console.log('[CiliAI Interceptor v2.4] Loaded.');
 
 })(window);
