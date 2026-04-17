@@ -1,15 +1,23 @@
 /**
- * CiliAI Intent Interceptor v2.4
- * Fixes (additions to v2.3):
- * 13. NEW: loc_disease_tissue intent — 3-way AND filter for queries like
- *          "Nephronophthisis transition zone genes in proximal tubule cells"
- * 14. FIX: matchTissueKw now recognises kidney cell types (proximal tubule,
- *          distal tubule, collecting duct, podocyte, loop of Henle) and other
- *          specific cell types that were previously unknown → tissue=null
- * 15. FIX: matchIntent — 3-way loc+disease+tissue now routes correctly instead
- *          of falling through the 2-way guards (which required one signal absent)
- * 16. FIX: tisNote and tisName expanded to cover all new cell types; kidney
- *          cell types get a dedicated note directing user to the Plot tab
+ * CiliAI Intent Interceptor v3.0 — Application Controller Architecture
+ *
+ * ARCHITECTURAL CHANGES (v3.0):
+ *  A. "Specificity First" parsing — geneMap validated BEFORE keyword matching,
+ *     so "BBS1" never gets hijacked by the "bbsome/bbs" disease/complex matchers.
+ *  B. Controller-Renderer Bridge — gene_overview intent calls
+ *     displayIndividualGenePage() directly, passing the live database object.
+ *  C. Visual side-effects — applyUnifiedHighlight() reads localization directly
+ *     from the DB record and applies CSS classes to SVG IDs. No if/else chains.
+ *  D. Cross-view interactivity — gene pages inject an "Expression Atlas" button
+ *     that switches to the Plot/UMAP view without re-running the query.
+ *  E. Defensive programming throughout — every UI call is try/catch guarded and
+ *     existence-checked. Text always comes from DB object keys, never hardcoded.
+ *
+ * Previous fixes retained (v2.1–v2.4):
+ *  pfam_filter + vertebrate scope (Li2014), phylo_domain scoping,
+ *  exact PFAM word-boundary matching, suppression timer 2500ms,
+ *  wrap() return-value preservation, oe_lof_combo, oe_filter, lof_filter,
+ *  loc_disease_tissue 3-way, matchTissueKw cell types, tisNote/tisName.
  *
  * Install: ONE script tag AFTER ciliai.js in index.html
  *   <script src="./ciliai/ciliai.js"></script>
@@ -278,6 +286,18 @@ function extractGenes(text) {
     return result;
 }
 
+/* ── ARCHITECTURE A: Specificity-First Gene Validation ──────────────────────
+ * Validates extracted tokens against the live geneMap BEFORE any keyword
+ * matching. Returns only tokens that are real gene symbols in the database.
+ * This prevents "BBS1" being hijacked by the bbsome/bbs keyword matchers,
+ * and "IFT88" being incorrectly routed to complex/disease handlers.
+ */
+function resolveValidGenes(tokens) {
+    var gm = gmap();
+    if (!gm || !Object.keys(gm).length) return tokens; /* DB not loaded yet — fall back */
+    return tokens.filter(function(sym) { return !!gm[sym.toUpperCase()]; });
+}
+
 function matchLocKw(q) {
     var locs = [
         ['transition zone', {term:'transition zone',label:'Transition Zone'}],
@@ -426,78 +446,72 @@ function matchIntent(raw) {
         }
     }
 
+    /* ══════════════════════════════════════════════════════════════════════════
+     * ARCHITECTURE A — SPECIFICITY FIRST
+     * Validate gene tokens against the live geneMap BEFORE running any keyword
+     * matchers. A single validated gene symbol forces gene_overview and short-
+     * circuits all broad keyword routes (disease, complex, tissue, etc.).
+     * This prevents "BBS1" from being hijacked by the "bbs/bbsome" matchers,
+     * and "IFT88" from being captured by IFT complex keyword rules.
+     * ════════════════════════════════════════════════════════════════════════*/
+    var rawGenes  = extractGenes(t);
+    var validGenes = resolveValidGenes(rawGenes);
+
+    /* Single validated gene + no explicit group query → gene overview page */
+    var isGroupQuery = /genes|list|show all|display all|how many|count|complex|syndrome|ciliopathy|disease|pathway/.test(q);
+    if (validGenes.length === 1 && !isGroupQuery) {
+        return {type:'gene_overview', gene:validGenes[0]};
+    }
+
+    /* Multiple validated genes → expression dot-plot / multi-gene view */
+    if (validGenes.length >= 2 && !isGroupQuery) {
+        return {type:'multi_gene', genes:validGenes};
+    }
+
+    /* All other signals — now run keyword matchers on the full query */
     var loc     = matchLocKw(q);
     var disease = matchDiseaseKw(q);
     var tissue  = matchTissueKw(q);
     var complex = matchComplexKw(q);
     var lofEff  = matchLOFKw(q);
-    var oeEff   = matchOEKw(q);   /* NEW — overexpression effect */
+    var oeEff   = matchOEKw(q);
     var domain  = matchDomainKw(q);
-    var genes   = extractGenes(t);
 
     /* Whether the query is primarily about overexpression */
     var isOEQuery = /overexpress|overexpression/.test(q);
 
     if (domain && /how many|count|number of/.test(q)) return {type:'domain_count', domain:domain};
-    if (domain && /which genes|what genes|list|show|proteins with|genes with|containing/.test(q) && genes.length < 2) return {type:'domain_list', domain:domain};
+    if (domain && /which genes|what genes|list|show|proteins with|genes with|containing/.test(q) && rawGenes.length < 2) return {type:'domain_list', domain:domain};
     if (/domain/.test(q) && /enrich|common|frequent|top domain/.test(q)) return {type:'domain_enrichment'};
-    if (/what domains|domains of|domain structure|domains does|domains in/.test(q) && genes.length === 1) return {type:'domain_gene', gene:genes[0]};
-    if (genes.length === 1 && /lof|loss.of.function|knockout|knock.out|knockdown|phenotype.*of|effect.*of|what does.*do|what happen/.test(q)) return {type:'lof_gene', gene:genes[0]};
+    if (/what domains|domains of|domain structure|domains does|domains in/.test(q) && validGenes.length === 1) return {type:'domain_gene', gene:validGenes[0]};
 
-    /* ── OVEREXPRESSION + LoF COMBO ─────────────────────────────────────────
-     * Handles cross-filter queries like:
-     *   "genes where overexpression increases cilia length but LoF has no effect"
-     *   "overexpression longer cilia but knockdown no effect"
-     *   "OE elongates but LoF no phenotype"
-     * Detected when query mentions both OE and LoF effects explicitly.
-     */
-    if (oeEff && lofEff) {
-        return {type:'oe_lof_combo', oeEffect:oeEff, lofEffect:lofEff, loc:loc};
-    }
+    /* Single validated gene + explicit phenotype/LoF query → gene overview (covers "what does X do") */
+    if (validGenes.length === 1) return {type:'gene_overview', gene:validGenes[0]};
 
-    /* ── PURE OVEREXPRESSION FILTER ─────────────────────────────────────────
-     * "genes where overexpression increases cilia" (no LoF constraint)
-     * "list overexpression longer cilia genes"
-     */
-    if (oeEff && !lofEff) {
-        return {type:'oe_filter', oeEffect:oeEff, loc:loc};
-    }
+    /* OE + LoF combo */
+    if (oeEff && lofEff) return {type:'oe_lof_combo', oeEffect:oeEff, lofEffect:lofEff, loc:loc};
+    if (oeEff && !lofEff) return {type:'oe_filter', oeEffect:oeEff, loc:loc};
 
-    /* ── PURE LoF FILTER (no OE in query) ───────────────────────────────────
-     * "genes where LoF has no effect"  — note: we only reach here if NOT an OE query
-     * Old code routed 'no effect' to lof_conserved_tissue only when conserv/phylogen
-     * was present. Now any LoF-only "no effect" query routes correctly.
-     */
+    /* LoF-only filter */
     if (lofEff && !isOEQuery) {
-        /* Suppress spurious 'cilia' loc match from disease names */
         if (loc && loc.term === 'cilia' && disease) loc = null;
         if (loc) return {type:'loc_phenotype', loc:loc, effect:lofEff};
-        /* Stand-alone LoF filter — was previously lof_conserved_tissue (wrong) */
         return {type:'lof_filter', effect:lofEff, tissue:tissue};
     }
 
-    /* Suppress spurious 'cilia' loc match from disease names like 'Primary Ciliary Dyskinesia' */
+    /* Suppress spurious 'cilia' loc match from disease names */
     if (loc && loc.term === 'cilia' && disease) loc = null;
 
-    /* ── 3-WAY: loc + disease + tissue ─────────────────────────────────────────
-     * e.g. "Nephronophthisis transition zone genes expressed in proximal tubule cells"
-     * All three signals present — apply all three as AND-filters.
-     */
-    if (loc && disease && tissue) {
-        return {type:'loc_disease_tissue', loc:loc, disease:disease, tissue:tissue};
-    }
+    /* 3-way: loc + disease + tissue */
+    if (loc && disease && tissue) return {type:'loc_disease_tissue', loc:loc, disease:disease, tissue:tissue};
 
-    /* ── 2-WAY combinations ─────────────────────────────────────────────────── */
-    /* loc + disease (no tissue) */
+    /* 2-way combinations */
     if (loc && disease && !tissue && !lofEff) return {type:'loc_disease', loc:loc, disease:disease};
-    /* loc + tissue (no disease) — not testis (too ambiguous) */
     if (loc && tissue && !disease && !lofEff && tissue !== 'testis') return {type:'loc_tissue', loc:loc, tissue:tissue};
-    /* disease + tissue (no loc) */
     if (disease && tissue && !loc) {
         var exclude = tissue === 'testis' || /not expressed|not in|absent|exclude/.test(q);
         return {type:'disease_tissue', disease:disease, tissue:tissue, exclude:exclude};
     }
-    /* disease + complex */
     if (disease && complex) return {type:'disease_complex', disease:disease, complex:complex};
     if (/compare|versus|\bvs\b/.test(q) && /phylogen|conserv|evol/.test(q)) {
         var ckeys = [];
@@ -510,13 +524,11 @@ function matchIntent(raw) {
         if (ckeys.length >= 2) return {type:'complex_phylo_compare', complexA:ckeys[0], complexB:ckeys[1]};
     }
 
-    /* FIX #2 — phylo_domain with explicit scope so dispatch can filter correctly */
     if (/conserv|phylogen|ciliary.specific|vertebrate.specific/.test(q) && domain) {
         var scope = /vertebrate/.test(q) ? 'vertebrate' : /mammalian/.test(q) ? 'mammalian' : 'ciliary_specific';
         return {type:'phylo_domain', domain:domain, scope:scope};
     }
 
-    /* FIX #1 — pfam_filter now carries scope so dispatch applies Li2014 filter */
     var pfamM = t.match(/\bPF\d{5}\b/);
     if (pfamM) {
         var pfamScope = /vertebrate.specific|vertebrate.only|only.*vertebrate/i.test(q) ? 'vertebrate'
@@ -526,7 +538,6 @@ function matchIntent(raw) {
         return {type:'pfam_filter', pfam:pfamM[0], scope:pfamScope};
     }
 
-    /* Phylogeny conservation with no-LoF-effect filter */
     if (/no.effect|no.*phenotype/.test(q) && /conserv|phylogen/.test(q)) {
         return {type:'lof_conserved_tissue', tissue:tissue};
     }
@@ -534,7 +545,175 @@ function matchIntent(raw) {
     return null;
 }
 
-/* ─── RENDER HELPERS ──────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+ * ARCHITECTURE C — UNIFIED HIGHLIGHT CONTROLLER
+ * Reads localization directly from the DB string and maps each comma-
+ * separated term to an SVG element ID. Uses a single CSS-class toggle,
+ * no if/else chains. Wrapped in try/catch so SVG failures never break text.
+ * ════════════════════════════════════════════════════════════════════════*/
+var LOC_SVG_MAP = {
+    'basal body':       'basal-body',
+    'centrosome':       'basal-body',
+    'pericentriolar':   'basal-body',
+    'transition zone':  'transition-zone',
+    'axoneme':          'axoneme',
+    'microtubule':      'axoneme',
+    'ciliary membrane': 'ciliary-membrane',
+    'membrane':         'ciliary-membrane',
+    'ciliary tip':      'ciliary-tip',
+    'tip':              'ciliary-tip',
+    'nucleus':          'nucleus',
+    'cytosol':          'cell-body',
+    'cytoplasm':        'cell-body',
+    'cilia':            'ciliary-membrane',
+    'flagella':         'axoneme'
+};
+
+function applyUnifiedHighlight(locString) {
+    try {
+        /* Architecture E: existence-check before any UI call */
+        var svgEl = document.getElementById('cilia-svg');
+        if (!svgEl) return;
+
+        /* Switch to diagram view non-destructively */
+        if (typeof win.switchView === 'function') {
+            try { win.switchView('diagram'); } catch(e) {}
+        }
+
+        /* Clear all existing highlights */
+        document.querySelectorAll('.cilia-part').forEach(function(p) {
+            p.classList.remove('active-highlight');
+        });
+
+        /* Map each term to an SVG id and apply highlight class */
+        var terms = (locString || '').toLowerCase().split(/[,;]/);
+        var highlighted = [];
+        terms.forEach(function(raw) {
+            var term = raw.trim();
+            /* Longest-match: try multi-word keys first */
+            var svgId = null;
+            Object.keys(LOC_SVG_MAP).sort(function(a,b){ return b.length - a.length; }).forEach(function(key) {
+                if (!svgId && term.indexOf(key) !== -1) svgId = LOC_SVG_MAP[key];
+            });
+            if (svgId && highlighted.indexOf(svgId) === -1) {
+                var el = document.getElementById(svgId);
+                if (el) { el.classList.add('active-highlight'); highlighted.push(svgId); }
+            }
+        });
+    } catch(e) {
+        console.warn('[CiliAI] applyUnifiedHighlight failed gracefully:', e.message);
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * ARCHITECTURE B + D — CONTROLLER-RENDERER BRIDGE
+ * renderGenePage: maps a DB object directly to a rich HTML card.
+ * Architecture E: all fields read from DB keys, never hardcoded.
+ * Architecture D: injects an "Expression Atlas" button for cross-view jump.
+ * ════════════════════════════════════════════════════════════════════════*/
+function renderGenePage(sym, gobj) {
+    /* Architecture E: pull from DB object keys — source of truth */
+    var gene        = (gobj['Gene']           || sym).toUpperCase();
+    var desc        = gobj['Gene.Description'] || gobj['description'] || '';
+    var locRaw      = gobj['Localization']     || gobj['localization'] || '';
+    var lof         = getLOF(gobj)             || 'Not reported';
+    var oe          = getOE(gobj)              || 'Not reported';
+    var pct         = getPCT(gobj)             || 'Not reported';
+    var funcSum     = gobj['Functional.Summary.from.Literature'] || gobj['functional_summary'] || gobj['Functional_Summary'] || '';
+    var omim        = gobj['OMIM_ID']          || gobj['omim_id']   || '';
+    var synonym     = gobj['synonym']          || '';
+    var mouseOrtho  = gobj['Ortholog_Mouse']   || '';
+    var complexes   = gobj['Protein_Complexes']|| gobj['protein_complexes'] || '';
+    var domDesc     = gobj['Domain_Descriptions'] || '';
+    var pfamIds     = gobj['PFAM_IDs']         || '';
+
+    /* Ciliopathies — array or comma string */
+    var cilioRaw = gobj['Ciliopathies'] || gobj['Ciliopathy'] || '';
+    var cilioList = Array.isArray(cilioRaw)
+        ? cilioRaw
+        : String(cilioRaw).split(/[,;]/).map(function(s){ return s.trim(); }).filter(Boolean);
+    var hasCiliopathy = cilioList.length > 0 && cilioList[0].toUpperCase() !== 'N/A';
+
+    /* Phylogeny badge — non-blocking */
+    var phyloBadgeHtml = '';
+    try { phyloBadgeHtml = _li2014BySymbol ? phyloBadge(gene) : ''; } catch(e) {}
+
+    /* Architecture D: Expression Atlas button — jumps to UMAP/Plot view */
+    var exprBtn = '<button onclick="(function(){'
+        +'try{'
+        +'if(window.CiliAI)window.CiliAI.activeGeneContext=\''+gene+'\';'
+        +'if(typeof window.renderUMAPPlot===\'function\')window.renderUMAPPlot(\''+gene+'\',[\''+gene+'\']);'
+        +'else if(typeof window.switchView===\'function\')window.switchView(\'plot\');'
+        +'}catch(e){}})()" '
+        +'style="background:#005b96;color:white;border:none;padding:6px 14px;border-radius:8px;'
+        +'font-size:11.5px;font-weight:600;cursor:pointer;margin-top:6px;display:inline-flex;'
+        +'align-items:center;gap:5px;">'
+        +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+        +'style="width:11px;height:11px;"><line x1="18" y1="20" x2="18" y2="10"/>'
+        +'<line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'
+        +'Expression Atlas</button>';
+
+    /* Domain pills */
+    var domainHtml = '';
+    if (domDesc || pfamIds) {
+        var domParts = (domDesc + (pfamIds ? '; '+pfamIds : '')).split(/[;,]/).map(function(s){ return s.trim(); }).filter(Boolean);
+        domainHtml = '<div style="margin-top:10px;">'
+            +'<b style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Domains</b><br>'
+            +'<div style="margin-top:3px;">'+domParts.slice(0,8).map(function(d){ return pill(d,'purple'); }).join(' ')+'</div>'
+            +'</div>';
+    }
+
+    /* Disease pills */
+    var diseaseHtml = '';
+    if (hasCiliopathy) {
+        diseaseHtml = '<div style="margin-top:10px;">'
+            +'<b style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Associated ciliopathies</b><br>'
+            +'<div style="margin-top:3px;">'+cilioList.slice(0,6).map(function(d){ return pill(d,'red'); }).join(' ')+'</div>'
+            +'</div>';
+    }
+
+    /* Meta row: OMIM, mouse ortholog, complexes */
+    var metaHtml = '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">';
+    if (omim)      metaHtml += '<a href="https://www.omim.org/entry/'+omim.replace(/[^0-9]/g,'')+'" target="_blank" style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-weight:600;text-decoration:none;">OMIM: '+omim+'</a>';
+    if (synonym)   metaHtml += pill('aka '+synonym,'gray');
+    if (mouseOrtho)metaHtml += pill('Mouse: '+mouseOrtho,'blue');
+    if (complexes) metaHtml += pill(complexes.split(/[;,]/)[0].trim(),'blue');
+    metaHtml += '</div>';
+
+    return '<div style="line-height:1.5;">'
+        /* Header */
+        +'<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
+        +'<b style="font-size:16px;color:#005b96;">'+gene+'</b>'
+        +(phyloBadgeHtml||'')
+        +(synonym ? '<span style="font-size:11px;color:#94a3b8;">'+synonym+'</span>' : '')
+        +'</div>'
+        /* Description */
+        +(desc ? '<p style="font-size:12px;color:#64748b;margin-bottom:8px;">'+desc.slice(0,120)+(desc.length>120?'…':'')+'</p>' : '')
+        /* Functional summary */
+        +(funcSum ? '<p style="font-size:12.5px;color:#334155;line-height:1.55;margin-bottom:10px;padding:8px;background:#f8fafc;border-radius:6px;border-left:3px solid #b3cde0;">'+funcSum.slice(0,300)+(funcSum.length>300?'…':'')+'</p>' : '')
+        /* 2×2 data grid — Architecture E: all values from DB keys */
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:4px;">'
+        +'<div style="background:#f8fafc;padding:8px;border-radius:8px;">'
+        +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Localization</b><br>'
+        +'<span style="color:#0f172a;font-weight:500;">'+( locRaw || '—' )+'</span></div>'
+        +'<div style="background:#f8fafc;padding:8px;border-radius:8px;">'
+        +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">LoF effect</b><br>'
+        +'<span style="color:#7c3aed;font-weight:600;">'+lof+'</span></div>'
+        +'<div style="background:#f8fafc;padding:8px;border-radius:8px;">'
+        +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Overexpression</b><br>'
+        +'<span style="color:#b45309;font-weight:500;">'+oe+'</span></div>'
+        +'<div style="background:#f8fafc;padding:8px;border-radius:8px;">'
+        +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">% ciliated cells</b><br>'
+        +'<span style="color:#065f46;font-weight:500;">'+pct+'</span></div>'
+        +'</div>'
+        +metaHtml
+        +diseaseHtml
+        +domainHtml
+        +exprBtn
+        +'</div>';
+}
+
+/* ─── DISPATCH ────────────────────────────────────────────────────────────── */
 function pill(text, color) {
     var C = {blue:['#dbeafe','#1e40af'],red:['#fee2e2','#991b1b'],green:['#dcfce7','#166534'],
              amber:['#fef3c7','#92400e'],purple:['#ede9fe','#5b21b6'],gray:['#f3f4f6','#374151']};
@@ -661,28 +840,43 @@ function dispatch(intent) {
         return 'The phylogeny function is not yet loaded. Try the <b>Cilia Analysis</b> page, Phylogeny tab.';
     }
 
-    if (type === 'lof_gene') {
+    /* ══════════════════════════════════════════════════════════════════════════
+     * ARCHITECTURE B — CONTROLLER-RENDERER BRIDGE: gene_overview
+     * Retrieves the live DB object and passes it to renderGenePage().
+     * Triggers applyUnifiedHighlight as a visual side-effect (Architecture C).
+     * Architecture E: try/catch guards all UI calls; text always renders.
+     * ════════════════════════════════════════════════════════════════════════*/
+    if (type === 'gene_overview') {
         var gobj = gmap()[intent.gene.toUpperCase()];
-        if (!gobj) return 'Gene <b>'+intent.gene+'</b> not found in CiliaHub.';
-        var lof = getLOF(gobj) || 'Not reported';
-        var oe  = getOE(gobj)  || 'Not reported';
-        var pct = getPCT(gobj) || 'Not reported';
-        var loc = gobj['Localization'] || gobj['localization'] || '-';
-        var dis = gobj['Ciliopathy'] || gobj['Ciliopathies'] || '-';
-        var sum = gobj['Functional.Summary.from.Literature'] || gobj['functional_summary'] || gobj['Gene.Description'] || '';
-        var diseaseHtml = (dis && dis !== '-' && dis !== 'N/A')
-            ? '<div style="margin-top:8px;"><b style="font-size:11.5px;color:#475569;">Disease</b><br>'+dis.split(',').slice(0,4).map(function(d){ return pill(d.trim(),'red'); }).join(' ')+'</div>'
-            : '';
-        var phyloHtml = _li2014BySymbol ? '<div><b style="color:#475569;">Phylogeny</b><br>'+phyloBadge(intent.gene)+'</div>' : '';
-        return '<b style="font-size:15px;color:#005b96;">'+intent.gene+'</b> — Cilia Phenotype Summary<br><br>'
-            +(sum ? '<p style="font-size:12.5px;color:#334155;line-height:1.5;margin-bottom:10px;">'+sum.slice(0,250)+(sum.length>250?'...':'')+'</p>' : '')
-            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">'
-            +'<div><b style="color:#475569;">LoF</b><br><span style="color:#7c3aed;font-weight:600;">'+lof+'</span></div>'
-            +'<div><b style="color:#475569;">Overexpression</b><br><span style="color:#b45309;">'+oe+'</span></div>'
-            +'<div><b style="color:#475569;">% ciliated cells</b><br><span style="color:#065f46;">'+pct+'</span></div>'
-            +'<div><b style="color:#475569;">Localization</b><br>'+loc+'</div>'
-            +phyloHtml
-            +'</div>'+diseaseHtml;
+        if (!gobj) return 'Gene <b>'+intent.gene+'</b> not found in the CiliaHub database.';
+
+        /* Architecture C — visual side-effect: highlight localization on SVG */
+        var locForHighlight = gobj['Localization'] || gobj['localization'] || '';
+        setTimeout(function() {
+            try { applyUnifiedHighlight(locForHighlight); } catch(e) {}
+        }, 50);
+
+        /* Architecture B + D — render rich page from DB object */
+        return renderGenePage(intent.gene, gobj);
+    }
+
+    /* multi_gene: user typed 2+ validated gene symbols — route to UMAP plot */
+    if (type === 'multi_gene') {
+        var syms = intent.genes;
+        /* Architecture E: check before calling */
+        setTimeout(function() {
+            try {
+                if (typeof win.renderUMAPPlot === 'function') win.renderUMAPPlot(syms[0], syms);
+                else if (typeof win.switchView === 'function') win.switchView('plot');
+            } catch(e) {}
+        }, 80);
+        return 'Showing expression data for <b>'+syms.join(', ')+'</b> in the Plot view. '
+            +'<div style="margin-top:8px;">'+syms.map(function(s){ return chip(s); }).join('')+'</div>';
+    }
+
+    /* lof_gene kept as alias for backward compatibility (older ciliai.js Router calls) */
+    if (type === 'lof_gene') {
+        return dispatch({type:'gene_overview', gene:intent.gene});
     }
 
     if (type === 'domain_count') {
@@ -1202,6 +1396,6 @@ win._ciliaiShowLastPhylo = function() {
         startSuppression();
     }
 };
-console.log('[CiliAI Interceptor v2.4] Loaded.');
+console.log('[CiliAI Interceptor v3.0] Application Controller Architecture loaded.');
 
 })(window);
