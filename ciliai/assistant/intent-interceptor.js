@@ -1136,17 +1136,27 @@ function dispatch(intent) {
 
         setTimeout(function(){ try{ applyUnifiedHighlight(Array.from(sharedLoc).join(', ')||gdata[0].locRaw); }catch(e){} },50);
 
-        /* ── PER-GENE COLOUR PALETTE ──────────────────────────────────────────
-         * Assign each gene a distinct colour passed to renderUMAPPlot so they
-         * appear in different colours on the same UMAP (if the renderer supports
-         * a colorMap argument). Also provide separate single-gene buttons as a
-         * reliable fallback that always works.
+        /* ── Auto-trigger the side-by-side UMAP immediately ──────────────────
+         * Don't make the user click a button — show the comparison straight away.
+         * showCompareUMAP lives in index.html and builds independent Plotly panels.
          */
         var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
         var colorMap = {};
         found.forEach(function(s,i){ colorMap[s] = GENE_COLORS[i % GENE_COLORS.length]; });
 
-        /* Combined button — calls showCompareUMAP for true side-by-side panels */
+        setTimeout(function() {
+            try {
+                if (typeof win.showCompareUMAP === 'function') {
+                    win.showCompareUMAP(found, colorMap);
+                }
+            } catch(e) { console.warn('[CiliAI] showCompareUMAP error:', e); }
+        }, 80);
+
+        /* Build the symList and per-gene buttons for the chat card */
+        var symList = found.map(function(s){ return "'"+s+"'"; }).join(',');
+        var exprBtn = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+
+        /* "View in Expression Atlas" combined button */
         exprBtn += '<button onclick="(function(){'
             +'try{'
             +'var genes=['+symList+'];'
@@ -1155,16 +1165,15 @@ function dispatch(intent) {
             +'if(typeof window.showCompareUMAP===\'function\'){'
             +'  window.showCompareUMAP(genes,cmap);'
             +'}else if(typeof window.renderUMAPPlot===\'function\'){'
-            +'  window.renderUMAPPlot(genes[0],genes,cmap);'
-            +'}else if(typeof window.switchView===\'function\'){window.switchView(\'plot\');}'
-            +'}catch(e){console.warn(e);}})()" '
+            +'  window.renderUMAPPlot(genes[0],genes);'
+            +'}'+'}catch(e){console.warn(e);}})()" '
             +'style="background:#005b96;color:white;border:none;padding:6px 14px;border-radius:8px;'
             +'font-size:11.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">'
             +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;">'
             +'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'
             +'Compare in Expression Atlas</button>';
 
-        /* Per-gene individual UMAP buttons with colour swatch */
+        /* Per-gene individual expand buttons */
         found.forEach(function(s, i) {
             var col = GENE_COLORS[i % GENE_COLORS.length];
             var sEsc = s.replace(/'/g,"\\'");
@@ -1172,11 +1181,10 @@ function dispatch(intent) {
                 +'try{'
                 +'if(window.CiliAI)window.CiliAI.activeGeneContext=\''+sEsc+'\';'
                 +'if(typeof window.renderUMAPPlot===\'function\')window.renderUMAPPlot(\''+sEsc+'\',[\''+sEsc+'\']);'
-                +'else if(typeof window.switchView===\'function\')window.switchView(\'plot\');'
                 +'}catch(e){}})()" '
                 +'style="background:white;color:#334155;border:2px solid '+col+';padding:5px 12px;border-radius:8px;'
                 +'font-size:11.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">'
-                +'<span style="width:10px;height:10px;border-radius:50%;background:'+col+';flex-shrink:0;"></span>'
+                +'<span style="width:10px;height:10px;border-radius:50%;background:'+col+';flex-shrink:0;display:inline-block;"></span>'
                 +s+'</button>';
         });
         exprBtn += '</div>';
