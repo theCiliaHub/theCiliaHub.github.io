@@ -30,7 +30,8 @@ var LOF_KEYS = [
     'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)',
     'lof_effects', 'LoF_effects', 'lof_effect'
 ];
-var OE_KEYS  = ['Overexpression effects on cilia length (increase/decrease/no effect)', 'overexpression_effects'];
+var OE_KEYS  = ['Overexpression effects on cilia length (increase/decrease/no effect)', 'overexpression_effects',
+                'Overexpression effects on cilia length or ciliogenesis'];
 var PCT_KEYS = ['Percentage of ciliated cells (increase/decrease/no effect)', 'percent_ciliated_cells_effects'];
 
 /* ─── DOMAIN VOCABULARY ───────────────────────────────────────────────────── */
@@ -410,14 +411,17 @@ function matchOEKw(q) {
     return null;
 }
 
-/* oefMatches — tests the OE field for a given effect keyword */
+/* oefMatches — tests the OE field for a given effect keyword.
+ * The OE field covers BOTH cilia length changes AND ciliogenesis effects.
+ * "No effect" means no change in either cilia length or cilia formation.   */
 function oefMatches(row, effect) {
     var v = getOE(row).toLowerCase();
     if (!v || v.indexOf('not reported') !== -1) return false;
     if (effect === 'shorter')   return /shorter|short.cilia|short.cilium/.test(v);
     if (effect === 'longer')    return /longer|elongat|increase/.test(v);
-    if (effect === 'loss')      return /loss.of.cilia|no.cilia|blocked|abolished/.test(v);
-    /* "no_effect" = no change in cilia LENGTH */
+    /* loss covers both "loss of cilia" (ciliogenesis) and "blocked ciliogenesis" */
+    if (effect === 'loss')      return /loss.of.cilia|no.cilia|blocked|abolished|ciliogenesis/.test(v);
+    /* "no_effect" = no change in cilia length AND no change in ciliogenesis */
     if (effect === 'no_effect') return /no[_ ]effect|no.change.in.cilia|no.change.cilia|no.cilia.length.change|unchanged/.test(v.trim());
     if (effect === 'motility')  return /motility/.test(v);
     return v.indexOf(effect.toLowerCase()) !== -1;
@@ -820,7 +824,7 @@ function renderGenePage(sym, gobj) {
         +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">LoF effect</b><br>'
         +'<span style="color:#7c3aed;font-weight:600;">'+lof+'</span></div>'
         +'<div style="background:#f8fafc;padding:8px;border-radius:8px;">'
-        +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Overexpression</b><br>'
+        +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Overexpression (length / ciliogenesis)</b><br>'
         +'<span style="color:#b45309;font-weight:500;">'+oe+'</span></div>'
         +'<div style="background:#f8fafc;padding:8px;border-radius:8px;">'
         +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">% ciliated cells</b><br>'
@@ -1038,7 +1042,7 @@ function dispatch(intent) {
         var matches = db().filter(function(r){ return getLoc(r).indexOf(loc.term) !== -1 && lofMatches(r,intent.effect); });
         if (!matches.length) return 'No <b>'+loc.label+'</b> genes found with <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype on LoF.';
         return '<b>'+loc.label+'</b> genes with LoF <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype — <b>'+matches.length+' genes</b>:<br>'
-            +tbl(['Gene','LoF effect','Overexpression','Disease'],matches.slice(0,40).map(function(g){
+            +tbl(['Gene','LoF effect','Overexpression (length / ciliogenesis)','Disease'],matches.slice(0,40).map(function(g){
                 var dis = g['Ciliopathy'] && g['Ciliopathy'] !== 'N/A' ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '-';
                 var oe  = getOE(g) || '-';
                 return [chip(g['Gene']), getLOF(g)||'-', oe, dis];
@@ -1061,8 +1065,8 @@ function dispatch(intent) {
 
         var oeLabel  = intent.oeEffect  === 'longer'    ? 'increases cilia length'
                      : intent.oeEffect  === 'shorter'   ? 'decreases cilia length'
-                     : intent.oeEffect  === 'no_effect' ? 'no change in cilia length'
-                     : intent.oeEffect  === 'loss'      ? 'causes cilia loss'
+                     : intent.oeEffect  === 'no_effect' ? 'no change in cilia length or ciliogenesis'
+                     : intent.oeEffect  === 'loss'      ? 'causes cilia loss / blocks ciliogenesis'
                      : intent.oeEffect;
         var lofLabel = intent.lofEffect === 'no_effect' ? 'no change in cilia length on LoF'
                      : intent.lofEffect === 'shorter'   ? 'shorter cilia on LoF'
@@ -1079,7 +1083,7 @@ function dispatch(intent) {
         var locNote = intent.loc ? ' in <b>'+intent.loc.label+'</b>' : '';
         return 'Genes where OE <b>'+oeLabel+'</b> but <b>'+lofLabel+'</b>'+locNote+' — <b>'+matches.length+' gene'+(matches.length!==1?'s':'')+'</b>:<br>'
             +tbl(
-                ['Gene','Overexpression effect','LoF effect','Localization','Disease'],
+                ['Gene','Overexpression (length / ciliogenesis)','LoF effect','Localization','Disease'],
                 matches.map(function(g){
                     var dis = g['Ciliopathy'] && g['Ciliopathy'] !== 'N/A'
                         ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '-';
@@ -1108,8 +1112,8 @@ function dispatch(intent) {
 
         var oeLabel = intent.oeEffect === 'longer'    ? 'increases cilia length'
                     : intent.oeEffect === 'shorter'   ? 'decreases cilia length'
-                    : intent.oeEffect === 'no_effect' ? 'no change in cilia length'
-                    : intent.oeEffect === 'loss'      ? 'causes cilia loss'
+                    : intent.oeEffect === 'no_effect' ? 'no change in cilia length or ciliogenesis'
+                    : intent.oeEffect === 'loss'      ? 'causes cilia loss / blocks ciliogenesis'
                     : intent.oeEffect;
 
         if (!matches.length) return 'No genes found where overexpression <b>'+oeLabel+'</b>.';
@@ -1117,7 +1121,7 @@ function dispatch(intent) {
         var locNote = intent.loc ? ' in <b>'+intent.loc.label+'</b>' : '';
         return 'Genes where overexpression <b>'+oeLabel+'</b>'+locNote+' — <b>'+matches.length+' gene'+(matches.length!==1?'s':'')+'</b>:<br>'
             +tbl(
-                ['Gene','Overexpression effect','LoF effect','Localization','Disease'],
+                ['Gene','Overexpression (length / ciliogenesis)','LoF effect','Localization','Disease'],
                 matches.map(function(g){
                     var dis = g['Ciliopathy'] && g['Ciliopathy'] !== 'N/A'
                         ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '-';
@@ -1160,7 +1164,7 @@ function dispatch(intent) {
 
         return 'Genes with <b>'+effectLabel+'</b> on LoF — <b>'+matches.length+' genes</b>:<br>'
             +tbl(
-                ['Gene','LoF effect','Overexpression effect','Localization','Disease'],
+                ['Gene','LoF effect','Overexpression (length / ciliogenesis)','Localization','Disease'],
                 matches.map(function(g){
                     var dis = g['Ciliopathy'] && g['Ciliopathy'] !== 'N/A'
                         ? pill(g['Ciliopathy'].split(',')[0].trim(),'red') : '-';
@@ -1191,7 +1195,7 @@ function dispatch(intent) {
         });
         return 'Genes with <b>no change in cilia length</b> on LoF — <b>'+matches.length+' genes</b>:<br>'
             +tbl(
-                ['Gene','LoF effect','Overexpression effect','Localization'],
+                ['Gene','LoF effect','Overexpression (length / ciliogenesis)','Localization'],
                 matches.map(function(g){
                     var oe = getOE(g);
                     var oeCell = oe && oe.indexOf('not reported') === -1
