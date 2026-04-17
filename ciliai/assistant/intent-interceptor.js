@@ -496,21 +496,20 @@ function matchIntent(raw) {
         return {type:'gene_overview', gene:validGenes[0]};
     }
 
-    /* Multiple validated genes → expression dot-plot / multi-gene view */
+    /* Multiple validated genes — check compare intent FIRST, then fall back to UMAP plot */
     if (validGenes.length >= 2 && !isGroupQuery) {
+        var isCompareQuery = /\bcompare\b|\bvs\b|\bversus\b|\bside.by.side\b|\bdifference|\bsimilar\b|\bboth\b/.test(q);
+        if (isCompareQuery) {
+            return {type:'multi_gene_compare', genes:validGenes};
+        }
         return {type:'multi_gene', genes:validGenes};
     }
 
     /* ── FEATURE H: MULTI-GENE COMPARISON ──────────────────────────────────────
-     * "Compare BBS1 and CEP290"  /  "BBS1 vs IFT88"  /  "BBS1 CEP290 comparison"
-     * Requires 2+ validated genes AND an explicit compare/vs keyword.
-     * Also catches: "BBS1 CEP290 side by side" / "BBS1 and IFT88 differences"
+     * Fallback: catches "Compare BBS1 and CEP290" where one gene may not have
+     * passed resolveValidGenes on the first pass (e.g. if geneMap not loaded yet).
      */
     var isCompareQuery = /\bcompare\b|\bvs\b|\bversus\b|\bside.by.side\b|\bdifference|\bsimilar\b|\bboth\b/.test(q);
-    if (validGenes.length >= 2 && isCompareQuery) {
-        return {type:'multi_gene_compare', genes:validGenes};
-    }
-    /* Catch "Compare BBS1 and CEP290" where genes may also appear in keyword matchers */
     if (isCompareQuery && validGenes.length === 1 && rawGenes.length >= 2) {
         var allValid = resolveValidGenes(rawGenes);
         if (allValid.length >= 2) return {type:'multi_gene_compare', genes:allValid};
