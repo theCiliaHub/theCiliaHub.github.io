@@ -1,22 +1,28 @@
 /**
- * CiliAI Intent Interceptor v3.0 — Application Controller Architecture
+ * CiliAI Intent Interceptor v4.0 — Multi-Gene Comparison · Compartment Reasoning · AI Hypothesis Generator
  *
- * ARCHITECTURAL CHANGES (v3.1):
- *  F. renderGenePage now has two paths:
- *     PATH 1 — delegates to displayIndividualGenePage() from script.js when
- *              available. Normalises gmap mixed-key record → canonical schema
- *              via normToCanonical(). Injects Expression Atlas button after render.
- *     PATH 2 — fallback inline card used when script.js hasn't loaded yet.
- *              Now includes Ensembl ID(s) rendered as clickable links to
- *              https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=ENSG…
- *  G. renderEnsemblLinks() helper — handles single IDs, multi-ID strings,
- *     semicolon/comma/space-separated lists, all linking correctly.
+ * NEW in v4.0:
+ *  H. multi_gene_compare — side-by-side structural comparison of 2+ genes:
+ *       shared localization, shared complexes, shared ciliopathies, phenotype diff,
+ *       domain overlap, conservation badges, direct Expression Atlas jump.
+ *       Triggered by: "Compare BBS1 and CEP290", "BBS1 vs IFT88", "BBS1 CEP290 comparison"
  *
- * Previous fixes retained (v2.1–v2.4):
- *  pfam_filter + vertebrate scope (Li2014), phylo_domain scoping,
- *  exact PFAM word-boundary matching, suppression timer 2500ms,
- *  wrap() return-value preservation, oe_lof_combo, oe_filter, lof_filter,
- *  loc_disease_tissue 3-way, matchTissueKw cell types, tisNote/tisName.
+ *  I. compartment_reasoning — biologically interprets all genes in a compartment:
+ *       phenotype distribution pie summary, disease enrichment, conservation profile,
+ *       IFT/complex membership, and a one-sentence biological interpretation.
+ *       Triggered by: "Transition zone biology", "What do basal body genes do?",
+ *                     "Axoneme gene phenotypes", "Ciliary tip compartment"
+ *
+ *  J. hypothesis_generator — ranks candidate genes by similarity to a query gene:
+ *       scores localization overlap + phenotype match + conservation class + domain overlap.
+ *       Triggered by: "Genes similar to BBS1", "New ciliopathy candidates like CEP290",
+ *                     "What genes are functionally related to IFT88?"
+ *
+ * Previous architecture retained (v3.1):
+ *  Specificity-First parsing, Controller-Renderer Bridge, applyUnifiedHighlight,
+ *  Expression Atlas button, normToCanonical, renderEnsemblLinks,
+ *  oe_lof_combo, oe_filter, lof_filter, loc_disease_tissue, matchTissueKw,
+ *  pfam_filter + Li2014 scoping, phylo_domain, complex_phylo_compare.
  *
  * Install: ONE script tag AFTER ciliai.js in index.html
  *   <script src="./ciliai/ciliai.js"></script>
@@ -475,6 +481,28 @@ function matchIntent(raw) {
         return {type:'multi_gene', genes:validGenes};
     }
 
+    /* ── FEATURE H: MULTI-GENE COMPARISON ──────────────────────────────────────
+     * "Compare BBS1 and CEP290"  /  "BBS1 vs IFT88"  /  "BBS1 CEP290 comparison"
+     * Requires 2+ validated genes AND an explicit compare/vs keyword.
+     * Also catches: "BBS1 CEP290 side by side" / "BBS1 and IFT88 differences"
+     */
+    var isCompareQuery = /\bcompare\b|\bvs\b|\bversus\b|\bside.by.side\b|\bdifference|\bsimilar\b|\bboth\b/.test(q);
+    if (validGenes.length >= 2 && isCompareQuery) {
+        return {type:'multi_gene_compare', genes:validGenes};
+    }
+    /* Catch "Compare BBS1 and CEP290" where genes may also appear in keyword matchers */
+    if (isCompareQuery && validGenes.length === 1 && rawGenes.length >= 2) {
+        var allValid = resolveValidGenes(rawGenes);
+        if (allValid.length >= 2) return {type:'multi_gene_compare', genes:allValid};
+    }
+
+    /* ── FEATURE I: COMPARTMENT REASONING ─────────────────────────────────────
+     * "Transition zone biology"  /  "What do basal body genes do?"
+     * "Axoneme phenotype profile"  /  "Ciliary tip compartment analysis"
+     * Requires a localization keyword + a reasoning/biology/analysis qualifier.
+     */
+    var isReasonQuery = /\bbiology\b|\bfunction\b|\bwhat do\b|\bphenotype profile\b|\bcompartment\b|\banalysis\b|\bprofile\b|\brole\b|\bcharacter/.test(q);
+
     /* All other signals — now run keyword matchers on the full query */
     var loc     = matchLocKw(q);
     var disease = matchDiseaseKw(q);
@@ -483,6 +511,21 @@ function matchIntent(raw) {
     var lofEff  = matchLOFKw(q);
     var oeEff   = matchOEKw(q);
     var domain  = matchDomainKw(q);
+
+    if (loc && isReasonQuery && !disease && !lofEff) {
+        return {type:'compartment_reasoning', loc:loc};
+    }
+
+    /* ── FEATURE J: AI HYPOTHESIS GENERATOR ────────────────────────────────────
+     * "Genes similar to BBS1"  /  "New ciliopathy candidates like CEP290"
+     * "What genes are functionally related to IFT88?"
+     * "Suggest genes with similar function to RPGRIP1L"
+     * Requires 1 validated gene + a similarity/candidate/related keyword.
+     */
+    var isSimilarQuery = /\bsimilar\b|\brelated\b|\bcandidates?\b|\bsuggest\b|\blike\b|\banalogous\b|\bfunctionally.related\b|\bhypothes/.test(q);
+    if (validGenes.length === 1 && isSimilarQuery) {
+        return {type:'hypothesis_generator', gene:validGenes[0]};
+    }
 
     /* Whether the query is primarily about overexpression */
     var isOEQuery = /overexpress|overexpression/.test(q);
@@ -988,7 +1031,6 @@ function dispatch(intent) {
     /* multi_gene: user typed 2+ validated gene symbols — route to UMAP plot */
     if (type === 'multi_gene') {
         var syms = intent.genes;
-        /* Architecture E: check before calling */
         setTimeout(function() {
             try {
                 if (typeof win.renderUMAPPlot === 'function') win.renderUMAPPlot(syms[0], syms);
@@ -999,7 +1041,328 @@ function dispatch(intent) {
             +'<div style="margin-top:8px;">'+syms.map(function(s){ return chip(s); }).join('')+'</div>';
     }
 
+    /* ══ FEATURE H: MULTI-GENE COMPARISON ══════════════════════════════════════
+     * "Compare BBS1 and CEP290" / "BBS1 vs IFT88" / "BBS1 CEP290 side by side"
+     * Side-by-side card: shared localization, ciliopathies, complexes, domains,
+     * per-gene phenotype data, compartment overlap score, Expression Atlas button.
+     * ═════════════════════════════════════════════════════════════════════════*/
+    if (type === 'multi_gene_compare') {
+        var syms = intent.genes.slice(0, 4);
+        var gm = gmap();
+        var found = syms.filter(function(s){ return !!gm[s.toUpperCase()]; });
+        var notFound = syms.filter(function(s){ return !gm[s.toUpperCase()]; });
+        if (!found.length) return 'None of the genes ('+syms.join(', ')+') were found in CiliaHub.';
+
+        function toSet(v) {
+            var arr = !v ? [] : Array.isArray(v) ? v : String(v).split(/[;,]/).map(function(s){ return s.trim(); });
+            return new Set(arr.filter(Boolean).map(function(s){ return s.toLowerCase(); }));
+        }
+        var gdata = found.map(function(sym) {
+            var g = gm[sym.toUpperCase()];
+            return {
+                sym:    sym,
+                loc:    toSet(g['Localization']||g['localization']),
+                locRaw: g['Localization']||g['localization']||'—',
+                lof:    getLOF(g)||'not reported',
+                oe:     getOE(g)||'not reported',
+                pct:    getPCT(g)||'not reported',
+                dis:    toSet(g['Ciliopathies']||g['Ciliopathy']),
+                disRaw: (Array.isArray(g['Ciliopathies'])?g['Ciliopathies'].join('; '):(g['Ciliopathy']||'—')),
+                cplx:   toSet(g['Protein_Complexes']||g['protein_complexes']),
+                dom:    toSet((g['Domain_Descriptions']||'')+' '+(g['PFAM_IDs']||''))
+            };
+        });
+        function intersectAll(key) {
+            var result = new Set(gdata[0][key]);
+            for (var i=1;i<gdata.length;i++){
+                var other=gdata[i][key];
+                result.forEach(function(v){ if(!other.has(v)) result.delete(v); });
+            }
+            return result;
+        }
+        var sharedLoc=intersectAll('loc'), sharedDis=intersectAll('dis'),
+            sharedCplx=intersectAll('cplx'), sharedDom=intersectAll('dom');
+
+        function jaccardPct(a,b){
+            var union=new Set([].concat(Array.from(a)).concat(Array.from(b)));
+            if(!union.size) return 0;
+            var inter=0; a.forEach(function(v){ if(b.has(v)) inter++; });
+            return Math.round(100*inter/union.size);
+        }
+        var overlapScore = gdata.length===2
+            ? jaccardPct(gdata[0].loc,gdata[1].loc)
+            : Math.round(sharedLoc.size/Math.max(1,Array.from(new Set(
+                gdata.reduce(function(acc,g){ return acc.concat(Array.from(g.loc)); },[])
+              )).length)*100);
+
+        setTimeout(function(){ try{ applyUnifiedHighlight(Array.from(sharedLoc).join(', ')||gdata[0].locRaw); }catch(e){} },50);
+
+        var symList=found.map(function(s){ return "'"+s+"'"; }).join(',');
+        var exprBtn='<button onclick="(function(){'
+            +'try{'
+            +'if(typeof window.renderUMAPPlot===\'function\')window.renderUMAPPlot(\''+found[0]+'\',['+symList+']);'
+            +'else if(typeof window.switchView===\'function\')window.switchView(\'plot\');'
+            +'}catch(e){}})()" '
+            +'style="background:#005b96;color:white;border:none;padding:6px 14px;border-radius:8px;'
+            +'font-size:11.5px;font-weight:600;cursor:pointer;margin-bottom:10px;display:inline-flex;align-items:center;gap:5px;">'
+            +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;">'
+            +'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'
+            +'Compare in Expression Atlas</button>';
+
+        var scoreCol=overlapScore>=60?'#166534':overlapScore>=30?'#92400e':'#991b1b';
+        var scoreBg=overlapScore>=60?'#dcfce7':overlapScore>=30?'#fef3c7':'#fee2e2';
+        function setList(s,color){
+            var arr=Array.from(s).filter(Boolean);
+            if(!arr.length) return '<span style="color:#94a3b8;font-style:italic;font-size:11px;">none</span>';
+            return arr.slice(0,8).map(function(v){ return pill(v,color); }).join(' ');
+        }
+
+        var out='<div style="line-height:1.5;">';
+        out+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+            +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+        found.forEach(function(s){ out+=chip(s); });
+        out+='</div>'
+            +'<span style="background:'+scoreBg+';color:'+scoreCol+';padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">'+overlapScore+'% compartment overlap</span>'
+            +'</div>';
+        out+=exprBtn;
+        out+='<div style="display:grid;grid-template-columns:repeat('+found.length+',1fr);gap:8px;margin-bottom:12px;">';
+        gdata.forEach(function(g){
+            var ph=''; try{ ph=_li2014BySymbol?phyloBadge(g.sym):''; }catch(e){}
+            out+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;">'
+                +'<div style="font-size:15px;font-weight:700;color:#005b96;margin-bottom:4px;">'+g.sym+(ph||'')+'</div>'
+                +'<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:6px;">Localization</div>'
+                +'<div style="font-size:11.5px;color:#0f172a;">'+g.locRaw+'</div>'
+                +'<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:6px;">LoF effect</div>'
+                +'<div style="font-size:11.5px;color:#7c3aed;font-weight:600;">'+g.lof+'</div>'
+                +'<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:6px;">Overexpression (length / ciliogenesis)</div>'
+                +'<div style="font-size:11.5px;color:#b45309;">'+g.oe+'</div>'
+                +'<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:6px;">Ciliopathies</div>'
+                +'<div style="font-size:11px;color:#be185d;">'+g.disRaw+'</div>'
+                +'</div>';
+        });
+        out+='</div>';
+        out+='<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:8px;">'
+            +'<div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Shared biology</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11.5px;">'
+            +'<div><b style="color:#475569;">Shared localization</b><br><div style="margin-top:3px;">'+setList(sharedLoc,'blue')+'</div></div>'
+            +'<div><b style="color:#475569;">Shared ciliopathies</b><br><div style="margin-top:3px;">'+setList(sharedDis,'red')+'</div></div>'
+            +'<div><b style="color:#475569;">Shared complexes</b><br><div style="margin-top:3px;">'+setList(sharedCplx,'green')+'</div></div>'
+            +'<div><b style="color:#475569;">Shared domains</b><br><div style="margin-top:3px;">'+setList(sharedDom,'purple')+'</div></div>'
+            +'</div></div>';
+        out+='<div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Phenotype comparison</div>'
+            +tbl(['Gene','LoF effect','Overexpression (length / ciliogenesis)','% ciliated cells'],
+                gdata.map(function(g){
+                    return [chip(g.sym),
+                        pill(g.lof,g.lof==='not reported'?'gray':'amber'),
+                        pill(g.oe, g.oe==='not reported'?'gray':'green'),
+                        g.pct];
+                }));
+        if(notFound.length) out+='<p style="font-size:11px;color:#94a3b8;margin-top:8px;">Not found in CiliaHub: '+notFound.join(', ')+'</p>';
+        out+='</div>';
+        return out;
+    }
+
+    /* ══ FEATURE I: CILIARY COMPARTMENT REASONING ══════════════════════════════
+     * "Transition zone biology" / "What do basal body genes do?"
+     * "Axoneme phenotype profile" / "Ciliary tip compartment"
+     * Biologically interprets all genes in a compartment with phenotype stats,
+     * disease enrichment, conservation profile, complex membership.
+     * ═════════════════════════════════════════════════════════════════════════*/
+    if (type === 'compartment_reasoning') {
+        var loc=intent.loc;
+        var genes=db().filter(function(r){ return getLoc(r).indexOf(loc.term)!==-1; });
+        if(!genes.length) return 'No genes found with <b>'+loc.label+'</b> localization in CiliaHub.';
+
+        var phenoCounts={shorter:0,longer:0,loss:0,no_change:0,motility:0,not_reported:0};
+        genes.forEach(function(g){
+            var v=getLOF(g).toLowerCase();
+            if(!v||v==='not reported')                          phenoCounts.not_reported++;
+            else if(/shorter|short.cilia/.test(v))              phenoCounts.shorter++;
+            else if(/longer|elongat/.test(v))                   phenoCounts.longer++;
+            else if(/loss.of.cilia|no.cilia|blocked/.test(v))   phenoCounts.loss++;
+            else if(/no[_ ]effect|no.change/.test(v))           phenoCounts.no_change++;
+            else if(/motility/.test(v))                         phenoCounts.motility++;
+            else                                                phenoCounts.not_reported++;
+        });
+        var disCounts={};
+        genes.forEach(function(g){
+            var raw=g['Ciliopathies']||g['Ciliopathy']||'';
+            var list=Array.isArray(raw)?raw:String(raw).split(/[;,]/).map(function(s){ return s.trim(); });
+            list.forEach(function(d){ if(d&&d.toUpperCase()!=='N/A'&&d.length>2) disCounts[d]=(disCounts[d]||0)+1; });
+        });
+        var topDiseases=Object.keys(disCounts).map(function(k){ return [k,disCounts[k]]; })
+            .sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+        var conservCounts={'Ciliary-specific':0,'Vertebrate-specific':0,'Mammalian-specific':0,'Cilia-related':0,'No data':0};
+        genes.forEach(function(g){
+            var cls=getPhyloClass(g['Gene'])||'No data';
+            conservCounts[cls]=(conservCounts[cls]||0)+1;
+        });
+        var cplxCounts={};
+        Object.keys(COMPLEX_SETS).forEach(function(ckey){
+            var n=genes.filter(function(g){ return inComplex(g['Gene'],ckey); }).length;
+            if(n) cplxCounts[cxName(ckey)]=n;
+        });
+        var topCplx=Object.keys(cplxCounts).map(function(k){ return [k,cplxCounts[k]]; })
+            .sort(function(a,b){ return b[1]-a[1]; }).slice(0,4);
+
+        var bioInterp={
+            'transition zone':'The transition zone acts as a selective gate controlling which proteins enter and exit the cilium. Defects here disrupt Hedgehog and Wnt receptor localisation and are strongly associated with Nephronophthisis and Joubert syndrome.',
+            'basal body':'The basal body nucleates and anchors the cilium at the plasma membrane. Genes here control cilia assembly initiation, centrosome maturation, and satellite organisation, with enrichment for Bardet–Biedl, Joubert, and skeletal ciliopathies.',
+            'axoneme':'The axoneme is the structural backbone of the cilium built from nine microtubule doublets. Genes here primarily drive motility via dynein arm assembly and are the major determinant of Primary Ciliary Dyskinesia.',
+            'ciliary membrane':'The ciliary membrane is compositionally distinct from the plasma membrane, enriched in signalling receptors for Hedgehog, Wnt, and PDGF pathways. Disruption typically causes cilia length changes.',
+            'ciliary tip':'The ciliary tip is the zone of IFT turnaround and tubulin addition. Genes here are critical for length homeostasis and characteristically produce elongation or shortening phenotypes.',
+            'cilia':'Ciliary genes collectively regulate assembly, maintenance, and signalling. Phenotypic diversity reflects IFT dynamics, membrane composition, tip regulation, and axonemal integrity.'
+        };
+        var interpText=bioInterp[loc.term]||'Genes localised to the <b>'+loc.label+'</b> compartment regulate its structure and function.';
+
+        setTimeout(function(){ try{ applyUnifiedHighlight(loc.term); }catch(e){} },50);
+
+        var total=genes.length, withPheno=total-phenoCounts.not_reported;
+        var topCplxName=topCplx.length?topCplx[0][0]:'—', topCplxN=topCplx.length?topCplx[0][1]:0;
+
+        var out='<div style="line-height:1.5;">';
+        out+='<div style="font-size:15px;font-weight:700;color:#005b96;margin-bottom:6px;">'+loc.label+' — Compartment Profile</div>';
+        out+='<div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:10px 12px;margin-bottom:12px;border-radius:0 8px 8px 0;font-size:12.5px;color:#1e3a5f;line-height:1.6;">'+interpText+'</div>';
+        out+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">';
+        [{v:total,l:'Total genes',c:'#005b96',bg:'#eff6ff'},
+         {v:withPheno,l:'With phenotype data',c:'#7c3aed',bg:'#f5f3ff'},
+         {v:topDiseases.length,l:'Ciliopathies',c:'#be185d',bg:'#fdf2f8'},
+         {v:topCplxN,l:topCplxN?'in '+topCplxName:'Complex data',c:'#065f46',bg:'#f0fdf4'}
+        ].forEach(function(s){
+            out+='<div style="background:'+s.bg+';border-radius:8px;padding:8px;text-align:center;">'
+                +'<div style="font-size:20px;font-weight:700;color:'+s.c+';">'+s.v+'</div>'
+                +'<div style="font-size:10px;color:#64748b;">'+s.l+'</div></div>';
+        });
+        out+='</div>';
+        out+='<div style="margin-bottom:12px;">'
+            +'<div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">LoF Phenotype Distribution</div>'
+            +'<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+        [{k:'shorter',l:'Shorter cilia',c:'red'},{k:'longer',l:'Longer cilia',c:'blue'},
+         {k:'loss',l:'Cilia loss',c:'purple'},{k:'no_change',l:'No change in length',c:'green'},
+         {k:'motility',l:'Motility defect',c:'amber'},{k:'not_reported',l:'Not reported',c:'gray'}
+        ].forEach(function(p){ if(phenoCounts[p.k]) out+=pill(phenoCounts[p.k]+' × '+p.l,p.c); });
+        out+='</div></div>';
+        if(topDiseases.length){
+            out+='<div style="margin-bottom:12px;">'
+                +'<div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Top Associated Ciliopathies</div>'
+                +'<div style="display:flex;flex-wrap:wrap;gap:5px;">';
+            topDiseases.forEach(function(d){ out+=pill(d[0]+' ('+d[1]+')', 'red'); });
+            out+='</div></div>';
+        }
+        if(topCplx.length){
+            out+='<div style="margin-bottom:12px;">'
+                +'<div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Complex Membership</div>'
+                +'<div style="display:flex;flex-wrap:wrap;gap:5px;">';
+            topCplx.forEach(function(c){ out+=pill(c[0]+' ('+c[1]+' genes)','green'); });
+            out+='</div></div>';
+        }
+        if(_li2014BySymbol){
+            out+='<div style="margin-bottom:10px;">'
+                +'<div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Evolutionary Conservation</div>'
+                +'<div style="display:flex;flex-wrap:wrap;gap:5px;">';
+            var cColors={'Ciliary-specific':'purple','Vertebrate-specific':'green','Mammalian-specific':'blue','Cilia-related':'amber','No data':'gray'};
+            Object.keys(conservCounts).forEach(function(cls){ if(conservCounts[cls]) out+=pill(conservCounts[cls]+' × '+cls,cColors[cls]||'gray'); });
+            out+='</div></div>';
+        }
+        out+='<div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">All '+loc.label+' genes ('+total+')</div>'
+            +'<div style="line-height:2;">'+genes.slice(0,40).map(function(g){ return chip(g['Gene']); }).join('')
+            +(genes.length>40?'<span style="font-size:11px;color:#94a3b8;"> …and '+(genes.length-40)+' more</span>':'')+'</div>'
+            +csvLink(genes,['Gene','Localization','lof_effects','Ciliopathy'],loc.term.replace(/\s/g,'_')+'_compartment.csv');
+        out+='</div>';
+        return out;
+    }
+
+    /* ══ FEATURE J: AI HYPOTHESIS GENERATOR ════════════════════════════════════
+     * "Genes similar to BBS1" / "Candidates like CEP290" / "Related to IFT88"
+     * Multi-dimensional similarity scoring:
+     *   localization overlap 40% + phenotype match 30%
+     *   + conservation class 15% + domain overlap 15%
+     * ═════════════════════════════════════════════════════════════════════════*/
+    if (type === 'hypothesis_generator') {
+        var qSym=intent.gene.toUpperCase();
+        var qGobj=gmap()[qSym];
+        if(!qGobj) return 'Gene <b>'+intent.gene+'</b> not found in CiliaHub.';
+
+        function toArr2(v){
+            if(!v) return [];
+            if(Array.isArray(v)) return v.map(function(s){ return String(s).toLowerCase().trim(); }).filter(Boolean);
+            return String(v).split(/[;,]/).map(function(s){ return s.toLowerCase().trim(); }).filter(Boolean);
+        }
+        function jaccard(a,b){
+            if(!a.length&&!b.length) return 0;
+            var sa=new Set(a),sb=new Set(b),inter=0;
+            sa.forEach(function(v){ if(sb.has(v)) inter++; });
+            return new Set([].concat(a).concat(b)).size ? inter/new Set([].concat(a).concat(b)).size : 0;
+        }
+        var qLoc=toArr2(qGobj['Localization']||qGobj['localization']);
+        var qLof=getLOF(qGobj).toLowerCase();
+        var qPhylo=getPhyloClass(qSym)||'';
+        var qDoms=toArr2((qGobj['Domain_Descriptions']||'')+' '+(qGobj['PFAM_IDs']||''));
+        var qDis=toArr2(qGobj['Ciliopathies']||qGobj['Ciliopathy']);
+
+        var scored=db().filter(function(r){ return r['Gene']!==qSym; }).map(function(r){
+            var sym=r['Gene'];
+            var rLoc=toArr2(r['Localization']||r['localization']);
+            var rLof=getLOF(r).toLowerCase();
+            var rPhy=getPhyloClass(sym)||'';
+            var rDom=toArr2((r['Domain_Descriptions']||'')+' '+(r['PFAM_IDs']||''));
+            var rDis=toArr2(r['Ciliopathies']||r['Ciliopathy']);
+            var total=Math.round(
+                jaccard(qLoc,rLoc)*40
+                +((qLof&&rLof&&qLof===rLof)?30:0)
+                +((qPhylo&&rPhy&&qPhylo===rPhy)?15:0)
+                +jaccard(qDoms,rDom)*15
+            );
+            var sharedDis=qDis.filter(function(d){ return rDis.indexOf(d)!==-1; });
+            var reasons=[];
+            if(jaccard(qLoc,rLoc)>0.3)          reasons.push('shared localization: '+rLoc.slice(0,2).join(', '));
+            if(qLof&&rLof&&qLof===rLof)          reasons.push('same LoF phenotype ('+rLof+')');
+            if(qPhylo&&rPhy&&qPhylo===rPhy)      reasons.push(rPhy+' conservation');
+            if(jaccard(qDoms,rDom)>0.25)         reasons.push('domain overlap');
+            if(sharedDis.length)                 reasons.push('both in '+sharedDis[0]);
+            return {sym:sym,score:total,reason:reasons.slice(0,2).join(' · '),sharedDis:sharedDis,lof:getLOF(r)||'—'};
+        });
+        scored.sort(function(a,b){ return b.score-a.score; });
+        var topHits=scored.filter(function(s){ return s.score>10; }).slice(0,12);
+
+        if(!topHits.length) return 'No strong candidates found similar to <b>'+qSym+'</b> in CiliaHub.<br>'
+            +'<span style="font-size:11.5px;color:#888;">Try a gene with annotated localization and phenotype data.</span>';
+
+        var qPhBadge=''; try{ qPhBadge=_li2014BySymbol?phyloBadge(qSym):''; }catch(e){}
+        function scoreBadge(s){
+            var bg=s>=60?'#dcfce7':s>=35?'#fef3c7':'#f3f4f6',col=s>=60?'#166534':s>=35?'#92400e':'#374151';
+            return '<span style="background:'+bg+';color:'+col+';padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;flex-shrink:0;">'+s+'%</span>';
+        }
+        var out='<div style="line-height:1.5;">';
+        out+='<div style="margin-bottom:8px;"><b style="font-size:14px;color:#005b96;">Functional candidates similar to </b>'+chip(qSym)+(qPhBadge||'')+'</div>';
+        out+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:11.5px;">'
+            +'<b>Query:</b> '
+            +'<span style="color:#7c3aed;">LoF: '+getLOF(qGobj)+'</span> · '
+            +'<span style="color:#0f172a;">Loc: '+(qLoc.slice(0,2).join(', ')||'—')+'</span> · '
+            +'<span style="color:#065f46;">Conservation: '+(qPhylo||'—')+'</span>'
+            +'</div>';
+        out+='<div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:7px 10px;margin-bottom:10px;border-radius:0 6px 6px 0;font-size:11px;color:#78350f;">'
+            +'⚡ AI-ranked by localization (40%), phenotype (30%), conservation (15%), domain similarity (15%). Experimental validation required.</div>';
+        out+='<div style="display:flex;flex-direction:column;gap:6px;">';
+        topHits.forEach(function(h,i){
+            var ph=''; try{ ph=_li2014BySymbol?phyloBadge(h.sym):''; }catch(e){}
+            var disHtml=h.sharedDis.length?'<span style="font-size:10px;color:#be185d;"> · '+h.sharedDis[0]+'</span>':'';
+            out+='<div style="display:flex;align-items:center;gap:8px;background:'+(i===0?'#eff6ff':'white')+';'
+                +'border:1px solid '+(i===0?'#bfdbfe':'#e2e8f0')+';border-radius:8px;padding:7px 10px;">'
+                +'<span style="font-size:11px;color:#94a3b8;font-weight:600;min-width:18px;">'+(i+1)+'.</span>'
+                +chip(h.sym)+(ph||'')
+                +'<div style="flex:1;font-size:11px;color:#475569;">'+h.reason+disHtml+'</div>'
+                +'<div style="font-size:11px;color:#64748b;flex-shrink:0;">LoF: <b>'+h.lof+'</b></div>'
+                +scoreBadge(h.score)+'</div>';
+        });
+        out+='</div>';
+        out+='<div style="margin-top:8px;font-size:11px;color:#94a3b8;">Based on '+db().length+' CiliaHub genes · Click any chip to view full profile</div>';
+        out+='</div>';
+        return out;
+    }
+
     /* lof_gene kept as alias for backward compatibility (older ciliai.js Router calls) */
+
     if (type === 'lof_gene') {
         return dispatch({type:'gene_overview', gene:intent.gene});
     }
@@ -1521,6 +1884,6 @@ win._ciliaiShowLastPhylo = function() {
         startSuppression();
     }
 };
-console.log('[CiliAI Interceptor v3.1] Application Controller Architecture loaded.');
+console.log('[CiliAI Interceptor v4.0] Multi-Gene Comparison · Compartment Reasoning · AI Hypothesis Generator loaded.');
 
 })(window);
