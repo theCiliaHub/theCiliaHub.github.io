@@ -258,6 +258,58 @@
         }
         #cilia-svg { display: flex; align-items: center; justify-content: center; }
 
+        /* ── SIDE-BY-SIDE COMPARE UMAP ── */
+        #compare-umap-container {
+            position: absolute; inset: 0;
+            width: 100% !important; height: 100% !important;
+            overflow-y: auto; overflow-x: hidden;
+            display: flex; flex-direction: column;
+            background: white;
+        }
+        .compare-umap-header {
+            flex-shrink: 0;
+            padding: 8px 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 12px; font-weight: 600; color: #475569;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+        }
+        .compare-umap-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+        .compare-umap-legend-item {
+            display: flex; align-items: center; gap: 5px;
+            font-size: 11.5px; font-weight: 600; color: #334155;
+        }
+        .compare-umap-legend-dot {
+            width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
+        }
+        .compare-umap-grid {
+            flex: 1; display: grid;
+            gap: 1px; background: #e2e8f0;
+            min-height: 0;
+        }
+        .compare-umap-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+        .compare-umap-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .compare-umap-grid.cols-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .compare-umap-cell {
+            background: white;
+            display: flex; flex-direction: column;
+            min-height: 0; overflow: hidden;
+        }
+        .compare-umap-cell-header {
+            flex-shrink: 0;
+            padding: 5px 12px;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 700;
+            border-bottom: 3px solid transparent;
+        }
+        .compare-umap-cell-plot { flex: 1; min-height: 0; }
+
+        @media (max-width: 768px) {
+            .compare-umap-grid.cols-2,
+            .compare-umap-grid.cols-3,
+            .compare-umap-grid.cols-4 { grid-template-columns: 1fr; }
+        }
+
         /* ══════════════════════════════════════════════════════
          * RIGHT CHAT PANEL — improved design
          * Kept as permanent desktop panel.
@@ -832,6 +884,7 @@
                 <div id="cilia-svg"></div>
                 <div id="plotly-container"></div>
                 <div id="domain-viewer"></div>
+                <div id="compare-umap-container" style="display:none;"></div>
                 <div id="vizActiveDescription" style="display:none"></div>
             </div>
         </div>
@@ -1535,6 +1588,7 @@ window.updateStatus = function(text, state) {
 window.showPlot = function(plotData, title) {
     document.getElementById('cilia-svg').style.display = 'none';
     document.getElementById('domain-viewer').style.display = 'none';
+    document.getElementById('compare-umap-container').style.display = 'none';
     var plotContainer = document.getElementById('plotly-container');
     plotContainer.style.display = 'block';
     document.getElementById('current-viz-title').textContent = title || 'Gene Expression UMAP';
@@ -1569,6 +1623,7 @@ window.showPlot = function(plotData, title) {
 window.showDiagram = function() {
     document.getElementById('plotly-container').style.display = 'none';
     document.getElementById('domain-viewer').style.display = 'none';
+    document.getElementById('compare-umap-container').style.display = 'none';
     document.getElementById('cilia-svg').style.display = 'flex';
     document.getElementById('current-viz-title').textContent = 'Diagram: Spatial Intelligence';
     window.CiliAI.currentPlot = null;
@@ -1576,6 +1631,7 @@ window.showDiagram = function() {
 window.showDomainViewer = function(gene) {
     document.getElementById('cilia-svg').style.display = 'none';
     document.getElementById('plotly-container').style.display = 'none';
+    document.getElementById('compare-umap-container').style.display = 'none';
     var domainContainer = document.getElementById('domain-viewer');
     domainContainer.style.display = 'flex'; domainContainer.innerHTML = '';
     document.getElementById('current-viz-title').textContent = 'Pfam Domains: ' + gene;
@@ -1627,6 +1683,163 @@ window.showDomainViewer = function(gene) {
     });
     domainContainer.appendChild(svg);
 };
+/* ══════════════════════════════════════════════════════════════════════════
+ * showCompareUMAP — renders N side-by-side independent UMAP panels,
+ * one per gene, each in its own colour. Called by the multi-gene comparison
+ * button in intent-interceptor.js.
+ *
+ * genes     : array of gene symbol strings, e.g. ['BBS1','CEP290']
+ * colorMap  : object { 'BBS1':'#e63946', 'CEP290':'#2a9d8f', ... }
+ * ════════════════════════════════════════════════════════════════════════*/
+window.showCompareUMAP = function(genes, colorMap) {
+    if (!genes || !genes.length) return;
+    colorMap = colorMap || {};
+
+    /* Hide all other views */
+    document.getElementById('cilia-svg').style.display = 'none';
+    document.getElementById('plotly-container').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+
+    var container = document.getElementById('compare-umap-container');
+    container.style.display = 'flex';
+    container.innerHTML = '';
+
+    /* Update header title */
+    var titleEl = document.getElementById('current-viz-title');
+    if (titleEl) titleEl.querySelector('#vizActiveTitle') && (titleEl.querySelector('#vizActiveTitle').textContent = 'Compare: '+genes.join(' vs '));
+    if (document.getElementById('current-viz-title')) {
+        document.getElementById('current-viz-title').textContent = 'Expression Atlas: '+genes.join(' vs ');
+    }
+
+    /* Activate plot tab */
+    document.querySelectorAll('.view-tab').forEach(function(t){ t.classList.remove('active'); });
+    var tabPlot = document.getElementById('tab-plot');
+    if (tabPlot) tabPlot.classList.add('active');
+
+    var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
+
+    /* Header strip: title + colour legend */
+    var header = document.createElement('div');
+    header.className = 'compare-umap-header';
+    var titleSpan = document.createElement('span');
+    titleSpan.textContent = 'Side-by-side expression — click any panel to expand';
+    header.appendChild(titleSpan);
+    var legend = document.createElement('div');
+    legend.className = 'compare-umap-legend';
+    genes.forEach(function(sym, i) {
+        var col = colorMap[sym] || GENE_COLORS[i % GENE_COLORS.length];
+        var item = document.createElement('div');
+        item.className = 'compare-umap-legend-item';
+        item.innerHTML = '<span class="compare-umap-legend-dot" style="background:'+col+';"></span>'
+            + '<span>'+sym+'</span>';
+        legend.appendChild(item);
+    });
+    header.appendChild(legend);
+    container.appendChild(header);
+
+    /* Grid */
+    var grid = document.createElement('div');
+    var colClass = genes.length <= 2 ? 'cols-2'
+                 : genes.length === 3 ? 'cols-3' : 'cols-4';
+    grid.className = 'compare-umap-grid ' + colClass;
+    container.appendChild(grid);
+
+    /* Build one cell per gene */
+    genes.forEach(function(sym, i) {
+        var col = colorMap[sym] || GENE_COLORS[i % GENE_COLORS.length];
+        var cell = document.createElement('div');
+        cell.className = 'compare-umap-cell';
+        cell.id = 'compare-cell-' + i;
+
+        /* Cell header */
+        var cellHeader = document.createElement('div');
+        cellHeader.className = 'compare-umap-cell-header';
+        cellHeader.style.borderBottomColor = col;
+        cellHeader.innerHTML = '<span style="width:11px;height:11px;border-radius:50%;background:'+col+';display:inline-block;flex-shrink:0;"></span>'
+            + '<span style="color:'+col+';">'+sym+'</span>';
+        /* Expand button */
+        var expandBtn = document.createElement('button');
+        expandBtn.title = 'View '+sym+' alone';
+        expandBtn.style.cssText = 'margin-left:auto;background:none;border:1px solid #e2e8f0;'
+            +'border-radius:5px;padding:2px 7px;font-size:10px;color:#64748b;cursor:pointer;';
+        expandBtn.textContent = '⤢ Expand';
+        expandBtn.addEventListener('click', function() {
+            if (window.renderUMAPPlot) {
+                window.showDiagram(); /* reset view */
+                setTimeout(function() {
+                    if (window.CiliAI) window.CiliAI.activeGeneContext = sym;
+                    window.renderUMAPPlot(sym, [sym]);
+                }, 50);
+            }
+        });
+        cellHeader.appendChild(expandBtn);
+        cell.appendChild(cellHeader);
+
+        /* Plot container */
+        var plotDiv = document.createElement('div');
+        plotDiv.className = 'compare-umap-cell-plot';
+        plotDiv.id = 'compare-plot-' + i;
+        cell.appendChild(plotDiv);
+        grid.appendChild(cell);
+
+        /* Render the UMAP into this cell — deferred so the DOM is ready */
+        (function(s, plotId, geneColor, idx) {
+            setTimeout(function() {
+                var cellEl = document.getElementById('compare-cell-'+idx);
+                var plotEl = document.getElementById(plotId);
+                if (!cellEl || !plotEl) return;
+                /* Compute available size from the cell */
+                var w = cellEl.clientWidth  || 320;
+                var h = Math.max(cellEl.clientHeight - 36, 200); /* subtract header height */
+
+                if (typeof window.renderUMAPPlot === 'function') {
+                    /* Temporarily point renderUMAPPlot output to this cell's div */
+                    var origPlotlyContainer = document.getElementById('plotly-container');
+                    /* Swap: make ciliai.js draw into our cell's div */
+                    var origId = origPlotlyContainer.id;
+                    origPlotlyContainer.id = '__compare_hidden_tmp';
+                    plotEl.id = 'plotly-container';
+                    if (window.CiliAI) window.CiliAI.activeGeneContext = s;
+                    window.renderUMAPPlot(s, [s]);
+                    /* Restore after a tick */
+                    setTimeout(function() {
+                        plotEl.id = plotId;
+                        origPlotlyContainer.id = origId;
+                        /* Re-colour the highlighted trace if Plotly is available */
+                        try {
+                            if (window.Plotly && plotEl.data) {
+                                var update = {};
+                                /* Find the highlighted gene trace and recolour */
+                                var traces = plotEl.data;
+                                for (var ti = 0; ti < traces.length; ti++) {
+                                    if (traces[ti].name && traces[ti].name.toUpperCase() === s.toUpperCase()) {
+                                        Plotly.restyle(plotEl, {'marker.color': geneColor, 'marker.size': 10}, [ti]);
+                                    }
+                                }
+                            }
+                        } catch(e) {}
+                    }, 400);
+                } else {
+                    /* Fallback: plain "no data" message */
+                    plotEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:13px;">UMAP not available</div>';
+                }
+            }, idx * 200); /* stagger renders by 200ms each to avoid race conditions */
+        })(sym, 'compare-plot-'+i, col, i);
+    });
+
+    /* Resize observer so plots reflow when the panel resizes */
+    try {
+        if (window.ResizeObserver) {
+            new ResizeObserver(function() {
+                genes.forEach(function(s, i) {
+                    var el = document.getElementById('compare-plot-'+i);
+                    if (el && window.Plotly) { try { Plotly.Plots.resize(el); } catch(e) {} }
+                });
+            }).observe(container);
+        }
+    } catch(e) {}
+};
+
 window.downloadCurrentVisualization = function() {
     if (window.CiliAI.currentPlot) {
         Plotly.downloadImage(window.CiliAI.currentPlot,{format:'png',filename:'ciliai-umap-plot',width:1200,height:800,scale:2});
