@@ -1034,7 +1034,8 @@ function dispatch(intent) {
      * Architecture E: try/catch guards all UI calls; text always renders.
      * ════════════════════════════════════════════════════════════════════════*/
     if (type === 'gene_overview') {
-        var gobj = gmap()[intent.gene.toUpperCase()];
+        var gobj = gmap()[intent.gene.toUpperCase()]
+                || db().find(function(r){ return (r['Gene']||'').toUpperCase() === intent.gene.toUpperCase(); });
         if (!gobj) return 'Gene <b>'+intent.gene+'</b> not found in the CiliaHub database.';
 
         /* Architecture C — visual side-effect: highlight localization on SVG */
@@ -1067,17 +1068,36 @@ function dispatch(intent) {
      * ═════════════════════════════════════════════════════════════════════════*/
     if (type === 'multi_gene_compare') {
         var syms = intent.genes.slice(0, 4);
-        var gm = gmap();
-        var found = syms.filter(function(s){ return !!gm[s.toUpperCase()]; });
-        var notFound = syms.filter(function(s){ return !gm[s.toUpperCase()]; });
-        if (!found.length) return 'None of the genes ('+syms.join(', ')+') were found in CiliaHub.';
+
+        /* ── Defensive lookup: tries uppercase key, original-case key,
+         *    then scans masterData by Gene field as a last resort.
+         *    This handles all geneMap key-casing variants.            */
+        function findGobj(sym) {
+            var gm = gmap();
+            return gm[sym.toUpperCase()] || gm[sym] || gm[sym.toLowerCase()]
+                || db().find(function(r){ return (r['Gene']||'').toUpperCase() === sym.toUpperCase(); })
+                || null;
+        }
+
+        var found    = syms.filter(function(s){ return !!findGobj(s); });
+        var notFound = syms.filter(function(s){ return !findGobj(s); });
+
+        if (!found.length) {
+            /* Diagnostic: show what the geneMap actually contains */
+            var gm = gmap();
+            var sampleKeys = Object.keys(gm).slice(0,5).join(', ');
+            var dbLen = db().length;
+            return 'Gene lookup failed for <b>'+syms.join(', ')+'</b>.<br>'
+                +'<span style="font-size:11px;color:#94a3b8;">DB: '+dbLen+' genes · geneMap sample keys: '+sampleKeys+'<br>'
+                +'Try clicking a gene chip to confirm it is loaded, then retry the comparison.</span>';
+        }
 
         function toSet(v) {
             var arr = !v ? [] : Array.isArray(v) ? v : String(v).split(/[;,]/).map(function(s){ return s.trim(); });
             return new Set(arr.filter(Boolean).map(function(s){ return s.toLowerCase(); }));
         }
         var gdata = found.map(function(sym) {
-            var g = gm[sym.toUpperCase()];
+            var g = findGobj(sym);
             return {
                 sym:    sym,
                 loc:    toSet(g['Localization']||g['localization']),
@@ -1375,7 +1395,7 @@ function dispatch(intent) {
      * ═════════════════════════════════════════════════════════════════════════*/
     if (type === 'hypothesis_generator') {
         var qSym=intent.gene.toUpperCase();
-        var qGobj=gmap()[qSym];
+        var qGobj = gmap()[qSym] || db().find(function(r){ return (r['Gene']||'').toUpperCase()===qSym; });
         if(!qGobj) return 'Gene <b>'+intent.gene+'</b> not found in CiliaHub.';
 
         function toArr2(v){
