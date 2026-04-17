@@ -15,6 +15,61 @@
     <script src="./ciliai/assistant/assistant-runtime.js"></script>
     <script src="./ciliai/ciliai.js"></script>
     <script src="./ciliai/assistant/intent-interceptor.js"></script>
+    <script src="./ciliai/assistant/ciliai-enhancements.js"></script>
+
+    <style>
+        /* ── ENHANCEMENTS CSS ── */
+
+        /* History panel — matches right panel width, slides in from left */
+        #ciliaiHistoryPanel {
+            font-family: 'Segoe UI','Inter',Arial,sans-serif;
+        }
+        #ciliaiHistoryList button:focus-visible {
+            outline: 2px solid var(--primary-blue);
+            outline-offset: -2px;
+        }
+
+        /* Share / History / Clear buttons share one style */
+        .clear-chat-btn {
+            white-space: nowrap;
+        }
+
+        /* Input hint kbd styling */
+        .input-hint kbd {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 3px;
+            padding: 0 4px;
+            font-size: 9px;
+            color: #64748b;
+            font-family: monospace;
+        }
+
+        /* Virtual scroll spacer rows must be invisible */
+        tr.vs-spacer { pointer-events: none; }
+
+        /* Follow-up chip row */
+        .ciliai-followups button:hover {
+            background: #dbeafe !important;
+        }
+
+        /* Confidence badge */
+        .ciliai-confidence {
+            font-size: 10px; font-weight: 700;
+            padding: 1px 7px; border-radius: 10px;
+            margin-left: 6px; vertical-align: middle;
+            display: inline-block;
+        }
+
+        /* Mobile: history panel overlays full screen */
+        @media (max-width: 768px) {
+            #ciliaiHistoryPanel {
+                right: 0 !important;
+                width: 100% !important;
+                z-index: 500 !important;
+            }
+        }
+    </style>
 
     <style>
         :root {
@@ -622,6 +677,60 @@
             z-index: calc(var(--mobile-chat-z) - 1);
         }
         .mobile-chat-backdrop.open { display: block; }
+        /* ── HISTORY DRAWER chip items ── */
+        .history-item {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:5px 8px; margin:2px 0;
+            border-radius:6px; cursor:pointer;
+            font-size:12px; color:#334155;
+            transition:background 0.12s;
+        }
+        .history-item:hover { background:#eff6ff; color:#1d4ed8; }
+        .history-item-text { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .history-item-time { font-size:10px; color:#94a3b8; margin-left:8px; flex-shrink:0; }
+
+        /* ── FOLLOW-UP CHIPS ── */
+        .followup-chip {
+            background:white; color:#005b96;
+            border:1px solid #b3cde0; border-radius:20px;
+            font-size:11px; font-weight:500;
+            padding:4px 10px; cursor:pointer;
+            transition:background 0.12s, border-color 0.12s, transform 0.1s;
+        }
+        .followup-chip:hover { background:#eff6ff; border-color:#93c5fd; transform:translateY(-1px); }
+
+        /* ── SHARE TOAST ── */
+        #shareToast {
+            position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+            background:#0f172a; color:white; padding:8px 18px;
+            border-radius:20px; font-size:12px; font-weight:500;
+            opacity:0; transition:opacity 0.25s, transform 0.25s;
+            pointer-events:none; z-index:9999; white-space:nowrap;
+        }
+        #shareToast.visible { opacity:1; transform:translateX(-50%) translateY(0); }
+
+        /* ── VIRTUAL SCROLL: only render visible rows ── */
+        .vs-sentinel { height:1px; }
+
+        /* ── COPY TO CLIPBOARD btn in chat messages ── */
+        .msg-copy-btn {
+            display:inline-block; margin-top:6px;
+            background:none; border:1px solid #e2e8f0;
+            color:#64748b; border-radius:6px;
+            font-size:10.5px; padding:3px 9px; cursor:pointer;
+            transition:background 0.12s, border-color 0.12s;
+        }
+        .msg-copy-btn:hover { background:#f1f5f9; border-color:#cbd5e1; }
+        .msg-export-btn {
+            display:inline-block; margin-top:6px; margin-left:4px;
+            background:#005b96; border:none; color:white;
+            border-radius:6px; font-size:10.5px; padding:3px 9px;
+            cursor:pointer; transition:background 0.12s;
+        }
+        .msg-export-btn:hover { background:#004a7f; }
+
+        /* ── ARIA live region for screen readers ── */
+        #srAnnounce { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
     </style>
 </head>
 <body>
@@ -642,6 +751,7 @@
             <li><a href="ciliahub.html">CiliaHub</a></li>
             <li><a href="about.html">About</a></li>
         </ul>
+        <div id="offlineIndicator" style="display:none;margin-left:12px;background:rgba(239,68,68,0.18);color:#fca5a5;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);flex-shrink:0;">⚠ Offline</div>
         <!-- Mobile: chat toggle in navbar -->
         <button class="mobile-chat-toggle" onclick="openMobileChat()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -735,7 +845,7 @@
     <!-- ─── RIGHT: DESKTOP CHAT PANEL ─── -->
     <aside class="right-panel" id="desktopChatPanel">
 
-        <!-- Polished header: status dot + gene count + clear button -->
+        <!-- Polished header: status dot + clear/history/share buttons -->
         <div class="chat-header">
             <div class="chat-header-left">
                 <h2>CiliAI Assistant</h2>
@@ -745,8 +855,19 @@
                 </div>
             </div>
             <div class="chat-header-right">
-                <button class="clear-chat-btn" onclick="clearChat()" title="Clear conversation">Clear</button>
+                <button class="clear-chat-btn" onclick="toggleHistory()" title="Query history" aria-label="Show query history">History</button>
+                <button class="clear-chat-btn" onclick="shareCurrentQuery()" title="Share current query as URL" aria-label="Share query">Share</button>
+                <button class="clear-chat-btn" onclick="clearChat()" title="Clear conversation" aria-label="Clear chat">Clear</button>
             </div>
+        </div>
+
+        <!-- Query history drawer -->
+        <div id="historyDrawer" style="display:none;flex-shrink:0;border-bottom:1px solid var(--border-light);background:#fafbfc;max-height:200px;overflow-y:auto;" aria-label="Query history">
+            <div style="padding:8px 14px 4px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;justify-content:space-between;">
+                <span>Recent queries</span>
+                <button onclick="clearHistory()" style="background:none;border:none;font-size:10px;color:#94a3b8;cursor:pointer;padding:2px 4px;" aria-label="Clear history">Clear all</button>
+            </div>
+            <div id="historyList" style="padding:0 10px 8px;"></div>
         </div>
 
         <!-- Examples panel: collapsed by default, click header to expand.
@@ -779,15 +900,17 @@
             </div>
         </div>
 
-        <!-- Input area: textarea (auto-grows), icon-only send button, keyboard hint -->
+        <!-- Input area: textarea, send button, command hint, follow-up chips -->
         <div class="input-area">
             <div class="chat-input-group">
-                <textarea id="chatInput" class="chat-input" placeholder="Ask about a gene, structure, disease…" rows="1"></textarea>
-                <button class="send-btn" id="sendBtn" onclick="window.handleUserSend()" title="Send (Enter)">
+                <textarea id="chatInput" class="chat-input" placeholder="Ask a question or type /help for commands…" rows="1" aria-label="Chat input" autocomplete="off" spellcheck="false"></textarea>
+                <button class="send-btn" id="sendBtn" onclick="window.handleUserSend()" title="Send (Enter)" aria-label="Send message">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 </button>
             </div>
-            <div class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</div>
+            <div class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> new line · <kbd>/help</kbd> for commands</div>
+            <!-- Follow-up suggestion chips — populated after each response -->
+            <div id="followUpChips" style="display:none;flex-wrap:wrap;gap:5px;margin-top:6px;"></div>
         </div>
     </aside>
 </div><!-- end .app-container -->
@@ -832,6 +955,11 @@
     </div>
 </div>
 
+
+<!-- ARIA live region for screen reader announcements -->
+<div id="srAnnounce" role="status" aria-live="polite" aria-atomic="true"></div>
+<!-- Share URL toast notification -->
+<div id="shareToast">Link copied to clipboard!</div>
 
 <!-- ═══════════════════════════════════════════════════════ SCRIPTS -->
 <script>
