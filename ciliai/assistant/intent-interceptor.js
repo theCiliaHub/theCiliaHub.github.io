@@ -263,14 +263,22 @@ function renderPhyloPlot(geneSymbols) {
 }
 
 /* ─── SUPPRESSION — blocks ciliai.js from appending its own answer ─────────
- * FIX #6: Timer extended from 1200ms → 2500ms to cover async AI responses.
+ * After the interceptor renders a response, we suppress ciliai.js's own async
+ * AI response for a window long enough to cover network round-trips (~1800ms).
+ * This is shorter than the previous 2500ms to avoid blocking legitimate
+ * follow-on messages from ciliai-enhancements.js patches.
+ * stopSuppression() can be called explicitly to end early (e.g. by patches).
  */
 var _suppressing = false;
 var _suppressTimer = null;
 function startSuppression() {
     _suppressing = true;
     if (_suppressTimer) clearTimeout(_suppressTimer);
-    _suppressTimer = setTimeout(function() { _suppressing = false; _suppressTimer = null; }, 2500);
+    _suppressTimer = setTimeout(function() { _suppressing = false; _suppressTimer = null; }, 1800);
+}
+function stopSuppression() {
+    _suppressing = false;
+    if (_suppressTimer) { clearTimeout(_suppressTimer); _suppressTimer = null; }
 }
 
 /* ─── INTENT KEYWORD MATCHERS ─────────────────────────────────────────────── */
@@ -1900,42 +1908,76 @@ function dispatch(intent) {
 }
 
 /* ─── INSTALL ─────────────────────────────────────────────────────────────── */
-function say(html) { if (typeof win.addChatMessage === 'function') win.addChatMessage(html, false); }
 
+/* say() always reads win.addChatMessage at call-time so it works regardless
+ * of how many times the function has been replaced by patches.              */
+function say(html) {
+    if (typeof win.addChatMessage === 'function') win.addChatMessage(html, false);
+}
+
+/* ── GUARD ──────────────────────────────────────────────────────────────────
+ * The guard intercepts addChatMessage to block ciliai.js's own AI responses
+ * when we have already handled the query (suppression window).
+ *
+ * PROBLEM: ciliai-enhancements.js patches addChatMessage at 500ms and 1500ms.
+ * Each patch creates a new function that does NOT carry __guardInstalled, so
+ * install() would see a fresh function and re-wrap it on its 300/800/2000ms
+ * retries — stacking three guards and causing unwanted suppressions.
+ *
+ * SOLUTION: use a stable flag on the window object (_ciliai_guard_active)
+ * that survives any number of function replacements. Only one guard layer
+ * is ever installed. When enhancements.js wraps addChatMessage, our flag
+ * is still set so we don't re-wrap.
+ */
 function installGuard() {
-    if (!win.addChatMessage || win.addChatMessage.__guardInstalled) return;
+    if (!win.addChatMessage) return;
+    if (win._ciliai_guard_active) return; /* already installed — don't stack */
+
     var origAdd = win.addChatMessage;
     win.addChatMessage = function(html, isUser) {
         if (isUser) return origAdd.call(this, html, isUser);
-        if (_suppressing) { console.debug('[CiliAI Interceptor] Blocked ciliai.js message'); return; }
+        if (_suppressing) {
+            console.debug('[CiliAI Interceptor] Blocked ciliai.js message');
+            return;
+        }
         return origAdd.call(this, html, isUser);
     };
+    /* Copy any existing properties so downstream patches still see them */
     win.addChatMessage.__guardInstalled = true;
+    win._ciliai_guard_active = true; /* stable sentinel on window — survives rewraps */
     console.log('[CiliAI Interceptor] Guard installed');
 }
 
 /*
- * FIX #7 — wrap() now preserves return value on non-intercepted paths.
- * Old code returned undefined when falling through to originalFn.
+ * wrap() patches a CiliAI query-handler function to intercept queries.
+ * When matchIntent returns a result, we:
+ *   1. Temporarily stop suppression so say() can deliver the HTML
+ *   2. Call say(html) to render the interceptor's response
+ *   3. Start suppression AFTER, so ciliai.js's own async response is blocked
+ * This ordering prevents the guard from blocking our own say() call.
  */
 function wrap(originalFn) {
     var wrapped = function(queryOrOpts) {
-        var text = (typeof queryOrOpts === 'string') ? queryOrOpts : (queryOrOpts && (queryOrOpts.text || queryOrOpts.raw || ''));
+        var text = (typeof queryOrOpts === 'string') ? queryOrOpts
+                 : (queryOrOpts && (queryOrOpts.text || queryOrOpts.raw || ''));
         if (!text || !text.trim()) return originalFn.apply(this, arguments);
         var intent = matchIntent(text);
         if (intent) {
             var html = dispatch(intent);
             if (html !== null && html !== undefined) {
-                say(html);
+                /* Pause suppression so our own message is not blocked */
+                var wasSuppressing = _suppressing;
+                _suppressing = false;
+                if (html !== '') say(html); /* empty string = PATH 1 bridge already rendered */
+                /* Re-arm suppression to block ciliai.js's async AI response */
                 startSuppression();
-                return; /* intercepted — don't call originalFn */
+                return; /* intercepted */
             }
         }
-        /* FIX: always return originalFn's result on non-intercepted paths */
         return originalFn.apply(this, arguments);
     };
     wrapped.__intercepted = true;
-    wrapped.__originalFn  = originalFn; /* preserve for phylo re-render fallback */
+    wrapped.__originalFn  = originalFn;
     return wrapped;
 }
 
@@ -1944,7 +1986,8 @@ function install() {
         win.handleAIQuery = wrap(win.handleAIQuery);
         console.log('[CiliAI Interceptor] Patched handleAIQuery');
     }
-    if (win.CiliAI && win.CiliAI.Router && typeof win.CiliAI.Router.dispatchAction === 'function' && !win.CiliAI.Router.dispatchAction.__intercepted) {
+    if (win.CiliAI && win.CiliAI.Router && typeof win.CiliAI.Router.dispatchAction === 'function'
+            && !win.CiliAI.Router.dispatchAction.__intercepted) {
         win.CiliAI.Router.dispatchAction = wrap(win.CiliAI.Router.dispatchAction);
         console.log('[CiliAI Interceptor] Patched Router.dispatchAction');
     }
@@ -1954,18 +1997,29 @@ function install() {
             console.log('[CiliAI Interceptor] Patched CiliAI.'+name);
         }
     });
+    /* Guard installed once only — window-level sentinel prevents re-stacking */
     installGuard();
 }
 
 install();
 setTimeout(install, 300);
 setTimeout(install, 800);
-setTimeout(install, 2000);
+/* NOTE: No 2000ms retry — by that point ciliai-enhancements.js has patched
+ * addChatMessage (at 500ms + 1500ms). A late install() would see a new
+ * addChatMessage that looks un-guarded and stack a second guard on top.
+ * The window._ciliai_guard_active sentinel handles this case safely. */
 
 /* Eagerly start loading Li2014 in the background so it's ready when needed */
 setTimeout(function(){ loadLi2014(null); }, 1500);
 
-win._CiliAI_Interceptor = {matchIntent: matchIntent, dispatch: dispatch, li2014BySymbol: function(){ return _li2014BySymbol; }};
+win._CiliAI_Interceptor = {
+    matchIntent:     matchIntent,
+    dispatch:        dispatch,
+    li2014BySymbol:  function(){ return _li2014BySymbol; },
+    startSuppression: startSuppression,
+    stopSuppression:  stopSuppression,
+    isSuppressing:    function(){ return _suppressing; }
+};
 win._ciliaiShowLastPhylo = function() {
     if (_lastPhyloGenes && _lastPhyloGenes.length) {
         var rendered = renderPhyloPlot(_lastPhyloGenes);
@@ -1975,6 +2029,6 @@ win._ciliaiShowLastPhylo = function() {
         startSuppression();
     }
 };
-console.log('[CiliAI Interceptor v4.1] Multi-colour comparison · Expanded compartment search · Ciliary tip fix loaded.');
+console.log('[CiliAI Interceptor v4.2] Guard singleton · wrap() ordering fix · suppression 1800ms loaded.');
 
 })(window);
