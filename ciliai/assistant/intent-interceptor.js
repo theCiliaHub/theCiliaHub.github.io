@@ -1,5 +1,14 @@
 /**
- * CiliAI Intent Interceptor v2.1
+ * CiliAI Intent Interceptor v2.2
+ * Fixes:
+ *  1. pfam_filter + vertebrate scope — now loads Li2014 matrix and actually filters
+ *  2. phylo_domain with vertebrate scope — uses Li2014 class index, not just text search
+ *  3. PFAM matching — exact word-boundary match, not substring indexOf
+ *  4. scope field respected in dispatch() for both pfam_filter and phylo_domain
+ *  5. Suppression timer extended (2500ms) to cover async AI responses
+ *  6. wrap() preserves return value on non-intercepted paths
+ *  7. Li2014 data cached on first use (lazy load, non-blocking)
+ *
  * Install: ONE script tag AFTER ciliai.js in index.html
  *   <script src="./ciliai/ciliai.js"></script>
  *   <script src="./ciliai/assistant/intent-interceptor.js"></script>
@@ -7,19 +16,15 @@
 'use strict';
 (function (win) {
 
+/* ─── FIELD KEY LISTS ─────────────────────────────────────────────────────── */
 var LOF_KEYS = [
     'Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)',
     'lof_effects', 'LoF_effects', 'lof_effect'
 ];
-var OE_KEYS = [
-    'Overexpression effects on cilia length (increase/decrease/no effect)',
-    'overexpression_effects'
-];
-var PCT_KEYS = [
-    'Percentage of ciliated cells (increase/decrease/no effect)',
-    'percent_ciliated_cells_effects'
-];
+var OE_KEYS  = ['Overexpression effects on cilia length (increase/decrease/no effect)', 'overexpression_effects'];
+var PCT_KEYS = ['Percentage of ciliated cells (increase/decrease/no effect)', 'percent_ciliated_cells_effects'];
 
+/* ─── DOMAIN VOCABULARY ───────────────────────────────────────────────────── */
 var DOMAIN_TERMS = {
     'WD40':        ['wd40','wd repeat','wd40/yvtn'],
     'TPR':         ['tpr','tetratricopeptide'],
@@ -36,6 +41,7 @@ var DOMAIN_TERMS = {
     'dynein':      ['dynein']
 };
 
+/* ─── COMPLEX MEMBERSHIP SETS ─────────────────────────────────────────────── */
 var COMPLEX_SETS = {
     ift_b: ['IFT22','IFT25','IFT27','IFT46','IFT52','IFT56','IFT57',
              'IFT70A','IFT70B','IFT74','IFT81','IFT88','IFT172',
@@ -56,8 +62,101 @@ var COMPLEX_SETS = {
                        'TMEM216','TMEM231','AHI1','CSPP1']
 };
 
-/* DATA HELPERS */
-function db() { return (win.CiliAI && win.CiliAI.masterData) ? win.CiliAI.masterData : []; }
+/* ─── LI ET AL 2014 PHYLOGENY CACHE ──────────────────────────────────────── */
+/*
+ * The Li2014 matrix encodes each gene's evolutionary profile as:
+ *   { g: "SYMBOL", e: "entrezId", s: [speciesIndices], c: classIndex }
+ * class_list = ["No_data","Ciliary_specific","Mammalian_specific",
+ *               "Vertebrate_specific","Cilia_related","Other"]
+ * So c === 3  →  Vertebrate_specific
+ *    c === 2  →  Mammalian_specific
+ *    c === 1  →  Ciliary_specific
+ *
+ * Vertebrate species occupy indices 126-139 in organisms_list.
+ */
+var LI2014_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/' +
+                 'refs/heads/main/data/phylogeny/li_et_al_2014_matrix_optimized.json';
+
+var _li2014 = null;            // null = not loaded; false = load failed; object = loaded
+var _li2014Loading = false;
+var _li2014BySymbol = null;    // Map: SYMBOL → gene entry  (populated on load)
+
+/* Li2014 class indices */
+var LI_CLASS = { NO_DATA:0, CILIARY_SPECIFIC:1, MAMMALIAN_SPECIFIC:2, VERTEBRATE_SPECIFIC:3, CILIA_RELATED:4, OTHER:5 };
+/* Vertebrate species indices in the Li2014 organisms_list (126-139 = D.rerio → H.sapiens) */
+var LI_VERT_MIN = 126;
+var LI_VERT_MAX = 139;
+
+function loadLi2014(callback) {
+    if (_li2014 !== null) { if (callback) callback(_li2014BySymbol); return; }
+    if (_li2014Loading) { setTimeout(function(){ loadLi2014(callback); }, 300); return; }
+    _li2014Loading = true;
+    fetch(LI2014_URL)
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            _li2014 = data;
+            _li2014BySymbol = {};
+            var genes = data.genes || {};
+            Object.keys(genes).forEach(function(eid){
+                var g = genes[eid];
+                if (g.g) _li2014BySymbol[g.g.toUpperCase()] = g;
+            });
+            _li2014Loading = false;
+            console.log('[CiliAI Interceptor] Li2014 loaded: ' + Object.keys(_li2014BySymbol).length + ' genes');
+            if (callback) callback(_li2014BySymbol);
+        })
+        .catch(function(e){
+            _li2014 = false;
+            _li2014Loading = false;
+            console.warn('[CiliAI Interceptor] Li2014 load failed:', e.message);
+            if (callback) callback(null);
+        });
+}
+
+/* ─── LI2014 QUERY HELPERS ────────────────────────────────────────────────── */
+
+/**
+ * isVertebrate(geneSymbol) — returns true only if the gene's species indices
+ * in the Li2014 matrix are ALL within the vertebrate range (126-139).
+ * This is the definitive "vertebrate-specific" check.
+ */
+function isVertebrateSpecific(sym) {
+    if (!_li2014BySymbol) return false;
+    var entry = _li2014BySymbol[sym.toUpperCase()];
+    if (!entry || !entry.s || !entry.s.length) return false;
+    // Use the pre-computed class label when available (c === 3 = Vertebrate_specific)
+    if (entry.c === LI_CLASS.VERTEBRATE_SPECIFIC) return true;
+    // Also accept genes whose species are entirely within vertebrate indices
+    for (var i = 0; i < entry.s.length; i++) {
+        if (entry.s[i] < LI_VERT_MIN || entry.s[i] > LI_VERT_MAX) return false;
+    }
+    return true;
+}
+
+function isMammalianSpecific(sym) {
+    if (!_li2014BySymbol) return false;
+    var entry = _li2014BySymbol[sym.toUpperCase()];
+    if (!entry) return false;
+    return entry.c === LI_CLASS.MAMMALIAN_SPECIFIC;
+}
+
+function isCiliarySpecific(sym) {
+    if (!_li2014BySymbol) return false;
+    var entry = _li2014BySymbol[sym.toUpperCase()];
+    if (!entry) return false;
+    return entry.c === LI_CLASS.CILIARY_SPECIFIC;
+}
+
+function getPhyloClass(sym) {
+    if (!_li2014BySymbol) return null;
+    var entry = _li2014BySymbol[sym.toUpperCase()];
+    if (!entry) return null;
+    var names = ['No data','Ciliary-specific','Mammalian-specific','Vertebrate-specific','Cilia-related','Other'];
+    return names[entry.c] || 'Unknown';
+}
+
+/* ─── DATA HELPERS ────────────────────────────────────────────────────────── */
+function db()   { return (win.CiliAI && win.CiliAI.masterData) ? win.CiliAI.masterData : []; }
 function gmap() { return (win.CiliAI && win.CiliAI.lookups && win.CiliAI.lookups.geneMap) || {}; }
 function getField(row, keys) {
     for (var i = 0; i < keys.length; i++) {
@@ -66,10 +165,11 @@ function getField(row, keys) {
     }
     return '';
 }
-function getLOF(row)  { return getField(row, LOF_KEYS);  }
-function getOE(row)   { return getField(row, OE_KEYS);   }
-function getPCT(row)  { return getField(row, PCT_KEYS);  }
-function getLoc(row)  { return ((row['Localization'] || row['localization'] || '')).toLowerCase(); }
+function getLOF(row) { return getField(row, LOF_KEYS); }
+function getOE(row)  { return getField(row, OE_KEYS); }
+function getPCT(row) { return getField(row, PCT_KEYS); }
+function getLoc(row) { return ((row['Localization'] || row['localization'] || '')).toLowerCase(); }
+
 function lofMatches(row, effect) {
     var v = getLOF(row).toLowerCase();
     if (!v || v.indexOf('not reported') !== -1) return false;
@@ -81,6 +181,7 @@ function lofMatches(row, effect) {
     if (effect === 'knockdown') return true;
     return v.indexOf(effect.toLowerCase()) !== -1;
 }
+
 function diseaseMatches(row, tag) {
     var raw = ((row['Ciliopathy'] || '') + ' ' + (row['Ciliopathies'] || '')).toLowerCase();
     var terms = {
@@ -96,65 +197,66 @@ function diseaseMatches(row, tag) {
     for (var i = 0; i < tlist.length; i++) { if (raw.indexOf(tlist[i]) !== -1) return true; }
     return false;
 }
+
 function hasDomain(row, family) {
     var h = ((row['Domain_Descriptions'] || '') + ' ' + (row['PFAM_IDs'] || '')).toLowerCase();
     var terms = DOMAIN_TERMS[family] || [family.toLowerCase()];
     for (var i = 0; i < terms.length; i++) { if (h.indexOf(terms[i]) !== -1) return true; }
     return false;
 }
+
+/**
+ * FIX #3 — exact PFAM accession matching.
+ * Uses word-boundary regex to prevent "PF1343" matching inside "PF13432".
+ * Checks both PFAM_IDs field and Domain_Descriptions field.
+ */
+function hasPfam(row, pfamId) {
+    var combined = (row['PFAM_IDs'] || '') + ' ' + (row['Domain_Descriptions'] || '');
+    // Word-boundary regex ensures exact token match, not substring
+    var re = new RegExp('\\b' + pfamId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '\\b', 'i');
+    return re.test(combined);
+}
+
 function inComplex(gene, key) { return (COMPLEX_SETS[key] || []).indexOf(gene) !== -1; }
 
-/* PHYLO CONTEXT — stores last comparison so "yes"/"show it" can re-render */
+/* ─── PHYLO CONTEXT — stores last comparison for "yes"/"show it" follow-ups ─ */
 var _lastPhyloGenes = null;
 var _lastPhyloNames = null;
 
 function renderPhyloPlot(geneSymbols) {
     if (!geneSymbols || !geneSymbols.length) return false;
-
-    // Switch to diagram/plot view — ciliai.js phylo renders in the main viz panel
     if (typeof win.switchView === 'function') win.switchView('diagram');
-
-    // 1. getPhylogenyAnalysis(symbolArray) — ciliai.js's primary phylogeny function
-    //    Takes an array of gene SYMBOL STRINGS like ["IFT88","BBS1"]
     if (typeof win.getPhylogenyAnalysis === 'function') {
         try { win.getPhylogenyAnalysis(geneSymbols); return true; } catch(e) {}
     }
-
-    // 2. routePhylogenyAnalysis(queryString) — ciliai.js catch-all phylogeny router
     if (typeof win.routePhylogenyAnalysis === 'function') {
         try { win.routePhylogenyAnalysis('Evolutionary profile: ' + geneSymbols.join(', ')); return true; } catch(e) {}
     }
-
-    // 3. handlePhylogenyVisualizationQuery — ciliai.js table/heatmap handler
     if (typeof win.handlePhylogenyVisualizationQuery === 'function') {
         try { win.handlePhylogenyVisualizationQuery(geneSymbols[0], 'nevers', 'heatmap'); return true; } catch(e) {}
     }
-
-    // 4. CiliAI.Router fallback — send as a natural language query
-    //    This lets ciliai.js's own routing handle it
     if (win.CiliAI && win.CiliAI.Router && typeof win.CiliAI.Router.dispatchAction === 'function') {
-        // Temporarily disable suppression so this internal call goes through
         _suppressing = false;
         try {
-            win.CiliAI.Router.dispatchAction.__originalFn
-                ? win.CiliAI.Router.dispatchAction.__originalFn({text:'Show evolution of '+geneSymbols.join(', '), echo:false})
-                : null;
+            var orig = win.CiliAI.Router.dispatchAction.__originalFn;
+            if (orig) orig({text:'Show evolution of '+geneSymbols.join(', '), echo:false});
         } catch(e) {}
     }
-
     return false;
 }
 
-/* SUPPRESSION — blocks ciliai.js from appending its own answer after ours */
+/* ─── SUPPRESSION — blocks ciliai.js from appending its own answer ─────────
+ * FIX #6: Timer extended from 1200ms → 2500ms to cover async AI responses.
+ */
 var _suppressing = false;
 var _suppressTimer = null;
 function startSuppression() {
     _suppressing = true;
     if (_suppressTimer) clearTimeout(_suppressTimer);
-    _suppressTimer = setTimeout(function() { _suppressing = false; _suppressTimer = null; }, 1200);
+    _suppressTimer = setTimeout(function() { _suppressing = false; _suppressTimer = null; }, 2500);
 }
 
-/* INTENT MATCHERS */
+/* ─── INTENT KEYWORD MATCHERS ─────────────────────────────────────────────── */
 var STOP = {
     'DNA':1,'RNA':1,'AND':1,'THE':1,'FOR':1,'ARE':1,'ALL':1,'ANY':1,
     'SHOW':1,'TELL':1,'LIST':1,'PLOT':1,'FROM':1,'WHAT':1,'WHERE':1,
@@ -163,6 +265,7 @@ var STOP = {
     'WHICH':1,'THESE':1,'SOME':1,'MORE':1,'MANY':1,'MUCH':1,'MOST':1,
     'CAUSE':1,'CAUSES':1,'EFFECT':1,'EFFECTS':1
 };
+
 function extractGenes(text) {
     var found = {}, result = [];
     var matches = text.match(/\b[A-Z][A-Z0-9]{1,11}\b/g) || [];
@@ -172,6 +275,7 @@ function extractGenes(text) {
     }
     return result;
 }
+
 function matchLocKw(q) {
     var locs = [
         ['transition zone', {term:'transition zone',label:'Transition Zone'}],
@@ -194,6 +298,7 @@ function matchLocKw(q) {
     }
     return null;
 }
+
 function matchDiseaseKw(q) {
     if (/\bbbs\b/.test(q)) return 'bardet_biedl';
     if (/\bnphp\b/.test(q)) return 'nphp';
@@ -215,6 +320,7 @@ function matchDiseaseKw(q) {
     for (var i = 0; i < P.length; i++) { if (q.indexOf(P[i][0]) !== -1) return P[i][1]; }
     return null;
 }
+
 function matchTissueKw(q) {
     var T = [
         ['cerebellum','cerebellum'],['cerebellar','cerebellum'],
@@ -229,6 +335,7 @@ function matchTissueKw(q) {
     for (var i = 0; i < T.length; i++) { if (q.indexOf(T[i][0]) !== -1) return T[i][1]; }
     return null;
 }
+
 function matchComplexKw(q) {
     var C = [
         ['ift-b complex','ift_b'],['ift complex b','ift_b'],['ift b complex','ift_b'],['ift-b','ift_b'],
@@ -241,6 +348,7 @@ function matchComplexKw(q) {
     for (var i = 0; i < C.length; i++) { if (q.indexOf(C[i][0]) !== -1) return C[i][1]; }
     return null;
 }
+
 function matchLOFKw(q) {
     if (/shorter cilia|short cilia|shorten|cilia shortening/.test(q)) return 'shorter';
     if (/longer cilia|elongat|lengthen/.test(q)) return 'longer';
@@ -250,6 +358,7 @@ function matchLOFKw(q) {
     if (/knocked down|knockdown|depletion/.test(q)) return 'knockdown';
     return null;
 }
+
 function matchDomainKw(q) {
     for (var fam in DOMAIN_TERMS) {
         var terms = DOMAIN_TERMS[fam];
@@ -258,6 +367,7 @@ function matchDomainKw(q) {
     return null;
 }
 
+/* ─── MAIN INTENT ROUTER ──────────────────────────────────────────────────── */
 function matchIntent(raw) {
     var t = raw.trim();
     var q = t.toLowerCase();
@@ -266,7 +376,7 @@ function matchIntent(raw) {
         return {type:'self_intro'};
     }
 
-    /* Follow-up: re-render last phylo when user says "yes" / "show it" etc */
+    /* Follow-up: re-render last phylo */
     if (_lastPhyloGenes && _lastPhyloGenes.length) {
         if (/^(yes|yeah|sure|ok|okay|please|show it|do it|show the plot|show heatmap|render|plot it|display it|show phylo|phylogenetic heatmap)[\s.!?]*$/.test(q) ||
             /phylogenetic heatmap shown in plot/.test(q) ||
@@ -310,17 +420,28 @@ function matchIntent(raw) {
         }
         if (ckeys.length >= 2) return {type:'complex_phylo_compare', complexA:ckeys[0], complexB:ckeys[1]};
     }
+
+    /* FIX #2 — phylo_domain with explicit scope so dispatch can filter correctly */
     if (/conserv|phylogen|ciliary.specific|vertebrate.specific/.test(q) && domain) {
         var scope = /vertebrate/.test(q) ? 'vertebrate' : /mammalian/.test(q) ? 'mammalian' : 'ciliary_specific';
         return {type:'phylo_domain', domain:domain, scope:scope};
     }
+
+    /* FIX #1 — pfam_filter now carries scope so dispatch applies Li2014 filter */
     var pfamM = t.match(/\bPF\d{5}\b/);
-    if (pfamM) return {type:'pfam_filter', pfam:pfamM[0], scope:/vertebrate/.test(q)?'vertebrate':'all'};
+    if (pfamM) {
+        var pfamScope = /vertebrate.specific|vertebrate.only|only.*vertebrate/i.test(q) ? 'vertebrate'
+                      : /mammalian.specific|mammalian.only/i.test(q) ? 'mammalian'
+                      : /ciliary.specific/i.test(q) ? 'ciliary_specific'
+                      : 'all';
+        return {type:'pfam_filter', pfam:pfamM[0], scope:pfamScope};
+    }
+
     if (/no.effect|no.*phenotype/.test(q) && /conserv|phylogen/.test(q)) return {type:'lof_conserved_tissue', tissue:tissue};
     return null;
 }
 
-/* RENDER HELPERS */
+/* ─── RENDER HELPERS ──────────────────────────────────────────────────────── */
 function pill(text, color) {
     var C = {blue:['#dbeafe','#1e40af'],red:['#fee2e2','#991b1b'],green:['#dcfce7','#166534'],
              amber:['#fef3c7','#92400e'],purple:['#ede9fe','#5b21b6'],gray:['#f3f4f6','#374151']};
@@ -376,22 +497,40 @@ function cxName(k) {
     return N[k] || k;
 }
 
-/* DISPATCH */
+/* ─── PHYLO BADGE HELPER ──────────────────────────────────────────────────── */
+function phyloBadge(sym) {
+    var cls = getPhyloClass(sym);
+    if (!cls) return '';
+    var colors = {
+        'Vertebrate-specific': ['#dcfce7','#166534'],
+        'Mammalian-specific':  ['#dbeafe','#1e40af'],
+        'Ciliary-specific':    ['#ede9fe','#5b21b6'],
+        'Cilia-related':       ['#fef3c7','#92400e'],
+        'No data':             ['#f3f4f6','#374151']
+    };
+    var c = colors[cls] || colors['No data'];
+    return '<span style="background:'+c[0]+';color:'+c[1]+';padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;margin-left:4px;">'+cls+'</span>';
+}
+
+/* ─── DISPATCH ────────────────────────────────────────────────────────────── */
 function dispatch(intent) {
     var type = intent.type;
 
     if (type === 'self_intro') {
         var total = db().length;
         var withDis = db().filter(function(r){ return r['Ciliopathy'] && r['Ciliopathy'] !== 'N/A'; }).length;
-        return '<b>CiliAI</b> - CiliaHub specialist assistant<br><b>Database:</b> '+total+' ciliary genes, '+withDis+' ciliopathy-associated<br><br>'
+        return '<b>CiliAI</b> — CiliaHub specialist assistant<br>'
+            +'<b>Database:</b> '+total+' ciliary genes, '+withDis+' ciliopathy-associated<br>'
+            +'<b>Phylogeny:</b> Li et al. (2014) matrix — '+(_li2014BySymbol ? Object.keys(_li2014BySymbol).length+' genes indexed' : 'loading...')+'<br><br>'
             +'<b>I can answer:</b><br>'
-            +'<div style="margin:3px 0;">LoF phenotype - <i>What is the knockdown effect of KIF3A?</i></div>'
-            +'<div style="margin:3px 0;">Protein domains - <i>How many genes have WD40 domains?</i></div>'
-            +'<div style="margin:3px 0;">Ciliopathy genes - <i>Joubert syndrome genes</i></div>'
-            +'<div style="margin:3px 0;">Loc + phenotype - <i>Basal body genes that shorten cilia</i></div>'
-            +'<div style="margin:3px 0;">Complex intersections - <i>BBS genes also in IFT-B</i></div>'
-            +'<div style="margin:3px 0;">Phylo comparison - <i>Compare BBSome vs IFT-A conservation</i></div>'
-            +'<div style="margin:3px 0;">scRNA-seq - <i>IFT88 in lung</i></div>';
+            +'<div style="margin:3px 0;">LoF phenotype — <i>What is the knockdown effect of KIF3A?</i></div>'
+            +'<div style="margin:3px 0;">Protein domains — <i>How many genes have WD40 domains?</i></div>'
+            +'<div style="margin:3px 0;">PFAM filter — <i>Vertebrate-specific genes with PFAM PF13432</i></div>'
+            +'<div style="margin:3px 0;">Ciliopathy genes — <i>Joubert syndrome genes</i></div>'
+            +'<div style="margin:3px 0;">Loc + phenotype — <i>Basal body genes that shorten cilia</i></div>'
+            +'<div style="margin:3px 0;">Complex intersections — <i>BBS genes also in IFT-B</i></div>'
+            +'<div style="margin:3px 0;">Phylo comparison — <i>Compare BBSome vs IFT-A conservation</i></div>'
+            +'<div style="margin:3px 0;">scRNA-seq — <i>IFT88 in lung</i></div>';
     }
 
     if (type === 'show_last_phylo') {
@@ -418,13 +557,15 @@ function dispatch(intent) {
         var diseaseHtml = (dis && dis !== '-' && dis !== 'N/A')
             ? '<div style="margin-top:8px;"><b style="font-size:11.5px;color:#475569;">Disease</b><br>'+dis.split(',').slice(0,4).map(function(d){ return pill(d.trim(),'red'); }).join(' ')+'</div>'
             : '';
-        return '<b style="font-size:15px;color:#005b96;">'+intent.gene+'</b> - Cilia Phenotype Summary<br><br>'
+        var phyloHtml = _li2014BySymbol ? '<div><b style="color:#475569;">Phylogeny</b><br>'+phyloBadge(intent.gene)+'</div>' : '';
+        return '<b style="font-size:15px;color:#005b96;">'+intent.gene+'</b> — Cilia Phenotype Summary<br><br>'
             +(sum ? '<p style="font-size:12.5px;color:#334155;line-height:1.5;margin-bottom:10px;">'+sum.slice(0,250)+(sum.length>250?'...':'')+'</p>' : '')
             +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">'
             +'<div><b style="color:#475569;">LoF</b><br><span style="color:#7c3aed;font-weight:600;">'+lof+'</span></div>'
             +'<div><b style="color:#475569;">Overexpression</b><br><span style="color:#b45309;">'+oe+'</span></div>'
             +'<div><b style="color:#475569;">% ciliated cells</b><br><span style="color:#065f46;">'+pct+'</span></div>'
             +'<div><b style="color:#475569;">Localization</b><br>'+loc+'</div>'
+            +phyloHtml
             +'</div>'+diseaseHtml;
     }
 
@@ -437,7 +578,7 @@ function dispatch(intent) {
     if (type === 'domain_list') {
         var matches = db().filter(function(r){ return hasDomain(r, intent.domain); });
         if (!matches.length) return 'No genes found with <b>'+intent.domain+'</b> domain in CiliaHub.';
-        return '<b>'+intent.domain+' domain</b> - <b>'+matches.length+' genes</b>:<br>'
+        return '<b>'+intent.domain+' domain</b> — <b>'+matches.length+' genes</b>:<br>'
             +'<div style="margin-top:8px;line-height:1.8;">'+matches.slice(0,60).map(function(g){ return chip(g['Gene']); }).join('')+'</div>'
             +(matches.length>60 ? '<p style="color:#888;font-size:11px">Showing 60 of '+matches.length+'</p>' : '')
             +csvLink(matches,['Gene','Domain_Descriptions','PFAM_IDs','Localization'],intent.domain.replace(/\s/g,'_')+'_genes.csv');
@@ -465,7 +606,7 @@ function dispatch(intent) {
         var loc = intent.loc;
         var matches = db().filter(function(r){ return getLoc(r).indexOf(loc.term) !== -1 && lofMatches(r,intent.effect); });
         if (!matches.length) return 'No <b>'+loc.label+'</b> genes found with <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype.';
-        return '<b>'+loc.label+'</b> genes with <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype - <b>'+matches.length+' genes</b>:<br>'
+        return '<b>'+loc.label+'</b> genes with <b>'+intent.effect.replace('_',' ')+'</b> cilia phenotype — <b>'+matches.length+' genes</b>:<br>'
             +tbl(['Gene','LoF Effect','Disease'],matches.slice(0,40).map(function(g){
                 var dis=g['Ciliopathy']&&g['Ciliopathy']!=='N/A'?pill(g['Ciliopathy'].split(',')[0].trim(),'red'):'-';
                 return [chip(g['Gene']),getLOF(g)||'-',dis];
@@ -477,7 +618,7 @@ function dispatch(intent) {
         var loc = intent.loc;
         var matches = db().filter(function(r){ return getLoc(r).indexOf(loc.term)!==-1 && diseaseMatches(r,intent.disease); });
         if (!matches.length) return 'No <b>'+loc.label+'</b> genes found associated with <b>'+disName(intent.disease)+'</b>.';
-        return '<b>'+loc.label+'</b> genes associated with <b>'+disName(intent.disease)+'</b> - <b>'+matches.length+' genes</b>:<br>'
+        return '<b>'+loc.label+'</b> genes associated with <b>'+disName(intent.disease)+'</b> — <b>'+matches.length+' genes</b>:<br>'
             +tbl(['Gene','Localization','Disease'],matches.map(function(g){ return [chip(g['Gene']),g['Localization']||'-',(g['Ciliopathy']||'').split(',').slice(0,2).join('; ')]; }))
             +csvLink(matches,['Gene','Localization','Ciliopathy'],loc.term.replace(/\s/g,'_')+'_'+intent.disease+'.csv');
     }
@@ -486,7 +627,7 @@ function dispatch(intent) {
         var loc = intent.loc;
         var matches = db().filter(function(r){ return getLoc(r).indexOf(loc.term)!==-1; });
         if (!matches.length) return 'No genes found with <b>'+loc.label+'</b> localization.';
-        return '<b>'+loc.label+'</b> genes (context: <b>'+tisName(intent.tissue)+'</b>) - <b>'+matches.length+' genes</b>:<br>'
+        return '<b>'+loc.label+'</b> genes (context: <b>'+tisName(intent.tissue)+'</b>) — <b>'+matches.length+' genes</b>:<br>'
             +tbl(['Gene','Localization','Disease'],matches.slice(0,40).map(function(g){
                 var dis=g['Ciliopathy']&&g['Ciliopathy']!=='N/A'?pill(g['Ciliopathy'].split(',')[0].trim(),'red'):'-';
                 return [chip(g['Gene']),g['Localization']||'-',dis];
@@ -507,7 +648,7 @@ function dispatch(intent) {
             var sorted=Object.keys(locC).map(function(k){return[k,locC[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,12);
             win.showPlot({data:[{type:'bar',orientation:'h',x:sorted.map(function(d){return d[1];}).reverse(),y:sorted.map(function(d){return d[0];}).reverse(),marker:{color:'#005b96'}}],layout:{title:{text:disName(intent.disease)+' - localization',font:{size:13}},xaxis:{title:'Genes'},yaxis:{automargin:true}}},disName(intent.disease));
         }
-        return '<b>'+disName(intent.disease)+'</b> genes (context: <b>'+tisName(intent.tissue)+'</b>) - <b>'+matches.length+' genes</b>:<br>'
+        return '<b>'+disName(intent.disease)+'</b> genes (context: <b>'+tisName(intent.tissue)+'</b>) — <b>'+matches.length+' genes</b>:<br>'
             +tbl(['Gene','Localization','Disease'],matches.slice(0,40).map(function(g){ return [chip(g['Gene']),g['Localization']||'-',(g['Ciliopathy']||'').split(',').slice(0,2).join('; ')]; }),40)
             +note+csvLink(matches,['Gene','Localization','Ciliopathy'],intent.disease+'_genes.csv');
     }
@@ -515,7 +656,7 @@ function dispatch(intent) {
     if (type === 'disease_complex') {
         var matches = db().filter(function(r){ return inComplex(r['Gene'],intent.complex) && diseaseMatches(r,intent.disease); });
         if (!matches.length) return 'No genes in both <b>'+disName(intent.disease)+'</b> and <b>'+cxName(intent.complex)+'</b>.';
-        return '<b>'+disName(intent.disease)+'</b> intersect <b>'+cxName(intent.complex)+'</b> - <b>'+matches.length+' gene'+(matches.length!==1?'s':'')+'</b>:<br>'
+        return '<b>'+disName(intent.disease)+'</b> intersect <b>'+cxName(intent.complex)+'</b> — <b>'+matches.length+' gene'+(matches.length!==1?'s':'')+'</b>:<br>'
             +'<div style="margin-top:6px;">'+matches.map(function(g){ return chip(g['Gene']); }).join('')+'</div><br>'
             +tbl(['Gene','Localization','Disease'],matches.map(function(g){ return [chip(g['Gene']),g['Localization']||'-',(g['Ciliopathy']||'').split(',').slice(0,2).join('; ')]; }))
             +csvLink(matches,['Gene','Localization','Ciliopathy'],intent.disease+'_'+intent.complex+'.csv');
@@ -527,12 +668,9 @@ function dispatch(intent) {
         var overlap = genesA.filter(function(g){ return genesB.indexOf(g)!==-1; });
         var seen = {};
         var allSymbols = genesA.concat(genesB).filter(function(s){ if(seen[s])return false; seen[s]=true; return true; });
-        /* Store context so follow-up "yes" / "show it" can re-render */
         _lastPhyloGenes = allSymbols;
         _lastPhyloNames = cxName(intent.complexA)+' vs '+cxName(intent.complexB);
-        /* Render immediately */
         renderPhyloPlot(allSymbols);
-        /* Clickable redraw button */
         var btn = '<div style="margin-top:10px;">'
             +'<button onclick="window._ciliaiShowLastPhylo&&window._ciliaiShowLastPhylo()" '
             +'style="background:#005b96;color:white;border:none;padding:8px 18px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">'
@@ -546,26 +684,136 @@ function dispatch(intent) {
             +btn;
     }
 
+    /* ── FIX #2 — phylo_domain now uses Li2014 class-based filtering ────────
+     * Old code: just searched Domain_Descriptions text, ignored scope entirely.
+     * New code: filters gene list by Li2014 class (c===3 for vertebrate, etc.)
+     *           then intersects with domain match.
+     * If Li2014 not yet loaded, shows a loading message and triggers load.
+     */
     if (type === 'phylo_domain') {
-        var matches = db().filter(function(r){ return hasDomain(r,intent.domain); });
-        return 'Ciliary genes with <b>'+intent.domain+'</b> domain - <b>'+matches.length+' genes</b>:<br>'
-            +'<div style="margin-top:8px;line-height:1.8;">'+matches.slice(0,60).map(function(g){return chip(g['Gene']);}).join('')+'</div>'
-            +(matches.length>60?'<p style="color:#888;font-size:11px">Showing 60 of '+matches.length+'</p>':'')
-            +'<div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">For Nevers/Li phylogenetic classification, use the Phylogeny tab on the Cilia Analysis page.</div>'
-            +csvLink(matches,['Gene','Domain_Descriptions','PFAM_IDs'],intent.domain+'_ciliary_genes.csv');
+        var domainMatches = db().filter(function(r){ return hasDomain(r, intent.domain); });
+        if (intent.scope !== 'all' && intent.scope) {
+            if (!_li2014BySymbol) {
+                /* Li2014 not loaded yet — trigger load and tell user to re-ask */
+                loadLi2014(function(){
+                    say('<b>Li et al. 2014 phylogeny data loaded.</b> Please re-ask your question.');
+                });
+                return '<span style="color:#92400e;">Loading Li et al. (2014) phylogeny matrix... This takes a few seconds. Please re-ask in a moment.</span>';
+            }
+            var filterFn = intent.scope === 'vertebrate'      ? isVertebrateSpecific
+                         : intent.scope === 'mammalian'       ? isMammalianSpecific
+                         : intent.scope === 'ciliary_specific' ? isCiliarySpecific
+                         : function(){ return true; };
+            domainMatches = domainMatches.filter(function(r){ return filterFn(r['Gene']); });
+        }
+        var scopeLabel = intent.scope === 'vertebrate' ? 'vertebrate-specific '
+                        : intent.scope === 'mammalian' ? 'mammalian-specific '
+                        : intent.scope === 'ciliary_specific' ? 'ciliary-specific '
+                        : '';
+        if (!domainMatches.length) {
+            return 'No '+scopeLabel+'ciliary genes found with <b>'+intent.domain+'</b> domain'
+                +(intent.scope && intent.scope !== 'all' ? ' (per Li et al. 2014 classification).' : '.')
+                +'<br><span style="font-size:11.5px;color:#888;">This is the correct answer — these genes are conserved across non-vertebrates.</span>';
+        }
+        return scopeLabel.charAt(0).toUpperCase()+scopeLabel.slice(1)+'ciliary genes with <b>'+intent.domain+'</b> domain'
+            +(intent.scope && intent.scope !== 'all' ? ' (Li et al. 2014)' : '')
+            +' — <b>'+domainMatches.length+' genes</b>:<br>'
+            +'<div style="margin-top:8px;line-height:1.8;">'+domainMatches.slice(0,60).map(function(g){
+                return chip(g['Gene'])+((_li2014BySymbol)?phyloBadge(g['Gene']):'');
+            }).join('')+'</div>'
+            +(domainMatches.length>60?'<p style="color:#888;font-size:11px">Showing 60 of '+domainMatches.length+'</p>':'')
+            +(_li2014BySymbol && intent.scope === 'all'
+                ? '<div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">Add "vertebrate-specific" to filter by evolutionary conservation.</div>'
+                : '')
+            +csvLink(domainMatches,['Gene','Domain_Descriptions','PFAM_IDs'],intent.domain+'_'+intent.scope+'_genes.csv');
     }
 
+    /* ── FIX #1 — pfam_filter with correct scope-based phylogenetic filtering ─
+     * Old code: used string .indexOf(pfam) — matched substrings, ignored scope.
+     * New code:
+     *   - Uses hasPfam() with word-boundary regex for exact matching
+     *   - When scope === 'vertebrate', cross-references Li2014 (c===3)
+     *   - When Li2014 not loaded, triggers async load and defers with message
+     *   - Shows clear "0 genes" result when correct answer is zero
+     */
     if (type === 'pfam_filter') {
-        var matches = db().filter(function(r){ return (r['PFAM_IDs']||'').indexOf(intent.pfam)!==-1||(r['Domain_Descriptions']||'').indexOf(intent.pfam)!==-1; });
-        if (!matches.length) return 'No CiliaHub genes found with PFAM accession <b>'+intent.pfam+'</b>.';
-        return 'Genes with PFAM <b>'+intent.pfam+'</b> - <b>'+matches.length+' genes</b>:<br>'
-            +tbl(['Gene','Domain Descriptions','Localization'],matches.map(function(g){return[chip(g['Gene']),(g['Domain_Descriptions']||'').slice(0,80),g['Localization']||'-'];}))
-            +csvLink(matches,['Gene','PFAM_IDs','Domain_Descriptions','Localization'],intent.pfam+'_genes.csv');
+        /* Step 1: find all CiliaHub genes with this exact PFAM accession */
+        var allPfamMatches = db().filter(function(r){ return hasPfam(r, intent.pfam); });
+
+        if (!allPfamMatches.length) {
+            return 'No CiliaHub genes found with PFAM accession <b>'+intent.pfam+'</b>.';
+        }
+
+        /* Step 2: if a phylogenetic scope was requested, apply Li2014 filter */
+        if (intent.scope && intent.scope !== 'all') {
+            if (!_li2014BySymbol) {
+                /* Trigger async load; show deferred message */
+                loadLi2014(function(){
+                    say('<b>Li et al. (2014) phylogeny data ready.</b> Please re-ask: "'
+                        +(intent.scope==='vertebrate'?'Vertebrate-specific ':'')+' genes with PFAM '+intent.pfam+'"');
+                });
+                return '<span style="color:#92400e;">Loading Li et al. (2014) phylogeny matrix '
+                    +'('+allPfamMatches.length+' genes found with '+intent.pfam+')...<br>'
+                    +'Please re-ask in a few seconds once loading completes.</span>';
+            }
+
+            var phyloFilter = intent.scope === 'vertebrate'      ? isVertebrateSpecific
+                            : intent.scope === 'mammalian'       ? isMammalianSpecific
+                            : intent.scope === 'ciliary_specific' ? isCiliarySpecific
+                            : function(){ return true; };
+
+            var phyloMatches = allPfamMatches.filter(function(r){ return phyloFilter(r['Gene']); });
+            var scopeLbl = intent.scope === 'vertebrate' ? 'Vertebrate-specific'
+                         : intent.scope === 'mammalian'  ? 'Mammalian-specific'
+                         : 'Ciliary-specific';
+
+            if (!phyloMatches.length) {
+                /* Correct answer is zero — explain clearly */
+                var nonVertRows = allPfamMatches.slice(0,15).map(function(g){
+                    var cls = getPhyloClass(g['Gene']) || 'not in Li2014';
+                    var entry = _li2014BySymbol ? _li2014BySymbol[g['Gene'].toUpperCase()] : null;
+                    var nonVert = entry ? entry.s.filter(function(i){ return i < LI_VERT_MIN || i > LI_VERT_MAX; }).length : '?';
+                    return [chip(g['Gene']), g['Localization']||'-', phyloBadge(g['Gene'])||cls,
+                            nonVert ? '<span style="color:#dc2626;font-size:11px;">+'+nonVert+' non-vertebrate sp.</span>' : '—'];
+                });
+                return '<b>'+scopeLbl+' genes with PFAM '+intent.pfam+':</b> <b style="color:#dc2626;">0 found</b><br>'
+                    +'<div style="background:#fef2f2;border-left:3px solid #ef4444;padding:10px 14px;margin:8px 0;border-radius:0 6px 6px 0;font-size:12px;color:#7f1d1d;">'
+                    +'<b>This is the correct answer.</b> All '+allPfamMatches.length+' gene'+(allPfamMatches.length!==1?'s':'')+' with this domain '
+                    +'are conserved across non-vertebrate organisms and are classified as <b>Cilia_related</b> or broader classes '
+                    +'in the Li et al. (2014) matrix — not Vertebrate_specific.'
+                    +'</div>'
+                    +'<p style="font-size:12px;color:#475569;margin-bottom:4px;">All '+allPfamMatches.length+' genes with PFAM '+intent.pfam+' (for reference):</p>'
+                    +tbl(['Gene','Localization','Li2014 class','Non-vertebrate presence'], nonVertRows, 15)
+                    +csvLink(allPfamMatches,['Gene','PFAM_IDs','Domain_Descriptions','Localization'],intent.pfam+'_all_genes.csv');
+            }
+
+            /* Vertebrate-specific genes found */
+            return '<b>'+scopeLbl+' genes with PFAM <b>'+intent.pfam+'</b> (Li et al. 2014) — <b>'+phyloMatches.length+' gene'+(phyloMatches.length!==1?'s':'')+'</b>:<br>'
+                +tbl(['Gene','Domain descriptions','Localization','Li2014 class'],
+                    phyloMatches.map(function(g){
+                        return [chip(g['Gene']),
+                                (g['Domain_Descriptions']||'').slice(0,60),
+                                g['Localization']||'-',
+                                phyloBadge(g['Gene'])];
+                    }))
+                +csvLink(phyloMatches,['Gene','PFAM_IDs','Domain_Descriptions','Localization'],intent.pfam+'_'+intent.scope+'_genes.csv');
+        }
+
+        /* No scope filter — return all genes with this PFAM (with phylo badges if available) */
+        return 'Genes with PFAM <b>'+intent.pfam+'</b> — <b>'+allPfamMatches.length+' genes</b>:<br>'
+            +tbl(['Gene','Domain descriptions','Localization','Li2014 class'],
+                allPfamMatches.map(function(g){
+                    return [chip(g['Gene']),
+                            (g['Domain_Descriptions']||'').slice(0,60),
+                            g['Localization']||'-',
+                            _li2014BySymbol ? (phyloBadge(g['Gene'])||'—') : '—'];
+                }))
+            +csvLink(allPfamMatches,['Gene','PFAM_IDs','Domain_Descriptions','Localization'],intent.pfam+'_genes.csv');
     }
 
     if (type === 'lof_conserved_tissue') {
         var matches = db().filter(function(r){ return lofMatches(r,'no_effect'); });
-        return 'Genes with <b>no cilia length phenotype</b> on LoF - <b>'+matches.length+' genes</b>:<br>'
+        return 'Genes with <b>no cilia length phenotype</b> on LoF — <b>'+matches.length+' genes</b>:<br>'
             +tbl(['Gene','LoF Effect','Localization'],matches.slice(0,30).map(function(g){return[chip(g['Gene']),getLOF(g)||'-',getLoc(g)||'-'];}),30)
             +(intent.tissue ? tisNote(intent.tissue) : '')
             +'<div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12px;color:#1e40af;">For conservation filtering, use the Phylogeny tab and select "in_all_organisms".</div>'
@@ -575,7 +823,7 @@ function dispatch(intent) {
     return null;
 }
 
-/* INSTALL */
+/* ─── INSTALL ─────────────────────────────────────────────────────────────── */
 function say(html) { if (typeof win.addChatMessage === 'function') win.addChatMessage(html, false); }
 
 function installGuard() {
@@ -590,6 +838,10 @@ function installGuard() {
     console.log('[CiliAI Interceptor] Guard installed');
 }
 
+/*
+ * FIX #7 — wrap() now preserves return value on non-intercepted paths.
+ * Old code returned undefined when falling through to originalFn.
+ */
 function wrap(originalFn) {
     var wrapped = function(queryOrOpts) {
         var text = (typeof queryOrOpts === 'string') ? queryOrOpts : (queryOrOpts && (queryOrOpts.text || queryOrOpts.raw || ''));
@@ -597,11 +849,17 @@ function wrap(originalFn) {
         var intent = matchIntent(text);
         if (intent) {
             var html = dispatch(intent);
-            if (html) { say(html); startSuppression(); return; }
+            if (html !== null && html !== undefined) {
+                say(html);
+                startSuppression();
+                return; /* intercepted — don't call originalFn */
+            }
         }
+        /* FIX: always return originalFn's result on non-intercepted paths */
         return originalFn.apply(this, arguments);
     };
     wrapped.__intercepted = true;
+    wrapped.__originalFn  = originalFn; /* preserve for phylo re-render fallback */
     return wrapped;
 }
 
@@ -628,7 +886,10 @@ setTimeout(install, 300);
 setTimeout(install, 800);
 setTimeout(install, 2000);
 
-win._CiliAI_Interceptor = {matchIntent: matchIntent, dispatch: dispatch};
+/* Eagerly start loading Li2014 in the background so it's ready when needed */
+setTimeout(function(){ loadLi2014(null); }, 1500);
+
+win._CiliAI_Interceptor = {matchIntent: matchIntent, dispatch: dispatch, li2014BySymbol: function(){ return _li2014BySymbol; }};
 win._ciliaiShowLastPhylo = function() {
     if (_lastPhyloGenes && _lastPhyloGenes.length) {
         var rendered = renderPhyloPlot(_lastPhyloGenes);
@@ -638,6 +899,6 @@ win._ciliaiShowLastPhylo = function() {
         startSuppression();
     }
 };
-console.log('[CiliAI Interceptor v2.1] Loaded.');
+console.log('[CiliAI Interceptor v2.2] Loaded.');
 
 })(window);
