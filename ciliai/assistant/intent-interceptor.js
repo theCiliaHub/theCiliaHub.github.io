@@ -1127,18 +1127,15 @@ function dispatch(intent) {
         var colorMap = {};
         found.forEach(function(s,i){ colorMap[s] = GENE_COLORS[i % GENE_COLORS.length]; });
 
-        /* Combined button — passes colorMap as 3rd argument for renderers that support it */
-        var symList = found.map(function(s){ return "'"+s+"'"; }).join(',');
-        var colorMapStr = JSON.stringify(colorMap).replace(/"/g,'\\"');
-        var exprBtn = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
-
-        /* Combined UMAP button */
+        /* Combined button — calls showCompareUMAP for true side-by-side panels */
         exprBtn += '<button onclick="(function(){'
             +'try{'
             +'var genes=['+symList+'];'
             +'var cmap='+JSON.stringify(colorMap)+';'
             +'if(window.CiliAI)window.CiliAI.activeGeneContext=genes[0];'
-            +'if(typeof window.renderUMAPPlot===\'function\'){'
+            +'if(typeof window.showCompareUMAP===\'function\'){'
+            +'  window.showCompareUMAP(genes,cmap);'
+            +'}else if(typeof window.renderUMAPPlot===\'function\'){'
             +'  window.renderUMAPPlot(genes[0],genes,cmap);'
             +'}else if(typeof window.switchView===\'function\'){window.switchView(\'plot\');}'
             +'}catch(e){console.warn(e);}})()" '
