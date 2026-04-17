@@ -1698,10 +1698,179 @@ window.showDomainViewer = function(gene) {
 };
 /* ══════════════════════════════════════════════════════════════════════════
  * showCompareUMAP — N independent UMAP panels, one per gene.
- * Uses fixed pixel heights derived from viz-card dimensions so Plotly
- * always receives concrete sizes. No DOM measurement race conditions.
+ *
+ * Strategy: renderUMAPPlot() in ciliai.js already knows how to get expression
+ * data for any gene symbol. It ends by calling window.showPlot(plotData, title).
+ * We temporarily replace window.showPlot with a version that redirects the
+ * Plotly.newPlot call to our target cell div instead of #plotly-container.
+ * We render genes sequentially so the intercepted showPlot always targets
+ * the right cell.
  * ════════════════════════════════════════════════════════════════════════*/
 window.showCompareUMAP = function(genes, colorMap) {
+    if (!genes || !genes.length) return;
+    colorMap = colorMap || {};
+    var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
+    genes.forEach(function(s,i){ if (!colorMap[s]) colorMap[s] = GENE_COLORS[i % GENE_COLORS.length]; });
+
+    /* Hide other views, keep compare container visible */
+    ['cilia-svg','plotly-container','domain-viewer'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    document.querySelectorAll('.view-tab').forEach(function(t){ t.classList.remove('active'); });
+    var tp = document.getElementById('tab-plot');
+    if (tp) tp.classList.add('active');
+    var te = document.getElementById('current-viz-title');
+    if (te) te.textContent = 'Expression: ' + genes.join(' vs ');
+
+    /* Compute panel sizes from the viz-card */
+    var vizCard = document.querySelector('.viz-card');
+    var vizHdr  = document.querySelector('.viz-header');
+    var totalH  = vizCard ? vizCard.clientHeight : (window.innerHeight - 60);
+    var hdrH    = vizHdr  ? vizHdr.clientHeight  : 50;
+    var totalW  = vizCard ? vizCard.clientWidth  : (window.innerWidth * 0.6);
+    var LEGEND_H = 38, CELL_HDR = 32;
+    var availH  = Math.max(totalH - hdrH - LEGEND_H - 8, 300);
+    var availW  = Math.max(totalW - 8, 400);
+    var panelW  = Math.floor((availW - (genes.length - 1) * 2) / genes.length);
+    var panelH  = availH - CELL_HDR - 4;
+
+    /* Build the container */
+    var outer = document.getElementById('compare-umap-container');
+    if (!outer) return;
+    outer.innerHTML = '';
+    outer.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;'
+        + 'width:100%;height:100%;background:white;overflow:hidden;';
+
+    /* Legend header */
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'flex-shrink:0;height:'+LEGEND_H+'px;display:flex;align-items:center;'
+        +'padding:0 16px;gap:16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;';
+    genes.forEach(function(sym, i) {
+        var c = colorMap[sym];
+        var it = document.createElement('div');
+        it.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#334155;';
+        it.innerHTML = '<span style="width:11px;height:11px;border-radius:50%;background:'+c+';display:inline-block;"></span>'+sym;
+        hdr.appendChild(it);
+    });
+    var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
+    var dsInf = (window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey]) || {};
+    var badge = document.createElement('span');
+    badge.style.cssText = 'margin-left:auto;font-size:10px;color:#94a3b8;';
+    badge.textContent = (dsInf.icon||'') + ' ' + (dsInf.name || dsKey);
+    hdr.appendChild(badge);
+    outer.appendChild(hdr);
+
+    /* Row of panels */
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-direction:row;flex:1;gap:2px;background:#e2e8f0;overflow:hidden;';
+    outer.appendChild(row);
+
+    /* Build cell divs for all genes */
+    var plotDivs = [];
+    genes.forEach(function(sym, i) {
+        var col = colorMap[sym];
+        var panel = document.createElement('div');
+        panel.style.cssText = 'display:flex;flex-direction:column;background:white;width:'+panelW+'px;flex-shrink:0;overflow:hidden;';
+
+        var ph = document.createElement('div');
+        ph.style.cssText = 'height:'+CELL_HDR+'px;display:flex;align-items:center;gap:6px;'
+            +'padding:0 10px;border-bottom:3px solid '+col+';flex-shrink:0;';
+        ph.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:'+col+';display:inline-block;"></span>'
+                     + '<span style="color:'+col+';font-weight:700;font-size:13px;">'+sym+'</span>';
+
+        var xb = document.createElement('button');
+        xb.textContent = '⤢ Single view';
+        xb.style.cssText = 'margin-left:auto;background:none;border:1px solid #e2e8f0;'
+            +'border-radius:5px;padding:2px 8px;font-size:10px;color:#64748b;cursor:pointer;';
+        xb.addEventListener('click', (function(s){ return function(){
+            if (window.CiliAI) window.CiliAI.activeGeneContext = s;
+            if (window.renderUMAPPlot) window.renderUMAPPlot(s,[s]);
+        };})(sym));
+        ph.appendChild(xb);
+        panel.appendChild(ph);
+
+        var pd = document.createElement('div');
+        pd.style.cssText = 'width:'+panelW+'px;height:'+panelH+'px;flex-shrink:0;';
+        pd.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Loading '+sym+'…</div>';
+        panel.appendChild(pd);
+        row.appendChild(panel);
+        plotDivs.push({ el: pd, gene: sym, color: col });
+    });
+
+    /* Render each gene sequentially by intercepting showPlot */
+    var _origShowPlot = window.showPlot;
+    var queue = plotDivs.slice();
+
+    function renderNext() {
+        if (!queue.length) {
+            /* All done — restore showPlot */
+            window.showPlot = _origShowPlot;
+            return;
+        }
+        var item = queue.shift();
+        var targetEl = item.el;
+        var sym = item.gene;
+        var col = item.color;
+
+        /* Clear loading text */
+        targetEl.innerHTML = '';
+
+        /* Intercept the NEXT showPlot call and redirect to our cell */
+        window.showPlot = function(plotData, title) {
+            /* Restore immediately so subsequent calls go to normal showPlot */
+            window.showPlot = _origShowPlot;
+
+            if (!window.Plotly || !plotData || !plotData.data) {
+                targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;">No data</div>';
+                renderNext();
+                return;
+            }
+
+            var layout = Object.assign({}, plotData.layout || {}, {
+                width:  panelW,
+                height: panelH,
+                margin: {l:30, r:30, t:30, b:30, pad:4},
+                paper_bgcolor: 'white',
+                plot_bgcolor:  '#f8fafc',
+                autosize: false,
+                font: {size:10},
+                showlegend: false,
+                title: {
+                    text: sym,
+                    font: {size:12, color: col},
+                    x: 0.04, xanchor:'left', y:0.97
+                }
+            });
+
+            Plotly.newPlot(targetEl, plotData.data, layout, {
+                responsive: false,
+                displayModeBar: false
+            }).then(function() {
+                console.log('[CiliAI Compare] Panel rendered: '+sym);
+                /* Render the next gene after a short gap */
+                setTimeout(renderNext, 100);
+            }).catch(function(e) {
+                console.warn('[CiliAI Compare] Plotly error for '+sym+':', e);
+                renderNext();
+            });
+        };
+
+        /* Trigger renderUMAPPlot for this gene — it will call our intercepted showPlot */
+        if (window.CiliAI) window.CiliAI.activeGeneContext = sym;
+        if (window.renderUMAPPlot) {
+            window.renderUMAPPlot(sym, [sym]);
+        } else {
+            window.showPlot = _origShowPlot; /* nothing to render */
+            targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;">renderUMAPPlot not available</div>';
+            renderNext();
+        }
+    }
+
+    /* Start rendering after a tick for DOM to settle */
+    setTimeout(renderNext, 80);
+};
     if (!genes || !genes.length) return;
     colorMap = colorMap || {};
     var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
@@ -1807,145 +1976,6 @@ window.showCompareUMAP = function(genes, colorMap) {
         panel.appendChild(pd);
         row.appendChild(panel);
 
-        /* Stagger renders — IIFE captures sym/col/pd/panelW/panelH by value */
-        (function(s, c, target, pw, ph, delay) {
-            setTimeout(function(){
-                target.innerHTML = '';
-                window.renderComparePanel(s, c, target, pw, ph);
-            }, delay);
-        })(sym, col, pd, panelW, panelH, 100 + i * 200);
-    });
-};
-
-/* ── renderComparePanel ─────────────────────────────────────────────────────
- * Builds Plotly traces for ONE gene from window.CiliAI.datasets and renders
- * into targetEl with the caller-supplied pixel dimensions.
- */
-window.renderComparePanel = function(gene, geneColor, targetEl, w, h) {
-    console.log('[CiliAI Compare] Rendering panel: gene='+gene+' w='+w+' h='+h+' el='+targetEl.tagName);
-    if (!window.Plotly) {
-        targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:'+h+'px;color:#94a3b8;">Plotly not loaded</div>';
-        return;
-    }
-
-    /* Use measured dimensions; fall back to element size if not supplied */
-    var pw = w || targetEl.clientWidth  || 320;
-    var ph = h || targetEl.clientHeight || 280;
-
-    var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
-    var ds    = (window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey]) || {};
-    var umap  = ds.umap || [];
-    var expr  = ds.expression || {};
-
-    /* Dataset not loaded yet — show a load button */
-    if (!umap.length) {
-        targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
-            +'height:'+ph+'px;flex-direction:column;gap:10px;color:#94a3b8;">'
-            +'<div>Dataset not loaded</div>'
-            +'<button onclick="(function(){'
-            +'window.loadDatasetOnDemand&&window.loadDatasetOnDemand(\''+dsKey+'\')'
-            +'.then(function(){window.renderComparePanel(\''+gene+'\',\''+geneColor+'\','
-            +'document.getElementById(\''+targetEl.id+'\'))})'
-            +'})()" style="padding:5px 14px;border:1px solid #cbd5e0;border-radius:6px;'
-            +'background:white;color:#005b96;cursor:pointer;font-size:12px;">Load</button>'
-            +'</div>';
-        return;
-    }
-
-    /* ── Background: all UMAP points grouped by cell type in grey ── */
-    var byCT = {};
-    umap.forEach(function(pt){
-        var ct = pt.cell_type || 'Unknown';
-        if (!byCT[ct]) byCT[ct] = {x:[],y:[]};
-        byCT[ct].x.push(pt.x);
-        byCT[ct].y.push(pt.y);
-    });
-
-    var traces = Object.keys(byCT).map(function(ct){
-        return {
-            type:'scatter', mode:'markers', name:ct, showlegend:false,
-            x: byCT[ct].x, y: byCT[ct].y,
-            marker: {color:'#d1d5db', size:2, opacity:0.4},
-            hoverinfo:'skip'
-        };
-    });
-
-    /* ── Expression overlay for this gene ── */
-    var geneUp = gene.toUpperCase();
-    var exX=[], exY=[], exV=[], exT=[];
-    var maxV = 0;
-
-    umap.forEach(function(pt){
-        var cd = expr[pt.cell_id];
-        if (!cd) return;
-        var v = cd[gene] || cd[geneUp] || cd[gene.toLowerCase()]
-             || (cd.genes && (cd.genes[gene] || cd.genes[geneUp])) || 0;
-        v = parseFloat(v) || 0;
-        if (v > 0) {
-            exX.push(pt.x); exY.push(pt.y); exV.push(v);
-            exT.push(gene+': '+v.toFixed(2)+'<br>'+(pt.cell_type||''));
-            if (v > maxV) maxV = v;
-        }
-    });
-
-    if (exX.length) {
-        traces.push({
-            type:'scatter', mode:'markers',
-            name: gene,
-            x:exX, y:exY,
-            marker:{
-                color: exV,
-                colorscale:[
-                    [0,   'rgba(220,220,220,0.1)'],
-                    [0.2, geneColor+'66'],
-                    [1,   geneColor]
-                ],
-                cmin:0, cmax:maxV||1,
-                size:5, opacity:0.95,
-                colorbar:{
-                    thickness:8, len:0.55, x:1.01,
-                    title:{text:'',side:'right'},
-                    tickfont:{size:8}
-                }
-            },
-            hovertemplate:'%{text}<extra></extra>',
-            text: exT,
-            showlegend: false
-        });
-    }
-
-    var titleText = exX.length
-        ? '<b>'+gene+'</b>  <span style="color:#94a3b8;font-size:9px;">'+exX.length+' cells</span>'
-        : '<b>'+gene+'</b>  <span style="color:#94a3b8;font-size:9px;">not detected</span>';
-
-    var layout = {
-        width:  pw,
-        height: ph,
-        margin: {l:8, r:28, t:36, b:8, pad:2},
-        paper_bgcolor: 'white',
-        plot_bgcolor:  '#f8fafc',
-        showlegend: false,
-        annotations: [{
-            text: exX.length ? gene + ' · ' + exX.length + ' cells' : gene + ' · not detected',
-            xref:'paper', yref:'paper', x:0.02, y:1.0, xanchor:'left', yanchor:'top',
-            showarrow: false,
-            font: {size:11, color: geneColor, family:'Inter,sans-serif'},
-            bgcolor:'rgba(255,255,255,0.85)', borderpad:3
-        }],
-        xaxis: {visible:false, zeroline:false, showgrid:false},
-        yaxis: {visible:false, zeroline:false, showgrid:false}
-    };
-
-    Plotly.newPlot(targetEl, traces, layout, {
-        responsive:     false,  /* we manage sizing ourselves */
-        displayModeBar: false,
-        staticPlot:     false
-    }).catch(function(e){
-        console.warn('[CiliAI] renderComparePanel error for '+gene+':', e);
-        targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
-            +'height:'+ph+'px;color:#ef4444;font-size:12px;">Render error: '+e.message+'</div>';
-    });
-};
 
 window.downloadCurrentVisualization = function() {
     if (window.CiliAI.currentPlot) {
