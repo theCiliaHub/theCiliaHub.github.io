@@ -307,23 +307,35 @@ function resolveValidGenes(tokens) {
 
 function matchLocKw(q) {
     var locs = [
-        ['transition zone', {term:'transition zone',label:'Transition Zone'}],
-        ['ciliary axoneme', {term:'axoneme',label:'Axoneme'}],
-        ['ciliary tip',     {term:'ciliary tip',label:'Ciliary Tip'}],
-        ['ciliary membrane',{term:'ciliary membrane',label:'Ciliary Membrane'}],
-        ['basal body',      {term:'basal body',label:'Basal Body'}],
-        ['motile cilia',    {term:'motile cilia',label:'Motile Cilia'}],
-        ['centrosome',      {term:'centrosome',label:'Centrosome'}],
-        ['mitochondria',    {term:'mitochondria',label:'Mitochondria'}],
-        ['lysosom',         {term:'lysosom',label:'Lysosomes'}],
-        ['axonemal',        {term:'axoneme',label:'Axoneme'}],
-        ['axoneme',         {term:'axoneme',label:'Axoneme'}],
-        ['flagella',        {term:'flagella',label:'Flagella / Axoneme'}],
-        ['nucleus',         {term:'nucleus',label:'Nucleus'}],
-        ['cilia',           {term:'cilia',label:'Cilia'}]
+        /* Longest/most-specific matches first to avoid prefix collisions */
+        ['transition zone',  {term:'transition zone', label:'Transition Zone'}],
+        ['ciliary axoneme',  {term:'axoneme',         label:'Axoneme'}],
+        ['ciliary tip',      {term:'ciliary tip',     label:'Ciliary Tip'}],
+        ['tip of cilia',     {term:'ciliary tip',     label:'Ciliary Tip'}],
+        ['cilia tip',        {term:'ciliary tip',     label:'Ciliary Tip'}],
+        ['ciliary membrane', {term:'ciliary membrane',label:'Ciliary Membrane'}],
+        ['basal body',       {term:'basal body',      label:'Basal Body'}],
+        ['motile cilia',     {term:'motile cilia',    label:'Motile Cilia'}],
+        ['centrosome',       {term:'centrosome',      label:'Centrosome'}],
+        ['mitochondria',     {term:'mitochondria',    label:'Mitochondria'}],
+        ['lysosom',          {term:'lysosom',         label:'Lysosomes'}],
+        ['axonemal dynein',  {term:'axoneme',         label:'Axoneme'}],
+        ['axonemal',         {term:'axoneme',         label:'Axoneme'}],
+        /* bare 'tip' only when clearly about cilia context */
+        ['\btip\b',          {term:'ciliary tip',     label:'Ciliary Tip'}],
+        ['axoneme',          {term:'axoneme',         label:'Axoneme'}],
+        ['flagella',         {term:'flagella',        label:'Flagella / Axoneme'}],
+        ['nucleus',          {term:'nucleus',         label:'Nucleus'}],
+        ['cilia',            {term:'cilia',           label:'Cilia'}]
     ];
     for (var i = 0; i < locs.length; i++) {
-        if (q.indexOf(locs[i][0]) !== -1) return locs[i][1];
+        var kw = locs[i][0];
+        /* Use regex for word-boundary patterns (prefixed with \b), plain indexOf otherwise */
+        if (kw.indexOf('\\b') !== -1) {
+            if (new RegExp(kw).test(q)) return locs[i][1];
+        } else {
+            if (q.indexOf(kw) !== -1) return locs[i][1];
+        }
     }
     return null;
 }
@@ -1097,17 +1109,53 @@ function dispatch(intent) {
 
         setTimeout(function(){ try{ applyUnifiedHighlight(Array.from(sharedLoc).join(', ')||gdata[0].locRaw); }catch(e){} },50);
 
-        var symList=found.map(function(s){ return "'"+s+"'"; }).join(',');
-        var exprBtn='<button onclick="(function(){'
+        /* ── PER-GENE COLOUR PALETTE ──────────────────────────────────────────
+         * Assign each gene a distinct colour passed to renderUMAPPlot so they
+         * appear in different colours on the same UMAP (if the renderer supports
+         * a colorMap argument). Also provide separate single-gene buttons as a
+         * reliable fallback that always works.
+         */
+        var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
+        var colorMap = {};
+        found.forEach(function(s,i){ colorMap[s] = GENE_COLORS[i % GENE_COLORS.length]; });
+
+        /* Combined button — passes colorMap as 3rd argument for renderers that support it */
+        var symList = found.map(function(s){ return "'"+s+"'"; }).join(',');
+        var colorMapStr = JSON.stringify(colorMap).replace(/"/g,'\\"');
+        var exprBtn = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+
+        /* Combined UMAP button */
+        exprBtn += '<button onclick="(function(){'
             +'try{'
-            +'if(typeof window.renderUMAPPlot===\'function\')window.renderUMAPPlot(\''+found[0]+'\',['+symList+']);'
-            +'else if(typeof window.switchView===\'function\')window.switchView(\'plot\');'
-            +'}catch(e){}})()" '
+            +'var genes=['+symList+'];'
+            +'var cmap='+JSON.stringify(colorMap)+';'
+            +'if(window.CiliAI)window.CiliAI.activeGeneContext=genes[0];'
+            +'if(typeof window.renderUMAPPlot===\'function\'){'
+            +'  window.renderUMAPPlot(genes[0],genes,cmap);'
+            +'}else if(typeof window.switchView===\'function\'){window.switchView(\'plot\');}'
+            +'}catch(e){console.warn(e);}})()" '
             +'style="background:#005b96;color:white;border:none;padding:6px 14px;border-radius:8px;'
-            +'font-size:11.5px;font-weight:600;cursor:pointer;margin-bottom:10px;display:inline-flex;align-items:center;gap:5px;">'
+            +'font-size:11.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">'
             +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;">'
             +'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'
             +'Compare in Expression Atlas</button>';
+
+        /* Per-gene individual UMAP buttons with colour swatch */
+        found.forEach(function(s, i) {
+            var col = GENE_COLORS[i % GENE_COLORS.length];
+            var sEsc = s.replace(/'/g,"\\'");
+            exprBtn += '<button onclick="(function(){'
+                +'try{'
+                +'if(window.CiliAI)window.CiliAI.activeGeneContext=\''+sEsc+'\';'
+                +'if(typeof window.renderUMAPPlot===\'function\')window.renderUMAPPlot(\''+sEsc+'\',[\''+sEsc+'\']);'
+                +'else if(typeof window.switchView===\'function\')window.switchView(\'plot\');'
+                +'}catch(e){}})()" '
+                +'style="background:white;color:#334155;border:2px solid '+col+';padding:5px 12px;border-radius:8px;'
+                +'font-size:11.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">'
+                +'<span style="width:10px;height:10px;border-radius:50%;background:'+col+';flex-shrink:0;"></span>'
+                +s+'</button>';
+        });
+        exprBtn += '</div>';
 
         var scoreCol=overlapScore>=60?'#166534':overlapScore>=30?'#92400e':'#991b1b';
         var scoreBg=overlapScore>=60?'#dcfce7':overlapScore>=30?'#fef3c7':'#fee2e2';
@@ -1120,16 +1168,22 @@ function dispatch(intent) {
         var out='<div style="line-height:1.5;">';
         out+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
             +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
-        found.forEach(function(s){ out+=chip(s); });
+        found.forEach(function(s,i){
+            var col=GENE_COLORS[i%GENE_COLORS.length];
+            out+='<span style="display:inline-flex;align-items:center;gap:4px;">'
+                +'<span style="width:10px;height:10px;border-radius:50%;background:'+col+';flex-shrink:0;display:inline-block;"></span>'
+                +chip(s)+'</span>';
+        });
         out+='</div>'
             +'<span style="background:'+scoreBg+';color:'+scoreCol+';padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">'+overlapScore+'% compartment overlap</span>'
             +'</div>';
         out+=exprBtn;
         out+='<div style="display:grid;grid-template-columns:repeat('+found.length+',1fr);gap:8px;margin-bottom:12px;">';
-        gdata.forEach(function(g){
+        gdata.forEach(function(g, i){
             var ph=''; try{ ph=_li2014BySymbol?phyloBadge(g.sym):''; }catch(e){}
-            out+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;">'
-                +'<div style="font-size:15px;font-weight:700;color:#005b96;margin-bottom:4px;">'+g.sym+(ph||'')+'</div>'
+            var geneColor = GENE_COLORS[i % GENE_COLORS.length];
+            out+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:4px solid '+geneColor+';border-radius:10px;padding:10px;">'
+                +'<div style="font-size:15px;font-weight:700;color:'+geneColor+';margin-bottom:4px;">'+g.sym+(ph||'')+'</div>'
                 +'<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:6px;">Localization</div>'
                 +'<div style="font-size:11.5px;color:#0f172a;">'+g.locRaw+'</div>'
                 +'<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:6px;">LoF effect</div>'
@@ -1170,8 +1224,45 @@ function dispatch(intent) {
      * ═════════════════════════════════════════════════════════════════════════*/
     if (type === 'compartment_reasoning') {
         var loc=intent.loc;
-        var genes=db().filter(function(r){ return getLoc(r).indexOf(loc.term)!==-1; });
-        if(!genes.length) return 'No genes found with <b>'+loc.label+'</b> localization in CiliaHub.';
+
+        /* ── MULTI-TERM DB SEARCH ──────────────────────────────────────────────
+         * The database stores localization with varied spellings, prefixes and
+         * compound terms. A single indexOf(loc.term) misses most entries.
+         * Each compartment maps to ALL the strings that appear in the DB field.
+         */
+        var COMPARTMENT_TERMS = {
+            'axoneme':         ['axoneme','axonemal','ciliary axoneme','outer dynein arm','inner dynein arm','nexin','radial spoke','central pair','intraflagellar transport','ift particle'],
+            'ciliary tip':     ['ciliary tip','cilia tip','tip of cilia','tip of flagella','distal tip','flagellar tip'],
+            'transition zone': ['transition zone','transition fiber','transition fibre'],
+            'ciliary membrane':['ciliary membrane','ciliary ectosomes','ift membrane'],
+            'basal body':      ['basal body','centriole','pericentriolar','subdistal appendage','distal appendage','mother centriole'],
+            'centrosome':      ['centrosome','centriole','pcm','pericentriolar'],
+            'cilia':           ['cilia','cilium','flagell','intraflagellar','ift'],
+            'motile cilia':    ['motile cilia','motile cilium','outer dynein','inner dynein'],
+            'nucleus':         ['nucleus','nuclear'],
+            'flagella':        ['flagell','axoneme'],
+            'lysosom':         ['lysosom']
+        };
+        var searchTerms = COMPARTMENT_TERMS[loc.term] || [loc.term];
+
+        function matchesCompartment(row) {
+            var locStr = getLoc(row); /* already lowercased */
+            for (var ti = 0; ti < searchTerms.length; ti++) {
+                if (locStr.indexOf(searchTerms[ti]) !== -1) return true;
+            }
+            return false;
+        }
+
+        var genes = db().filter(matchesCompartment);
+
+        /* Diagnostic: show what was searched if still empty */
+        if (!genes.length) {
+            return 'No genes found with <b>'+loc.label+'</b> localization in CiliaHub.<br>'
+                +'<span style="font-size:11px;color:#94a3b8;">Searched DB for: '
+                +searchTerms.map(function(t){ return '<code>'+t+'</code>'; }).join(', ')+'</span><br>'
+                +'<span style="font-size:11px;color:#94a3b8;">This compartment may use different terminology in the database. '
+                +'Try: "cilia genes", "basal body genes", or "transition zone genes".</span>';
+        }
 
         var phenoCounts={shorter:0,longer:0,loss:0,no_change:0,motility:0,not_reported:0};
         genes.forEach(function(g){
@@ -1884,6 +1975,6 @@ win._ciliaiShowLastPhylo = function() {
         startSuppression();
     }
 };
-console.log('[CiliAI Interceptor v4.0] Multi-Gene Comparison · Compartment Reasoning · AI Hypothesis Generator loaded.');
+console.log('[CiliAI Interceptor v4.1] Multi-colour comparison · Expanded compartment search · Ciliary tip fix loaded.');
 
 })(window);
