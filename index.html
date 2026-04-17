@@ -262,19 +262,20 @@
         #compare-umap-container {
             position: absolute; inset: 0;
             width: 100% !important; height: 100% !important;
-            overflow-y: auto; overflow-x: hidden;
             display: flex; flex-direction: column;
             background: white;
+            overflow: hidden;
         }
         .compare-umap-header {
             flex-shrink: 0;
-            padding: 8px 16px;
+            height: 38px;
+            padding: 0 16px;
             background: #f8fafc;
             border-bottom: 1px solid #e2e8f0;
             font-size: 12px; font-weight: 600; color: #475569;
-            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: 6px;
         }
-        .compare-umap-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+        .compare-umap-legend { display: flex; gap: 12px; flex-wrap: nowrap; align-items: center; }
         .compare-umap-legend-item {
             display: flex; align-items: center; gap: 5px;
             font-size: 11.5px; font-weight: 600; color: #334155;
@@ -283,31 +284,43 @@
             width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
         }
         .compare-umap-grid {
-            flex: 1; display: grid;
-            gap: 1px; background: #e2e8f0;
-            min-height: 0;
+            flex: 1;
+            display: grid;
+            gap: 2px;
+            background: #e2e8f0;
+            /* height is set by JS after measurement */
         }
-        .compare-umap-grid.cols-2 { grid-template-columns: 1fr 1fr; }
-        .compare-umap-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .compare-umap-grid.cols-2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+        .compare-umap-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr; }
         .compare-umap-grid.cols-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
         .compare-umap-cell {
             background: white;
             display: flex; flex-direction: column;
-            min-height: 0; overflow: hidden;
+            overflow: hidden;
+            /* height comes from the grid row */
         }
         .compare-umap-cell-header {
             flex-shrink: 0;
-            padding: 5px 12px;
+            height: 32px;
+            padding: 0 10px;
             display: flex; align-items: center; gap: 6px;
             font-size: 12px; font-weight: 700;
             border-bottom: 3px solid transparent;
+            box-sizing: border-box;
         }
-        .compare-umap-cell-plot { flex: 1; min-height: 0; }
+        .compare-umap-cell-plot {
+            /* explicit pixel height set by JS — Plotly needs a sized parent */
+            flex: 1;
+            overflow: hidden;
+        }
 
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
             .compare-umap-grid.cols-2,
             .compare-umap-grid.cols-3,
-            .compare-umap-grid.cols-4 { grid-template-columns: 1fr; }
+            .compare-umap-grid.cols-4 {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(auto-fill, 300px);
+            }
         }
 
         /* ══════════════════════════════════════════════════════
@@ -1684,12 +1697,10 @@ window.showDomainViewer = function(gene) {
     domainContainer.appendChild(svg);
 };
 /* ══════════════════════════════════════════════════════════════════════════
- * showCompareUMAP — renders N independent UMAP panels side-by-side.
+ * showCompareUMAP — N independent UMAP panels, one per gene.
  * Each panel is a standalone Plotly chart built directly from the loaded
- * dataset — no id-swapping, no dependency on renderUMAPPlot's internals.
- *
- * genes    : ['BBS1','CEP290', ...]
- * colorMap : {'BBS1':'#e63946','CEP290':'#2a9d8f', ...}
+ * dataset. No id-swapping. Sizes measured after a requestAnimationFrame
+ * so Plotly always gets real pixel dimensions.
  * ════════════════════════════════════════════════════════════════════════*/
 window.showCompareUMAP = function(genes, colorMap) {
     if (!genes || !genes.length) return;
@@ -1697,237 +1708,244 @@ window.showCompareUMAP = function(genes, colorMap) {
     var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
     genes.forEach(function(s,i){ if (!colorMap[s]) colorMap[s] = GENE_COLORS[i % GENE_COLORS.length]; });
 
-    /* Hide all other views */
+    /* Hide every other view */
     ['cilia-svg','plotly-container','domain-viewer'].forEach(function(id){
         var el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
 
-    var container = document.getElementById('compare-umap-container');
-    if (!container) return;
-    container.style.display = 'flex';
-    container.innerHTML = '';
+    var outer = document.getElementById('compare-umap-container');
+    if (!outer) return;
+    outer.innerHTML = '';
+    outer.style.display = 'flex';
 
-    /* Tab activation */
+    /* Tab */
     document.querySelectorAll('.view-tab').forEach(function(t){ t.classList.remove('active'); });
-    var tabPlot = document.getElementById('tab-plot');
-    if (tabPlot) tabPlot.classList.add('active');
-    var titleEl = document.getElementById('current-viz-title');
-    if (titleEl) titleEl.textContent = 'Expression Atlas: ' + genes.join(' vs ');
+    var tp = document.getElementById('tab-plot');
+    if (tp) tp.classList.add('active');
+    var te = document.getElementById('current-viz-title');
+    if (te) te.textContent = 'Expression: ' + genes.join(' vs ');
 
-    /* ── HEADER: legend + dataset badge ── */
-    var header = document.createElement('div');
-    header.className = 'compare-umap-header';
+    /* ── Header ─────────────────────────────────────────────────────── */
+    var hdr = document.createElement('div');
+    hdr.className = 'compare-umap-header';
+
     var legend = document.createElement('div');
     legend.className = 'compare-umap-legend';
     genes.forEach(function(sym, i) {
-        var col = colorMap[sym];
-        var item = document.createElement('div');
-        item.className = 'compare-umap-legend-item';
-        item.innerHTML = '<span class="compare-umap-legend-dot" style="background:'+col+';"></span><span>'+sym+'</span>';
-        legend.appendChild(item);
+        var c = colorMap[sym];
+        var it = document.createElement('div');
+        it.className = 'compare-umap-legend-item';
+        it.innerHTML = '<span class="compare-umap-legend-dot" style="background:'+c+'"></span><span>'+sym+'</span>';
+        legend.appendChild(it);
     });
-    var dsKey  = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
-    var dsInfo = (window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey]) || {};
-    var dsBadge = document.createElement('span');
-    dsBadge.style.cssText = 'font-size:10px;color:#94a3b8;';
-    dsBadge.textContent = (dsInfo.icon||'') + ' ' + (dsInfo.name||dsKey) + ' · click panel header to expand';
-    header.appendChild(legend);
-    header.appendChild(dsBadge);
-    container.appendChild(header);
 
-    /* ── GRID ── */
+    var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
+    var dsInf = (window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey]) || {};
+    var badge = document.createElement('span');
+    badge.style.cssText = 'font-size:10px;color:#94a3b8;white-space:nowrap;';
+    badge.textContent = (dsInf.icon||'') + ' ' + (dsInf.name || dsKey);
+
+    hdr.appendChild(legend);
+    hdr.appendChild(badge);
+    outer.appendChild(hdr);
+
+    /* ── Grid ────────────────────────────────────────────────────────── */
     var grid = document.createElement('div');
     var colClass = genes.length <= 2 ? 'cols-2' : genes.length === 3 ? 'cols-3' : 'cols-4';
     grid.className = 'compare-umap-grid ' + colClass;
-    container.appendChild(grid);
+    outer.appendChild(grid);
 
-    /* ── BUILD ONE PANEL PER GENE ── */
+    /* ── One cell per gene ───────────────────────────────────────────── */
+    /* Store plot divs so we can measure them after paint */
+    var plotDivs = [];
+
     genes.forEach(function(sym, i) {
         var col = colorMap[sym];
 
-        /* Cell wrapper */
         var cell = document.createElement('div');
         cell.className = 'compare-umap-cell';
-        cell.id = 'cmp-cell-' + i;
 
-        /* Cell header */
-        var cellHdr = document.createElement('div');
-        cellHdr.className = 'compare-umap-cell-header';
-        cellHdr.style.borderBottomColor = col;
-        cellHdr.innerHTML = '<span style="width:11px;height:11px;border-radius:50%;background:'+col+';display:inline-block;flex-shrink:0;"></span>'
-            + '<span style="color:'+col+';font-size:13px;">'+sym+'</span>';
+        /* Coloured top header strip */
+        var ch = document.createElement('div');
+        ch.className = 'compare-umap-cell-header';
+        ch.style.borderBottomColor = col;
+        ch.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:'+col+';display:inline-block;flex-shrink:0;"></span>'
+                     + '<span style="color:'+col+';">'+sym+'</span>';
 
-        /* Expand button → single-gene view */
-        var expandBtn = document.createElement('button');
-        expandBtn.textContent = '⤢ Expand';
-        expandBtn.style.cssText = 'margin-left:auto;background:none;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:10px;color:#64748b;cursor:pointer;';
-        expandBtn.addEventListener('click', (function(s){ return function() {
+        /* Expand → full single-gene view */
+        var xBtn = document.createElement('button');
+        xBtn.textContent = '⤢ Expand';
+        xBtn.style.cssText = 'margin-left:auto;background:none;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:10px;color:#64748b;cursor:pointer;';
+        xBtn.addEventListener('click', (function(s){ return function(){
             if (window.CiliAI) window.CiliAI.activeGeneContext = s;
-            if (window.renderUMAPPlot) window.renderUMAPPlot(s, [s]);
-        }; })(sym));
-        cellHdr.appendChild(expandBtn);
-        cell.appendChild(cellHdr);
+            if (window.renderUMAPPlot) window.renderUMAPPlot(s,[s]);
+        };})(sym));
+        ch.appendChild(xBtn);
+        cell.appendChild(ch);
 
-        /* Plot div — unique stable id, never reused */
-        var plotDiv = document.createElement('div');
-        plotDiv.id = 'cmp-plot-' + Date.now() + '-' + i;
-        plotDiv.style.cssText = 'flex:1;min-height:0;width:100%;height:100%;';
-        cell.appendChild(plotDiv);
+        /* Plot area — Plotly renders here */
+        var pd = document.createElement('div');
+        pd.className = 'compare-umap-cell-plot';
+        /* Temporary loading message */
+        pd.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Loading '+sym+'…</div>';
+        cell.appendChild(pd);
         grid.appendChild(cell);
-
-        /* Render with a small stagger so the DOM has measured sizes */
-        (function(gene, geneCol, pDiv, idx) {
-            setTimeout(function() {
-                renderComparePanel(gene, geneCol, pDiv);
-            }, 80 + idx * 300);
-        })(sym, col, plotDiv, i);
+        plotDivs.push({ el: pd, gene: sym, color: col });
     });
 
-    /* ── RESIZE OBSERVER ── */
-    try {
-        if (window.ResizeObserver) {
-            new ResizeObserver(function() {
-                for (var i = 0; i < genes.length; i++) {
-                    var cell = document.getElementById('cmp-cell-' + i);
-                    if (!cell) continue;
-                    var pDiv = cell.querySelector('.compare-umap-cell-plot > div') || cell.querySelector('[id^="cmp-plot-"]');
-                    if (pDiv && window.Plotly) { try { Plotly.Plots.resize(pDiv); } catch(e){} }
-                }
-            }).observe(container);
-        }
-    } catch(e) {}
+    /* ── Render after the browser has painted and measured ───────────── */
+    /* Two nested rAFs guarantee a full layout pass has completed */
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            /* Measure the grid to get the real available height */
+            var gridH = grid.clientHeight;
+            var hdrH  = 32; /* .compare-umap-cell-header fixed height */
+            var plotH = Math.max(gridH - hdrH - 4, 240);
+            var plotW = Math.floor((grid.clientWidth - (genes.length - 1) * 2) / genes.length);
+
+            plotDivs.forEach(function(pd, idx) {
+                /* Set explicit pixel dimensions so Plotly has something to measure */
+                pd.el.style.width  = plotW + 'px';
+                pd.el.style.height = plotH + 'px';
+                pd.el.innerHTML = ''; /* clear loading text */
+
+                /* Stagger each render by 150ms to avoid simultaneous data lookups */
+                setTimeout(function(){
+                    window.renderComparePanel(pd.gene, pd.color, pd.el, plotW, plotH);
+                }, idx * 150);
+            });
+        });
+    });
 };
 
 /* ── renderComparePanel ─────────────────────────────────────────────────────
- * Builds Plotly traces for one gene directly from window.CiliAI.datasets
- * and renders into a specific DOM element — completely independent of
- * #plotly-container and renderUMAPPlot.
+ * Builds Plotly traces for ONE gene from window.CiliAI.datasets and renders
+ * into targetEl with the caller-supplied pixel dimensions.
  */
-window.renderComparePanel = function(gene, geneColor, targetEl) {
+window.renderComparePanel = function(gene, geneColor, targetEl, w, h) {
     if (!window.Plotly) {
         targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;">Plotly not loaded</div>';
         return;
     }
+
+    /* Use measured dimensions; fall back to element size if not supplied */
+    var pw = w || targetEl.clientWidth  || 320;
+    var ph = h || targetEl.clientHeight || 280;
 
     var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
     var ds    = (window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey]) || {};
     var umap  = ds.umap || [];
     var expr  = ds.expression || {};
 
+    /* Dataset not loaded yet — show a load button */
     if (!umap.length) {
-        targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:8px;color:#94a3b8;">'
-            +'<span>Dataset not loaded yet.</span>'
-            +'<button onclick="window.loadDatasetOnDemand && window.loadDatasetOnDemand(\''+dsKey+'\').then(function(){ window.renderComparePanel(\''+gene+'\',\''+geneColor+'\', document.getElementById(\''+targetEl.id+'\')) })" '
-            +'style="padding:5px 12px;border:1px solid #cbd5e0;border-radius:6px;background:white;color:#005b96;cursor:pointer;font-size:12px;">Load dataset</button>'
+        targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+            +'height:'+ph+'px;flex-direction:column;gap:10px;color:#94a3b8;">'
+            +'<div>Dataset not loaded</div>'
+            +'<button onclick="(function(){'
+            +'window.loadDatasetOnDemand&&window.loadDatasetOnDemand(\''+dsKey+'\')'
+            +'.then(function(){window.renderComparePanel(\''+gene+'\',\''+geneColor+'\','
+            +'document.getElementById(\''+targetEl.id+'\'))})'
+            +'})()" style="padding:5px 14px;border:1px solid #cbd5e0;border-radius:6px;'
+            +'background:white;color:#005b96;cursor:pointer;font-size:12px;">Load</button>'
             +'</div>';
         return;
     }
 
-    /* Group UMAP points by cell type */
-    var byCellType = {};
-    umap.forEach(function(pt) {
+    /* ── Background: all UMAP points grouped by cell type in grey ── */
+    var byCT = {};
+    umap.forEach(function(pt){
         var ct = pt.cell_type || 'Unknown';
-        if (!byCellType[ct]) byCellType[ct] = { x:[], y:[], ids:[] };
-        byCellType[ct].x.push(pt.x);
-        byCellType[ct].y.push(pt.y);
-        byCellType[ct].ids.push(pt.cell_id);
+        if (!byCT[ct]) byCT[ct] = {x:[],y:[]};
+        byCT[ct].x.push(pt.x);
+        byCT[ct].y.push(pt.y);
     });
 
-    /* Neutral grey background traces (one per cell type) */
-    var traces = Object.keys(byCellType).map(function(ct) {
+    var traces = Object.keys(byCT).map(function(ct){
         return {
-            type: 'scatter', mode: 'markers',
-            name: ct, showlegend: false,
-            x: byCellType[ct].x,
-            y: byCellType[ct].y,
-            marker: { color: '#d1d5db', size: 3, opacity: 0.5 },
-            hoverinfo: 'text',
-            text: byCellType[ct].ids.map(function(){ return ct; })
+            type:'scatter', mode:'markers', name:ct, showlegend:false,
+            x: byCT[ct].x, y: byCT[ct].y,
+            marker: {color:'#d1d5db', size:2, opacity:0.4},
+            hoverinfo:'skip'
         };
     });
 
-    /* Expression lookup for this gene */
-    var geneUpper = gene.toUpperCase();
-    var exprX = [], exprY = [], exprVals = [], exprText = [];
-    var maxVal = 0;
+    /* ── Expression overlay for this gene ── */
+    var geneUp = gene.toUpperCase();
+    var exX=[], exY=[], exV=[], exT=[];
+    var maxV = 0;
 
-    umap.forEach(function(pt) {
-        var cellData = expr[pt.cell_id];
-        if (!cellData) return;
-        /* Try multiple key formats the expression object may use */
-        var val = cellData[gene] || cellData[geneUpper]
-               || cellData[gene.toLowerCase()]
-               || (cellData.genes && (cellData.genes[gene] || cellData.genes[geneUpper]))
-               || 0;
-        val = parseFloat(val) || 0;
-        if (val > 0) {
-            exprX.push(pt.x);
-            exprY.push(pt.y);
-            exprVals.push(val);
-            exprText.push(gene + ': ' + val.toFixed(2) + '<br>' + (pt.cell_type||''));
-            if (val > maxVal) maxVal = val;
+    umap.forEach(function(pt){
+        var cd = expr[pt.cell_id];
+        if (!cd) return;
+        var v = cd[gene] || cd[geneUp] || cd[gene.toLowerCase()]
+             || (cd.genes && (cd.genes[gene] || cd.genes[geneUp])) || 0;
+        v = parseFloat(v) || 0;
+        if (v > 0) {
+            exX.push(pt.x); exY.push(pt.y); exV.push(v);
+            exT.push(gene+': '+v.toFixed(2)+'<br>'+(pt.cell_type||''));
+            if (v > maxV) maxV = v;
         }
     });
 
-    /* Highlighted expression trace */
-    if (exprX.length > 0) {
+    if (exX.length) {
         traces.push({
-            type: 'scatter', mode: 'markers',
-            name: gene + ' expression',
-            x: exprX, y: exprY,
-            marker: {
-                color: exprVals,
-                colorscale: [
-                    [0,   'rgba(255,255,255,0)'],
-                    [0.1, geneColor+'44'],
+            type:'scatter', mode:'markers',
+            name: gene,
+            x:exX, y:exY,
+            marker:{
+                color: exV,
+                colorscale:[
+                    [0,   'rgba(220,220,220,0.1)'],
+                    [0.2, geneColor+'66'],
                     [1,   geneColor]
                 ],
-                cmin: 0, cmax: maxVal || 1,
-                size: 5, opacity: 0.9,
-                colorbar: {
-                    thickness: 10, len: 0.6,
-                    title: {text: 'Expr', side:'right'},
-                    tickfont: {size: 9}
+                cmin:0, cmax:maxV||1,
+                size:5, opacity:0.95,
+                colorbar:{
+                    thickness:8, len:0.55, x:1.01,
+                    title:{text:'',side:'right'},
+                    tickfont:{size:8}
                 }
             },
-            hovertemplate: '%{text}<extra></extra>',
-            text: exprText
-        });
-    } else {
-        /* No expression data found — add a "no expression" annotation trace */
-        traces.push({
-            type: 'scatter', mode: 'markers',
-            name: gene + ' (not detected)',
-            x: [], y: [],
-            marker: { color: geneColor, size: 6 }
+            hovertemplate:'%{text}<extra></extra>',
+            text: exT,
+            showlegend: false
         });
     }
 
-    /* Layout */
-    var w = targetEl.clientWidth  || 300;
-    var h = Math.max((targetEl.clientHeight || targetEl.parentElement && targetEl.parentElement.clientHeight || 300) - 4, 200);
+    var titleText = exX.length
+        ? '<b>'+gene+'</b>  <span style="color:#94a3b8;font-size:9px;">'+exX.length+' cells</span>'
+        : '<b>'+gene+'</b>  <span style="color:#94a3b8;font-size:9px;">not detected</span>';
 
     var layout = {
-        autosize: true,
-        width: w, height: h,
-        margin: { l:30, r:20, t:30, b:30, pad:4 },
-        paper_bgcolor: 'white', plot_bgcolor: '#f8fafc',
+        width:  pw,
+        height: ph,
+        margin: {l:8, r:28, t:36, b:8, pad:2},
+        paper_bgcolor: 'white',
+        plot_bgcolor:  '#f8fafc',
         showlegend: false,
-        title: {
-            text: exprX.length ? gene + ' (' + exprX.length + ' cells)' : gene + ' — not detected',
-            font: { size: 11, color: geneColor },
-            x: 0.04, xanchor: 'left', y: 0.97
-        },
-        xaxis: { visible: false, zeroline: false },
-        yaxis: { visible: false, zeroline: false }
+        annotations: [{
+            text: exX.length ? gene + ' · ' + exX.length + ' cells' : gene + ' · not detected',
+            xref:'paper', yref:'paper', x:0.02, y:1.0, xanchor:'left', yanchor:'top',
+            showarrow: false,
+            font: {size:11, color: geneColor, family:'Inter,sans-serif'},
+            bgcolor:'rgba(255,255,255,0.85)', borderpad:3
+        }],
+        xaxis: {visible:false, zeroline:false, showgrid:false},
+        yaxis: {visible:false, zeroline:false, showgrid:false}
     };
 
     Plotly.newPlot(targetEl, traces, layout, {
-        responsive: true,
+        responsive:     false,  /* we manage sizing ourselves */
         displayModeBar: false,
-        staticPlot: false
-    }).catch(function(e){ console.warn('[CiliAI] compare panel render error:', e); });
+        staticPlot:     false
+    }).catch(function(e){
+        console.warn('[CiliAI] renderComparePanel error for '+gene+':', e);
+        targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+            +'height:'+ph+'px;color:#ef4444;font-size:12px;">Render error: '+e.message+'</div>';
+    });
 };
 
 window.downloadCurrentVisualization = function() {
