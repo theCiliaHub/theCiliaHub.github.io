@@ -1698,9 +1698,8 @@ window.showDomainViewer = function(gene) {
 };
 /* ══════════════════════════════════════════════════════════════════════════
  * showCompareUMAP — N independent UMAP panels, one per gene.
- * Each panel is a standalone Plotly chart built directly from the loaded
- * dataset. No id-swapping. Sizes measured after a requestAnimationFrame
- * so Plotly always gets real pixel dimensions.
+ * Uses fixed pixel heights derived from viz-card dimensions so Plotly
+ * always receives concrete sizes. No DOM measurement race conditions.
  * ════════════════════════════════════════════════════════════════════════*/
 window.showCompareUMAP = function(genes, colorMap) {
     if (!genes || !genes.length) return;
@@ -1714,11 +1713,6 @@ window.showCompareUMAP = function(genes, colorMap) {
         if (el) el.style.display = 'none';
     });
 
-    var outer = document.getElementById('compare-umap-container');
-    if (!outer) return;
-    outer.innerHTML = '';
-    outer.style.display = 'flex';
-
     /* Tab */
     document.querySelectorAll('.view-tab').forEach(function(t){ t.classList.remove('active'); });
     var tp = document.getElementById('tab-plot');
@@ -1726,96 +1720,100 @@ window.showCompareUMAP = function(genes, colorMap) {
     var te = document.getElementById('current-viz-title');
     if (te) te.textContent = 'Expression: ' + genes.join(' vs ');
 
-    /* ── Header ─────────────────────────────────────────────────────── */
-    var hdr = document.createElement('div');
-    hdr.className = 'compare-umap-header';
+    /* ── Compute sizes from the known page layout ───────────────────────
+     * viz-card fills the left panel. We know the navbar is 60px.
+     * Use window dimensions as the reliable fallback.                    */
+    var vizCard = document.querySelector('.viz-card');
+    var vizHdr  = document.querySelector('.viz-header');
+    var totalH  = vizCard  ? vizCard.clientHeight  : (window.innerHeight - 60);
+    var hdrH    = vizHdr   ? vizHdr.clientHeight   : 50;
+    var totalW  = vizCard  ? vizCard.clientWidth   : (window.innerWidth * 0.6);
 
-    var legend = document.createElement('div');
-    legend.className = 'compare-umap-legend';
+    var LEGEND_H = 38;  /* header strip */
+    var CELL_HDR = 32;  /* per-panel coloured header */
+    var availH  = Math.max(totalH - hdrH - LEGEND_H - 8, 300);
+    var availW  = Math.max(totalW - 8, 400);
+
+    /* For 2 genes: two side-by-side panels */
+    var panelW = Math.floor((availW - (genes.length - 1) * 2) / genes.length);
+    var panelH = availH - CELL_HDR - 4;
+
+    /* ── Build the container ─────────────────────────────────────────── */
+    var outer = document.getElementById('compare-umap-container');
+    if (!outer) return;
+    outer.innerHTML = '';
+    outer.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;'
+        + 'width:100%;height:100%;background:white;overflow:hidden;';
+
+    /* Legend header */
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'flex-shrink:0;height:'+LEGEND_H+'px;display:flex;align-items:center;'
+        +'padding:0 16px;gap:16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;';
+
     genes.forEach(function(sym, i) {
         var c = colorMap[sym];
         var it = document.createElement('div');
-        it.className = 'compare-umap-legend-item';
-        it.innerHTML = '<span class="compare-umap-legend-dot" style="background:'+c+'"></span><span>'+sym+'</span>';
-        legend.appendChild(it);
+        it.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#334155;';
+        it.innerHTML = '<span style="width:11px;height:11px;border-radius:50%;background:'+c+';display:inline-block;"></span>'
+                     + sym;
+        hdr.appendChild(it);
     });
 
     var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
     var dsInf = (window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey]) || {};
     var badge = document.createElement('span');
-    badge.style.cssText = 'font-size:10px;color:#94a3b8;white-space:nowrap;';
+    badge.style.cssText = 'margin-left:auto;font-size:10px;color:#94a3b8;';
     badge.textContent = (dsInf.icon||'') + ' ' + (dsInf.name || dsKey);
-
-    hdr.appendChild(legend);
     hdr.appendChild(badge);
     outer.appendChild(hdr);
 
-    /* ── Grid ────────────────────────────────────────────────────────── */
-    var grid = document.createElement('div');
-    var colClass = genes.length <= 2 ? 'cols-2' : genes.length === 3 ? 'cols-3' : 'cols-4';
-    grid.className = 'compare-umap-grid ' + colClass;
-    outer.appendChild(grid);
+    /* Row of panels */
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-direction:row;flex:1;gap:2px;background:#e2e8f0;overflow:hidden;';
+    outer.appendChild(row);
 
-    /* ── One cell per gene ───────────────────────────────────────────── */
-    /* Store plot divs so we can measure them after paint */
-    var plotDivs = [];
-
+    /* One panel per gene — built synchronously, rendered with stagger */
     genes.forEach(function(sym, i) {
         var col = colorMap[sym];
 
-        var cell = document.createElement('div');
-        cell.className = 'compare-umap-cell';
+        /* Panel wrapper — explicit pixel size */
+        var panel = document.createElement('div');
+        panel.style.cssText = 'display:flex;flex-direction:column;background:white;'
+            + 'width:'+panelW+'px;flex-shrink:0;overflow:hidden;';
 
-        /* Coloured top header strip */
-        var ch = document.createElement('div');
-        ch.className = 'compare-umap-cell-header';
-        ch.style.borderBottomColor = col;
-        ch.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:'+col+';display:inline-block;flex-shrink:0;"></span>'
-                     + '<span style="color:'+col+';">'+sym+'</span>';
+        /* Coloured top strip */
+        var ph = document.createElement('div');
+        ph.style.cssText = 'height:'+CELL_HDR+'px;display:flex;align-items:center;gap:6px;'
+            +'padding:0 10px;border-bottom:3px solid '+col+';flex-shrink:0;';
+        ph.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:'+col+';display:inline-block;"></span>'
+                     + '<span style="color:'+col+';font-weight:700;font-size:13px;">'+sym+'</span>';
 
-        /* Expand → full single-gene view */
-        var xBtn = document.createElement('button');
-        xBtn.textContent = '⤢ Expand';
-        xBtn.style.cssText = 'margin-left:auto;background:none;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:10px;color:#64748b;cursor:pointer;';
-        xBtn.addEventListener('click', (function(s){ return function(){
+        /* Expand button */
+        var xb = document.createElement('button');
+        xb.textContent = '⤢ Expand';
+        xb.style.cssText = 'margin-left:auto;background:none;border:1px solid #e2e8f0;'
+            +'border-radius:5px;padding:2px 8px;font-size:10px;color:#64748b;cursor:pointer;';
+        xb.addEventListener('click', (function(s){ return function(){
             if (window.CiliAI) window.CiliAI.activeGeneContext = s;
             if (window.renderUMAPPlot) window.renderUMAPPlot(s,[s]);
         };})(sym));
-        ch.appendChild(xBtn);
-        cell.appendChild(ch);
+        ph.appendChild(xb);
+        panel.appendChild(ph);
 
-        /* Plot area — Plotly renders here */
+        /* Plotly target — explicit pixel size */
         var pd = document.createElement('div');
-        pd.className = 'compare-umap-cell-plot';
-        /* Temporary loading message */
+        pd.style.cssText = 'width:'+panelW+'px;height:'+panelH+'px;flex-shrink:0;';
         pd.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Loading '+sym+'…</div>';
-        cell.appendChild(pd);
-        grid.appendChild(cell);
-        plotDivs.push({ el: pd, gene: sym, color: col });
-    });
+        panel.appendChild(pd);
+        row.appendChild(panel);
 
-    /* ── Render after the browser has painted and measured ───────────── */
-    /* Two nested rAFs guarantee a full layout pass has completed */
-    requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-            /* Measure the grid to get the real available height */
-            var gridH = grid.clientHeight;
-            var hdrH  = 32; /* .compare-umap-cell-header fixed height */
-            var plotH = Math.max(gridH - hdrH - 4, 240);
-            var plotW = Math.floor((grid.clientWidth - (genes.length - 1) * 2) / genes.length);
-
-            plotDivs.forEach(function(pd, idx) {
-                /* Set explicit pixel dimensions so Plotly has something to measure */
-                pd.el.style.width  = plotW + 'px';
-                pd.el.style.height = plotH + 'px';
-                pd.el.innerHTML = ''; /* clear loading text */
-
-                /* Stagger each render by 150ms to avoid simultaneous data lookups */
-                setTimeout(function(){
-                    window.renderComparePanel(pd.gene, pd.color, pd.el, plotW, plotH);
-                }, idx * 150);
-            });
-        });
+        /* Stagger renders — IIFE captures sym/col/pd/panelW/panelH by value */
+        (function(s, c, target, pw, ph, delay) {
+            setTimeout(function(){
+                target.innerHTML = '';
+                window.renderComparePanel(s, c, target, pw, ph);
+            }, delay);
+        })(sym, col, pd, panelW, panelH, 100 + i * 200);
     });
 };
 
@@ -1824,8 +1822,9 @@ window.showCompareUMAP = function(genes, colorMap) {
  * into targetEl with the caller-supplied pixel dimensions.
  */
 window.renderComparePanel = function(gene, geneColor, targetEl, w, h) {
+    console.log('[CiliAI Compare] Rendering panel: gene='+gene+' w='+w+' h='+h+' el='+targetEl.tagName);
     if (!window.Plotly) {
-        targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;">Plotly not loaded</div>';
+        targetEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:'+h+'px;color:#94a3b8;">Plotly not loaded</div>';
         return;
     }
 
