@@ -1,17 +1,16 @@
 /**
  * CiliAI Intent Interceptor v3.0 — Application Controller Architecture
  *
- * ARCHITECTURAL CHANGES (v3.0):
- *  A. "Specificity First" parsing — geneMap validated BEFORE keyword matching,
- *     so "BBS1" never gets hijacked by the "bbsome/bbs" disease/complex matchers.
- *  B. Controller-Renderer Bridge — gene_overview intent calls
- *     displayIndividualGenePage() directly, passing the live database object.
- *  C. Visual side-effects — applyUnifiedHighlight() reads localization directly
- *     from the DB record and applies CSS classes to SVG IDs. No if/else chains.
- *  D. Cross-view interactivity — gene pages inject an "Expression Atlas" button
- *     that switches to the Plot/UMAP view without re-running the query.
- *  E. Defensive programming throughout — every UI call is try/catch guarded and
- *     existence-checked. Text always comes from DB object keys, never hardcoded.
+ * ARCHITECTURAL CHANGES (v3.1):
+ *  F. renderGenePage now has two paths:
+ *     PATH 1 — delegates to displayIndividualGenePage() from script.js when
+ *              available. Normalises gmap mixed-key record → canonical schema
+ *              via normToCanonical(). Injects Expression Atlas button after render.
+ *     PATH 2 — fallback inline card used when script.js hasn't loaded yet.
+ *              Now includes Ensembl ID(s) rendered as clickable links to
+ *              https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=ENSG…
+ *  G. renderEnsemblLinks() helper — handles single IDs, multi-ID strings,
+ *     semicolon/comma/space-separated lists, all linking correctly.
  *
  * Previous fixes retained (v2.1–v2.4):
  *  pfam_filter + vertebrate scope (Li2014), phylo_domain scoping,
@@ -607,38 +606,182 @@ function applyUnifiedHighlight(locString) {
 
 /* ══════════════════════════════════════════════════════════════════════════
  * ARCHITECTURE B + D — CONTROLLER-RENDERER BRIDGE
- * renderGenePage: maps a DB object directly to a rich HTML card.
- * Architecture E: all fields read from DB keys, never hardcoded.
- * Architecture D: injects an "Expression Atlas" button for cross-view jump.
+ *
+ * renderGenePage has two paths:
+ *
+ * PATH 1 (preferred): If displayIndividualGenePage() exists in script.js,
+ *   normalise the gmap DB object into the canonical snake_case schema and
+ *   call it directly. That function renders the full rich page (Ensembl links,
+ *   OMIM, CORUM, STRING, orthologs, screen data, references).
+ *
+ * PATH 2 (fallback): If script.js hasn't loaded yet, render an inline card
+ *   that covers all the same fields including Ensembl IDs with clickable links.
+ *
+ * Architecture E: all fields read from DB object keys, never hardcoded.
+ * Architecture D: Expression Atlas button injected in both paths.
  * ════════════════════════════════════════════════════════════════════════*/
-function renderGenePage(sym, gobj) {
-    /* Architecture E: pull from DB object keys — source of truth */
-    var gene        = (gobj['Gene']           || sym).toUpperCase();
-    var desc        = gobj['Gene.Description'] || gobj['description'] || '';
-    var locRaw      = gobj['Localization']     || gobj['localization'] || '';
-    var lof         = getLOF(gobj)             || 'Not reported';
-    var oe          = getOE(gobj)              || 'Not reported';
-    var pct         = getPCT(gobj)             || 'Not reported';
-    var funcSum     = gobj['Functional.Summary.from.Literature'] || gobj['functional_summary'] || gobj['Functional_Summary'] || '';
-    var omim        = gobj['OMIM_ID']          || gobj['omim_id']   || '';
-    var synonym     = gobj['synonym']          || '';
-    var mouseOrtho  = gobj['Ortholog_Mouse']   || '';
-    var complexes   = gobj['Protein_Complexes']|| gobj['protein_complexes'] || '';
-    var domDesc     = gobj['Domain_Descriptions'] || '';
-    var pfamIds     = gobj['PFAM_IDs']         || '';
+function normToCanonical(sym, gobj) {
+    /* Convert the gmap mixed-key record to the snake_case canonical schema
+     * that displayIndividualGenePage() expects.                           */
+    var toArr = function(v) {
+        if (!v) return [];
+        if (Array.isArray(v)) return v.filter(Boolean);
+        return String(v).split(/[;,]/).map(function(s){ return s.trim(); }).filter(Boolean);
+    };
 
-    /* Ciliopathies — array or comma string */
-    var cilioRaw = gobj['Ciliopathies'] || gobj['Ciliopathy'] || '';
-    var cilioList = Array.isArray(cilioRaw)
-        ? cilioRaw
-        : String(cilioRaw).split(/[,;]/).map(function(s){ return s.trim(); }).filter(Boolean);
-    var hasCiliopathy = cilioList.length > 0 && cilioList[0].toUpperCase() !== 'N/A';
+    /* Ensembl IDs — stored as 'Ensembl ID', 'Ensembl.ID', or 'ensembl_id' */
+    var ensemblRaw = gobj['Ensembl ID'] || gobj['Ensembl.ID'] || gobj['ensembl_id'] || '';
+
+    return {
+        gene:                         (gobj['Gene'] || sym).toUpperCase(),
+        description:                  gobj['Gene.Description'] || gobj['description'] || '',
+        synonym:                      gobj['synonym'] || gobj['Synonym'] || '',
+        ensembl_id:                   ensemblRaw,
+        omim_id:                      gobj['OMIM_ID'] || gobj['omim_id'] || '',
+        localization:                 toArr(gobj['Localization'] || gobj['localization']),
+        functional_summary:           gobj['Functional.Summary.from.Literature'] || gobj['functional_summary'] || gobj['Functional_Summary'] || '',
+        functional_category:          toArr(gobj['Functional.category'] || gobj['functional_category']),
+        ciliopathy:                   toArr(gobj['Ciliopathies'] || gobj['Ciliopathy']),
+        domain_descriptions:          toArr(gobj['Domain_Descriptions'] || gobj['domain_descriptions']),
+        pfam_ids:                     toArr(gobj['PFAM_IDs'] || gobj['pfam_ids']),
+        protein_complexes:            gobj['Protein_Complexes'] || gobj['protein_complexes'] || '',
+        complex_names:                toArr(gobj['Protein_Complexes'] || gobj['protein_complexes']),
+        string_link:                  gobj['string_link'] || '',
+        reference:                    gobj['Reference'] || gobj['reference'] || '',
+        ortholog_mouse:               gobj['Ortholog_Mouse']      || gobj['ortholog_mouse']      || '',
+        ortholog_zebrafish:           gobj['Ortholog_Zebrafish']  || gobj['ortholog_zebrafish']  || '',
+        ortholog_drosophila:          gobj['Ortholog_Drosophila'] || gobj['ortholog_drosophila'] || '',
+        ortholog_c_elegans:           gobj['Ortholog_C_elegans']  || gobj['ortholog_c_elegans']  || '',
+        ortholog_xenopus:             gobj['Ortholog_Xenopus']    || gobj['ortholog_xenopus']    || '',
+        lof_effects:                  getLOF(gobj)  || '',
+        overexpression_effects:       getOE(gobj)   || '',
+        percent_ciliated_cells_effects: getPCT(gobj) || '',
+        screens:                      gobj['screens'] || []
+    };
+}
+
+function renderEnsemblLinks(ensemblRaw) {
+    /* Renders one or more Ensembl IDs as clickable links */
+    if (!ensemblRaw) return '<span style="color:#94a3b8;font-style:italic;">Not available</span>';
+    var ids = String(ensemblRaw).split(/[;,\s]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    if (!ids.length) return '<span style="color:#94a3b8;font-style:italic;">Not available</span>';
+    return ids.map(function(id) {
+        return '<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g='
+            +encodeURIComponent(id)+'" target="_blank" rel="noopener noreferrer" '
+            +'style="color:#005b96;font-weight:600;text-decoration:none;font-size:12px;'
+            +'background:#eff6ff;padding:2px 8px;border-radius:6px;border:1px solid #bfdbfe;'
+            +'display:inline-block;margin:1px;">'
+            +id+'</a>';
+    }).join(' ');
+}
+
+function renderGenePage(sym, gobj) {
+    var canonical = normToCanonical(sym, gobj);
+
+    /* ── PATH 1: delegate to script.js full-page renderer ─────────────────
+     * displayIndividualGenePage renders into .content-area with complete
+     * Ensembl links, OMIM, CORUM, STRING, orthologs, screen table, references.
+     * After calling it, inject the Expression Atlas button non-destructively.
+     */
+    if (typeof win.displayIndividualGenePage === 'function') {
+        try {
+            win.displayIndividualGenePage(canonical);
+
+            /* Architecture D: inject Expression Atlas button after render */
+            setTimeout(function() {
+                try {
+                    var contentArea = document.querySelector('.content-area');
+                    if (!contentArea) return;
+                    /* Don't inject twice */
+                    if (contentArea.querySelector('.ciliai-expr-btn')) return;
+                    var btn = document.createElement('button');
+                    btn.className = 'ciliai-expr-btn';
+                    btn.style.cssText = 'background:#005b96;color:white;border:none;padding:7px 16px;'
+                        +'border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;'
+                        +'display:inline-flex;align-items:center;gap:6px;margin:12px 0 4px;';
+                    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+                        +'style="width:13px;height:13px;">'
+                        +'<line x1="18" y1="20" x2="18" y2="10"/>'
+                        +'<line x1="12" y1="20" x2="12" y2="4"/>'
+                        +'<line x1="6" y1="20" x2="6" y2="14"/></svg>'
+                        +'Expression Atlas';
+                    btn.onclick = function() {
+                        try {
+                            if (win.CiliAI) win.CiliAI.activeGeneContext = canonical.gene;
+                            if (typeof win.renderUMAPPlot === 'function') win.renderUMAPPlot(canonical.gene, [canonical.gene]);
+                            else if (typeof win.switchView === 'function') win.switchView('plot');
+                        } catch(e) {}
+                    };
+                    /* Insert at the top of the gene detail page */
+                    var header = contentArea.querySelector('.gene-header');
+                    if (header) header.appendChild(btn);
+                    else contentArea.insertBefore(btn, contentArea.firstChild);
+                } catch(e) {}
+            }, 60);
+
+            /* Return empty string — the full page is already in the DOM */
+            return '';
+        } catch(e) {
+            console.warn('[CiliAI] displayIndividualGenePage failed, using fallback:', e.message);
+        }
+    }
+
+    /* ── PATH 2: inline fallback card ─────────────────────────────────────
+     * Used when displayIndividualGenePage isn't loaded yet.
+     * Renders all fields including Ensembl IDs with clickable links.
+     */
+    var gene     = canonical.gene;
+    var locRaw   = Array.isArray(canonical.localization) ? canonical.localization.join(', ') : (canonical.localization || '');
+    var lof      = canonical.lof_effects              || 'Not reported';
+    var oe       = canonical.overexpression_effects   || 'Not reported';
+    var pct      = canonical.percent_ciliated_cells_effects || 'Not reported';
+    var funcSum  = canonical.functional_summary       || '';
+    var desc     = canonical.description              || '';
+    var omim     = canonical.omim_id                  || '';
+    var synonym  = canonical.synonym                  || '';
+    var mouseOrtho = canonical.ortholog_mouse         || '';
+    var ensemblRaw = canonical.ensembl_id             || '';
+    var complexes  = canonical.complex_names.length ? canonical.complex_names[0] : '';
 
     /* Phylogeny badge — non-blocking */
     var phyloBadgeHtml = '';
     try { phyloBadgeHtml = _li2014BySymbol ? phyloBadge(gene) : ''; } catch(e) {}
 
-    /* Architecture D: Expression Atlas button — jumps to UMAP/Plot view */
+    /* Domain pills */
+    var domParts = canonical.domain_descriptions.concat(canonical.pfam_ids).slice(0,8);
+    var domainHtml = domParts.length
+        ? '<div style="margin-top:10px;">'
+          +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Domains</b><br>'
+          +'<div style="margin-top:3px;">'+domParts.map(function(d){ return pill(d,'purple'); }).join(' ')+'</div>'
+          +'</div>'
+        : '';
+
+    /* Disease pills */
+    var cilioList = canonical.ciliopathy;
+    var hasCiliopathy = cilioList.length > 0 && cilioList[0].toUpperCase() !== 'N/A';
+    var diseaseHtml = hasCiliopathy
+        ? '<div style="margin-top:10px;">'
+          +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Associated ciliopathies</b><br>'
+          +'<div style="margin-top:3px;">'+cilioList.slice(0,6).map(function(d){ return pill(d,'red'); }).join(' ')+'</div>'
+          +'</div>'
+        : '';
+
+    /* Ensembl IDs with links */
+    var ensemblHtml = '<div style="margin-top:10px;">'
+        +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Ensembl ID</b><br>'
+        +'<div style="margin-top:3px;">'+renderEnsemblLinks(ensemblRaw)+'</div>'
+        +'</div>';
+
+    /* Meta row */
+    var metaHtml = '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">';
+    if (omim) metaHtml += '<a href="https://www.omim.org/entry/'+omim.replace(/[^0-9]/g,'')+'" target="_blank" '
+        +'style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-weight:600;text-decoration:none;">OMIM: '+omim+'</a>';
+    if (synonym)   metaHtml += pill('aka '+synonym,'gray');
+    if (mouseOrtho)metaHtml += pill('Mouse: '+mouseOrtho,'blue');
+    if (complexes) metaHtml += pill(complexes,'blue');
+    metaHtml += '</div>';
+
+    /* Architecture D: Expression Atlas button */
     var exprBtn = '<button onclick="(function(){'
         +'try{'
         +'if(window.CiliAI)window.CiliAI.activeGeneContext=\''+gene+'\';'
@@ -646,39 +789,12 @@ function renderGenePage(sym, gobj) {
         +'else if(typeof window.switchView===\'function\')window.switchView(\'plot\');'
         +'}catch(e){}})()" '
         +'style="background:#005b96;color:white;border:none;padding:6px 14px;border-radius:8px;'
-        +'font-size:11.5px;font-weight:600;cursor:pointer;margin-top:6px;display:inline-flex;'
+        +'font-size:11.5px;font-weight:600;cursor:pointer;margin-top:8px;display:inline-flex;'
         +'align-items:center;gap:5px;">'
         +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
         +'style="width:11px;height:11px;"><line x1="18" y1="20" x2="18" y2="10"/>'
         +'<line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'
         +'Expression Atlas</button>';
-
-    /* Domain pills */
-    var domainHtml = '';
-    if (domDesc || pfamIds) {
-        var domParts = (domDesc + (pfamIds ? '; '+pfamIds : '')).split(/[;,]/).map(function(s){ return s.trim(); }).filter(Boolean);
-        domainHtml = '<div style="margin-top:10px;">'
-            +'<b style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Domains</b><br>'
-            +'<div style="margin-top:3px;">'+domParts.slice(0,8).map(function(d){ return pill(d,'purple'); }).join(' ')+'</div>'
-            +'</div>';
-    }
-
-    /* Disease pills */
-    var diseaseHtml = '';
-    if (hasCiliopathy) {
-        diseaseHtml = '<div style="margin-top:10px;">'
-            +'<b style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Associated ciliopathies</b><br>'
-            +'<div style="margin-top:3px;">'+cilioList.slice(0,6).map(function(d){ return pill(d,'red'); }).join(' ')+'</div>'
-            +'</div>';
-    }
-
-    /* Meta row: OMIM, mouse ortholog, complexes */
-    var metaHtml = '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">';
-    if (omim)      metaHtml += '<a href="https://www.omim.org/entry/'+omim.replace(/[^0-9]/g,'')+'" target="_blank" style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-weight:600;text-decoration:none;">OMIM: '+omim+'</a>';
-    if (synonym)   metaHtml += pill('aka '+synonym,'gray');
-    if (mouseOrtho)metaHtml += pill('Mouse: '+mouseOrtho,'blue');
-    if (complexes) metaHtml += pill(complexes.split(/[;,]/)[0].trim(),'blue');
-    metaHtml += '</div>';
 
     return '<div style="line-height:1.5;">'
         /* Header */
@@ -687,15 +803,15 @@ function renderGenePage(sym, gobj) {
         +(phyloBadgeHtml||'')
         +(synonym ? '<span style="font-size:11px;color:#94a3b8;">'+synonym+'</span>' : '')
         +'</div>'
-        /* Description */
-        +(desc ? '<p style="font-size:12px;color:#64748b;margin-bottom:8px;">'+desc.slice(0,120)+(desc.length>120?'…':'')+'</p>' : '')
-        /* Functional summary */
-        +(funcSum ? '<p style="font-size:12.5px;color:#334155;line-height:1.55;margin-bottom:10px;padding:8px;background:#f8fafc;border-radius:6px;border-left:3px solid #b3cde0;">'+funcSum.slice(0,300)+(funcSum.length>300?'…':'')+'</p>' : '')
-        /* 2×2 data grid — Architecture E: all values from DB keys */
+        +(desc ? '<p style="font-size:12px;color:#64748b;margin-bottom:8px;">'+desc.slice(0,140)+(desc.length>140?'…':'')+'</p>' : '')
+        +(funcSum ? '<p style="font-size:12.5px;color:#334155;line-height:1.55;margin-bottom:10px;'
+            +'padding:8px;background:#f8fafc;border-radius:6px;border-left:3px solid #b3cde0;">'
+            +funcSum.slice(0,300)+(funcSum.length>300?'…':'')+'</p>' : '')
+        /* 2×2 data grid */
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:4px;">'
         +'<div style="background:#f8fafc;padding:8px;border-radius:8px;">'
         +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Localization</b><br>'
-        +'<span style="color:#0f172a;font-weight:500;">'+( locRaw || '—' )+'</span></div>'
+        +'<span style="color:#0f172a;font-weight:500;">'+(locRaw||'—')+'</span></div>'
         +'<div style="background:#f8fafc;padding:8px;border-radius:8px;">'
         +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">LoF effect</b><br>'
         +'<span style="color:#7c3aed;font-weight:600;">'+lof+'</span></div>'
@@ -706,6 +822,7 @@ function renderGenePage(sym, gobj) {
         +'<b style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">% ciliated cells</b><br>'
         +'<span style="color:#065f46;font-weight:500;">'+pct+'</span></div>'
         +'</div>'
+        +ensemblHtml
         +metaHtml
         +diseaseHtml
         +domainHtml
@@ -1396,6 +1513,6 @@ win._ciliaiShowLastPhylo = function() {
         startSuppression();
     }
 };
-console.log('[CiliAI Interceptor v3.0] Application Controller Architecture loaded.');
+console.log('[CiliAI Interceptor v3.1] Application Controller Architecture loaded.');
 
 })(window);
