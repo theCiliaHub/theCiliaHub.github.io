@@ -1699,14 +1699,232 @@ window.showDomainViewer = function(gene) {
 /* ══════════════════════════════════════════════════════════════════════════
  * showCompareUMAP — N independent UMAP panels, one per gene.
  *
- * Strategy: renderUMAPPlot() in ciliai.js already knows how to get expression
- * data for any gene symbol. It ends by calling window.showPlot(plotData, title).
- * We temporarily replace window.showPlot with a version that redirects the
- * Plotly.newPlot call to our target cell div instead of #plotly-container.
- * We render genes sequentially so the intercepted showPlot always targets
- * the right cell.
+ * Strategy: call renderUMAPPlot normally (it draws into #plotly-container).
+ * Poll for the Plotly chart to appear there, then clone its data+layout into
+ * our cell div using Plotly.newPlot. This avoids all showPlot/switchView
+ * conflicts — we never touch the render pipeline, just copy the result.
  * ════════════════════════════════════════════════════════════════════════*/
 window.showCompareUMAP = function(genes, colorMap) {
+    if (!genes || !genes.length) return;
+    colorMap = colorMap || {};
+    var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
+    genes.forEach(function(s,i){ if (!colorMap[s]) colorMap[s] = GENE_COLORS[i % GENE_COLORS.length]; });
+
+    /* Compute panel sizes from the viz-card BEFORE hiding anything */
+    var vizCard = document.querySelector('.viz-card');
+    var vizHdr  = document.querySelector('.viz-header');
+    var totalH  = vizCard ? vizCard.clientHeight : (window.innerHeight - 60);
+    var hdrH    = vizHdr  ? vizHdr.clientHeight  : 50;
+    var totalW  = vizCard ? vizCard.clientWidth  : (window.innerWidth * 0.6);
+    var LEGEND_H = 38, CELL_HDR = 32;
+    var availH  = Math.max(totalH - hdrH - LEGEND_H - 8, 300);
+    var availW  = Math.max(totalW - 8, 400);
+    var panelW  = Math.floor((availW - (genes.length - 1) * 2) / genes.length);
+    var panelH  = Math.max(availH - CELL_HDR - 4, 240);
+
+    /* Build the compare container structure (hidden until we have data) */
+    var outer = document.getElementById('compare-umap-container');
+    if (!outer) return;
+    outer.innerHTML = '';
+    /* Don't show the outer container yet — renderUMAPPlot needs #plotly-container visible */
+
+    /* Legend header */
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'flex-shrink:0;height:'+LEGEND_H+'px;display:flex;align-items:center;'
+        +'padding:0 16px;gap:16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;';
+    genes.forEach(function(sym, i) {
+        var c = colorMap[sym];
+        var it = document.createElement('div');
+        it.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#334155;';
+        it.innerHTML = '<span style="width:11px;height:11px;border-radius:50%;background:'+c+';display:inline-block;"></span>'+sym;
+        hdr.appendChild(it);
+    });
+    var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
+    var dsInf = (window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey]) || {};
+    var badge = document.createElement('span');
+    badge.style.cssText = 'margin-left:auto;font-size:10px;color:#94a3b8;';
+    badge.textContent = (dsInf.icon||'') + ' ' + (dsInf.name || dsKey);
+    hdr.appendChild(badge);
+    outer.appendChild(hdr);
+
+    /* Row of panels */
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-direction:row;flex:1;gap:2px;background:#e2e8f0;overflow:hidden;';
+    outer.appendChild(row);
+
+    /* Build cell divs */
+    var plotDivs = [];
+    genes.forEach(function(sym, i) {
+        var col = colorMap[sym];
+        var panel = document.createElement('div');
+        panel.style.cssText = 'display:flex;flex-direction:column;background:white;'
+            +'width:'+panelW+'px;flex-shrink:0;overflow:hidden;';
+
+        var ph = document.createElement('div');
+        ph.style.cssText = 'height:'+CELL_HDR+'px;display:flex;align-items:center;gap:6px;'
+            +'padding:0 10px;border-bottom:3px solid '+col+';flex-shrink:0;';
+        ph.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:'+col+';display:inline-block;"></span>'
+                     + '<span style="color:'+col+';font-weight:700;font-size:13px;">'+sym+'</span>';
+        var xb = document.createElement('button');
+        xb.textContent = '⤢ Single view';
+        xb.style.cssText = 'margin-left:auto;background:none;border:1px solid #e2e8f0;'
+            +'border-radius:5px;padding:2px 8px;font-size:10px;color:#64748b;cursor:pointer;';
+        xb.addEventListener('click', (function(s){ return function(){
+            if (window.CiliAI) window.CiliAI.activeGeneContext = s;
+            if (window.renderUMAPPlot) window.renderUMAPPlot(s,[s]);
+        };})(sym));
+        ph.appendChild(xb);
+        panel.appendChild(ph);
+
+        var pd = document.createElement('div');
+        pd.style.cssText = 'width:'+panelW+'px;height:'+panelH+'px;flex-shrink:0;';
+        pd.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;'
+            +'color:#94a3b8;font-size:12px;">Loading '+sym+'…</div>';
+        panel.appendChild(pd);
+        row.appendChild(panel);
+        plotDivs.push({ el: pd, gene: sym, color: col });
+    });
+
+    /* ── SEQUENTIAL CLONE RENDERER ──────────────────────────────────────────
+     * For each gene:
+     *   1. Call renderUMAPPlot — it draws into #plotly-container
+     *   2. Poll until window.CiliAI.currentPlot appears (Plotly resolves)
+     *   3. Clone plotData.data + layout into our cell div via Plotly.newPlot
+     *   4. Restore compare view (hide #plotly-container, show #compare-umap-container)
+     *   5. Move to next gene
+     */
+    var SOURCE_ID = 'plotly-container';
+    var rendered  = 0;
+
+    function cloneGene(idx) {
+        if (idx >= plotDivs.length) {
+            /* All genes rendered — show the compare container */
+            showCompareView();
+            return;
+        }
+        var item   = plotDivs[idx];
+        var sym    = item.gene;
+        var col    = item.color;
+        var target = item.el;
+
+        /* Make #plotly-container visible so renderUMAPPlot can draw into it */
+        ['cilia-svg','domain-viewer','compare-umap-container'].forEach(function(id){
+            var el = document.getElementById(id); if (el) el.style.display = 'none';
+        });
+        var src = document.getElementById(SOURCE_ID);
+        if (src) { src.style.display = 'block'; src.innerHTML = ''; }
+        if (window.CiliAI) { window.CiliAI.currentPlot = null; window.CiliAI.activeGeneContext = sym; }
+
+        /* Trigger render */
+        if (!window.renderUMAPPlot) {
+            target.innerHTML = '<div style="padding:20px;color:#94a3b8;font-size:12px;">renderUMAPPlot not available</div>';
+            cloneGene(idx + 1);
+            return;
+        }
+        window.renderUMAPPlot(sym, [sym]);
+
+        /* Poll for Plotly to finish drawing (max 8 seconds) */
+        var waited = 0;
+        var poll = setInterval(function() {
+            waited += 150;
+            var srcEl = document.getElementById(SOURCE_ID);
+            var hasPlot = srcEl && srcEl._fullData && srcEl._fullData.length > 0;
+            /* Also accept: Plotly element has data property set */
+            if (!hasPlot && srcEl) hasPlot = !!(srcEl.data && srcEl.data.length);
+            /* Also accept: CiliAI.currentPlot is set */
+            if (!hasPlot) hasPlot = !!(window.CiliAI && window.CiliAI.currentPlot);
+
+            if (hasPlot || waited >= 8000) {
+                clearInterval(poll);
+
+                if (!hasPlot) {
+                    console.warn('[CiliAI Compare] Timeout waiting for '+sym+' UMAP');
+                    target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+                        +'height:100%;color:#94a3b8;font-size:12px;">'+sym+' — no data</div>';
+                    cloneGene(idx + 1);
+                    return;
+                }
+
+                /* Extract traces and layout from the rendered Plotly element */
+                var srcEl2 = document.getElementById(SOURCE_ID);
+                var traces = [];
+                var srcLayout = {};
+                try {
+                    if (srcEl2 && srcEl2.data) {
+                        traces = JSON.parse(JSON.stringify(srcEl2.data));
+                    } else if (window.CiliAI && window.CiliAI.currentPlot && window.CiliAI.currentPlot.data) {
+                        traces = JSON.parse(JSON.stringify(window.CiliAI.currentPlot.data));
+                    }
+                    if (srcEl2 && srcEl2.layout) {
+                        srcLayout = srcEl2.layout;
+                    } else if (window.CiliAI && window.CiliAI.currentPlot && window.CiliAI.currentPlot.layout) {
+                        srcLayout = window.CiliAI.currentPlot.layout;
+                    }
+                } catch(e) { console.warn('[CiliAI Compare] Clone parse error:', e); }
+
+                if (!traces.length) {
+                    target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+                        +'height:100%;color:#94a3b8;font-size:12px;">'+sym+' — empty plot</div>';
+                    cloneGene(idx + 1);
+                    return;
+                }
+
+                /* Build layout for the cell */
+                var layout = {
+                    width:  panelW,
+                    height: panelH,
+                    margin: {l:20, r:20, t:28, b:20, pad:2},
+                    paper_bgcolor: 'white',
+                    plot_bgcolor:  srcLayout.plot_bgcolor || '#f8fafc',
+                    autosize: false,
+                    showlegend: true,
+                    legend: {x:1.01, y:1, xanchor:'left', font:{size:9}},
+                    font: {size:9},
+                    xaxis: Object.assign({}, srcLayout.xaxis || {}, {title:''}),
+                    yaxis: Object.assign({}, srcLayout.yaxis || {}, {title:''}),
+                    annotations: [{
+                        text: sym,
+                        xref:'paper', yref:'paper',
+                        x:0.02, y:0.98,
+                        xanchor:'left', yanchor:'top',
+                        showarrow:false,
+                        font:{size:12, color:col, family:'Inter,sans-serif'},
+                        bgcolor:'rgba(255,255,255,0.85)', borderpad:3
+                    }]
+                };
+
+                Plotly.newPlot(target, traces, layout, {
+                    responsive:false, displayModeBar:false, staticPlot:false
+                }).then(function() {
+                    console.log('[CiliAI Compare] Panel rendered: '+sym);
+                    rendered++;
+                    /* Short pause then render next gene */
+                    setTimeout(function(){ cloneGene(idx + 1); }, 200);
+                }).catch(function(e) {
+                    console.warn('[CiliAI Compare] Plotly.newPlot error for '+sym+':', e);
+                    cloneGene(idx + 1);
+                });
+            }
+        }, 150);
+    }
+
+    function showCompareView() {
+        /* Hide plotly-container, show the compare panels */
+        ['cilia-svg','plotly-container','domain-viewer'].forEach(function(id){
+            var el = document.getElementById(id); if (el) el.style.display = 'none';
+        });
+        outer.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;'
+            +'width:100%;height:100%;background:white;overflow:hidden;';
+        document.querySelectorAll('.view-tab').forEach(function(t){ t.classList.remove('active'); });
+        var tp = document.getElementById('tab-plot');
+        if (tp) tp.classList.add('active');
+        var te = document.getElementById('current-viz-title');
+        if (te) te.textContent = 'Expression: '+genes.join(' vs ');
+    }
+
+    /* Start rendering the first gene */
+    cloneGene(0);
+};
     if (!genes || !genes.length) return;
     colorMap = colorMap || {};
     var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
