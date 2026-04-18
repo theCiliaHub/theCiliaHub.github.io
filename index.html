@@ -1795,10 +1795,30 @@ window.showCompareUMAP = function(genes, colorMap) {
      */
     var SOURCE_ID = 'plotly-container';
     var rendered  = 0;
+    var _retried  = {};  /* track genes already retried so we don't loop */
+
+    /* Wait for the active dataset to finish loading before rendering.
+     * renderUMAPPlot triggers a dataset load internally — if we poll too
+     * early we time out before any data arrives. Waiting here means the
+     * poll only starts once data is actually available.                  */
+    function waitForDataset(callback) {
+        var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
+        var ds    = window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey];
+        if (ds && ds._loaded) { callback(); return; }
+        /* Dataset is loading — poll until _loaded is set (max 45s) */
+        var w = 0;
+        var t = setInterval(function() {
+            w += 300;
+            var ds2 = window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey];
+            if ((ds2 && ds2._loaded) || w >= 45000) {
+                clearInterval(t);
+                callback();
+            }
+        }, 300);
+    }
 
     function cloneGene(idx) {
         if (idx >= plotDivs.length) {
-            /* All genes rendered — show the compare container */
             showCompareView();
             return;
         }
@@ -1806,6 +1826,10 @@ window.showCompareUMAP = function(genes, colorMap) {
         var sym    = item.gene;
         var col    = item.color;
         var target = item.el;
+
+        /* Show loading state */
+        target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+            +'height:100%;color:#94a3b8;font-size:12px;">Loading '+sym+'…</div>';
 
         /* Make #plotly-container visible so renderUMAPPlot can draw into it */
         ['cilia-svg','domain-viewer','compare-umap-container'].forEach(function(id){
@@ -1815,51 +1839,61 @@ window.showCompareUMAP = function(genes, colorMap) {
         if (src) { src.style.display = 'block'; src.innerHTML = ''; }
         if (window.CiliAI) { window.CiliAI.currentPlot = null; window.CiliAI.activeGeneContext = sym; }
 
-        /* Trigger render */
         if (!window.renderUMAPPlot) {
             target.innerHTML = '<div style="padding:20px;color:#94a3b8;font-size:12px;">renderUMAPPlot not available</div>';
             cloneGene(idx + 1);
             return;
         }
+
+        /* Trigger the render — this starts the dataset load if not cached */
         window.renderUMAPPlot(sym, [sym]);
 
-        /* Poll for Plotly to finish drawing (max 8 seconds) */
-        var waited = 0;
-        var poll = setInterval(function() {
-            waited += 150;
-            var srcEl = document.getElementById(SOURCE_ID);
-            var hasPlot = srcEl && srcEl._fullData && srcEl._fullData.length > 0;
-            /* Also accept: Plotly element has data property set */
-            if (!hasPlot && srcEl) hasPlot = !!(srcEl.data && srcEl.data.length);
-            /* Also accept: CiliAI.currentPlot is set */
-            if (!hasPlot) hasPlot = !!(window.CiliAI && window.CiliAI.currentPlot);
+        /* Poll for Plotly to finish.
+         * First gene: up to 45s (triggers cold dataset download ~10-30s).
+         * Subsequent genes: up to 20s (dataset already cached).           */
+        var isFirstGene = (idx === 0 && !_retried[sym]);
+        var maxWait = isFirstGene ? 45000 : 20000;
+        var waited  = 0;
 
-            if (hasPlot || waited >= 8000) {
+        var poll = setInterval(function() {
+            waited += 200;
+            var srcEl   = document.getElementById(SOURCE_ID);
+            var hasPlot = !!(srcEl && srcEl._fullData && srcEl._fullData.length > 0)
+                       || !!(srcEl && srcEl.data && srcEl.data.length > 0)
+                       || !!(window.CiliAI && window.CiliAI.currentPlot);
+
+            if (!hasPlot && waited >= maxWait) {
+                clearInterval(poll);
+                console.warn('[CiliAI Compare] Timeout waiting for '+sym+' UMAP after '+maxWait+'ms');
+
+                /* If we haven't retried this gene yet, push it to the end of the queue
+                 * so it gets another chance after remaining genes warm the cache.     */
+                if (!_retried[sym]) {
+                    _retried[sym] = true;
+                    plotDivs.push(item);  /* re-queue at end */
+                    target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+                        +'height:100%;flex-direction:column;gap:6px;color:#94a3b8;font-size:12px;">'
+                        +'<span>'+sym+' — retrying after others…</span></div>';
+                } else {
+                    target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+                        +'height:100%;color:#94a3b8;font-size:12px;">'+sym+' — no expression data in this dataset</div>';
+                }
+                cloneGene(idx + 1);
+                return;
+            }
+
+            if (hasPlot) {
                 clearInterval(poll);
 
-                if (!hasPlot) {
-                    console.warn('[CiliAI Compare] Timeout waiting for '+sym+' UMAP');
-                    target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
-                        +'height:100%;color:#94a3b8;font-size:12px;">'+sym+' — no data</div>';
-                    cloneGene(idx + 1);
-                    return;
-                }
-
-                /* Extract traces and layout from the rendered Plotly element */
-                var srcEl2 = document.getElementById(SOURCE_ID);
-                var traces = [];
+                /* Extract the Plotly traces from the rendered element */
+                var srcEl2   = document.getElementById(SOURCE_ID);
+                var traces   = [];
                 var srcLayout = {};
                 try {
-                    if (srcEl2 && srcEl2.data) {
-                        traces = JSON.parse(JSON.stringify(srcEl2.data));
-                    } else if (window.CiliAI && window.CiliAI.currentPlot && window.CiliAI.currentPlot.data) {
-                        traces = JSON.parse(JSON.stringify(window.CiliAI.currentPlot.data));
-                    }
-                    if (srcEl2 && srcEl2.layout) {
-                        srcLayout = srcEl2.layout;
-                    } else if (window.CiliAI && window.CiliAI.currentPlot && window.CiliAI.currentPlot.layout) {
-                        srcLayout = window.CiliAI.currentPlot.layout;
-                    }
+                    var plotEl = (srcEl2 && srcEl2.data && srcEl2.data.length) ? srcEl2
+                               : (window.CiliAI && window.CiliAI.currentPlot) || srcEl2;
+                    if (plotEl && plotEl.data) traces = JSON.parse(JSON.stringify(plotEl.data));
+                    if (plotEl && plotEl.layout) srcLayout = plotEl.layout;
                 } catch(e) { console.warn('[CiliAI Compare] Clone parse error:', e); }
 
                 if (!traces.length) {
@@ -1869,7 +1903,6 @@ window.showCompareUMAP = function(genes, colorMap) {
                     return;
                 }
 
-                /* Build layout for the cell */
                 var layout = {
                     width:  panelW,
                     height: panelH,
@@ -1884,10 +1917,8 @@ window.showCompareUMAP = function(genes, colorMap) {
                     yaxis: Object.assign({}, srcLayout.yaxis || {}, {title:''}),
                     annotations: [{
                         text: sym,
-                        xref:'paper', yref:'paper',
-                        x:0.02, y:0.98,
-                        xanchor:'left', yanchor:'top',
-                        showarrow:false,
+                        xref:'paper', yref:'paper', x:0.02, y:0.98,
+                        xanchor:'left', yanchor:'top', showarrow:false,
                         font:{size:12, color:col, family:'Inter,sans-serif'},
                         bgcolor:'rgba(255,255,255,0.85)', borderpad:3
                     }]
@@ -1898,14 +1929,13 @@ window.showCompareUMAP = function(genes, colorMap) {
                 }).then(function() {
                     console.log('[CiliAI Compare] Panel rendered: '+sym);
                     rendered++;
-                    /* Short pause then render next gene */
                     setTimeout(function(){ cloneGene(idx + 1); }, 200);
                 }).catch(function(e) {
-                    console.warn('[CiliAI Compare] Plotly.newPlot error for '+sym+':', e);
+                    console.warn('[CiliAI Compare] Plotly error for '+sym+':', e);
                     cloneGene(idx + 1);
                 });
             }
-        }, 150);
+        }, 200);
     }
 
     function showCompareView() {
@@ -1922,8 +1952,30 @@ window.showCompareUMAP = function(genes, colorMap) {
         if (te) te.textContent = 'Expression: '+genes.join(' vs ');
     }
 
-    /* Start rendering the first gene */
-    cloneGene(0);
+    /* Trigger the dataset load immediately by calling renderUMAPPlot for gene 0.
+     * Then wait for the dataset to be fully loaded before starting the clone sequence.
+     * This means gene 0 doesn't time out — we wait as long as needed for the download. */
+    if (window.renderUMAPPlot && plotDivs.length) {
+        var firstSym = plotDivs[0].gene;
+        /* Show #plotly-container so renderUMAPPlot can work */
+        ['cilia-svg','domain-viewer','compare-umap-container'].forEach(function(id){
+            var el = document.getElementById(id); if (el) el.style.display = 'none';
+        });
+        var srcEl0 = document.getElementById(SOURCE_ID);
+        if (srcEl0) { srcEl0.style.display = 'block'; srcEl0.innerHTML = ''; }
+        if (window.CiliAI) { window.CiliAI.currentPlot = null; window.CiliAI.activeGeneContext = firstSym; }
+        window.renderUMAPPlot(firstSym, [firstSym]);  /* triggers dataset download */
+    }
+
+    /* Now wait for dataset to be _loaded, then start the clone sequence */
+    waitForDataset(function() {
+        console.log('[CiliAI Compare] Dataset ready — starting compare render for: '+genes.join(', '));
+        /* Reset plotly-container for a clean render */
+        if (window.CiliAI) window.CiliAI.currentPlot = null;
+        var srcEl0 = document.getElementById(SOURCE_ID);
+        if (srcEl0) srcEl0.innerHTML = '';
+        cloneGene(0);  /* re-renders gene 0 cleanly, then continues with 1, 2, ... */
+    });
 };
 
 window.downloadCurrentVisualization = function() {
