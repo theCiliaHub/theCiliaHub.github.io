@@ -138,10 +138,10 @@ ClinVar · MGI (mouse phenotypes) · Pfam · Reactome/GO/KEGG · PubMed + expert
 
 If you use CiliaHub, please cite the Application Note and the archived software release:
 
-> Kaplan, O.I. (2026) CiliaHub: an updated gold-standard catalogue of ciliary genes with
-> integrated ciliopathy data. *Bioinformatics* (submitted).
+> Yenisert, F., Cevik, S., Kaplan, O.I. (2026) CiliaHub: an updated gold-standard catalogue of ciliary genes with
+> integrated ciliopathy data. (submitted).
 
-Software archive: Zenodo DOI `10.5281/zenodo.XXXXXXX` *(fill in on release)*.
+Software archive: Zenodo DOI `10.5281/zenodo.20696641` *(fill in on release)*.
 Machine-readable citation metadata is in `CITATION.cff`.
 
 ---
