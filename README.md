@@ -1,8 +1,28 @@
-# CiliaHub — Interactive Ciliary Gene Database
+# CiliaHub — an updated gold-standard catalogue of ciliary genes with integrated ciliopathy data
 
-**Live site:** [https://theciliahub.github.io](https://theciliahub.github.io)
+**Live site:** https://ciliahub.org
+*(The legacy `theciliahub.github.io` address redirects here. This repository holds the
+source code, data-build pipeline, and CiliAI assistant.)*
 
-CiliaHub is a web-based research platform for exploring **human ciliary genes** — genes whose proteins form or operate cilia, the hair-like cellular organelles. It combines a curated database of 2,000+ genes with interactive visualizations and an AI-powered assistant (**CiliAI**).
+CiliaHub is a freely accessible, login-free web resource for human **ciliary genes** and
+the **ciliopathies**. It couples an expert-curated, evidence-tiered gold-standard gene
+catalogue to an integrated, queryable platform spanning evolutionary conservation,
+functional screens, protein domains, complex membership, clinical variants, phenotypes,
+and expression — together with a natural-language assistant (**CiliAI**) and a
+four-class ciliopathy framework.
+
+---
+
+## What's in the catalogue
+
+- **2,790** human ciliary and cilia-associated genes.
+- **2,148** designated **gold-standard** (confirmed localization to the cilium, transition
+  zone, basal body, or flagellum) and **642** cilia-associated.
+- **88** ciliopathies linked to **542** disease genes, organized into a four-class
+  framework: **Primary**, **Motile**, **Tissue-restricted**, and **Secondary**
+  (the last catalogued separately as non-ciliary disorders).
+- Orthologs across **five** model organisms (mouse, *Xenopus*, zebrafish, *Drosophila*,
+  *C. elegans*).
 
 ---
 
@@ -10,139 +30,131 @@ CiliaHub is a web-based research platform for exploring **human ciliary genes** 
 
 | Page | URL | Description |
 |---|---|---|
-| **Home** | `/` | Search genes, view interactive cilia diagram, chat with CiliAI assistant |
-| **Cilia Analysis** | `/plots.html` | Generate scientific plots (UMAP, phylogeny, network, expression heatmap, etc.) |
-| **CiliaHub** | `/ciliahub.html` | Detailed per-gene view (localization, ciliopathies, protein complexes, screen data) |
-| **About** | `/about.html` | Project background, team, and citations |
+| **Home** | `/` (`index.html`) | Gene search, interactive cilia diagram, gold-standard CSV/JSON export |
+| **Cilia Analysis** | `/plots.html` | Classify gene lists (≤2,000) → enrichment, classification, localization, ciliopathy association, functional category, screens, overview (SVG/PNG/CSV) |
+| **CiliAI** | `/ciliai.html` | Natural-language assistant over the curated database, with spatial/structural visualizations |
+| **Ciliopathy** | `/phenotype.html` | Disease–gene–symptom search across the four-class framework (HPO-backed) |
+| **API** | `/api.html` | Static-JSON endpoint documentation and code examples |
+| **About** | `/about.html` | Project background, dataset download, contact |
+| **Interactive Cilium** | `/ciliahub.html` | Per-localization interactive cilium view |
 
 ---
 
-## Key Features
+## Data access
 
-- **Gene Search** — Real-time suggestions by symbol, synonym, or Ensembl ID
-- **Interactive Cilia SVG** — Genes are highlighted at their subcellular location (Axoneme, Basal Body, Transition Zone, etc.)
-- **Expression Visualization** — Organ-level (Human Protein Atlas nTPM) and single-cell (CellxGene UMAP) expression data
-- **Phylogenetic Analysis** — Cross-species conservation heatmaps (Li *et al.* 2014, Nevers *et al.* 2017)
-- **Protein Network Graph** — Visualize co-complex relationships (CORUM data)
-- **Batch Query** — Analyze multiple genes at once; export results as CSV/JSON
-- **CiliAI Assistant** — Conversational AI backed by DeepSeek, with database-grounded answers (RAG)
+All data are served as static JSON with no authentication or rate limits, and as a single
+downloadable file. Canonical endpoints (see `/api.html` for the full list):
+
+```
+https://ciliahub.org/data/genes/ciliahub_master_merged.json     # full gene catalogue
+https://ciliahub.org/data/phenotype/phenotype_meta.json         # ciliopathy summary
+https://ciliahub.org/data/phenotype/class_index.json            # disease → class index
+https://ciliahub.org/data/phenotype/gene_to_diseases.json       # gene → diseases index
+```
+
+Per-gene pages: `https://ciliahub.org/gene/<SYMBOL>` (e.g. `/gene/BBS1`).
 
 ---
 
-## Running Locally
+## Running locally
 
-This is a **pure static site** — no build step required.
+A pure static site — no build step required to view it:
 
 ```bash
-# Clone and serve
 git clone https://github.com/theCiliaHub/theCiliaHub.github.io.git
 cd theCiliaHub.github.io
 python3 -m http.server 8080
-# Open http://localhost:8080
+# open http://localhost:8080
 ```
-
-The AI assistant is pre-configured to use the cloud proxy (see `ciliai/env.js`), so it works out of the box.
 
 ---
 
-## CiliAI Assistant
+## CiliAI assistant
 
-The assistant uses a **hybrid approach**:
+CiliAI uses a large language model to interpret natural-language queries against the
+curated database; **all underlying annotations are expert-reviewed** (the model interprets
+questions, it does not generate the data). It runs a hybrid pipeline: rule-based intent
+handlers answer known questions directly from the local database, and unhandled queries
+fall back to a configurable LLM provider via a proxy.
 
-1. **Rule-based** — 30+ intent handlers answer known questions directly from the local database (gene info, disease gene lists, localization, screens, etc.)
-2. **LLM fallback** — Unhandled queries go to **DeepSeek Chat** via a Cloudflare Worker proxy, with relevant gene data injected as context (RAG)
-3. **Local LLM** — You can switch to a local **Ollama / Llama 3** instance instead
-
-### Environment Configuration
-
-Copy `ciliai/env.example.js` to `ciliai/env.js` and set your values:
+Configure via `ciliai/env.js` (copy from `ciliai/env.example.js`):
 
 | Variable | Description |
 |---|---|
-| `CILIAI_LLM_PROVIDER` | `deepseek` or `ollama` |
-| `CILIAI_MODEL` | e.g. `deepseek-chat` or `llama3.1` |
-| `CILIAI_ASSISTANT_PROXY_URL` | Your Cloudflare Worker URL |
-| `CILIAI_PROXY_SECRET` | Optional shared secret for proxy auth |
+| `CILIAI_LLM_PROVIDER` | LLM backend (e.g. `deepseek`, `ollama`) |
+| `CILIAI_MODEL` | Model name |
+| `CILIAI_ASSISTANT_PROXY_URL` | Proxy worker URL (keeps API keys server-side) |
 | `CILIAI_ASSISTANT_V2` | `true` to enable the LLM assistant |
-| `CILIAI_DEBUG` | `true` to enable console logging |
+| `CILIAI_DEBUG` | `true` for console logging |
 
-### Cloudflare Worker Proxy (Recommended)
-
-To keep your DeepSeek API key out of the browser:
-
-1. Create a Cloudflare Worker and add your `DEEPSEEK_API_KEY` as a secret
-2. Deploy the worker from `serverless/cloudflare-worker.js`
-3. Set `CILIAI_ASSISTANT_PROXY_URL` in `ciliai/env.js` to your Worker URL
+The proxy worker lives in `serverless/cloudflare-worker.js`.
 
 ---
 
-## Project Structure
+## Data-build pipeline
+
+The catalogue and derived JSON are regenerated from curated source tables:
+
+```bash
+python3 scripts/sync_genes.py          # source tables -> generated JSON datasets
+python3 scripts/build_site_jsons.py    # site-facing JSON (called by sync_genes.py)
+```
+
+The phenotype data is regenerated from Supplementary Tables S1 (gene catalogue),
+S2 (disease catalogue), and S5 (symptom classification). A GitHub Actions workflow
+(`.github/workflows/sync-genes.yml`) reruns the pipeline when the source tables change.
+
+---
+
+## Repository layout
 
 ```
 theCiliaHub.github.io/
-├── index.html              # Home page
-├── plots.html              # Cilia Analysis / Plot page
-├── ciliahub.html           # Gene database view
-├── about.html              # About page
-│
-├── js/
-│   ├── script.js           # SPA navigation, search, gene pages, expression viz
-│   ├── plots.js            # All chart rendering (Plotly.js, D3.js)
-│   └── globals.js          # Shared utilities
-│
-├── ciliai/
-│   ├── ciliai.js           # Main logic engine (query routing, data handlers)
-│   ├── env.js              # Runtime config (LLM provider, keys, proxy URL)
-│   └── assistant/
-│       ├── assistant-core.js      # Config builder, response parser
-│       ├── assistant-runtime.js   # LLM integration, action dispatcher
-│       └── providers/
-│           ├── deepseek.js        # DeepSeek API provider
-│           └── ollama.js          # Ollama local LLM provider
-│
-├── data/
-│   ├── genes/              # Master gene DB + lookup maps (~30 MB)
-│   ├── expression/         # RNA-seq & scRNA-seq data (~32 MB)
-│   ├── phylogeny/          # Cross-species conservation matrices (~32 MB)
-│   ├── umap/               # UMAP coordinates for single-cell plots
-│   └── domains/            # Protein domain annotations
-│
-├── serverless/
-│   └── cloudflare-worker.js   # Proxy worker (keeps API key server-side)
-└── scripts/
-    └── generate_json.py       # Python script to regenerate JSON data files
+├── *.html                 # page sources (or redirect stubs; see deployment notes)
+├── js/                    # SPA navigation, search, plotting
+├── ciliai/                # CiliAI engine
+│   ├── ciliai.js
+│   ├── env.example.js
+│   └── assistant/         # intent engine, runtime, providers
+├── data/                  # genes, phenotype, expression, phylogeny, domains, umap, source
+├── styles/                # CSS
+├── assets/                # logos, diagrams
+├── scripts/               # data-build pipeline (Python)
+├── serverless/            # Cloudflare worker proxy
+└── docs/                  # additional documentation
 ```
 
 ---
 
-## Data Sources
+## Data sources
 
-| Source | Data |
-|---|---|
-| [Human Protein Atlas](https://www.proteinatlas.org/) | Tissue-level RNA expression (nTPM) |
-| [CellxGene](https://cellxgene.cziscience.com/) | Single-cell RNA-seq expression + UMAP coordinates |
-| [CORUM](https://mips.helmholtz-muenchen.de/corum/) | Human protein complex memberships |
-| Ensembl | Gene IDs and annotations |
-| OMIM | Disease associations |
-| Li *et al.* 2014 / Nevers *et al.* 2017 | Phylogenetic conservation matrices |
-| PubMed + manual curation | Expanded ciliome (688 → 2,000+ genes) |
+Human Protein Atlas (tissue nTPM) · CELLxGENE (single-cell expression + UMAP) ·
+Alliance of Genome Resources (orthology) · CORUM (complexes) · Ensembl · OMIM ·
+ClinVar · MGI (mouse phenotypes) · Pfam · Reactome/GO/KEGG · PubMed + expert curation.
 
 ---
 
-## Testing the Assistant
+## Citing CiliaHub
 
-Run the golden-contract test suite:
-```bash
-node --test ciliai/tests/assistant_golden.test.mjs
-```
+If you use CiliaHub, please cite the Application Note and the archived software release:
 
-Or open the in-browser verification panel at `/verify.html`.
+> Kaplan, O.I. (2026) CiliaHub: an updated gold-standard catalogue of ciliary genes with
+> integrated ciliopathy data. *Bioinformatics* (submitted).
+
+Software archive: Zenodo DOI `10.5281/zenodo.XXXXXXX` *(fill in on release)*.
+Machine-readable citation metadata is in `CITATION.cff`.
+
+---
+
+## License
+
+See `LICENSE`. *(Confirm the intended license — the Application Note states the source code
+is open, which requires an OSI-approved license file in the repository.)*
 
 ---
 
 ## Contact
 
-- **Dr. Oktay I. Kaplan** — oktay.kaplan@agu.edu.tr  
-- **Ferhan Yenisert** — ferhan.yenisert@agu.edu.tr
-
-**License:** Research use only. Please cite relevant sources when publishing.
+Dr. Oktay I. Kaplan — oktay.kaplan@agu.edu.tr
+Rare Disease Laboratory, Faculty of Life and Natural Sciences, Abdullah Gül University,
+38080 Kayseri, Türkiye.
