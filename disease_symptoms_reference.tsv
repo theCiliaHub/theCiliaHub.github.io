@@ -1,0 +1,1821 @@
+disease	class	organ	symptom_concept	hpo
+Acrocallosal Syndrome	Primary Ciliopathies	Skeletal	Bifid / duplicated thumb or hallux	HP:0010053
+Acrocallosal Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Acrocallosal Syndrome	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+Acrocallosal Syndrome	Primary Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+Acrocallosal Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Acrocallosal Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Acrocallosal Syndrome	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+Acrocallosal Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Acrocallosal Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Acrocallosal Syndrome	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Acrocallosal Syndrome	Primary Ciliopathies	CNS	Hypotonia	HP:0001252
+Acrocallosal Syndrome	Primary Ciliopathies	GI_Abdominal	Imperforate anus / anal atresia	HP:0002023
+Acrocallosal Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Long philtrum / abnormal philtrum	HP:0000343
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Acrocallosal Syndrome	Primary Ciliopathies	CNS	Macrocephaly	HP:0000256
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Malar flattening / abnormal cheek	HP:0000272
+Acrocallosal Syndrome	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+Acrocallosal Syndrome	Primary Ciliopathies	Cardiac	Mitral / tricuspid / valve abnormality	HP:0001654
+Acrocallosal Syndrome	Primary Ciliopathies	CNS	Molar tooth sign	HP:0002419
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Acrocallosal Syndrome	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+Acrocallosal Syndrome	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Acrocallosal Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Acrocallosal Syndrome	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Acrocallosal Syndrome	Primary Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Acrocallosal Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0002692
+Acrocallosal Syndrome	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+Acrocallosal Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Acrocallosal Syndrome	Primary Ciliopathies	Craniofacial	Tongue abnormality	HP:0000157
+Acrocallosal Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Alström Syndrome	Primary Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+Alström Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Acanthosis nigricans	HP:0000956
+Alström Syndrome	Primary Ciliopathies	Endocrine	Adipose / skin fat distribution abnormality	HP:0000771
+Alström Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Alopecia / sparse hair	HP:0001596
+Alström Syndrome	Primary Ciliopathies	Respiratory	Asthma	HP:0002099
+Alström Syndrome	Primary Ciliopathies	Vascular	Atherosclerosis / vascular calcification	HP:0002621
+Alström Syndrome	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Alström Syndrome	Primary Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+Alström Syndrome	Primary Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Alström Syndrome	Primary Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Alström Syndrome	Primary Ciliopathies	Eye	Cataract	HP:0000518
+Alström Syndrome	Primary Ciliopathies	Eye	Cone-rod dystrophy	HP:0000548
+Alström Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000230
+Alström Syndrome	Primary Ciliopathies	Endocrine	Diabetes mellitus	HP:0000842
+Alström Syndrome	Primary Ciliopathies	Hepatic	Elevated transaminases / abnormal liver enzymes	HP:0002910
+Alström Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Alström Syndrome	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395; HP:0001394
+Alström Syndrome	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Alström Syndrome	Primary Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Alström Syndrome	Primary Ciliopathies	Endocrine	Hyperuricemia / gout	HP:0002149
+Alström Syndrome	Primary Ciliopathies	Reproductive	Hypogonadism / hypogonadotropic hypogonadism	HP:0000044
+Alström Syndrome	Primary Ciliopathies	Endocrine	Hypothyroidism	HP:0011784
+Alström Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Alström Syndrome	Primary Ciliopathies	Endocrine	Lipid metabolism / dyslipidaemia	HP:0003119
+Alström Syndrome	Primary Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0007754
+Alström Syndrome	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+Alström Syndrome	Primary Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Alström Syndrome	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Alström Syndrome	Primary Ciliopathies	Eye	Photophobia / night blindness	HP:0000613
+Alström Syndrome	Primary Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0000871
+Alström Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Alström Syndrome	Primary Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Alström Syndrome	Primary Ciliopathies	Eye	Refractive error	HP:0000539
+Alström Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107; HP:0000086
+Alström Syndrome	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Alström Syndrome	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Alström Syndrome	Primary Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Alström Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Alström Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0001270
+Alström Syndrome	Primary Ciliopathies	Eye	Visual field defect	HP:0001123
+Alström Syndrome	Primary Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Apraxia	HP:0002186
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Areflexia / hyporeflexia	HP:0001284
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Skeletal	Arthrogryposis / contractures	HP:0002804
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Ataxia / gait abnormality	HP:0002317
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Bulbar dysfunction	HP:0001283
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Hematologic_Immune	Cancer susceptibility / tumour	HP:0002664
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Cerebellar hypoplasia/atrophy	HP:0001321
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Cerebral atrophy / volume loss	HP:0002180
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Hematologic_Immune	Chromosomal instability / radiation sensitivity	HP:0003220
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Constitutional symptom (catchall)	HP:0007495
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Eye movement abnormality (other)	HP:0000496
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Frequency / weakness / fatigue (general)	HP:0003388
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Hypertonia / spasticity	HP:0001276
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Intellectual disability / developmental delay	HP:0001249
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Microcephaly	HP:0000252
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Nystagmus	HP:0000639
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Peripheral neuropathy	HP:0003693
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Skin_Hair_Nail	Photodermatitis / photosensitivity	HP:0000992
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Eye	Photophobia / night blindness	HP:0000613
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Skeletal	Short stature / dwarfism	HP:0004322
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	Eye	Tortuous / abnormal retinal vessels	HP:0030842
+Ataxia-Telangiectasia-like Disorder	Secondary Diseases	CNS	Tremor / dyskinesia / dystonia	HP:0002072
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Vascular	Aneurysm	HP:0002617
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Cardiac	Dextrocardia / cardiac malposition	HP:0001651
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Hepatic	Elevated transaminases / abnormal liver enzymes	HP:0002910
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Glomerular abnormality	HP:0000095
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Endocrine	Hyperuricemia / gout	HP:0002149
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Hepatic	Liver cysts	HP:0001407
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Craniofacial	Malar flattening / abnormal cheek	HP:0000272
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0010754
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Autosomal Dominant Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Tubulointerstitial nephropathy	HP:0001970
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Reproductive	Anhydramnios / oligohydramnios	HP:0001561
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	GI_Abdominal	Esophageal abnormality	HP:0002031
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Hepatic	Liver cysts	HP:0001407
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Renal tubular acidosis / Fanconi-like	HP:0001944
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0001834
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Autosomal Recessive Polycystic Kidney Disease	Tissue-restricted Ciliopathies	Renal	Tubulointerstitial nephropathy	HP:0001970
+BRENS Syndrome	Primary Ciliopathies	Endocrine	Adrenal insufficiency / abnormality	HP:0000846
+BRENS Syndrome	Primary Ciliopathies	GI_Abdominal	Ascites	HP:0001541
+BRENS Syndrome	Primary Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+BRENS Syndrome	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+BRENS Syndrome	Primary Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+BRENS Syndrome	Primary Ciliopathies	CNS	Cerebral atrophy / volume loss	HP:0002059
+BRENS Syndrome	Primary Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0002904
+BRENS Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+BRENS Syndrome	Primary Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+BRENS Syndrome	Primary Ciliopathies	Cardiac	Dextrocardia / cardiac malposition	HP:0001651
+BRENS Syndrome	Primary Ciliopathies	Hepatic	Elevated transaminases / abnormal liver enzymes	HP:0003073
+BRENS Syndrome	Primary Ciliopathies	Craniofacial	Eyebrow / eyelash abnormality	HP:0000534
+BRENS Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+BRENS Syndrome	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+BRENS Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+BRENS Syndrome	Primary Ciliopathies	Renal	Glomerular abnormality	HP:0000095
+BRENS Syndrome	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395; HP:0001394
+BRENS Syndrome	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+BRENS Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+BRENS Syndrome	Primary Ciliopathies	Renal	Hydronephrosis	HP:0000126
+BRENS Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+BRENS Syndrome	Primary Ciliopathies	CNS	Hypotonia	HP:0001252
+BRENS Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+BRENS Syndrome	Primary Ciliopathies	Skeletal	Joint laxity / hypermobility	HP:0001388
+BRENS Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+BRENS Syndrome	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+BRENS Syndrome	Primary Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0000568
+BRENS Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+BRENS Syndrome	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+BRENS Syndrome	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+BRENS Syndrome	Primary Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0011784
+BRENS Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+BRENS Syndrome	Primary Ciliopathies	Reproductive	Polyhydramnios	HP:0001561
+BRENS Syndrome	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+BRENS Syndrome	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+BRENS Syndrome	Primary Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+BRENS Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+BRENS Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+BRENS Syndrome	Primary Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+BRENS Syndrome	Primary Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+BRENS Syndrome	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+BRENS Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+BRENS Syndrome	Primary Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+BRENS Syndrome	Primary Ciliopathies	CNS	White matter abnormality	HP:0002500
+Bardet-Biedl Syndrome	Primary Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+Bardet-Biedl Syndrome	Primary Ciliopathies	Respiratory	Asthma	HP:0002099
+Bardet-Biedl Syndrome	Primary Ciliopathies	CNS	Ataxia / gait abnormality	HP:0002370
+Bardet-Biedl Syndrome	Primary Ciliopathies	Cardiac	Atrial isomerism / heterotaxy	HP:0030853; HP:0001696
+Bardet-Biedl Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Bardet-Biedl Syndrome	Primary Ciliopathies	Cardiac	Cardiomyopathy	HP:0005144
+Bardet-Biedl Syndrome	Primary Ciliopathies	Eye	Cataract	HP:0000518
+Bardet-Biedl Syndrome	Primary Ciliopathies	Eye	Cone-rod dystrophy	HP:0000548
+Bardet-Biedl Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Bardet-Biedl Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Bardet-Biedl Syndrome	Primary Ciliopathies	Cardiac	Dextrocardia / cardiac malposition	HP:0001651
+Bardet-Biedl Syndrome	Primary Ciliopathies	Endocrine	Diabetes mellitus	HP:0000819
+Bardet-Biedl Syndrome	Primary Ciliopathies	Hepatic	Elevated transaminases / abnormal liver enzymes	HP:0002910
+Bardet-Biedl Syndrome	Primary Ciliopathies	Renal	Glomerular abnormality	HP:0000095
+Bardet-Biedl Syndrome	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Bardet-Biedl Syndrome	Primary Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Bardet-Biedl Syndrome	Primary Ciliopathies	GI_Abdominal	Hirschsprung disease / aganglionic bowel	HP:0002251
+Bardet-Biedl Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0001085
+Bardet-Biedl Syndrome	Primary Ciliopathies	Reproductive	Hypogonadism / hypogonadotropic hypogonadism	HP:0000044
+Bardet-Biedl Syndrome	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Bardet-Biedl Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Bardet-Biedl Syndrome	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Bardet-Biedl Syndrome	Primary Ciliopathies	Endocrine	Lipid metabolism / dyslipidaemia	HP:0003119
+Bardet-Biedl Syndrome	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Bardet-Biedl Syndrome	Primary Ciliopathies	CNS	Macrocephaly	HP:0000256
+Bardet-Biedl Syndrome	Primary Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0007754
+Bardet-Biedl Syndrome	Primary Ciliopathies	CNS	Microcephaly	HP:0000252
+Bardet-Biedl Syndrome	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+Bardet-Biedl Syndrome	Primary Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Bardet-Biedl Syndrome	Primary Ciliopathies	Reproductive	Olfactory bulb hypoplasia / anosmia	HP:0000458
+Bardet-Biedl Syndrome	Primary Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Bardet-Biedl Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Bardet-Biedl Syndrome	Primary Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Bardet-Biedl Syndrome	Primary Ciliopathies	Eye	Refractive error	HP:0000539
+Bardet-Biedl Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Bardet-Biedl Syndrome	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Bardet-Biedl Syndrome	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Bardet-Biedl Syndrome	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Bardet-Biedl Syndrome	Primary Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Bardet-Biedl Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Bardet-Biedl Syndrome	Primary Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Bardet-Biedl Syndrome	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Bardet-Biedl Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0002692
+Bardet-Biedl Syndrome	Primary Ciliopathies	CNS	Speech / language abnormality	HP:0002463
+Bardet-Biedl Syndrome	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+Bardet-Biedl Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Bardet-Biedl Syndrome	Primary Ciliopathies	Renal	Tubulointerstitial nephropathy	HP:0001970
+Bardet-Biedl Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Bardet-Biedl Syndrome	Primary Ciliopathies	Vascular	Vascular attenuation / abnormal vasculature	HP:0002597
+Bardet-Biedl Syndrome	Primary Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skin_Hair_Nail	Alopecia / sparse hair	HP:0001006
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skin_Hair_Nail	Atopic dermatitis / eczema	HP:0001047
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skin_Hair_Nail	Basal cell carcinoma	HP:0002671
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Hematologic_Immune	Cancer susceptibility / tumour	HP:0002664
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skin_Hair_Nail	Cutaneous papules / fibrofolliculomas	HP:0030410
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skin_Hair_Nail	Hair colour / texture abnormality	HP:0003705
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skin_Hair_Nail	Hyperpigmentation / hypopigmentation	HP:0011355
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skeletal	Joint laxity / hypermobility	HP:0001388
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skin_Hair_Nail	Milia / pitted skin	HP:0001054
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Craniofacial	Nasal abnormality	HP:0000366
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Skin_Hair_Nail	Sweating abnormality	HP:0000966
+Bazex-Dupré-Christol Syndrome	Secondary Diseases	Craniofacial	Tongue abnormality	HP:0001286
+Biliary Atresia	Tissue-restricted Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Biliary Atresia	Tissue-restricted Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0001396
+Biliary Atresia	Tissue-restricted Ciliopathies	Cardiac	Dextrocardia / cardiac malposition	HP:0001651
+Biliary Atresia	Tissue-restricted Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Biliary Atresia	Tissue-restricted Ciliopathies	Respiratory	Mucociliary clearance impairment	HP:0005938
+Biliary Atresia	Tissue-restricted Ciliopathies	Hepatic	Portal hypertension	HP:0001409
+Biliary Atresia	Tissue-restricted Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Biliary Atresia	Tissue-restricted Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+COACH Syndrome	Primary Ciliopathies	CNS	Abnormal breathing pattern (CNS-driven)	HP:0002098
+COACH Syndrome	Primary Ciliopathies	CNS	Apraxia	HP:0002186
+COACH Syndrome	Primary Ciliopathies	CNS	Ataxia / gait abnormality	HP:0001251
+COACH Syndrome	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+COACH Syndrome	Primary Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+COACH Syndrome	Primary Ciliopathies	Eye	Choriocapillaris / chorioretinal abnormality	HP:0007844
+COACH Syndrome	Primary Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+COACH Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+COACH Syndrome	Primary Ciliopathies	Hepatic	Elevated transaminases / abnormal liver enzymes	HP:0002910
+COACH Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+COACH Syndrome	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+COACH Syndrome	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+COACH Syndrome	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+COACH Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+COACH Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+COACH Syndrome	Primary Ciliopathies	CNS	Hyperreflexia	HP:0001347
+COACH Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+COACH Syndrome	Primary Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+COACH Syndrome	Primary Ciliopathies	CNS	Hypotonia	HP:0001252
+COACH Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+COACH Syndrome	Primary Ciliopathies	CNS	Molar tooth sign	HP:0002419
+COACH Syndrome	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+COACH Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+COACH Syndrome	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+COACH Syndrome	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+COACH Syndrome	Primary Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+COACH Syndrome	Primary Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+COACH Syndrome	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+Carpenter Syndrome	Primary Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Carpenter Syndrome	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Camptodactyly	HP:0012385
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001606
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Coccyx / sacrum abnormality	HP:0008443
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Craniosynostosis	HP:0001363
+Carpenter Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Carpenter Syndrome	Primary Ciliopathies	Reproductive	Delayed puberty / amenorrhea	HP:0000823
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Carpenter Syndrome	Primary Ciliopathies	Cardiac	Dextrocardia / cardiac malposition	HP:0001651
+Carpenter Syndrome	Primary Ciliopathies	Respiratory	Diaphragmatic abnormality	HP:0000776
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Eyebrow / eyelash abnormality	HP:0000534
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000506
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Carpenter Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Carpenter Syndrome	Primary Ciliopathies	Renal	Hydronephrosis	HP:0000126
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Carpenter Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Carpenter Syndrome	Primary Ciliopathies	Eye	Iris / anterior chamber abnormality	HP:0000525
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Joint laxity / hypermobility	HP:0008156
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Malar flattening / abnormal cheek	HP:0000272
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Carpenter Syndrome	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0011497
+Carpenter Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Nipple abnormality	HP:0010783
+Carpenter Syndrome	Primary Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Carpenter Syndrome	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Carpenter Syndrome	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Pectus deformity	HP:0000766
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Carpenter Syndrome	Primary Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0000049
+Carpenter Syndrome	Primary Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Carpenter Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Carpenter Syndrome	Primary Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0002692
+Carpenter Syndrome	Primary Ciliopathies	CNS	Spina bifida / neural tube defect	HP:0002414
+Carpenter Syndrome	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Carpenter Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Carpenter Syndrome	Primary Ciliopathies	Cardiac	Tetralogy of Fallot	HP:0001636
+Carpenter Syndrome	Primary Ciliopathies	Craniofacial	Webbed neck / short neck	HP:0030183
+Ciliary Monogenic Obesity	Tissue-restricted Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+Ciliary Monogenic Obesity	Tissue-restricted Ciliopathies	Endocrine	Diabetes mellitus	HP:0000819
+Ciliary Monogenic Obesity	Tissue-restricted Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Reproductive	Anhydramnios / oligohydramnios	HP:0001561
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Arthrogryposis / contractures	HP:0002804
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	GI_Abdominal	Ascites	HP:0001541
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Auditory canal / external ear (structural)	HP:0000400
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Bone fragility / fracture	HP:0002659; HP:0001642
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Bowed long bones	HP:0006487
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Cardiac	Cardiomegaly	HP:0001640
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Renal	Hydronephrosis	HP:0000126
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Reproductive	Hydrops fetalis	HP:0001789
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Vascular	Lymphedema / lymphatic abnormality	HP:0010880
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Metaphyseal abnormality	HP:0000944
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	CNS	Microcephaly	HP:0000252
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Reproductive	Micropenis	HP:0000054
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Ossification abnormality	HP:0010674
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Osteopenia / osteoporosis	HP:0000938
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Respiratory	Pulmonary cyst / lung lesion (specific)	HP:0002202
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Short ribs / narrow thorax	HP:0000774
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0002692
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Reproductive	Umbilical cord abnormality	HP:0010881
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Complex Lethal Osteochondrodysplasia	Tissue-restricted Ciliopathies	Craniofacial	Webbed neck / short neck	HP:0000465
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Abnormal OCT / autofluorescence	HP:0030453
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Bone-spicule retinal pigmentation	HP:0007737
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Cataract	HP:0000518
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Choriocapillaris / chorioretinal abnormality	HP:0008070
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Cone dystrophy	HP:0000548
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Cone-rod dystrophy	HP:0000548
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	CNS	Constitutional symptom (catchall)	HP:0025142
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Hyperpigmentation / hypopigmentation	HP:0011355
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0011505
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0009926
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	CNS	Nystagmus	HP:0000639
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Photophobia / night blindness	HP:0007891
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Refractive error	HP:0000539
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Retinal arteriolar attenuation	HP:0007843
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Vascular	Vascular attenuation / abnormal vasculature	HP:0002597
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Visual field defect	HP:0000551
+Cone-Rod Dystrophy	Tissue-restricted Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Behavioural abnormality	HP:0000708
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Bitemporal narrowing	HP:0000341
+Cornelia de Lange Syndrome	Secondary Diseases	Renal	Bladder / urinary tract abnormality	HP:0000014
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Brachydactyly / short digits	HP:0001156
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Bulbar dysfunction	HP:0001612
+Cornelia de Lange Syndrome	Secondary Diseases	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Cornelia de Lange Syndrome	Secondary Diseases	Cardiac	Cardiomyopathy	HP:0001638
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Clinodactyly	HP:0030084
+Cornelia de Lange Syndrome	Secondary Diseases	Reproductive	Cryptorchidism	HP:0000028
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Dental anomaly	HP:0000164
+Cornelia de Lange Syndrome	Secondary Diseases	Respiratory	Diaphragmatic abnormality	HP:0000776
+Cornelia de Lange Syndrome	Secondary Diseases	GI_Abdominal	Esophageal abnormality	HP:0002031
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Eyebrow / eyelash abnormality	HP:0000527
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Cornelia de Lange Syndrome	Secondary Diseases	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Frontal bossing / abnormal forehead	HP:0000294
+Cornelia de Lange Syndrome	Secondary Diseases	Renal	Glomerular abnormality	HP:0000095
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	High-arched / narrow palate	HP:0000218
+Cornelia de Lange Syndrome	Secondary Diseases	Skin_Hair_Nail	Hirsutism	HP:0001007
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Holoprosencephaly	HP:0001360
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Hypertelorism	HP:0000316
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Hypertonia / spasticity	HP:0001276
+Cornelia de Lange Syndrome	Secondary Diseases	Reproductive	Hypogonadism / hypogonadotropic hypogonadism	HP:0000044
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Hypotonia	HP:0001252
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Intellectual disability / developmental delay	HP:0001249
+Cornelia de Lange Syndrome	Secondary Diseases	GI_Abdominal	Intestinal / GI structural anomaly	HP:0002021
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Joint laxity / hypermobility	HP:0001377
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Limb asymmetry / partial limb absence	HP:0009815
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Long philtrum / abnormal philtrum	HP:0000343
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Low-set / malformed ears	HP:0000356
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Microcephaly	HP:0000252
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Cornelia de Lange Syndrome	Secondary Diseases	Reproductive	Micropenis	HP:0000054
+Cornelia de Lange Syndrome	Secondary Diseases	Cardiac	Mitral / tricuspid / valve abnormality	HP:0001654
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Nasal abnormality	HP:0000366
+Cornelia de Lange Syndrome	Secondary Diseases	Skin_Hair_Nail	Nipple abnormality	HP:0010783
+Cornelia de Lange Syndrome	Secondary Diseases	Endocrine	Obesity / hyperphagia	HP:0001513
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+Cornelia de Lange Syndrome	Secondary Diseases	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002090
+Cornelia de Lange Syndrome	Secondary Diseases	Eye	Refractive error	HP:0000539
+Cornelia de Lange Syndrome	Secondary Diseases	Renal	Renal cysts / cystic kidney	HP:0000107
+Cornelia de Lange Syndrome	Secondary Diseases	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Cornelia de Lange Syndrome	Secondary Diseases	Reproductive	Scrotal / penile abnormality	HP:0000054
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Seizures / epilepsy	HP:0001250
+Cornelia de Lange Syndrome	Secondary Diseases	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Cornelia de Lange Syndrome	Secondary Diseases	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Septum pellucidum abnormality	HP:0001331
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0003988
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Short stature / dwarfism	HP:0004322
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0100777
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Skull base / cranial vault abnormality	HP:0002692
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Speech / language abnormality	HP:0002463
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Syndactyly / webbed digits	HP:0001159
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Tongue abnormality	HP:0000157
+Cornelia de Lange Syndrome	Secondary Diseases	Vascular	Vascular attenuation / abnormal vasculature	HP:0001052
+Cornelia de Lange Syndrome	Secondary Diseases	CNS	Ventricular enlargement	HP:0002119
+Cornelia de Lange Syndrome	Secondary Diseases	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Cornelia de Lange Syndrome	Secondary Diseases	Craniofacial	Webbed neck / short neck	HP:0000465
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Respiratory	Asthma	HP:0002099
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Auditory canal / external ear (structural)	HP:0000460
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Bitemporal narrowing	HP:0000341
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Hematologic_Immune	Bone marrow hypoplasia / pancytopenia	HP:0005528
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0001396
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Clavicular abnormality	HP:0000889
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Cone-shaped epiphyses	HP:0010580
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	CNS	Cortical malformation	HP:0007364
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Craniosynostosis	HP:0001363
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Vascular	Cystic hygroma	HP:0000476
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Epiphyseal abnormality (other)	HP:0005930
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Eyebrow / eyelash abnormality	HP:0000534
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Frenulum / oral frenulum abnormality	HP:0000190
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Renal	Glomerular abnormality	HP:0000095
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skin_Hair_Nail	Hair colour / texture abnormality	HP:0011362
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Reproductive	Hydrops fetalis	HP:0001789
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Endocrine	Hypoglycaemia	HP:0002901
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001263
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Joint laxity / hypermobility	HP:0001388
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Hepatic	Liver cysts	HP:0001407
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Long philtrum / abnormal philtrum	HP:0000343
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	CNS	Macrocephaly	HP:0000256
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Macrostomia / oral aperture abnormality	HP:0000233
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Malar flattening / abnormal cheek	HP:0000272
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skin_Hair_Nail	Milia / pitted skin	HP:0001816
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Osteopenia / osteoporosis	HP:0000938
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0011608
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Pectus deformity	HP:0000766
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Eye	Photophobia / night blindness	HP:0000613
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Reproductive	Polyhydramnios	HP:0001561
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Eye	Refractive error	HP:0000539
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Renal	Renal tubular acidosis / Fanconi-like	HP:0001947
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Short ribs / narrow thorax	HP:0000774
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0004492
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Renal	Tubulointerstitial nephropathy	HP:0001970
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Cranioectodermal Dysplasia (Sensenbrenner)	Primary Ciliopathies	Craniofacial	Webbed neck / short neck	HP:0000465
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Cone-shaped epiphyses	HP:0010580
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Ellis-van Creveld Syndrome	Primary Ciliopathies	CNS	Dandy-Walker malformation	HP:0001305
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0006350
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Ellis-van Creveld Syndrome	Primary Ciliopathies	CNS	Hypertonia / spasticity	HP:0011804
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Ellis-van Creveld Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Pectus deformity	HP:0000766
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Short ribs / narrow thorax	HP:0000774
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Ellis-van Creveld Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0000252
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Skeletal	Camptodactyly	HP:0012385
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Craniofacial	Craniosynostosis	HP:0001363
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001263
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	CNS	Macrocephaly	HP:0000256
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0002692
+Greig Cephalopolysyndactyly Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Holoprosencephaly	Tissue-restricted Ciliopathies	Endocrine	Adrenal insufficiency / abnormality	HP:0000846
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Anencephaly	HP:0002323
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Auditory canal / external ear (structural)	HP:0000389
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+Holoprosencephaly	Tissue-restricted Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Bitemporal narrowing	HP:0000341
+Holoprosencephaly	Tissue-restricted Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Holoprosencephaly	Tissue-restricted Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Cerebellar hypoplasia/atrophy	HP:0001321
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0009745
+Holoprosencephaly	Tissue-restricted Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Cortical malformation	HP:0008064
+Holoprosencephaly	Tissue-restricted Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Holoprosencephaly	Tissue-restricted Ciliopathies	Endocrine	Diabetes mellitus	HP:0000819
+Holoprosencephaly	Tissue-restricted Ciliopathies	Respiratory	Diaphragmatic abnormality	HP:0000776
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Holoprosencephaly	Tissue-restricted Ciliopathies	GI_Abdominal	Esophageal abnormality	HP:0002031
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Eyebrow / eyelash abnormality	HP:0000534
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Frenulum / oral frenulum abnormality	HP:0000190
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0000340
+Holoprosencephaly	Tissue-restricted Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Holoprosencephaly	Tissue-restricted Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Holoprosencephaly	HP:0001360
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Hypertonia / spasticity	HP:0001276
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Hypotelorism	HP:0000601
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Hypotonia	HP:0001252
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Holoprosencephaly	Tissue-restricted Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Long philtrum / abnormal philtrum	HP:0000343
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Holoprosencephaly	Tissue-restricted Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Macrocephaly	HP:0000256
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Malar flattening / abnormal cheek	HP:0000272
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Microcephaly	HP:0000252
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000327
+Holoprosencephaly	Tissue-restricted Ciliopathies	Reproductive	Micropenis	HP:0000054
+Holoprosencephaly	Tissue-restricted Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0000520
+Holoprosencephaly	Tissue-restricted Ciliopathies	Craniofacial	Nasal abnormality	HP:0001763
+Holoprosencephaly	Tissue-restricted Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Holoprosencephaly	Tissue-restricted Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Holoprosencephaly	Tissue-restricted Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Holoprosencephaly	Tissue-restricted Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0010627
+Holoprosencephaly	Tissue-restricted Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Holoprosencephaly	Tissue-restricted Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Holoprosencephaly	Tissue-restricted Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Septum pellucidum abnormality	HP:0001331
+Holoprosencephaly	Tissue-restricted Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Spina bifida / neural tube defect	HP:0002414
+Holoprosencephaly	Tissue-restricted Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Holoprosencephaly	Tissue-restricted Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Holoprosencephaly	Tissue-restricted Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+Holoprosencephaly	Tissue-restricted Ciliopathies	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Holoprosencephaly	Tissue-restricted Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Hydrolethalus Syndrome	Primary Ciliopathies	Endocrine	Adrenal insufficiency / abnormality	HP:0000846
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Anencephaly	HP:0002323
+Hydrolethalus Syndrome	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Cerebellar dysgenesis (other)	HP:0007033
+Hydrolethalus Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Cortical malformation	HP:0007364
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Dandy-Walker malformation	HP:0001305
+Hydrolethalus Syndrome	Primary Ciliopathies	Respiratory	Diaphragmatic abnormality	HP:0000776
+Hydrolethalus Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Hydrolethalus Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Hydrolethalus Syndrome	Primary Ciliopathies	Renal	Hydronephrosis	HP:0000126
+Hydrolethalus Syndrome	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Hydrolethalus Syndrome	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Hydrolethalus Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Hydrolethalus Syndrome	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Hydrolethalus Syndrome	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Hydrolethalus Syndrome	Primary Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0000568
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Molar tooth sign	HP:0002419
+Hydrolethalus Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Hydrolethalus Syndrome	Primary Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0000871
+Hydrolethalus Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Hydrolethalus Syndrome	Primary Ciliopathies	Reproductive	Polyhydramnios	HP:0001561
+Hydrolethalus Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Septum pellucidum abnormality	HP:0001331
+Hydrolethalus Syndrome	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009824
+Hydrolethalus Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0002692
+Hydrolethalus Syndrome	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Hydrolethalus Syndrome	Primary Ciliopathies	Respiratory	Tracheal / laryngeal abnormality	HP:0002778
+Hydrolethalus Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Hydrolethalus Syndrome	Primary Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+Hydrolethalus Syndrome	Primary Ciliopathies	Craniofacial	Webbed neck / short neck	HP:0000475
+Joubert Syndrome	Primary Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+Joubert Syndrome	Primary Ciliopathies	CNS	Abnormal breathing pattern (CNS-driven)	HP:0002098
+Joubert Syndrome	Primary Ciliopathies	CNS	Anencephaly	HP:0002323
+Joubert Syndrome	Primary Ciliopathies	CNS	Apraxia	HP:0002186
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Arthrogryposis / contractures	HP:0002804
+Joubert Syndrome	Primary Ciliopathies	CNS	Ataxia / gait abnormality	HP:0001260
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Auditory canal / external ear (structural)	HP:0008551
+Joubert Syndrome	Primary Ciliopathies	CNS	Behavioural abnormality	HP:0000742
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Bifid / duplicated thumb or hallux	HP:0010053
+Joubert Syndrome	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Joubert Syndrome	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Bowed long bones	HP:0006487
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Joubert Syndrome	Primary Ciliopathies	CNS	Brainstem / pons abnormality	HP:0011962
+Joubert Syndrome	Primary Ciliopathies	CNS	Bulbar dysfunction	HP:0001283
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Camptodactyly	HP:0012385
+Joubert Syndrome	Primary Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Joubert Syndrome	Primary Ciliopathies	Eye	Cataract	HP:0000518
+Joubert Syndrome	Primary Ciliopathies	CNS	Cerebellar dysgenesis (other)	HP:0007033
+Joubert Syndrome	Primary Ciliopathies	CNS	Cerebellar hypoplasia/atrophy	HP:0001321
+Joubert Syndrome	Primary Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Joubert Syndrome	Primary Ciliopathies	CNS	Cerebral atrophy / volume loss	HP:0002059
+Joubert Syndrome	Primary Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0001396
+Joubert Syndrome	Primary Ciliopathies	Eye	Choriocapillaris / chorioretinal abnormality	HP:0007844
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Coccyx / sacrum abnormality	HP:0008443
+Joubert Syndrome	Primary Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+Joubert Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Joubert Syndrome	Primary Ciliopathies	CNS	Cortical malformation	HP:0002538
+Joubert Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Joubert Syndrome	Primary Ciliopathies	CNS	Dandy-Walker malformation	HP:0001305
+Joubert Syndrome	Primary Ciliopathies	CNS	Encephalocele	HP:0002818
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Joubert Syndrome	Primary Ciliopathies	CNS	Eye movement abnormality (other)	HP:0000496
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Eyebrow / eyelash abnormality	HP:0000534
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Joubert Syndrome	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001520
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Frenulum / oral frenulum abnormality	HP:0000190
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+Joubert Syndrome	Primary Ciliopathies	Reproductive	Genital ambiguity	HP:0000062
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Joubert Syndrome	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Joubert Syndrome	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Joubert Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Joubert Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Hirsutism	HP:0001007
+Joubert Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Joubert Syndrome	Primary Ciliopathies	Renal	Hydronephrosis	HP:0000126
+Joubert Syndrome	Primary Ciliopathies	CNS	Hyperreflexia	HP:0001347
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Joubert Syndrome	Primary Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Joubert Syndrome	Primary Ciliopathies	CNS	Hypertonia / spasticity	HP:0001276
+Joubert Syndrome	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Joubert Syndrome	Primary Ciliopathies	Endocrine	Hypothyroidism	HP:0000821
+Joubert Syndrome	Primary Ciliopathies	CNS	Hypotonia	HP:0001252
+Joubert Syndrome	Primary Ciliopathies	GI_Abdominal	Imperforate anus / anal atresia	HP:0002023
+Joubert Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001263
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Joint laxity / hypermobility	HP:0001388
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Long philtrum / abnormal philtrum	HP:0000343
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Joubert Syndrome	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Joubert Syndrome	Primary Ciliopathies	CNS	Macrocephaly	HP:0000256
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Macrostomia / oral aperture abnormality	HP:0010282
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Malar flattening / abnormal cheek	HP:0000272
+Joubert Syndrome	Primary Ciliopathies	CNS	Microcephaly	HP:0000252
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0009738
+Joubert Syndrome	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+Joubert Syndrome	Primary Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0007369
+Joubert Syndrome	Primary Ciliopathies	Cardiac	Mitral / tricuspid / valve abnormality	HP:0001654
+Joubert Syndrome	Primary Ciliopathies	CNS	Molar tooth sign	HP:0002419
+Joubert Syndrome	Primary Ciliopathies	Respiratory	Mucociliary clearance impairment	HP:0011947
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Joubert Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Nipple abnormality	HP:0010783
+Joubert Syndrome	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+Joubert Syndrome	Primary Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Joubert Syndrome	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0007833
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Joubert Syndrome	Primary Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0000871
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Joubert Syndrome	Primary Ciliopathies	Hematologic_Immune	Recurrent infection (unspecified)	HP:0002719
+Joubert Syndrome	Primary Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002094
+Joubert Syndrome	Primary Ciliopathies	Eye	Refractive error	HP:0000539
+Joubert Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Joubert Syndrome	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Joubert Syndrome	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Joubert Syndrome	Primary Ciliopathies	Renal	Renal tubular acidosis / Fanconi-like	HP:0003639
+Joubert Syndrome	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Joubert Syndrome	Primary Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0010460
+Joubert Syndrome	Primary Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Joubert Syndrome	Primary Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Joubert Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Joubert Syndrome	Primary Ciliopathies	Eye	Severe visual impairment / blindness	HP:0000618
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Short ribs / narrow thorax	HP:0000774
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Joubert Syndrome	Primary Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0011800
+Joubert Syndrome	Primary Ciliopathies	CNS	Speech / language abnormality	HP:0002463
+Joubert Syndrome	Primary Ciliopathies	CNS	Spina bifida / neural tube defect	HP:0002414
+Joubert Syndrome	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+Joubert Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Joubert Syndrome	Primary Ciliopathies	Craniofacial	Tongue abnormality	HP:0000157
+Joubert Syndrome	Primary Ciliopathies	CNS	Tremor / dyskinesia / dystonia	HP:0010763
+Joubert Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Joubert Syndrome	Primary Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+Joubert Syndrome	Primary Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Juvenile Myoclonic Epilepsy	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001263
+Juvenile Myoclonic Epilepsy	Tissue-restricted Ciliopathies	CNS	Myoclonic seizures / epileptic myoclonus	HP:0001336
+Juvenile Myoclonic Epilepsy	Tissue-restricted Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	CNS	Ataxia / gait abnormality	HP:0001251
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	Eye	Choriocapillaris / chorioretinal abnormality	HP:0008070
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	CNS	Hypertonia / spasticity	HP:0001276
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	Reproductive	Micropenis	HP:0000054
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	CNS	Nystagmus	HP:0000639
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0000054
+Laurence-Moon Syndrome	Tissue-restricted Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Abnormal OCT / autofluorescence	HP:0030453
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	CNS	Autism spectrum / social cognitive	HP:0000729
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Bone-spicule retinal pigmentation	HP:0007737
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Cataract	HP:0000518
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Choriocapillaris / chorioretinal abnormality	HP:0007844
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	CNS	Constitutional symptom (catchall)	HP:0025142
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	CNS	Eye movement abnormality (other)	HP:0030506
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Hyperpigmentation / hypopigmentation	HP:0011355
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Iris / anterior chamber abnormality	HP:0000563
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Leber congenital amaurosis	HP:0500026
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0007754
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0000490
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	CNS	Nystagmus	HP:0000639
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Photophobia / night blindness	HP:0000613
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Refractive error	HP:0000539
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Retinal arteriolar attenuation	HP:0007843
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0500155
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	CNS	Strabismus	HP:0000486
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Tortuous / abnormal retinal vessels	HP:0011023
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	CNS	Tremor / dyskinesia / dystonia	HP:0000473
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Visual field defect	HP:0001123
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Leber Congenital Amaurosis	Tissue-restricted Ciliopathies	Eye	Vitreous abnormality	HP:0004327
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Reproductive	Anhydramnios / oligohydramnios	HP:0001561
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	CNS	Areflexia / hyporeflexia	HP:0001284
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skeletal	Arthrogryposis / contractures	HP:0002804
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	CNS	Behavioural abnormality	HP:0000733
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skeletal	Bone fragility / fracture	HP:0002659; HP:0001642
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Eye	Cataract	HP:0000518
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Hematologic_Immune	Chromosomal instability / radiation sensitivity	HP:0003220
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Reproductive	Cryptorchidism	HP:0000028
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skin_Hair_Nail	Cutaneous papules / fibrofolliculomas	HP:0001482
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Craniofacial	Dental anomaly	HP:0000164
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Eye	Glaucoma	HP:0000501
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Renal	Glomerular abnormality	HP:0000095
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	CNS	Hypotonia	HP:0001252
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	CNS	Intellectual disability / developmental delay	HP:0001249
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	GI_Abdominal	Intestinal / GI structural anomaly	HP:0002019
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skeletal	Joint laxity / hypermobility	HP:0001388
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Endocrine	Lipid metabolism / dyslipidaemia	HP:0003119
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Eye	Microphthalmia / anophthalmia	HP:0000568
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0001374
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Hematologic_Immune	Plasma protein abnormality	HP:0011028
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Renal	Renal failure / ESRD / CKD	HP:0000083
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Renal	Renal tubular acidosis / Fanconi-like	HP:0001947
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	CNS	Seizures / epilepsy	HP:0001250
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skeletal	Short stature / dwarfism	HP:0004322
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002749
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	CNS	Ventricular enlargement	HP:0002119
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	Eye	Visual impairment / blindness	HP:0000505
+Lowe Oculocerebrorenal Syndrome	Secondary Diseases	CNS	White matter abnormality	HP:0002500
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+McKusick-Kaufman Syndrome	Primary Ciliopathies	GI_Abdominal	Hirschsprung disease / aganglionic bowel	HP:0002251
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Renal	Hydronephrosis	HP:0000126
+McKusick-Kaufman Syndrome	Primary Ciliopathies	GI_Abdominal	Imperforate anus / anal atresia	HP:0002023
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Vascular	Lymphedema / lymphatic abnormality	HP:0001785
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0001374
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+McKusick-Kaufman Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Anencephaly	HP:0002323
+Meckel-Gruber Syndrome	Primary Ciliopathies	Reproductive	Anhydramnios / oligohydramnios	HP:0001561
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Apraxia	HP:0002186
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Arnold-Chiari malformation	HP:0002308
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Arthrogryposis / contractures	HP:0002804
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Ataxia / gait abnormality	HP:0001251
+Meckel-Gruber Syndrome	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Meckel-Gruber Syndrome	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Bowed long bones	HP:0006487
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Cerebellar hypoplasia/atrophy	HP:0001321
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Cerebral atrophy / volume loss	HP:0002059
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Coccyx / sacrum abnormality	HP:0008443
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Cortical malformation	HP:0002139
+Meckel-Gruber Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Dandy-Walker malformation	HP:0001305
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Encephalocele	HP:0002818
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Frenulum / oral frenulum abnormality	HP:0000190
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0000340
+Meckel-Gruber Syndrome	Primary Ciliopathies	Reproductive	Genital ambiguity	HP:0000062
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Meckel-Gruber Syndrome	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Meckel-Gruber Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Meckel-Gruber Syndrome	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Hypotelorism	HP:0000601
+Meckel-Gruber Syndrome	Primary Ciliopathies	GI_Abdominal	Imperforate anus / anal atresia	HP:0002023
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Meckel-Gruber Syndrome	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Meckel-Gruber Syndrome	Primary Ciliopathies	Eye	Iris / anterior chamber abnormality	HP:0000525
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Meckel-Gruber Syndrome	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Microcephaly	HP:0000252
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Meckel-Gruber Syndrome	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+Meckel-Gruber Syndrome	Primary Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0000568
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Molar tooth sign	HP:0002419
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Meckel-Gruber Syndrome	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Meckel-Gruber Syndrome	Primary Ciliopathies	Hematologic_Immune	Plasma protein abnormality	HP:0006254
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Meckel-Gruber Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Meckel-Gruber Syndrome	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Meckel-Gruber Syndrome	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Meckel-Gruber Syndrome	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Meckel-Gruber Syndrome	Primary Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0010460
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Meckel-Gruber Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Spina bifida / neural tube defect	HP:0002414
+Meckel-Gruber Syndrome	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Meckel-Gruber Syndrome	Primary Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Meckel-Gruber Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Tongue abnormality	HP:0000157
+Meckel-Gruber Syndrome	Primary Ciliopathies	Respiratory	Tracheal / laryngeal abnormality	HP:0002778
+Meckel-Gruber Syndrome	Primary Ciliopathies	Reproductive	Umbilical cord abnormality	HP:0010881
+Meckel-Gruber Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Meckel-Gruber Syndrome	Primary Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+Meckel-Gruber Syndrome	Primary Ciliopathies	Craniofacial	Webbed neck / short neck	HP:0000465
+Medulloblastoma	Tissue-restricted Ciliopathies	CNS	Medulloblastoma	HP:0002885
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0000989
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Hepatic	Elevated transaminases / abnormal liver enzymes	HP:0002910
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395; HP:0001394
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Neonatal Sclerosing Cholangitis	Tissue-restricted Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Nephronophthisis	Primary Ciliopathies	Hematologic_Immune	Anemia	HP:0001903
+Nephronophthisis	Primary Ciliopathies	Reproductive	Anhydramnios / oligohydramnios	HP:0001561
+Nephronophthisis	Primary Ciliopathies	CNS	Arachnoid cyst	HP:0100702
+Nephronophthisis	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Nephronophthisis	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000805
+Nephronophthisis	Primary Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Nephronophthisis	Primary Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Nephronophthisis	Primary Ciliopathies	CNS	Cerebral atrophy / volume loss	HP:0002059
+Nephronophthisis	Primary Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0001396
+Nephronophthisis	Primary Ciliopathies	CNS	Constitutional symptom (catchall)	HP:0000707
+Nephronophthisis	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Nephronophthisis	Primary Ciliopathies	Renal	Glomerular abnormality	HP:0000095
+Nephronophthisis	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Nephronophthisis	Primary Ciliopathies	Renal	Hematuria	HP:0000790
+Nephronophthisis	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001392
+Nephronophthisis	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Nephronophthisis	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Nephronophthisis	Primary Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Nephronophthisis	Primary Ciliopathies	Endocrine	Hypoglycaemia	HP:0002153
+Nephronophthisis	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Nephronophthisis	Primary Ciliopathies	Hepatic	Liver cysts	HP:0001407
+Nephronophthisis	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Nephronophthisis	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+Nephronophthisis	Primary Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Nephronophthisis	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Nephronophthisis	Primary Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Nephronophthisis	Primary Ciliopathies	CNS	Peripheral neuropathy	HP:0011922
+Nephronophthisis	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Nephronophthisis	Primary Ciliopathies	Eye	Refractive error	HP:0000539
+Nephronophthisis	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Nephronophthisis	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Nephronophthisis	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Nephronophthisis	Primary Ciliopathies	Renal	Renal tubular acidosis / Fanconi-like	HP:0000103
+Nephronophthisis	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Nephronophthisis	Primary Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Nephronophthisis	Primary Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Nephronophthisis	Primary Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Nephronophthisis	Primary Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Nephronophthisis	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+Nephronophthisis	Primary Ciliopathies	CNS	Tremor / dyskinesia / dystonia	HP:0001337
+Nephronophthisis	Primary Ciliopathies	Renal	Tubulointerstitial nephropathy	HP:0001970
+Nephronophthisis	Primary Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Cardiac	Arrhythmia	HP:0011675
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Endocrine	Diabetes mellitus	HP:0000819
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Respiratory	Diaphragmatic abnormality	HP:0000776
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Endocrine	Hypothyroidism	HP:0000821
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	CNS	Microcephaly	HP:0000252
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Cardiac	Pericardial / endocardial abnormality	HP:0001697
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0000871
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Cardiac	Tetralogy of Fallot	HP:0001636
+Nonsyndromic Tetralogy of Fallot	Tissue-restricted Ciliopathies	Reproductive	Umbilical cord abnormality	HP:0010881
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Abnormal breathing pattern (CNS-driven)	HP:0002098
+Orofaciodigital Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Alopecia / sparse hair	HP:0001596
+Orofaciodigital Syndrome	Primary Ciliopathies	GI_Abdominal	Anal / perianal abnormality	HP:0001746
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Apraxia	HP:0002186
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Arachnoid cyst	HP:0100702
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Ataxia / gait abnormality	HP:0001260
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Bifid / duplicated thumb or hallux	HP:0010053
+Orofaciodigital Syndrome	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Orofaciodigital Syndrome	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Brainstem / pons abnormality	HP:0002419
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Bulbar dysfunction	HP:0011968
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Camptodactyly	HP:0012385
+Orofaciodigital Syndrome	Primary Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Cerebellar dysgenesis (other)	HP:0007033
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Cerebellar hypoplasia/atrophy	HP:0001321
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Cerebral atrophy / volume loss	HP:0002059
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Clubbing of digits	HP:0001217
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Orofaciodigital Syndrome	Primary Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Cortical malformation	HP:0007364
+Orofaciodigital Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Dandy-Walker malformation	HP:0001305
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000172
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Encephalocele	HP:0002818
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Eye movement abnormality (other)	HP:0000496
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Orofaciodigital Syndrome	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Frenulum / oral frenulum abnormality	HP:0000190
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0000340
+Orofaciodigital Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Hair colour / texture abnormality	HP:0011362
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Orofaciodigital Syndrome	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Orofaciodigital Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Hippocampal abnormality	HP:0410176
+Orofaciodigital Syndrome	Primary Ciliopathies	GI_Abdominal	Hirschsprung disease / aganglionic bowel	HP:0002251
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Holoprosencephaly	HP:0001360
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0002410
+Orofaciodigital Syndrome	Primary Ciliopathies	Renal	Hydronephrosis	HP:0000126
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Orofaciodigital Syndrome	Primary Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Orofaciodigital Syndrome	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Hypotonia	HP:0001252
+Orofaciodigital Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Ichthyosis / hyperkeratosis	HP:0001978
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001263
+Orofaciodigital Syndrome	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0002255
+Orofaciodigital Syndrome	Primary Ciliopathies	Hepatic	Liver cysts	HP:0001407
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Long philtrum / abnormal philtrum	HP:0000343
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Orofaciodigital Syndrome	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Macrostomia / oral aperture abnormality	HP:0000159
+Orofaciodigital Syndrome	Primary Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0007754
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Malar flattening / abnormal cheek	HP:0000272
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Metaphyseal abnormality	HP:0000944
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Microcephaly	HP:0000252
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000327
+Orofaciodigital Syndrome	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+Orofaciodigital Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Milia / pitted skin	HP:0001054
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Molar tooth sign	HP:0002419
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000819
+Orofaciodigital Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Nipple abnormality	HP:0010783
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+Orofaciodigital Syndrome	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Orofaciodigital Syndrome	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Orofaciodigital Syndrome	Primary Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Pectus deformity	HP:0000766
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Orofaciodigital Syndrome	Primary Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Orofaciodigital Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Orofaciodigital Syndrome	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Orofaciodigital Syndrome	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Orofaciodigital Syndrome	Primary Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0010460
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Orofaciodigital Syndrome	Primary Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Orofaciodigital Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0005736
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Short ribs / narrow thorax	HP:0000774
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0008437
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Speech / language abnormality	HP:0010294
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Spina bifida / neural tube defect	HP:0002414
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Orofaciodigital Syndrome	Primary Ciliopathies	Cardiac	Tetralogy of Fallot	HP:0001636
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Tongue abnormality	HP:0000157
+Orofaciodigital Syndrome	Primary Ciliopathies	Respiratory	Tracheal / laryngeal abnormality	HP:0002778
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Tremor / dyskinesia / dystonia	HP:0001336
+Orofaciodigital Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000138
+Orofaciodigital Syndrome	Primary Ciliopathies	Vascular	Vascular attenuation / abnormal vasculature	HP:0010722
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+Orofaciodigital Syndrome	Primary Ciliopathies	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Orofaciodigital Syndrome	Primary Ciliopathies	Craniofacial	Webbed neck / short neck	HP:0000465
+Orofaciodigital Syndrome	Primary Ciliopathies	CNS	White matter abnormality	HP:0002500
+Pallister-Hall Syndrome	Primary Ciliopathies	Endocrine	Adrenal insufficiency / abnormality	HP:0000846
+Pallister-Hall Syndrome	Primary Ciliopathies	Craniofacial	Auditory canal / external ear (structural)	HP:0000356
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Pallister-Hall Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Pallister-Hall Syndrome	Primary Ciliopathies	CNS	Cortical malformation	HP:0010833
+Pallister-Hall Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Pallister-Hall Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Pallister-Hall Syndrome	Primary Ciliopathies	Craniofacial	Frenulum / oral frenulum abnormality	HP:0000190
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Pallister-Hall Syndrome	Primary Ciliopathies	CNS	Holoprosencephaly	HP:0001360
+Pallister-Hall Syndrome	Primary Ciliopathies	GI_Abdominal	Imperforate anus / anal atresia	HP:0002023
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Joint laxity / hypermobility	HP:0003044
+Pallister-Hall Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Pallister-Hall Syndrome	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Pallister-Hall Syndrome	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+Pallister-Hall Syndrome	Primary Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0000568
+Pallister-Hall Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Pallister-Hall Syndrome	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0001374
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Pallister-Hall Syndrome	Primary Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0000871
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Pallister-Hall Syndrome	Primary Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0008736
+Pallister-Hall Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009824
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Pallister-Hall Syndrome	Primary Ciliopathies	Craniofacial	Tongue abnormality	HP:0000171
+Pallister-Hall Syndrome	Primary Ciliopathies	Respiratory	Tracheal / laryngeal abnormality	HP:0002778
+Pallister-Hall Syndrome	Primary Ciliopathies	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Respiratory	Asthma	HP:0002099
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Respiratory	Atelectasis	HP:0100750
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Primary Ciliary Dyskinesia	Motile Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Auditory	Conductive / mixed hearing loss	HP:0000405; HP:0000410
+Primary Ciliary Dyskinesia	Motile Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Primary Ciliary Dyskinesia	Motile Ciliopathies	CNS	Cortical malformation	HP:0002538
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Cardiac	Dextrocardia / cardiac malposition	HP:0001651
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Reproductive	Female infertility	HP:0008222
+Primary Ciliary Dyskinesia	Motile Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Endocrine	Hypothyroidism	HP:0000821
+Primary Ciliary Dyskinesia	Motile Ciliopathies	CNS	Hypotonia	HP:0001252
+Primary Ciliary Dyskinesia	Motile Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Eye	Iris / anterior chamber abnormality	HP:0000525
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Respiratory	Mucociliary clearance impairment	HP:0005938
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Respiratory	Otitis media (recurrent)	HP:0000403
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Respiratory	Pulmonary hypertension	HP:0002092
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Primary Ciliary Dyskinesia	Motile Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Reproductive	Sperm flagellar abnormality / male infertility	HP:0012864
+Primary Ciliary Dyskinesia	Motile Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Primary Ciliary Dyskinesia	Motile Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+RHYNS Syndrome	Primary Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Epiphyseal abnormality (other)	HP:0005930
+RHYNS Syndrome	Primary Ciliopathies	CNS	Eye movement abnormality (other)	HP:0006896
+RHYNS Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Osteopenia / osteoporosis	HP:0000938
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+RHYNS Syndrome	Primary Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0000871
+RHYNS Syndrome	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+RHYNS Syndrome	Primary Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+RHYNS Syndrome	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+RHYNS Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0002683
+RHYNS Syndrome	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Reproductive	Anhydramnios / oligohydramnios	HP:0001561
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Skeletal	Bowed long bones	HP:0006487
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0001396
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	CNS	Dandy-Walker malformation	HP:0001305
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Renal	Glomerular abnormality	HP:0000095
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Hepatic	Liver cysts	HP:0001407
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Cardiac	Mitral / tricuspid / valve abnormality	HP:0001654
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0008873
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Renal-hepatic-pancreatic Dysplasia	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0030453
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Abnormal OCT / autofluorescence	HP:0030453
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Bone-spicule retinal pigmentation	HP:0007737
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Cataract	HP:0007787
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Choriocapillaris / chorioretinal abnormality	HP:0008064
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Coats-like vasculopathy	HP:0007763
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Cone-rod dystrophy	HP:0000548
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Skeletal	Cone-shaped epiphyses	HP:0010580
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	CNS	Constitutional symptom (catchall)	HP:0025142
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Hepatic	Elevated transaminases / abnormal liver enzymes	HP:0002910
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	GI_Abdominal	Esophageal abnormality	HP:0002031
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	CNS	Eye movement abnormality (other)	HP:0030506
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Hyperpigmentation / hypopigmentation	HP:0011355
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	CNS	Hypertonia / spasticity	HP:0001276
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Endocrine	Hypoglycaemia	HP:0001943
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	CNS	Hypotonia	HP:0001252
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0007754
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Reproductive	Micropenis	HP:0000054
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	CNS	Nystagmus	HP:0000639
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Photophobia / night blindness	HP:0007891
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Pigment epithelium / RPE abnormality	HP:0007703
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Refractive error	HP:0000539
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Retinal arteriolar attenuation	HP:0007843
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0011531
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Retinitis pigmentosa / rod-cone dystrophy	HP:0000510
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	CNS	Strabismus	HP:0000486
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Tortuous / abnormal retinal vessels	HP:0011023
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Vascular	Vascular attenuation / abnormal vasculature	HP:0002597
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Visual field defect	HP:0001123
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Retinal Dystrophy/Degeneration	Tissue-restricted Ciliopathies	Eye	Vitreous abnormality	HP:0004327
+SOFT Syndrome	Primary Ciliopathies	CNS	Ataxia / gait abnormality	HP:0002515
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Coccyx / sacrum abnormality	HP:0008443
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Cone-shaped epiphyses	HP:0010580
+SOFT Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+SOFT Syndrome	Primary Ciliopathies	Endocrine	Diabetes mellitus	HP:0000819
+SOFT Syndrome	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+SOFT Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+SOFT Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Hair colour / texture abnormality	HP:0011362
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+SOFT Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+SOFT Syndrome	Primary Ciliopathies	CNS	Hypotonia	HP:0001252
+SOFT Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+SOFT Syndrome	Primary Ciliopathies	Craniofacial	Long / short face	HP:0000277
+SOFT Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+SOFT Syndrome	Primary Ciliopathies	CNS	Macrocephaly	HP:0000256
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Metaphyseal abnormality	HP:0000944
+SOFT Syndrome	Primary Ciliopathies	CNS	Microcephaly	HP:0000252
+SOFT Syndrome	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000307
+SOFT Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Milia / pitted skin	HP:0001792
+SOFT Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Ossification abnormality	HP:0010674
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+SOFT Syndrome	Primary Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0010460
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+SOFT Syndrome	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+SOFT Syndrome	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0002692
+SOFT Syndrome	Primary Ciliopathies	CNS	Speech / language abnormality	HP:0001620
+SOFT Syndrome	Primary Ciliopathies	Reproductive	Sperm flagellar abnormality / male infertility	HP:0012864
+SOFT Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0008760
+STAR Syndrome	Primary Ciliopathies	GI_Abdominal	Anal / perianal abnormality	HP:0001746
+STAR Syndrome	Primary Ciliopathies	Craniofacial	Auditory canal / external ear (structural)	HP:0008551
+STAR Syndrome	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+STAR Syndrome	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+STAR Syndrome	Primary Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+STAR Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+STAR Syndrome	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+STAR Syndrome	Primary Ciliopathies	Craniofacial	Craniosynostosis	HP:0001363
+STAR Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+STAR Syndrome	Primary Ciliopathies	CNS	Eye movement abnormality (other)	HP:0009921
+STAR Syndrome	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+STAR Syndrome	Primary Ciliopathies	Renal	Glomerular abnormality	HP:0000095
+STAR Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001829
+STAR Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+STAR Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+STAR Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+STAR Syndrome	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0004415
+STAR Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+STAR Syndrome	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+STAR Syndrome	Primary Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0010460
+STAR Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001655
+STAR Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+STAR Syndrome	Primary Ciliopathies	CNS	Spina bifida / neural tube defect	HP:0002414
+STAR Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+STAR Syndrome	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+STAR Syndrome	Primary Ciliopathies	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Abnormal OCT / autofluorescence	HP:0030453
+Senior-Løken Syndrome	Primary Ciliopathies	Hematologic_Immune	Anemia	HP:0001903
+Senior-Løken Syndrome	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Senior-Løken Syndrome	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0010677
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Bone-spicule retinal pigmentation	HP:0007737
+Senior-Løken Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Senior-Løken Syndrome	Primary Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Senior-Løken Syndrome	Primary Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0001396
+Senior-Løken Syndrome	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Senior-Løken Syndrome	Primary Ciliopathies	Reproductive	Hypogonadism / hypogonadotropic hypogonadism	HP:0000044
+Senior-Løken Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Senior-Løken Syndrome	Primary Ciliopathies	Hepatic	Liver cysts	HP:0001407
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0007754
+Senior-Løken Syndrome	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+Senior-Løken Syndrome	Primary Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Senior-Løken Syndrome	Primary Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Senior-Løken Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0003370
+Senior-Løken Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Refractive error	HP:0000539
+Senior-Løken Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Senior-Løken Syndrome	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Senior-Løken Syndrome	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0011037
+Senior-Løken Syndrome	Primary Ciliopathies	Renal	Renal tubular acidosis / Fanconi-like	HP:0000103
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Retinal arteriolar attenuation	HP:0007843
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Senior-Løken Syndrome	Primary Ciliopathies	CNS	Strabismus	HP:0000486
+Senior-Løken Syndrome	Primary Ciliopathies	Renal	Tubulointerstitial nephropathy	HP:0001970
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Visual field defect	HP:0001123
+Senior-Løken Syndrome	Primary Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Abnormal OCT / autofluorescence	HP:0030453
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Anencephaly	HP:0002323
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Apraxia	HP:0002186
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Areflexia / hyporeflexia	HP:0001284
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Arthrogryposis / contractures	HP:0002804
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	GI_Abdominal	Ascites	HP:0001541
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Ataxia / gait abnormality	HP:0001251
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Respiratory	Atelectasis	HP:0011950
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Auditory canal / external ear (structural)	HP:0000378
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Bitemporal narrowing	HP:0000341
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Bone-spicule retinal pigmentation	HP:0007737
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Bowed long bones	HP:0006487
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Brainstem / pons abnormality	HP:0011962
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Bulbar dysfunction	HP:0008551
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Cataract	HP:0000518
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Cerebellar dysgenesis (other)	HP:0007033
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Cerebellar hypoplasia/atrophy	HP:0001321
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Hepatic	Cholestasis / jaundice	HP:0001396
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Clavicular abnormality	HP:0000889
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Coloboma (ocular)	HP:0000589
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Cone-shaped epiphyses	HP:0010580
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Cortical malformation	HP:0010833
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Craniosynostosis	HP:0001363
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skin_Hair_Nail	Cutis laxa / loose skin	HP:0008070
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Vascular	Cystic hygroma	HP:0000476
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Dandy-Walker malformation	HP:0001305
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000172
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Endocrine	Diabetes mellitus	HP:0040270
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Respiratory	Diaphragmatic abnormality	HP:0000776
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Encephalocele	HP:0002818
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Epiphyseal abnormality (other)	HP:0005930
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	GI_Abdominal	Esophageal abnormality	HP:0002031
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Eye movement abnormality (other)	HP:0030506
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Eyebrow / eyelash abnormality	HP:0000534
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Frenulum / oral frenulum abnormality	HP:0000190
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Genital ambiguity	HP:0000062
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Renal	Glomerular abnormality	HP:0000095
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skin_Hair_Nail	Hair colour / texture abnormality	HP:0011362
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Hepatic	Hepatic fibrosis / cirrhosis	HP:0001395
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Hippocampal abnormality	HP:0001753
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skin_Hair_Nail	Hirsutism	HP:0001007
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Holoprosencephaly	HP:0001360
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Hydrops fetalis	HP:0001789
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Hypertonia / spasticity	HP:0001388
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Hypotonia	HP:0001558
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	GI_Abdominal	Imperforate anus / anal atresia	HP:0002023
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011458
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Joint laxity / hypermobility	HP:0001388
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Limb asymmetry / partial limb absence	HP:0008866
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Hepatic	Liver cysts	HP:0001407
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Long philtrum / abnormal philtrum	HP:0000343
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Macrocephaly	HP:0000256
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Macrostomia / oral aperture abnormality	HP:0010282
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0007754
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Malar flattening / abnormal cheek	HP:0000272
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Metaphyseal abnormality	HP:0000944
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Microcephaly	HP:0000252
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Micropenis	HP:0000054
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0000520
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skin_Hair_Nail	Milia / pitted skin	HP:0008404
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Molar tooth sign	HP:0002419
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000431
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skin_Hair_Nail	Nipple abnormality	HP:0010783
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Nystagmus	HP:0000639
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Olfactory bulb hypoplasia / anosmia	HP:0000458
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Ossification abnormality	HP:0010674
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	GI_Abdominal	Pancreatic insufficiency / pancreatitis	HP:0001738; HP:0001733
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Pectus deformity	HP:0000766
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Endocrine	Pituitary abnormality / hypopituitarism	HP:0000871
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Polyhydramnios	HP:0001561
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Refractive error	HP:0000539
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Renal	Renal failure / ESRD / CKD	HP:0000083
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Retinal arteriolar attenuation	HP:0007843
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Retinitis pigmentosa / rod-cone dystrophy	HP:0000510
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0010460
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Short ribs / narrow thorax	HP:0000774
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0009928
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Speech / language abnormality	HP:0002463
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Sperm flagellar abnormality / male infertility	HP:0012864
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Cardiac	Tetralogy of Fallot	HP:0001636
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Tongue abnormality	HP:0000171
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Respiratory	Tracheal / laryngeal abnormality	HP:0002778
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Renal	Tubulointerstitial nephropathy	HP:0001970
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Umbilical cord abnormality	HP:0010881
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Vascular	Vascular attenuation / abnormal vasculature	HP:0011028
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	Craniofacial	Webbed neck / short neck	HP:0000465
+Short-Rib Thoracic Dysplasia	Primary Ciliopathies	CNS	White matter abnormality	HP:0007030
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Cardiac	Arrhythmia	HP:0011675
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001182
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Hematologic_Immune	Cancer susceptibility / tumour	HP:0006744; HP:0002664
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Coccyx / sacrum abnormality	HP:0008443
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Reproductive	Cryptorchidism	HP:0000028
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000172
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Endocrine	Diabetes mellitus	HP:0006331
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Respiratory	Diaphragmatic abnormality	HP:0000776
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Epicanthal folds	HP:0000286
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0040194
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Hepatic	Hepatomegaly	HP:0002240
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Reproductive	Hydrops fetalis	HP:0010880
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Reproductive	Hypospadias	HP:0000047
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	CNS	Hypotonia	HP:0001252
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001263
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0002245
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	CNS	Macrocephaly	HP:0000256
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Milia / pitted skin	HP:0001792
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skin_Hair_Nail	Nipple abnormality	HP:0010783
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Endocrine	Obesity / hyperphagia	HP:0001513
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Ossification abnormality	HP:0010674
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Pectus deformity	HP:0000766
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Hematologic_Immune	Plasma protein abnormality	HP:0006254
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Renal	Renal cysts / cystic kidney	HP:0000107
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Syndactyly / webbed digits	HP:0001159
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Craniofacial	Tongue abnormality	HP:0000157
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Simpson-Golabi-Behmel Syndrome	Primary Ciliopathies	Renal	Wilms tumour	HP:0002667
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Reproductive	Anhydramnios / oligohydramnios	HP:0001623
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skin_Hair_Nail	Atopic dermatitis / eczema	HP:0001047
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Behavioural abnormality	HP:0000708
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Bitemporal narrowing	HP:0000341
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Renal	Bladder / urinary tract abnormality	HP:0000014
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Bulbar dysfunction	HP:0001612
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Eye	Cataract	HP:0000518
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Cortical malformation	HP:0007364
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Reproductive	Cryptorchidism	HP:0000028
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Dental anomaly	HP:0000172
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Epicanthal folds	HP:0000286
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Epiphyseal abnormality (other)	HP:0005930
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Reproductive	Genital ambiguity	HP:0000062
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Hydrocephalus	HP:0000238
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Renal	Hydronephrosis	HP:0000126
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Hypertelorism	HP:0000316
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Hypertonia / spasticity	HP:0001276
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Reproductive	Hypospadias	HP:0000047
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Hypotonia	HP:0001558
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Intellectual disability / developmental delay	HP:0001249
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	GI_Abdominal	Intestinal / GI structural anomaly	HP:0002021
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Endocrine	Lipid metabolism / dyslipidaemia	HP:0003119
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Low-set / malformed ears	HP:0000356
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Microcephaly	HP:0000252
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Reproductive	Micropenis	HP:0000054
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Nasal abnormality	HP:0000366
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Cardiac	Outflow tract / great vessel anomaly	HP:0001702
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0010743
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skin_Hair_Nail	Photodermatitis / photosensitivity	HP:0000992
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Polydactyly	HP:0001162
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Renal	Renal cysts / cystic kidney	HP:0000107
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Reproductive	Scrotal / penile abnormality	HP:0000054
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Seizures / epilepsy	HP:0001250
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Short stature / dwarfism	HP:0004322
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Sleep abnormality	HP:0002360
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	CNS	Strabismus	HP:0000486
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Skeletal	Syndactyly / webbed digits	HP:0001159
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	Craniofacial	Tongue abnormality	HP:0000157
+Smith-Lemli-Opitz Syndrome	Secondary Diseases	GI_Abdominal	Vomiting	HP:0002013
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Apraxia	HP:0002186
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Areflexia / hyporeflexia	HP:0001284
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Cardiac	Arrhythmia	HP:0011675
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Astrogliosis / Purkinje abnormality	HP:0002171
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Ataxia / gait abnormality	HP:0002136
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Atopic dermatitis / eczema	HP:0012740
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Behavioural abnormality	HP:0000733
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Craniofacial	Bitemporal narrowing	HP:0000341
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Renal	Bladder / urinary tract abnormality	HP:0000014
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Brainstem / pons abnormality	HP:0011962
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Bulbar dysfunction	HP:0002046
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Cerebellar dysgenesis (other)	HP:0007033
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Cerebellar hypoplasia/atrophy	HP:0001321
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Cerebellar vermis hypoplasia/aplasia	HP:0001320
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Cerebral atrophy / volume loss	HP:0002059
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Constitutional symptom (catchall)	HP:0002076
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Cutaneous papules / fibrofolliculomas	HP:0012757
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Hepatic	Elevated transaminases / abnormal liver enzymes	HP:0003073
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Eye movement abnormality (other)	HP:0000496
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Craniofacial	Eyelid / palpebral abnormality	HP:0000492
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Frequency / weakness / fatigue (general)	HP:0003388
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Craniofacial	High-arched / narrow palate	HP:0000218
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Hyperpigmentation / hypopigmentation	HP:0007481
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Hyperreflexia	HP:0001347
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Hypertonia / spasticity	HP:0007256
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Hypotonia	HP:0001252
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Ichthyosis / hyperkeratosis	HP:0008064
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0002354
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Eye	Iris / anterior chamber abnormality	HP:0000525
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Endocrine	Lipid metabolism / dyslipidaemia	HP:0003119
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Nystagmus	HP:0000639
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skeletal	Pectus deformity	HP:0000766
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Peripheral neuropathy	HP:0002936
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Hematologic_Immune	Plasma protein abnormality	HP:0011028
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Reproductive	Scrotal / penile abnormality	HP:0000029
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Seizures / epilepsy	HP:0001250
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Speech / language abnormality	HP:0002300
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Reproductive	Sperm flagellar abnormality / male infertility	HP:0012864
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Strabismus	HP:0000486
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Craniofacial	Tongue abnormality	HP:0000157
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Eye	Tortuous / abnormal retinal vessels	HP:0030842
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Tremor / dyskinesia / dystonia	HP:0000473
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	Ventricular enlargement	HP:0002119
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	GI_Abdominal	Vomiting	HP:0002013
+Spinocerebellar Ataxia	Tissue-restricted Ciliopathies	CNS	White matter abnormality	HP:0002500
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0000512
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Abnormal breathing pattern (CNS-driven)	HP:0002098
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Cardiac	Arrhythmia	HP:0011675
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Arthrogryposis / contractures	HP:0002804
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Ataxia / gait abnormality	HP:0002515
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Bone age abnormality	HP:0005982
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Bone fragility / fracture	HP:0002659; HP:0001642
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	CNS calcification	HP:0002514
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Cardiac	Cardiomegaly	HP:0001640
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Cardiac	Cardiomyopathy	HP:0012819
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Clavicular abnormality	HP:0000889
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Coarse facial features / abnormal facies	HP:0001999
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Coccyx / sacrum abnormality	HP:0008443
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Eye	Cone-rod dystrophy	HP:0000548
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Cone-shaped epiphyses	HP:0010580
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Cortical malformation	HP:0002132
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Epiphyseal abnormality (other)	HP:0005930
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Frontal bossing / abnormal forehead	HP:0002007
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Hair colour / texture abnormality	HP:0001595
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skin_Hair_Nail	Hyperpigmentation / hypopigmentation	HP:0011355
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Vascular	Hypertension (systemic)	HP:0000822
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Hypertonia / spasticity	HP:0001276
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Endocrine	Hypothyroidism	HP:0000821
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Hypotonia	HP:0001252
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Hematologic_Immune	Immunodeficiency	HP:0002721
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Joint laxity / hypermobility	HP:0001388
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Limb asymmetry / partial limb absence	HP:0100559
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Long philtrum / abnormal philtrum	HP:0000343
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Macrocephaly	HP:0000256
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Metaphyseal abnormality	HP:0000944
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Nystagmus	HP:0000639
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Ossification abnormality	HP:0010674
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Osteopenia / osteoporosis	HP:0000938
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Pectus deformity	HP:0000766
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Pelvic / iliac / acetabular abnormality	HP:0002644
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Hematologic_Immune	Recurrent infection (unspecified)	HP:0004313
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Eye	Retinal arteriolar attenuation	HP:0007843
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Rib abnormality (other)	HP:0000772
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Scoliosis / kyphosis / lordosis	HP:0002650
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Short limbs (rhizomelic / mesomelic)	HP:0009826
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Short ribs / narrow thorax	HP:0000774
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Skeletal dysplasia (general/unspecified)	HP:0002652
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Skull base / cranial vault abnormality	HP:0010299
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Speech / language abnormality	HP:0002463
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Reproductive	Sperm flagellar abnormality / male infertility	HP:0012864
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Hematologic_Immune	Splenomegaly	HP:0001744
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	CNS	Strabismus	HP:0000486
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Hematologic_Immune	Thrombocytopenia	HP:0001873
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Tongue abnormality	HP:0000157
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Renal	Tubulointerstitial nephropathy	HP:0001970
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Skeletal	Vertebral / cervical abnormality	HP:0000925
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Eye	Visual field defect	HP:0001123
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Spondylometaphyseal Dysplasia	Tissue-restricted Ciliopathies	Craniofacial	Webbed neck / short neck	HP:0000465
+Stromme Syndrome	Primary Ciliopathies	Cardiac	Cardiomyopathy	HP:0001638
+Stromme Syndrome	Primary Ciliopathies	Eye	Cataract	HP:0000518
+Stromme Syndrome	Primary Ciliopathies	CNS	Cerebellar hypoplasia/atrophy	HP:0001321
+Stromme Syndrome	Primary Ciliopathies	Craniofacial	Cleft lip / palate	HP:0410030; HP:0000175
+Stromme Syndrome	Primary Ciliopathies	CNS	Corpus callosum abnormality	HP:0001273
+Stromme Syndrome	Primary Ciliopathies	CNS	Hydrocephalus	HP:0000238
+Stromme Syndrome	Primary Ciliopathies	Renal	Hydronephrosis	HP:0000126
+Stromme Syndrome	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Stromme Syndrome	Primary Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001249
+Stromme Syndrome	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Stromme Syndrome	Primary Ciliopathies	Eye	Iris / anterior chamber abnormality	HP:0000647
+Stromme Syndrome	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Stromme Syndrome	Primary Ciliopathies	CNS	Microcephaly	HP:0000252
+Stromme Syndrome	Primary Ciliopathies	Craniofacial	Micrognathia / retrognathia	HP:0000347
+Stromme Syndrome	Primary Ciliopathies	Eye	Microphthalmia / anophthalmia	HP:0000568
+Stromme Syndrome	Primary Ciliopathies	Craniofacial	Nasal abnormality	HP:0000366
+Stromme Syndrome	Primary Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Stromme Syndrome	Primary Ciliopathies	CNS	Peripheral neuropathy	HP:0003198
+Stromme Syndrome	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Stromme Syndrome	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Stromme Syndrome	Primary Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Stromme Syndrome	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001655
+Stromme Syndrome	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Stromme Syndrome	Primary Ciliopathies	Craniofacial	Tongue abnormality	HP:0000157
+Townes-Brocks Syndrome	Secondary Diseases	GI_Abdominal	Anal / perianal abnormality	HP:0001746
+Townes-Brocks Syndrome	Secondary Diseases	Skeletal	Bifid / duplicated thumb or hallux	HP:0010053
+Townes-Brocks Syndrome	Secondary Diseases	Renal	Bladder / urinary tract abnormality	HP:0000014
+Townes-Brocks Syndrome	Secondary Diseases	Eye	Choriocapillaris / chorioretinal abnormality	HP:0007844
+Townes-Brocks Syndrome	Secondary Diseases	Skeletal	Clinodactyly	HP:0030084
+Townes-Brocks Syndrome	Secondary Diseases	Reproductive	Cryptorchidism	HP:0000028
+Townes-Brocks Syndrome	Secondary Diseases	GI_Abdominal	Esophageal abnormality	HP:0002031
+Townes-Brocks Syndrome	Secondary Diseases	CNS	Eye movement abnormality (other)	HP:0009921
+Townes-Brocks Syndrome	Secondary Diseases	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Townes-Brocks Syndrome	Secondary Diseases	GI_Abdominal	Hernia (abdominal)	HP:0100790
+Townes-Brocks Syndrome	Secondary Diseases	Reproductive	Hypospadias	HP:0000047
+Townes-Brocks Syndrome	Secondary Diseases	Endocrine	Hypothyroidism	HP:0000821
+Townes-Brocks Syndrome	Secondary Diseases	GI_Abdominal	Imperforate anus / anal atresia	HP:0002023
+Townes-Brocks Syndrome	Secondary Diseases	CNS	Intellectual disability / developmental delay	HP:0001249
+Townes-Brocks Syndrome	Secondary Diseases	GI_Abdominal	Intestinal / GI structural anomaly	HP:0011024
+Townes-Brocks Syndrome	Secondary Diseases	Craniofacial	Low-set / malformed ears	HP:0000356
+Townes-Brocks Syndrome	Secondary Diseases	CNS	Microcephaly	HP:0000252
+Townes-Brocks Syndrome	Secondary Diseases	Skeletal	Phalangeal / metacarpal / metatarsal abnormality	HP:0009834
+Townes-Brocks Syndrome	Secondary Diseases	Skeletal	Polydactyly	HP:0001162
+Townes-Brocks Syndrome	Secondary Diseases	Renal	Renal cysts / cystic kidney	HP:0000107
+Townes-Brocks Syndrome	Secondary Diseases	Renal	Renal failure / ESRD / CKD	HP:0000083
+Townes-Brocks Syndrome	Secondary Diseases	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Townes-Brocks Syndrome	Secondary Diseases	Reproductive	Scrotal / penile abnormality	HP:0008736
+Townes-Brocks Syndrome	Secondary Diseases	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Townes-Brocks Syndrome	Secondary Diseases	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Townes-Brocks Syndrome	Secondary Diseases	Skeletal	Syndactyly / webbed digits	HP:0001159
+Townes-Brocks Syndrome	Secondary Diseases	Cardiac	Tetralogy of Fallot	HP:0001636
+Townes-Brocks Syndrome	Secondary Diseases	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Abnormal ERG / electroretinogram	HP:0007984
+Usher Syndrome	Tissue-restricted Ciliopathies	CNS	Areflexia / hyporeflexia	HP:0001284
+Usher Syndrome	Tissue-restricted Ciliopathies	CNS	Ataxia / gait abnormality	HP:0001251
+Usher Syndrome	Tissue-restricted Ciliopathies	CNS	Behavioural abnormality	HP:0000708
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Bone-spicule retinal pigmentation	HP:0007737
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Cataract	HP:0000518
+Usher Syndrome	Tissue-restricted Ciliopathies	CNS	Intellectual disability / developmental delay	HP:0001263
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Macular dystrophy / abnormality	HP:0007754
+Usher Syndrome	Tissue-restricted Ciliopathies	CNS	Nystagmus	HP:0000639
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Optic nerve abnormality	HP:0000587
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Photophobia / night blindness	HP:0000613
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Retinal arteriolar attenuation	HP:0007843
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Retinal dystrophy (other / unspecified)	HP:0000556
+Usher Syndrome	Tissue-restricted Ciliopathies	Auditory	Sensorineural hearing loss / deafness	HP:0000407
+Usher Syndrome	Tissue-restricted Ciliopathies	Auditory	Vestibular dysfunction	HP:0008676
+Usher Syndrome	Tissue-restricted Ciliopathies	Eye	Visual impairment / blindness	HP:0000505
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Cardiac	Atrial isomerism / heterotaxy	HP:0030853; HP:0001696
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Hepatic	Biliary tract abnormality	HP:0001923
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Skeletal	Birth weight / length / OFC abnormality	HP:0011451
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Cardiac	Cardiac defect (general / unspecified)	HP:0001627
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Cardiac	Cardiomegaly	HP:0001640
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Skeletal	Coccyx / sacrum abnormality	HP:0008443
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	CNS	Constitutional symptom (catchall)	HP:0025142
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Cardiac	Dextrocardia / cardiac malposition	HP:0001651
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Endocrine	Failure to thrive / growth retardation	HP:0001508
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Craniofacial	Hypertelorism	HP:0000316
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	GI_Abdominal	Imperforate anus / anorectal anomaly	HP:0011457
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	GI_Abdominal	Intestinal / GI structural anomaly	HP:0010462
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Respiratory	Lung lobation / structural abnormality	HP:0002088
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Cardiac	Mitral / tricuspid / valve abnormality	HP:0001654
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Respiratory	Mucociliary clearance impairment	HP:0011947
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Cardiac	Outflow tract / great vessel anomaly	HP:0001669
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Respiratory	Recurrent respiratory infections / bronchiectasis	HP:0002783
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Renal	Renal hypoplasia / dysplasia	HP:0000110
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Cardiac	Septal defect (ASD/VSD/AV canal)	HP:0001671
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Respiratory	Situs inversus / heterotaxy (organ-level)	HP:0001696; HP:0030853
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Reproductive	Sperm flagellar abnormality / male infertility	HP:0012864
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Hematologic_Immune	Spleen abnormality (asplenia/polysplenia)	HP:0001743
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	CNS	Tremor / dyskinesia / dystonia	HP:0001337
+Visceral Heterotaxy / Situs Inversus	Primary Ciliopathies	Reproductive	Uterine / vaginal abnormality	HP:0000130
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Skeletal	Brachydactyly / short digits	HP:0001156
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Skeletal	Clinodactyly	HP:0030084
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Craniofacial	Dental anomaly	HP:0000164
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Craniofacial	Frenulum / oral frenulum abnormality	HP:0000190
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Skeletal	Hand / foot abnormality (general)	HP:0001167
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Craniofacial	Hypotelorism	HP:0000601
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Craniofacial	Low-set / malformed ears	HP:0000356
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Skin_Hair_Nail	Milia / pitted skin	HP:0001792
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Skeletal	Polydactyly	HP:0001162
+Weyers Acrofacial Dysostosis	Primary Ciliopathies	Skeletal	Short stature / dwarfism	HP:0004322

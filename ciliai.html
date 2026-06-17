@@ -1,0 +1,3120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiliAI — Enhanced Gene Explorer</title>
+    <link rel="icon" type="image/png" href="/assets/CiliaHub_Logo_web.png">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="/ciliai/env.js"></script>
+    <script src="/ciliai/assistant/assistant-core.js"></script>
+    <script src="/ciliai/assistant/providers/deepseek.js"></script>
+    <script src="/ciliai/assistant/providers/ollama.js"></script>
+    <script src="/ciliai/assistant/assistant-runtime.js"></script>
+    <script src="/ciliai/ciliai.js"></script>
+    <script src="/ciliai/assistant/intent-interceptor.js"></script>
+    <script src="/ciliai/assistant/ciliai-enhancements.js"></script>
+    <script src="/js/data.js"></script>
+    <script src="/js/gene-data.js"></script>
+    <script src="/js/gene-card.js"></script>
+    <script src="/js/gold-standard-export.js"></script>
+
+    <style>
+        /* ── ENHANCEMENTS CSS ── */
+
+        /* History panel — matches right panel width, slides in from left */
+        #ciliaiHistoryPanel {
+            font-family: 'Segoe UI','Inter',Arial,sans-serif;
+        }
+        #ciliaiHistoryList button:focus-visible {
+            outline: 2px solid var(--primary-blue);
+            outline-offset: -2px;
+        }
+
+        /* Share / History / Clear buttons share one style */
+        .clear-chat-btn {
+            white-space: nowrap;
+        }
+
+        /* Input hint kbd styling */
+        .input-hint kbd {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 3px;
+            padding: 0 4px;
+            font-size: 9px;
+            color: #64748b;
+            font-family: monospace;
+        }
+
+        /* Virtual scroll spacer rows must be invisible */
+        tr.vs-spacer { pointer-events: none; }
+
+        /* Follow-up chip row */
+        .ciliai-followups button:hover {
+            background: #dbeafe !important;
+        }
+
+        /* Confidence badge */
+        .ciliai-confidence {
+            font-size: 10px; font-weight: 700;
+            padding: 1px 7px; border-radius: 10px;
+            margin-left: 6px; vertical-align: middle;
+            display: inline-block;
+        }
+
+        /* Mobile: history panel overlays full screen */
+        @media (max-width: 768px) {
+            #ciliaiHistoryPanel {
+                right: 0 !important;
+                width: 100% !important;
+                z-index: 500 !important;
+            }
+        }
+    </style>
+
+    <style>
+        :root {
+            --primary-blue: #005b96;
+            --secondary-blue: #b3cde0;
+            --accent-text: #333333;
+            --border-light: #e2e8f0;
+            --status-loading-bg: #e3f2fd;
+            --status-ready-bg: #e8f5e9;
+            --status-error-bg: #ffebee;
+            --highlight-gold: #f6e05e;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --color-pcm1: #5b21b6;
+            --color-tmem17: #475569;
+            --color-arl13b: #0891b2;
+            --color-tubulin: #2563eb;
+
+            /* Mobile chat panel */
+            --mobile-chat-z: 400;
+            --mobile-chat-height: 70vh;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html {
+            height: 100%;
+            font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--accent-text);
+            overflow: hidden;
+        }
+
+        /* ── NAVBAR ── */
+        .top-navbar {
+            background: var(--primary-blue);
+            color: white;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 28px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+            position: sticky;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+        .nav-container { display: flex; align-items: center; height: 100%; width: 100%; }
+        .brand {
+            display: flex; align-items: center; gap: 10px;
+            font-weight: 700; font-size: 17px;
+            padding-right: 24px; margin-right: 8px;
+            border-right: 1px solid rgba(255,255,255,0.2);
+            flex-shrink: 0;
+        }
+        .brand img { height: 36px; border-radius: 6px; }
+        .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+        .brand-subtitle { font-size: 10px; opacity: 0.8; font-weight: 400; }
+        .nav-links { display: flex; list-style: none; gap: 2px; height: 100%; margin-left: 8px; }
+        .nav-links a {
+            color: rgba(255,255,255,0.8); text-decoration: none;
+            padding: 0 16px; height: 100%; display: flex; align-items: center;
+            font-size: 15px; font-weight: 500;
+            transition: color 0.2s, background-color 0.2s;
+            position: relative;
+        }
+        .nav-links a::after {
+            content: ''; position: absolute; bottom: 0;
+            left: 12px; right: 12px; height: 3px;
+            background: white; border-radius: 3px 3px 0 0;
+            transform: scaleX(0); transition: transform 0.2s ease;
+        }
+        .nav-links a:hover { color: white; background-color: rgba(255,255,255,0.08); }
+        .nav-links a:hover::after { transform: scaleX(1); }
+        .nav-links a.active { color: white; font-weight: 600; background-color: rgba(255,255,255,0.12); }
+        .nav-links a.active::after { transform: scaleX(1); }
+
+        /* Mobile chat toggle button in navbar */
+        .mobile-chat-toggle {
+            display: none;
+            margin-left: auto;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+        .mobile-chat-toggle:hover { background: rgba(255,255,255,0.25); }
+        .mobile-chat-toggle svg { width: 14px; height: 14px; }
+
+        /* ── MAIN LAYOUT ── */
+        .app-container {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            height: calc(100vh - 60px);
+            width: 100vw;
+        }
+
+        /* ── LEFT PANEL ── */
+        .center-panel {
+            display: flex; flex-direction: column;
+            padding: 20px; overflow: hidden;
+            background: var(--bg); gap: 16px;
+        }
+        .top-bar {
+            display: flex; align-items: center;
+            justify-content: space-between;
+            height: 44px; gap: 12px;
+        }
+        .search-container { display: flex; gap: 8px; flex: 1; max-width: 600px; }
+        .search-input {
+            flex: 1; padding: 0 16px;
+            border: 1px solid var(--border-light); border-radius: 8px;
+            height: 44px; font-size: 14px; background: white;
+        }
+        .search-btn {
+            padding: 0 24px; background: var(--primary-blue);
+            color: white; border: none; border-radius: 8px;
+            font-weight: 600; cursor: pointer; height: 44px;
+            transition: background 0.2s;
+        }
+        .search-btn:hover { background: #004577; }
+        .status-badge { padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .status.loading  { background: var(--status-loading-bg); color: var(--primary-blue); }
+        .status.ready    { background: var(--status-ready-bg); color: #2e7d32; }
+        .status.error    { background: var(--status-error-bg); color: #c62828; }
+
+        /* ── VIZ CARD ── */
+        .viz-card {
+            flex: 1; background: var(--card); border-radius: 12px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            display: flex; flex-direction: column;
+            overflow: hidden; position: relative;
+        }
+        .viz-header {
+            padding: 0 20px; border-bottom: 1px solid var(--border-light);
+            display: flex; justify-content: space-between; align-items: center;
+            background: white; z-index: 10; height: 54px; flex-shrink: 0;
+        }
+        .viz-title-group { display: flex; align-items: center; gap: 16px; overflow: hidden; }
+        .viz-title {
+            font-size: 15px; font-weight: 700; color: var(--primary-blue);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .view-tabs {
+            display: flex; gap: 4px; background: #f1f5f9;
+            padding: 3px; border-radius: 8px;
+        }
+        .view-tab {
+            border: none; background: transparent;
+            padding: 5px 14px; font-weight: 600; font-size: 11px;
+            color: #64748b; cursor: pointer; border-radius: 6px;
+            transition: all 0.2s; white-space: nowrap;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .view-tab.active { background: white; color: var(--primary-blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .viz-actions { display: flex; gap: 6px; }
+        .action-btn {
+            background: var(--secondary-blue); color: var(--primary-blue);
+            border: none; padding: 6px 14px; border-radius: 6px;
+            font-weight: 700; font-size: 11px; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .action-btn:hover { background: var(--primary-blue); color: white; }
+        .viz-controls {
+            padding: 8px 20px; border-bottom: 1px solid var(--border-light);
+            display: flex; justify-content: space-between; align-items: center;
+            background: #fafafa; height: 44px; flex-shrink: 0;
+        }
+        .control-group { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: #666; }
+        .control-group select { padding: 4px 8px; border-radius: 5px; border: 1px solid var(--border-light); font-size: 11px; outline: none; background: white; cursor: pointer; }
+        .zoom-controls { display: flex; gap: 4px; }
+        .zoom-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .zoom-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); background: #f0f7ff; }
+        #viz-stage { flex: 1; position: relative; overflow: hidden; width: 100%; background: white; }
+        #cilia-svg, #plotly-container, #domain-viewer {
+            position: absolute; inset: 0;
+            width: 100% !important; height: 100% !important; overflow: hidden;
+        }
+        #cilia-svg { display: flex; align-items: center; justify-content: center; }
+
+        /* ── SIDE-BY-SIDE COMPARE UMAP ── */
+        #compare-umap-container {
+            position: absolute; inset: 0;
+            width: 100% !important; height: 100% !important;
+            display: flex; flex-direction: column;
+            background: white;
+            overflow: hidden;
+        }
+        .compare-umap-header {
+            flex-shrink: 0;
+            height: 38px;
+            padding: 0 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 12px; font-weight: 600; color: #475569;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: 6px;
+        }
+        .compare-umap-legend { display: flex; gap: 12px; flex-wrap: nowrap; align-items: center; }
+        .compare-umap-legend-item {
+            display: flex; align-items: center; gap: 5px;
+            font-size: 11.5px; font-weight: 600; color: #334155;
+        }
+        .compare-umap-legend-dot {
+            width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
+        }
+        .compare-umap-grid {
+            flex: 1;
+            display: grid;
+            gap: 2px;
+            background: #e2e8f0;
+            /* height is set by JS after measurement */
+        }
+        .compare-umap-grid.cols-2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+        .compare-umap-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr; }
+        .compare-umap-grid.cols-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .compare-umap-cell {
+            background: white;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            /* height comes from the grid row */
+        }
+        .compare-umap-cell-header {
+            flex-shrink: 0;
+            height: 32px;
+            padding: 0 10px;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 700;
+            border-bottom: 3px solid transparent;
+            box-sizing: border-box;
+        }
+        .compare-umap-cell-plot {
+            /* explicit pixel height set by JS — Plotly needs a sized parent */
+            flex: 1;
+            overflow: hidden;
+        }
+
+        @media (max-width: 900px) {
+            .compare-umap-grid.cols-2,
+            .compare-umap-grid.cols-3,
+            .compare-umap-grid.cols-4 {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(auto-fill, 300px);
+            }
+        }
+
+        /* ══════════════════════════════════════════════════════
+         * RIGHT CHAT PANEL — improved design
+         * Kept as permanent desktop panel.
+         * Key improvements:
+         *   - Polished header with status dot + gene count
+         *   - Examples panel starts collapsed, one-click expand
+         *     showing featured chips + "More ▾" drawer for all
+         *   - Messages area has subtle scroll indicator
+         *   - Input area with send shortcut hint + loading state
+         * ══════════════════════════════════════════════════════ */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            border-left: 1px solid var(--border-light);
+            overflow: hidden;
+            box-shadow: -2px 0 12px rgba(0,0,0,0.04);
+        }
+
+        /* ── CHAT HEADER ── */
+        .chat-header {
+            padding: 0 20px;
+            height: 58px;
+            border-bottom: 1px solid var(--border-light);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+        }
+        .chat-header-left { display: flex; flex-direction: column; gap: 2px; }
+        .chat-header h2 { font-size: 15px; color: #0f172a; font-weight: 700; line-height: 1; }
+        .chat-header-meta {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; color: #94a3b8;
+        }
+        .chat-status-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: #94a3b8; flex-shrink: 0;
+            transition: background 0.4s;
+        }
+        .chat-status-dot.ready  { background: #22c55e; box-shadow: 0 0 0 2px #dcfce7; }
+        .chat-status-dot.loading { background: #f59e0b; animation: dotPulse 1.2s ease-in-out infinite; }
+        @keyframes dotPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+        .chat-header-right { display: flex; align-items: center; gap: 8px; }
+        .clear-chat-btn {
+            background: none; border: 1px solid #e2e8f0;
+            color: #94a3b8; font-size: 10px; font-weight: 600;
+            padding: 4px 9px; border-radius: 6px; cursor: pointer;
+            transition: all 0.15s; white-space: nowrap;
+        }
+        .clear-chat-btn:hover { border-color: #cbd5e1; color: #475569; background: #f8fafc; }
+
+        /* ── EXAMPLES PANEL ── */
+        /* Sits between header and messages. Shows featured chips inline,
+           with a "More examples" accordion for the remaining categories. */
+        .examples-panel {
+            flex-shrink: 0;
+            background: #fafbfc;
+            border-bottom: 1px solid var(--border-light);
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .examples-panel.expanded {
+            max-height: 500px;
+            overflow-y: auto;
+            /* Force visible scrollbar so users know they can scroll
+             * through all chips. Default macOS scrollbars are hidden
+             * until scroll-in-progress. */
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #fafbfc;
+        }
+        .examples-panel.expanded::-webkit-scrollbar {
+            width: 8px;
+        }
+        .examples-panel.expanded::-webkit-scrollbar-track {
+            background: #fafbfc;
+        }
+        .examples-panel.expanded::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .examples-panel.expanded::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .examples-panel.collapsed { max-height: 50px; overflow: hidden; }
+
+        .examples-header {
+            padding: 0 16px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+        .examples-header:hover { background: #f1f5f9; }
+        .examples-header-left {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .examples-header-icon {
+            width: 24px; height: 24px; border-radius: 6px;
+            background: #eff6ff; display: flex; align-items: center;
+            justify-content: center; flex-shrink: 0;
+        }
+        .examples-header-icon svg { width: 12px; height: 12px; color: var(--primary-blue); stroke: var(--primary-blue); }
+        .examples-header-title {
+            font-size: 12px; font-weight: 600; color: #334155;
+        }
+        .examples-header-count {
+            font-size: 10px; color: #94a3b8;
+            background: #f1f5f9; padding: 1px 6px;
+            border-radius: 10px; font-weight: 500;
+        }
+        .examples-chevron {
+            color: #94a3b8; font-size: 11px;
+            transition: transform 0.2s;
+        }
+        .examples-panel.expanded .examples-chevron { transform: rotate(180deg); }
+
+        /* Featured row — always visible when panel is expanded */
+        .examples-featured {
+            padding: 0 14px 10px;
+            display: flex; flex-wrap: wrap; gap: 5px;
+        }
+        /* Category sections in the accordion */
+        .examples-section { padding: 0 14px 10px; }
+        .examples-section-label {
+            font-size: 9px; font-weight: 700; color: #b0bec5;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            margin: 8px 0 5px;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .examples-section-label::before {
+            content: ''; width: 4px; height: 4px;
+            border-radius: 50%; background: currentColor; flex-shrink: 0;
+        }
+        .examples-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+
+        /* Chip styles — each category gets its own colour accent on hover */
+        .ex-chip {
+            background: white; color: #475569;
+            border: 1px solid #e2e8f0; border-radius: 20px;
+            font-size: 11px; font-weight: 500;
+            padding: 4px 10px; cursor: pointer;
+            transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.1s;
+            white-space: nowrap; line-height: 1.4;
+        }
+        .ex-chip:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        .ex-featured .ex-chip:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+        .ex-expression .ex-chip:hover { background: #ecfdf5; border-color: #86efac; color: #15803d; }
+        .ex-domain .ex-chip:hover { background: #f5f3ff; border-color: #c4b5fd; color: #5b21b6; }
+        .ex-disease .ex-chip:hover { background: #fff1f2; border-color: #fda4af; color: #be123c; }
+        .ex-loc .ex-chip:hover { background: #fffbeb; border-color: #fcd34d; color: #b45309; }
+        .ex-complex .ex-chip:hover { background: #f0fdf4; border-color: #4ade80; color: #166534; }
+
+        /* ── MESSAGES AREA ── */
+        .messages-area {
+            flex: 1;
+            padding: 16px 16px 8px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #f8fafc;
+            scroll-behavior: smooth;
+        }
+        /* Subtle top fade when content is scrollable */
+        .messages-area::before {
+            content: '';
+            position: sticky;
+            top: 0;
+            display: block;
+            height: 12px;
+            margin: -8px -16px 0;
+            background: linear-gradient(to bottom, #f8fafc, transparent);
+            pointer-events: none;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+        /* Welcome placeholder shown when no messages yet */
+        .chat-welcome {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            flex: 1; padding: 20px 10px;
+            text-align: center;
+        }
+        .chat-welcome-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 12px;
+        }
+        .chat-welcome-icon svg { width: 22px; height: 22px; stroke: var(--primary-blue); }
+        .chat-welcome h3 { font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+        .chat-welcome p { font-size: 12px; color: #94a3b8; line-height: 1.6; max-width: 240px; }
+        .welcome-starters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 14px;
+            max-width: 320px;
+        }
+        .welcome-starters .ex-chip {
+            font-size: 12px;
+        }
+
+
+        /* Gene of the Day card */
+        .gene-of-day-card {
+            margin: 14px auto 8px;
+            max-width: 320px;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, #f0f7ff, #e8f1fa);
+            border: 1px solid #d4e3f5;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,91,150,0.06);
+            text-align: left;
+        }
+        .gene-of-day-eyebrow {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #5a8bc6;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .gene-of-day-eyebrow::before {
+            content: "★";
+            font-size: 11px;
+            color: #f59e0b;
+        }
+        .gene-of-day-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary-blue, #005b96);
+            margin: 4px 0 8px;
+            letter-spacing: -0.01em;
+        }
+        .gene-of-day-row {
+            font-size: 12px;
+            color: #475569;
+            margin: 5px 0;
+            line-height: 1.45;
+        }
+        .gene-of-day-row strong {
+            color: #334155;
+            font-weight: 600;
+        }
+        .gene-of-day-pill {
+            display: inline-block;
+            font-size: 10.5px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #dbeafe;
+            color: #1e3a5f;
+            margin-left: 4px;
+        }
+        .gene-of-day-pill.primary    { background: #fde68a; color: #78350f; }
+        .gene-of-day-pill.motile     { background: #c7d2fe; color: #312e81; }
+        .gene-of-day-pill.idio       { background: #bbf7d0; color: #14532d; }
+        .gene-of-day-pill.secondary  { background: #fecaca; color: #7f1d1d; }
+        .gene-of-day-action {
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #005b96;
+            cursor: pointer;
+            background: none; border: none; padding: 0;
+            text-align: left;
+            transition: color 0.15s ease;
+        }
+        .gene-of-day-action:hover { color: #003d63; text-decoration: underline; }
+        .gene-of-day-card[hidden] { display: none; }
+
+        /* Message bubbles */
+        .ciliai-message {
+            display: flex; flex-direction: column; gap: 3px; width: 100%;
+            animation: ciliaiMsgIn .28s cubic-bezier(.22,.61,.36,1);
+        }
+        @keyframes ciliaiMsgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { .ciliai-message { animation: none; } }
+        .ciliai-message.user { align-items: flex-end; }
+        /* Assistant messages: row layout with a CiliAI avatar to the left */
+        .ciliai-message.assistant { flex-direction: row; align-items: flex-start; gap: 9px; }
+        .ciliai-message.assistant::before {
+            content: ""; flex-shrink: 0; width: 30px; height: 30px; margin-top: 1px;
+            border-radius: 50%;
+            background:
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M12 2l1.7 6.1 6.1 1.7-6.1 1.7L12 18l-1.7-6.1L4.2 10l6.1-1.7z'/%3E%3C/svg%3E") center / 16px 16px no-repeat,
+                linear-gradient(135deg, #0a6fb5 0%, #00a39a 100%);
+            box-shadow: 0 2px 7px rgba(0,91,150,0.30);
+        }
+        .ciliai-message-content {
+            max-width: 92%; min-width: 0;
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 13px; line-height: 1.55;
+        }
+        .assistant .ciliai-message-content { max-width: calc(100% - 40px); }
+        .user .ciliai-message-content {
+            background: var(--primary-blue); color: white;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,91,150,0.25);
+        }
+        .assistant .ciliai-message-content {
+            background: white; border: 1px solid #e8edf4;
+            border-bottom-left-radius: 4px; color: #1e293b;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        /* Timestamps */
+        .msg-time {
+            font-size: 10px; color: #b0bec5; padding: 0 4px;
+        }
+        /* Thinking animation */
+        .thinking-bubble {
+            display: flex; align-items: center; gap: 4px;
+            padding: 10px 14px; background: white;
+            border: 1px solid #e8edf4; border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .thinking-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: #94a3b8; animation: thinkBounce 1.2s ease-in-out infinite;
+        }
+        .thinking-dot:nth-child(2) { animation-delay: 0.15s; }
+        .thinking-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes thinkBounce { 0%,80%,100%{transform:scale(0.7);opacity:0.5} 40%{transform:scale(1);opacity:1} }
+
+        .suggested-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .gene-badge {
+            background: #eff6ff; color: var(--primary-blue);
+            padding: 4px 11px; border-radius: 20px; font-size: 11px;
+            font-weight: 600; cursor: pointer; transition: all 0.2s;
+            border: 1px solid #bfdbfe;
+        }
+        .gene-badge:hover { background: var(--primary-blue); color: white; border-color: var(--primary-blue); transform: translateY(-1px); }
+
+        /* ── INPUT AREA ── */
+        .input-area {
+            padding: 10px 14px 12px;
+            border-top: 1px solid #e8edf4;
+            background: white;
+            flex-shrink: 0;
+        }
+        .chat-input-group { display: flex; gap: 8px; align-items: flex-end; }
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1.5px solid #dde3ed;
+            border-radius: 12px;
+            font-size: 13px; outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background: #f8fafc; color: #1e293b;
+            resize: none;
+            min-height: 40px;
+            max-height: 100px;
+            line-height: 1.4;
+            font-family: inherit;
+        }
+        .chat-input::placeholder { color: #b0bec5; font-size: 12.5px; }
+        .chat-input:focus { border-color: var(--primary-blue); background: white; box-shadow: 0 0 0 3px rgba(0,91,150,0.07); }
+        .send-btn {
+            background: var(--primary-blue); color: white;
+            border: none; width: 40px; height: 40px;
+            border-radius: 12px; font-size: 13px; font-weight: 600;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+            flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,91,150,0.3);
+        }
+        .send-btn:hover { background: #004a7f; box-shadow: 0 4px 12px rgba(0,91,150,0.4); }
+        .send-btn:active { transform: scale(0.94); }
+        .send-btn svg { width: 15px; height: 15px; }
+        .send-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+        /* Examples popover trigger — ghost button next to chat input */
+        .examples-trigger-btn {
+            background: transparent;
+            color: var(--primary-blue);
+            border: 1px solid #cbd5e1;
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+            flex-shrink: 0;
+        }
+        .examples-trigger-btn:hover {
+            background: #f0f7ff; border-color: var(--primary-blue);
+        }
+        .examples-trigger-btn:active { transform: scale(0.94); }
+        .examples-trigger-btn[aria-expanded="true"] {
+            background: var(--primary-blue); color: white;
+            border-color: var(--primary-blue);
+        }
+        .examples-trigger-btn svg { width: 18px; height: 18px; }
+
+        /* Floating popover — fixed position relative to viewport, slides
+         * in from bottom. Hidden by default until .open class is added. */
+        .examples-popover {
+            position: fixed;
+            bottom: 90px;
+            right: 24px;
+            width: 380px;
+            max-width: calc(100vw - 32px);
+            max-height: 60vh;
+            background: white;
+            border: 1px solid var(--border-light, #e2e8f0);
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 4px 8px rgba(15, 23, 42, 0.06);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            transform: translateY(8px) scale(0.97);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.18s ease, opacity 0.18s ease;
+        }
+        .examples-popover.open {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .examples-popover-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-light, #e2e8f0);
+            flex-shrink: 0;
+        }
+        .examples-popover-title {
+            font-size: 13px; font-weight: 600; color: #0f172a;
+        }
+        .examples-popover-count {
+            font-size: 11px; color: #64748b;
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 9999px;
+        }
+        .examples-popover-close {
+            margin-left: auto;
+            background: transparent; border: none;
+            font-size: 14px; color: #94a3b8;
+            cursor: pointer;
+            width: 24px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 4px;
+        }
+        .examples-popover-close:hover { background: #f1f5f9; color: #475569; }
+        .examples-popover-body {
+            overflow-y: auto;
+            padding: 10px 14px 14px;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #ffffff;
+        }
+        .examples-popover-body::-webkit-scrollbar { width: 8px; }
+        .examples-popover-body::-webkit-scrollbar-track { background: #ffffff; }
+        .examples-popover-body::-webkit-scrollbar-thumb {
+            background: #cbd5e1; border-radius: 4px;
+        }
+        .examples-popover-body::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Mobile: full-width drawer-style at bottom */
+        @media (max-width: 600px) {
+            .examples-popover {
+                left: 16px; right: 16px;
+                width: auto;
+                bottom: 80px;
+                max-height: 70vh;
+            }
+        }
+        .input-hint {
+            font-size: 10px; color: #b0bec5;
+            margin-top: 5px; text-align: right;
+        }
+        .input-hint kbd {
+            background: #f1f5f9; border: 1px solid #e2e8f0;
+            border-radius: 3px; padding: 0 4px;
+            font-size: 9px; color: #64748b;
+        }
+
+        /* ── DASHBOARD ── */
+        .landing-dashboard {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 12px; padding: 0 0 8px 0; flex-shrink: 0;
+        }
+        .stat-item { background: white; padding: 14px; border-radius: 12px; border: 1px solid var(--border-light); text-align: center; }
+        .stat-value { font-size: 18px; font-weight: 800; color: var(--primary-blue); }
+        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 4px; font-weight: 700; }
+
+        /* ── CILIA PARTS ── */
+        .cilia-part { cursor: pointer; transition: all 0.3s ease; }
+        .cilia-part:hover { opacity: 0.9; }
+        .cilia-part.active-highlight {
+            fill: var(--highlight-gold) !important; stroke: var(--primary-blue); stroke-width: 2.5;
+            filter: drop-shadow(0 0 5px rgba(246, 224, 94, 0.8));
+        }
+        .cilia-labels text { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .labels-visible .cilia-labels text { opacity: 1; }
+        .ai-result-card { background: white; border: 1px solid var(--border-light); border-radius: 12px; padding: 16px; margin-top: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .assistant-markdown { line-height: 1.6; color: #1f2937; }
+        .assistant-markdown p { margin: 4px 0; }
+        .assistant-markdown strong { color: var(--primary-blue); }
+        .assistant-markdown ul { margin: 6px 0 6px 16px; padding: 0; }
+        .assistant-markdown li { margin: 2px 0; }
+
+        /* ── MOBILE OVERLAY CHAT PANEL ──
+         * FIX #2: On mobile, the right-panel is hidden and replaced by a
+         * slide-up overlay triggered by the floating chat button.
+         */
+        @media (max-width: 768px) {
+            body, html { overflow: hidden; }
+
+            .app-container {
+                grid-template-columns: 1fr;
+                height: calc(100vh - 60px);
+            }
+
+            /* Hide desktop right panel on mobile */
+            .right-panel {
+                display: none !important;
+            }
+
+            /* Show mobile toggle button */
+            .mobile-chat-toggle { display: flex; }
+
+            /* Hide nav links on small screens to save space */
+            .nav-links { display: none; }
+
+            /* Floating chat button */
+            .mobile-chat-fab {
+                display: flex !important;
+            }
+
+            /* Mobile chat overlay */
+            .mobile-chat-overlay {
+                display: flex !important;
+            }
+
+            /* Center panel takes full width */
+            .center-panel { padding: 12px; gap: 10px; }
+            .landing-dashboard { grid-template-columns: repeat(3,1fr); gap: 6px; }
+            .stat-item { padding: 10px 6px; }
+            .stat-value { font-size: 15px; }
+            .stat-label { font-size: 9px; }
+        }
+
+        /* Floating chat button (mobile only) */
+        .mobile-chat-fab {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 18px rgba(0,91,150,0.45);
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .mobile-chat-fab:hover { transform: scale(1.07); box-shadow: 0 6px 24px rgba(0,91,150,0.55); }
+        .mobile-chat-fab svg { width: 24px; height: 24px; }
+        .mobile-chat-fab .fab-badge {
+            position: absolute; top: 8px; right: 8px;
+            width: 10px; height: 10px;
+            background: #22c55e; border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        /* Mobile chat overlay panel */
+        .mobile-chat-overlay {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: var(--mobile-chat-height);
+            background: white;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -8px 40px rgba(0,0,0,0.18);
+            z-index: var(--mobile-chat-z);
+            flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+            overflow: hidden;
+        }
+        .mobile-chat-overlay.open { transform: translateY(0); }
+
+        /* Drag handle */
+        .mobile-chat-handle {
+            width: 36px; height: 4px;
+            background: #cbd5e1; border-radius: 2px;
+            margin: 10px auto 0;
+            flex-shrink: 0; cursor: grab;
+        }
+
+        .mobile-chat-header {
+            padding: 10px 16px 8px;
+            display: flex; align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-light);
+            flex-shrink: 0;
+        }
+        .mobile-chat-header h2 { font-size: 15px; color: var(--primary-blue); font-weight: 700; }
+        .mobile-close-btn {
+            background: #f1f5f9; border: none;
+            width: 28px; height: 28px; border-radius: 50%;
+            cursor: pointer; color: #64748b;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; font-weight: 600;
+        }
+
+        /* Mobile overlay: cap the examples panel height so it doesn't eat all screen space */
+        .mobile-chat-overlay .examples-panel.expanded { max-height: 200px; }
+        .mobile-chat-overlay .messages-area { background: #f8fafc; }
+
+        /* Backdrop */
+        .mobile-chat-backdrop {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.35);
+            z-index: calc(var(--mobile-chat-z) - 1);
+        }
+        .mobile-chat-backdrop.open { display: block; }
+        /* ── HISTORY DRAWER chip items ── */
+        .history-item {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:5px 8px; margin:2px 0;
+            border-radius:6px; cursor:pointer;
+            font-size:12px; color:#334155;
+            transition:background 0.12s;
+        }
+        .history-item:hover { background:#eff6ff; color:#1d4ed8; }
+        .history-item-text { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .history-item-time { font-size:10px; color:#94a3b8; margin-left:8px; flex-shrink:0; }
+
+        /* ── FOLLOW-UP CHIPS ── */
+        .followup-chip {
+            background:white; color:#005b96;
+            border:1px solid #b3cde0; border-radius:20px;
+            font-size:11px; font-weight:500;
+            padding:4px 10px; cursor:pointer;
+            transition:background 0.12s, border-color 0.12s, transform 0.1s;
+        }
+        .followup-chip:hover { background:#eff6ff; border-color:#93c5fd; transform:translateY(-1px); }
+
+        /* ── SHARE TOAST ── */
+        #shareToast {
+            position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+            background:#0f172a; color:white; padding:8px 18px;
+            border-radius:20px; font-size:12px; font-weight:500;
+            opacity:0; transition:opacity 0.25s, transform 0.25s;
+            pointer-events:none; z-index:9999; white-space:nowrap;
+        }
+        #shareToast.visible { opacity:1; transform:translateX(-50%) translateY(0); }
+
+        /* ── VIRTUAL SCROLL: only render visible rows ── */
+        .vs-sentinel { height:1px; }
+
+        /* ── COPY TO CLIPBOARD btn in chat messages ── */
+        .msg-copy-btn {
+            display:inline-block; margin-top:6px;
+            background:none; border:1px solid #e2e8f0;
+            color:#64748b; border-radius:6px;
+            font-size:10.5px; padding:3px 9px; cursor:pointer;
+            transition:background 0.12s, border-color 0.12s;
+        }
+        .msg-copy-btn:hover { background:#f1f5f9; border-color:#cbd5e1; }
+        .msg-export-btn {
+            display:inline-block; margin-top:6px; margin-left:4px;
+            background:#005b96; border:none; color:white;
+            border-radius:6px; font-size:10.5px; padding:3px 9px;
+            cursor:pointer; transition:background 0.12s;
+        }
+        .msg-export-btn:hover { background:#004a7f; }
+
+        /* ── ARIA live region for screen readers ── */
+        #srAnnounce { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+    </style>
+<script>
+(function(){
+  if(new URLSearchParams(location.search).get('embed')!=='1') return;
+  document.documentElement.classList.add('embed-mode');
+  document.addEventListener('DOMContentLoaded', function(){
+    var ld=document.createElement('div');
+    ld.id='embed-loading';
+    ld.innerHTML='<div class="embed-spin"></div><div>Loading UMAP plot\u2026</div>';
+    document.body.appendChild(ld);
+    var tries=0;
+    var iv=setInterval(function(){
+      tries++;
+      var pc=document.getElementById('plotly-container');
+      var drawn=pc&&pc.querySelector('svg, canvas');
+      if(drawn||tries>120){ ld.style.display='none'; clearInterval(iv); }
+    },400);
+  });
+})();
+</script>
+<style id="ch-embed-mode">
+/* Loading state shown until the UMAP plot is drawn */
+#embed-loading { position:fixed; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:16px; background:#fff; z-index:80;
+  color:#005b96; font:600 15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+#embed-loading .embed-spin { width:42px; height:42px; border:4px solid #dbeafe;
+  border-top-color:#005b96; border-radius:50%; animation:embed-spin .9s linear infinite; }
+@keyframes embed-spin { to { transform: rotate(360deg); } }
+html.embed-mode #cilia-svg, html.embed-mode #domain-viewer { display:none !important; }
+/* Embed mode: when loaded in the scRNA popup iframe (?embed=1), hide all
+   chrome and show only the plot panel full-bleed. */
+html.embed-mode .top-navbar,
+html.embed-mode .top-bar,
+html.embed-mode .right-panel,
+html.embed-mode #desktopChatPanel,
+html.embed-mode .viz-header,
+html.embed-mode .viz-controls,
+html.embed-mode .mobile-chat-bar,
+html.embed-mode .chat-fab { display: none !important; }
+html.embed-mode, html.embed-mode body { margin: 0; height: 100%; overflow: hidden; background: #fff; }
+html.embed-mode .app-container { display: block; height: 100vh; margin: 0; padding: 0; }
+html.embed-mode .center-panel { width: 100%; max-width: none; height: 100vh; margin: 0; padding: 0; }
+html.embed-mode .viz-card { height: 100vh; border: none; border-radius: 0; margin: 0; box-shadow: none; }
+html.embed-mode #viz-stage { height: 100vh; min-height: 0; }
+
+/* ── Hybrid workspace: chat-primary (left) + collapsible visualization canvas (right).
+   Desktop only; mobile (≤768px) and embed-mode are left untouched. ── */
+@media (min-width: 769px) {
+    .app-container {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        transition: grid-template-columns .32s cubic-bezier(.4, 0, .2, 1);
+    }
+    #desktopChatPanel { order: 1; border-left: none; border-right: 1px solid var(--border-light); }
+    .center-panel { order: 2; position: relative; transition: opacity .22s ease; }
+    .app-container.canvas-collapsed { grid-template-columns: minmax(0, 1fr) 0; }
+    .app-container.canvas-collapsed .center-panel {
+        opacity: 0; pointer-events: none; overflow: hidden; padding-left: 0; padding-right: 0;
+    }
+    .canvas-collapse-btn {
+        background: transparent; border: 1px solid var(--border-light); color: #64748b;
+        border-radius: 6px; cursor: pointer; padding: 4px 9px; font-size: 11px; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 4px; transition: background .15s;
+    }
+    .canvas-collapse-btn:hover { background: #f1f5f9; color: #00406d; }
+    .canvas-reopen { display: none; }
+    .app-container.canvas-collapsed .canvas-reopen {
+        display: inline-flex; align-items: center; gap: 6px;
+        position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+        background: var(--primary-blue); color: #fff; border: none;
+        padding: 14px 9px; border-radius: 9px 0 0 9px; cursor: pointer;
+        font-size: 12px; font-weight: 700; letter-spacing: .3px; writing-mode: vertical-rl;
+        z-index: 60; box-shadow: -2px 0 12px rgba(0, 0, 0, .14);
+    }
+    .app-container.canvas-collapsed .canvas-reopen:hover { background: #004577; }
+}
+html.embed-mode #plotly-container { height: 100vh; width: 100%; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ NAVBAR -->
+<nav class="top-navbar">
+    <div class="nav-container">
+        <div class="brand">
+            <img src="/assets/CiliaHub_Logo_web.png" alt="CiliaHub Logo">
+            <div class="brand-text">
+                <div>CiliaHub</div>
+                <div class="brand-subtitle">Ciliary Gene Database</div>
+            </div>
+        </div>
+        <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="plots.html">Cilia Analysis</a></li>
+                <li><a href="ciliai.html" class="active">CiliAI</a></li>
+                <li><a href="phenotype.html">Ciliopathy</a></li>
+                <li><a href="api.html">API</a></li>
+                <li><a href="about.html">About</a></li>
+            </ul>
+        <div id="offlineIndicator" style="display:none;margin-left:12px;background:rgba(239,68,68,0.18);color:#fca5a5;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);flex-shrink:0;">⚠ Offline</div>
+        <!-- Mobile: chat toggle in navbar -->
+        <button class="mobile-chat-toggle" onclick="openMobileChat()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Ask CiliAI
+        </button>
+    </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ MAIN LAYOUT -->
+<div class="app-container">
+
+    <!-- ─── LEFT: VIZ PANEL ─── -->
+    <div class="center-panel">
+        <div class="top-bar">
+            <div class="search-container">
+                <input type="text" id="geneSearch" class="search-input" placeholder="Search gene, disease or function (IFT88, Joubert, transition zone)..." oninput="window.liveSearch(this.value)">
+<div id="search-suggestions" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #e1e8ed;border-radius:0 0 8px 8px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:280px;overflow-y:auto;z-index:500;display:none;"></div>
+                <button class="search-btn" onclick="window.searchGene()">Visualize</button>
+            </div>
+            <div id="dataStatus" class="status-badge loading" style="display:none;">SYNCING</div>
+        </div>
+        <div class="viz-card">
+            <div class="viz-header">
+                <div class="viz-title-group">
+                    <div class="viz-title" id="current-viz-title"><span id="vizActiveTitle">Cilia Spatial Intelligence</span></div>
+                    <div class="view-tabs">
+                        <button class="view-tab active" id="tab-diagram" onclick="window.switchView('diagram')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;pointer-events:none;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>Diagram
+                        </button>
+                        <button class="view-tab" id="tab-plot" onclick="window.switchView('plot')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;pointer-events:none;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Plot
+                        </button>
+                        <button class="view-tab" id="tab-domain" onclick="window.switchView('domain')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;pointer-events:none;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>Domains
+                        </button>
+                    </div>
+                </div>
+                <div class="viz-actions">
+                    <button class="action-btn" onclick="window.downloadCurrentVisualization()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;flex-shrink:0;pointer-events:none;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>PNG
+                    </button>
+                    <button class="action-btn" onclick="window.downloadJournalSVG()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;flex-shrink:0;pointer-events:none;"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>SVG
+                    </button>
+                    <button class="action-btn" onclick="window.toggleFullscreen()" title="Fullscreen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;pointer-events:none;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                    </button>
+                    <button class="canvas-collapse-btn" onclick="window.CiliaCanvasController && CiliaCanvasController.collapse()" title="Collapse visualization panel">Collapse ›</button>
+                </div>
+            </div>
+            <div class="viz-controls">
+                <div class="control-group">
+                    <span>Color:</span>
+                    <select id="colorSelect">
+                        <option value="anatomical">Anatomical</option>
+                        <option value="expression">Expression</option>
+                        <option value="function">Function</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" title="Zoom In" onclick="window.zoomIn()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                        </button>
+                        <button class="zoom-btn" title="Zoom Out" onclick="window.zoomOut()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                        </button>
+                        <button class="zoom-btn" title="Reset View" onclick="window.SpatialManager.resetZoom()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <input type="checkbox" id="labelToggle" onchange="window.toggleLabels(this)"> Labels
+                    </label>
+                </div>
+            </div>
+            <div id="viz-stage">
+                <div id="cilia-svg"></div>
+                <div id="plotly-container"></div>
+                <div id="domain-viewer"></div>
+                <div id="compare-umap-container" style="display:none;"></div>
+                <div id="vizActiveDescription" style="display:none"></div>
+            </div>
+        </div>
+        <div class="landing-dashboard">
+            <div class="stat-item"><div class="stat-value" id="stat-genes">...</div><div class="stat-label">Ciliary Genes</div></div>
+
+            <div class="stat-item"><div class="stat-value" id="stat-ciliopathys">...</div><div class="stat-label">Confirmed Ciliopathy Diseases</div></div>
+            <div class="stat-item"><div class="stat-value" id="stat-ciliopathy-genes">...</div><div class="stat-label">Confirmed Ciliopathy Genes</div></div>
+        </div>
+    </div>
+
+    <button type="button" class="canvas-reopen" onclick="window.CiliaCanvasController && CiliaCanvasController.expand()" title="Show visualization panel">‹ Visualization</button>
+
+    <!-- ─── RIGHT: DESKTOP CHAT PANEL ─── -->
+    <aside class="right-panel" id="desktopChatPanel">
+
+        <!-- Polished header: status dot + clear/history/share buttons -->
+        <!-- Recent additions panel — populated dynamically by
+             window.CiliaHub.refreshUpdateBanner() at startup. The element IDs
+             (rab-*) are written to from master.meta.changelog and master.meta.
+             Hardcoded fallbacks below show pre-load state only. -->
+        <div id="recent-additions-panel" style="display:none;background:#E6F1FB;border:1px solid #B5D4F4;border-radius:10px;padding:16px 20px;margin:0 0 16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <p id="rab-title" style="font-size:14px;font-weight:600;color:#042C53;margin:0;">Database update</p>
+            <button onclick="this.parentElement.parentElement.style.display='none'" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;">✕</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+            <span style="font-size:12px;background:#042C53;color:#B5D4F4;padding:2px 8px;border-radius:4px;">NEW</span>
+            <span id="rab-new-genes" style="font-size:12px;color:#042C53;">…</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <span style="font-size:12px;background:#378ADD;color:white;padding:2px 8px;border-radius:4px;">CILIOPATHY DB</span>
+            <span id="rab-stats" style="font-size:12px;color:#042C53;">…</span>
+          </div>
+        </div>
+
+        <div class="chat-header">
+            <div class="chat-header-left">
+                <h2>CiliAI Assistant</h2>
+                <div class="chat-header-meta">
+                    <span class="chat-status-dot" id="chatStatusDot"></span>
+                    <span id="chatStatusText">Connecting…</span>
+                </div>
+            </div>
+            <div class="chat-header-right">
+                <!-- Login UI will be added here -->
+                <span id="recent-additions-toggle" onclick="document.getElementById('recent-additions-panel').style.display=document.getElementById('recent-additions-panel').style.display==='none'?'block':'none'"
+                  style="font-size:11px;color:#0F6E56;background:#E1F5EE;padding:3px 10px;border-radius:12px;cursor:pointer;font-weight:600;white-space:nowrap;"
+                  title="Show recently added and updated genes">…</span>
+            </div>
+        </div>
+
+        <!-- Query history drawer -->
+        <div id="historyDrawer" style="display:none;flex-shrink:0;border-bottom:1px solid var(--border-light);background:#fafbfc;max-height:200px;overflow-y:auto;" aria-label="Query history">
+            <div style="padding:8px 14px 4px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;justify-content:space-between;">
+                <span>Recent queries</span>
+                <button onclick="clearHistory()" style="background:none;border:none;font-size:10px;color:#94a3b8;cursor:pointer;padding:2px 4px;" aria-label="Clear history">Clear all</button>
+            </div>
+            <div id="historyList" style="padding:0 10px 8px;"></div>
+        </div>
+
+        <!-- Examples popover: floating overlay triggered by 💡 button.
+             Hidden by default; shown when user clicks the button next
+             to the chat input. Closes on click outside or Esc. -->
+        <div class="examples-popover" id="examplesPopover" role="dialog" aria-label="Example queries" aria-hidden="true">
+            <div class="examples-popover-header">
+                <span class="examples-popover-title">💡 Example queries</span>
+                <span class="examples-popover-count">58 queries</span>
+                <button class="examples-popover-close" onclick="toggleExamplesPopover(false)" aria-label="Close">✕</button>
+            </div>
+            <div class="examples-popover-body">
+                <div class="examples-section" id="examplesAllCategories"></div>
+            </div>
+        </div>
+
+        <!-- Messages area — shows welcome card until first message -->
+        <div class="messages-area" id="messages">
+            <div class="chat-welcome" id="chatWelcome">
+                <div class="chat-welcome-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <h3>Ask me anything</h3>
+                <p>Questions about ciliary genes, localization, phylogeny, domains, or disease. Click 💡 below for examples.</p>
+                                <div class="gene-of-day-card" id="geneOfDayCard" hidden>
+                    <div class="gene-of-day-eyebrow">Gene of the Day</div>
+                    <div class="gene-of-day-name" id="godName">—</div>
+                    <div class="gene-of-day-row"><strong>Cilia Localization:</strong> <span id="godLoc">—</span></div>
+                    <div class="gene-of-day-row"><strong>Ciliopathy Status:</strong> <span id="godStatus">—</span></div>
+                    <div class="gene-of-day-row" id="godSummaryRow" style="margin-top:8px;color:#64748b;font-style:italic;font-size:11.5px;line-height:1.5;"></div>
+                    <button class="gene-of-day-action" id="godAction" type="button">Tell me more →</button>
+                </div>
+
+                <div class="welcome-starters" id="welcomeStarters">
+                    <button class="ex-chip" onclick="window.welcomeSend('Gold Standard ciliary genes')">🥇 Gold Standard Ciliary Genes</button>
+                    <button class="ex-chip" onclick="window.welcomeSend('Joubert syndrome genes')">Joubert syndrome genes</button>
+                    <button class="ex-chip" onclick="window.welcomeSend('Tell me about IFT88')">Tell me about IFT88</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input area: textarea, send button, command hint, follow-up chips -->
+        <div class="input-area">
+            <div class="chat-input-group">
+                <button class="examples-trigger-btn" id="examplesTriggerBtn" onclick="toggleExamplesPopover()" title="Example queries" aria-label="Show example queries" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </button>
+                <textarea id="chatInput" class="chat-input" placeholder="Ask a question or type /help for commands…" rows="1" aria-label="Chat input" autocomplete="off" spellcheck="false"></textarea>
+                <button class="send-btn" id="sendBtn" onclick="window.handleUserSend()" title="Send (Enter)" aria-label="Send message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+            <div class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> new line · <kbd>/help</kbd> for commands</div>
+            <!-- Follow-up suggestion chips — populated after each response -->
+            <div id="followUpChips" style="display:none;flex-wrap:wrap;gap:5px;margin-top:6px;"></div>
+        </div>
+    </aside>
+</div><!-- end .app-container -->
+
+<!-- FIX #2: Mobile floating action button -->
+<button class="mobile-chat-fab" id="mobileChatFab" onclick="openMobileChat()" title="Open CiliAI Chat">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <span class="fab-badge"></span>
+</button>
+
+<!-- Mobile chat overlay -->
+<div class="mobile-chat-backdrop" id="mobileChatBackdrop" onclick="closeMobileChat()"></div>
+<div class="mobile-chat-overlay" id="mobileChatOverlay">
+    <div class="mobile-chat-handle" id="mobileHandle"></div>
+    <div class="mobile-chat-header">
+        <h2>CiliAI Assistant</h2>
+        <button class="mobile-close-btn" onclick="closeMobileChat()">✕</button>
+    </div>
+    <div class="examples-panel collapsed" id="mobileExamplesPanel">
+        <div class="examples-header" onclick="toggleMobileExamplesPanel()">
+            <div class="examples-header-left">
+                <div class="examples-header-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <span class="examples-header-title">Example queries</span>
+            </div>
+            <span class="examples-chevron">▾</span>
+        </div>
+        <div id="mobileExamplesContent">
+            <div class="examples-featured ex-featured" id="mobileExamplesFeatured"></div>
+            <div class="examples-section" id="mobileExamplesAllCategories"></div>
+        </div>
+    </div>
+    <div class="messages-area" id="mobileMessages"></div>
+    <div class="input-area">
+        <div class="chat-input-group">
+            <textarea id="mobileChatInput" class="chat-input" placeholder="Ask about a gene or disease…" rows="1"></textarea>
+            <button class="send-btn" onclick="mobileHandleSend()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ARIA live region for screen reader announcements -->
+<div id="srAnnounce" role="status" aria-live="polite" aria-atomic="true"></div>
+<!-- Share URL toast notification -->
+<div id="shareToast">Link copied to clipboard!</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCRIPTS -->
+<script>
+
+/* ══════════════════════════════════════════════════════════════════
+ * EXAMPLES DATA — defined once, rendered into desktop + mobile
+ * ════════════════════════════════════════════════════════════════*/
+var EXAMPLE_CATEGORIES = [
+    {
+        label: 'Single-Gene Lookup', cls: 'ex-loc',
+        chips: [
+            'Tell me about IFT88',
+            'Tell me about CEP290',
+            'Tell me about ARL13B',
+            'Tell me about BBS1',
+            'Tell me about WDR31',
+            'IFT88 localization',
+            'CEP290 localization',
+            'BBS1 evolution',
+            'IFT88 evolution',
+            'WDR31 domains',
+            'IFT88 domains',
+            'CEP290 domains'
+        ]
+    },
+    {
+        label: 'Ciliopathies & Disease', cls: 'ex-disease',
+        chips: [
+            'Joubert syndrome genes',
+            'Bardet-Biedl syndrome genes',
+            'Meckel-Gruber syndrome genes',
+            'Nephronophthisis genes',
+            'Primary Ciliary Dyskinesia genes',
+            'Senior-Loken syndrome genes',
+            'Alstrom syndrome genes',
+            'Jeune syndrome genes',
+            'Short-rib thoracic dysplasia genes',
+            'Cranioectodermal dysplasia genes',
+            'Orofaciodigital syndrome genes',
+            'Usher syndrome genes',
+            'Leber congenital amaurosis genes',
+            'Polycystic kidney disease genes',
+            'Show primary ciliopathy genes',
+            'Show tissue-restricted ciliopathy genes',
+            'Show motile ciliopathy genes',
+            'Total ciliopathy genes'
+        ]
+    },
+    {
+        label: 'Domains & Structure', cls: 'ex-domain',
+        chips: [
+            'How many genes have WD40 domains?',
+            'How many genes have TPR domains?',
+            'How many genes have coiled-coil domains?',
+            'Genes with WD40 domains',
+            'Genes with TPR domains',
+            'Genes with kinase domains'
+        ]
+    },
+    {
+        label: 'Localization & Compartments', cls: 'ex-loc',
+        chips: [
+            'Show transition zone genes',
+            'Show basal body genes',
+            'Show axoneme genes',
+            'Show centrosome genes',
+            'Show genes localized to peroxisome',
+            'Show genes localized to mitochondria',
+            'How many basal body genes are there?',
+            'How many transition zone genes are there?'
+        ]
+    },
+    {
+        label: 'Complexes & Modules', cls: 'ex-complex',
+        chips: [
+            'Show IFT-A complex genes',
+            'Show IFT-B complex genes',
+            'Show BBSome genes',
+            'Show MKS module genes',
+            'Show NPHP module genes',
+            'Show dynein-2 complex genes',
+            'Compare BBSome vs IFT-A phylogeny',
+            'Compare IFT-A vs IFT-B phylogeny'
+        ]
+    },
+    {
+        label: 'Classification & Stats', cls: 'ex-expression',
+        chips: [
+            'Pan-ciliary genes',
+            'Idio-ciliary genes',
+            'Gold Standard ciliary genes',
+            'How many ciliary genes are in CiliaHub?',
+            'How many Joubert syndrome genes are there?',
+            'Total ciliopathy genes'
+        ]
+    },
+    {
+        label: 'Multi-Gene & Expression', cls: 'ex-expression',
+        chips: [
+            'Dot plot: IFT88, ARL13B, BBS1, FOXJ1',
+            'Dot plot: BBS1, BBS2, BBS4, BBS7',
+            'BBSome vs IFT-B',
+            'ARL13B scRNA-seq',
+            'IFT88 scRNA-seq',
+            'CEP290 scRNA-seq',
+            'Where is IFT88 most expressed?',
+            'Where is BBS1 most expressed?'
+        ]
+    },
+    {
+        label: 'Diseases & Symptoms', cls: 'ex-disease',
+        chips: [
+            'List the symptoms of Joubert syndrome',
+            'Symptoms of Bardet-Biedl syndrome',
+            'Phenotypes of Meckel-Gruber syndrome',
+            'Which diseases are associated with polydactyly?',
+            'Diseases linked to retinal degeneration',
+            'Which ciliopathies cause situs inversus?',
+            'Which diseases cause molar tooth sign?',
+            'Which ciliopathies affect the kidney?',
+            'What diseases is CEP290 linked to?',
+            'Compare symptoms of Joubert and Meckel-Gruber syndrome',
+            'Most common symptoms in primary ciliopathies',
+            'Most affected organ systems in ciliopathies'
+        ]
+    }
+];
+
+function buildExamples(featuredEl, allCatsEl, sendFn) {
+    if (!allCatsEl) return;
+    if (featuredEl) featuredEl.innerHTML = '';
+    allCatsEl.innerHTML  = '';
+    EXAMPLE_CATEGORIES.forEach(function(cat) {
+        // featured-row is only used if BOTH the category is marked featured
+        // AND a featuredEl was provided. Otherwise the category renders
+        // inline like any other.
+        var target = (cat.featured && featuredEl) ? featuredEl : allCatsEl;
+        if (target === allCatsEl) {
+            var label = document.createElement('div');
+            label.className = 'examples-section-label';
+            label.textContent = cat.label;
+            target.appendChild(label);
+        }
+        var chips = document.createElement('div');
+        chips.className = 'examples-chips ' + cat.cls;
+        cat.chips.forEach(function(text) {
+            var btn = document.createElement('button');
+            btn.className = 'ex-chip';
+            btn.textContent = text;
+            btn.addEventListener('click', function() { sendFn(text); });
+            chips.appendChild(btn);
+        });
+        target.appendChild(chips);
+    });
+}
+
+function makeSendFn(closeFirst) {
+    return function(text) {
+        if (closeFirst) {
+            toggleExamplesPopover(false); /* close popover after pick */
+        }
+        hideWelcome();
+        if (window.CiliAI && window.CiliAI.Router && window.CiliAI.Router.dispatchAction) {
+            window.CiliAI.Router.dispatchAction({ source: 'preset', intent: 'raw', text: text, echo: true });
+        } else if (window.handleAIQuery) {
+            window.addChatMessage(text, true);
+            window.handleAIQuery(text);
+        }
+    };
+}
+
+/* Welcome-card starter chips — global so HTML onclick can reach it.
+ * Same dispatch behavior as makeSendFn(false): no popover to close,
+ * just hide welcome and route. */
+window.welcomeSend = function(text) {
+    hideWelcome();
+    if (window.CiliAI && window.CiliAI.Router && window.CiliAI.Router.dispatchAction) {
+        window.CiliAI.Router.dispatchAction({ source: 'preset', intent: 'raw', text: text, echo: true });
+    } else if (window.handleAIQuery) {
+        window.addChatMessage(text, true);
+        window.handleAIQuery(text);
+    }
+};
+
+/* ── EXAMPLES PANEL TOGGLE ── */
+function toggleExamplesPopover(forceState) {
+    var pop = document.getElementById('examplesPopover');
+    var btn = document.getElementById('examplesTriggerBtn');
+    if (!pop || !btn) return;
+    var open;
+    if (typeof forceState === 'boolean') {
+        open = forceState;
+    } else {
+        open = !pop.classList.contains('open');
+    }
+    pop.classList.toggle('open', open);
+    pop.setAttribute('aria-hidden', open ? 'false' : 'true');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function toggleMobileExamplesPanel() {
+    var panel = document.getElementById('mobileExamplesPanel');
+    if (!panel) return;
+    var shouldCollapse = panel.classList.contains('expanded');
+    panel.classList.toggle('collapsed', shouldCollapse);
+    panel.classList.toggle('expanded', !shouldCollapse);
+}
+/* Close popover on click outside or Esc */
+document.addEventListener('click', function(e){
+    var pop = document.getElementById('examplesPopover');
+    var btn = document.getElementById('examplesTriggerBtn');
+    if (!pop || !pop.classList.contains('open')) return;
+    if (pop.contains(e.target) || (btn && btn.contains(e.target))) return;
+    toggleExamplesPopover(false);
+});
+document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') {
+        var pop = document.getElementById('examplesPopover');
+        if (pop && pop.classList.contains('open')) toggleExamplesPopover(false);
+    }
+});
+
+/* ── WELCOME CARD ── */
+function hideWelcome() {
+    var w = document.getElementById('chatWelcome');
+    if (w) { w.style.display = 'none'; }
+}
+
+/* ── CLEAR CHAT ── */
+function clearChat() {
+    var msgs = document.getElementById('messages');
+    if (!msgs) return;
+    /* Remove all message nodes but leave the welcome card */
+    var children = Array.from(msgs.children);
+    children.forEach(function(c) {
+        if (!c.classList.contains('chat-welcome')) msgs.removeChild(c);
+    });
+    var w = document.getElementById('chatWelcome');
+    if (w) w.style.display = '';
+}
+
+/* ── STATUS DOT UPDATER ── */
+function updateChatStatus(text, state) {
+    if (text && /\d/.test(text)) {
+        var _cg = (window.CiliAI && window.CiliAI.ciliarygeneData &&
+                   Object.keys(window.CiliAI.ciliarygeneData).length > 0)
+            ? Object.keys(window.CiliAI.ciliarygeneData).length.toLocaleString()
+            : null;
+        if (_cg) text = text.replace(/\d[\d,]+(?=\s*genes)/i, _cg);
+    }
+    var dot  = document.getElementById('chatStatusDot');
+    var span = document.getElementById('chatStatusText');
+    if (dot)  { dot.className = 'chat-status-dot ' + (state||''); }
+    if (span) { span.textContent = text || ''; }
+}
+
+/* ── TEXTAREA AUTO-GROW ── */
+function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * MOBILE CHAT PANEL
+ * ════════════════════════════════════════════════════════════════*/
+var _mobileOpen = false;
+
+function openMobileChat() {
+    var overlay  = document.getElementById('mobileChatOverlay');
+    var backdrop = document.getElementById('mobileChatBackdrop');
+    if (!overlay) return;
+    overlay.classList.add('open');
+    backdrop.classList.add('open');
+    _mobileOpen = true;
+    syncMessagesToMobile();
+    setTimeout(function(){ var inp = document.getElementById('mobileChatInput'); if(inp) inp.focus(); }, 400);
+}
+function closeMobileChat() {
+    var overlay  = document.getElementById('mobileChatOverlay');
+    var backdrop = document.getElementById('mobileChatBackdrop');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    backdrop.classList.remove('open');
+    _mobileOpen = false;
+}
+function syncMessagesToMobile() {
+    var src  = document.getElementById('messages');
+    var dest = document.getElementById('mobileMessages');
+    if (!src || !dest) return;
+    dest.innerHTML = src.innerHTML;
+    dest.scrollTop = dest.scrollHeight;
+}
+function mobileHandleSend() {
+    var input = document.getElementById('mobileChatInput');
+    var query = (input && input.value.trim()) ? input.value.trim() : '';
+    if (!query) return;
+    input.value = '';
+    autoGrow(input);
+    hideWelcome();
+    var desktopInput = document.getElementById('chatInput');
+    if (desktopInput) desktopInput.value = query;
+    if (window.handleUserSend) window.handleUserSend();
+    setTimeout(syncMessagesToMobile, 150);
+    setTimeout(syncMessagesToMobile, 800);
+    setTimeout(syncMessagesToMobile, 1800);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * DOM READY — wire everything up
+ * ════════════════════════════════════════════════════════════════*/
+document.addEventListener('DOMContentLoaded', function() {
+
+    /* Build desktop examples */
+    buildExamples(
+        document.getElementById('examplesFeatured'),
+        document.getElementById('examplesAllCategories'),
+        makeSendFn(true)
+    );
+
+    /* Build mobile examples */
+    buildExamples(
+        document.getElementById('mobileExamplesFeatured'),
+        document.getElementById('mobileExamplesAllCategories'),
+        function(text) {
+            closeMobileChat();
+            setTimeout(function(){
+                hideWelcome();
+                var inp = document.getElementById('chatInput');
+                if (inp) inp.value = text;
+                if (window.CiliAI && window.CiliAI.Router && window.CiliAI.Router.dispatchAction) {
+                    window.CiliAI.Router.dispatchAction({ source: 'preset', intent: 'raw', text: text, echo: true });
+                } else if (window.handleAIQuery) {
+                    window.addChatMessage(text, true);
+                    window.handleAIQuery(text);
+                }
+            }, 100);
+        }
+    );
+
+    /* Desktop textarea: Enter sends, Shift+Enter = newline, auto-grow */
+    var chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.addEventListener('input', function() { autoGrow(this); });
+        chatInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                window.handleUserSend();
+            }
+        });
+    }
+
+    /* Mobile textarea */
+    var mobileInput = document.getElementById('mobileChatInput');
+    if (mobileInput) {
+        mobileInput.addEventListener('input', function() { autoGrow(this); });
+        mobileInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                mobileHandleSend();
+            }
+        });
+    }
+
+    /* Gene search enter key */
+    var geneSearch = document.getElementById('geneSearch');
+    if (geneSearch) {
+        geneSearch.addEventListener('keydown', function(e) { if(e.key==='Enter') window.searchGene(); });
+    }
+});
+
+/* Patch addChatMessage to mirror to mobile when open + hide welcome + update status */
+function patchAddChatMessage() {
+    if (!window.addChatMessage || window.addChatMessage.__mobilePatchInstalled) return;
+    var origAdd = window.addChatMessage;
+    window.addChatMessage = function(html, isUser) {
+        hideWelcome();
+        var result = origAdd.apply(this, arguments);
+        if (_mobileOpen) { setTimeout(syncMessagesToMobile, 80); }
+        return result;
+    };
+    window.addChatMessage.__mobilePatchInstalled = true;
+}
+setTimeout(patchAddChatMessage, 500);
+setTimeout(patchAddChatMessage, 1500);
+
+/* Patch updateStatus to also update the chat header status dot */
+function patchUpdateStatus() {
+    if (!window.updateStatus || window.updateStatus.__chatPatchInstalled) return;
+    var origUpdate = window.updateStatus;
+    window.updateStatus = function(text, state) {
+        origUpdate.apply(this, arguments);
+        /* Map app states to chat dot states */
+        if (state === 'ready')   updateChatStatus(text, 'ready');
+        else if (state === 'loading') updateChatStatus('Loading…', 'loading');
+        else if (state === 'error')   updateChatStatus('Error', '');
+        else                          updateChatStatus(text, '');
+    };
+    window.updateStatus.__chatPatchInstalled = true;
+}
+setTimeout(patchUpdateStatus, 100);
+setTimeout(patchUpdateStatus, 800);
+
+/* ══════════════════════════════════════════════════════════════════
+ * ALL ORIGINAL INDEX.HTML JAVASCRIPT BELOW — UNCHANGED
+ * ════════════════════════════════════════════════════════════════*/
+
+window.showGoldStandardTable = function() {
+    window.switchView('diagram');
+    var container = document.getElementById('cilia-svg');
+    if (!container) return;
+    if (!window.CiliAI || !window.CiliAI.masterData) {
+        window.addChatMessage('Error: Database not loaded.', false); return;
+    }
+    var allGenes = window.CiliAI.masterData.sort(function(a,b){ return a.Gene.localeCompare(b.Gene); });
+    var totalCount = allGenes.length;
+    container.innerHTML = `
+        <div class="ciliai-table-container" style="display:flex;flex-direction:column;height:100%;width:100%;background:white;">
+            <div style="padding:12px 20px;border-bottom:1px solid #e2e8f0;display:flex;gap:12px;align-items:center;background:#f8fafc;flex-shrink:0;">
+                <div style="flex:1;">
+                    <h3 style="margin:0;color:#005b96;font-size:16px;font-weight:700;">Ciliary Gene Database</h3>
+                    <p style="margin:2px 0 0;font-size:11px;color:#64748b;"><strong>${totalCount.toLocaleString()}</strong> Genes</p>
+                </div>
+                <input type="text" id="gs-search" placeholder="Search gene, disease..."
+                    style="padding:8px 12px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;width:220px;outline:none;"
+                    onfocus="this.style.borderColor='#005b96'" onblur="this.style.borderColor='#cbd5e0'"
+                    onkeyup="window.filterGoldStandardTable()">
+                <button onclick="window.downloadGoldStandardCSV()"
+                    style="height:36px;padding:0 16px;display:flex;align-items:center;gap:6px;background:#005b96;color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;">⬇ CSV</button>
+            </div>
+            <div style="flex:1;overflow-y:auto;">
+                <table id="gs-table" style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
+                    <thead style="position:sticky;top:0;background:#f1f5f9;z-index:5;">
+                        <tr>
+                            <th style="padding:12px 10px;text-align:left;color:#475569;width:90px;border-bottom:2px solid #e2e8f0;">Gene</th>
+                            <th style="padding:12px 10px;text-align:left;color:#475569;width:250px;border-bottom:2px solid #e2e8f0;">Description</th>
+                            <th style="padding:12px 10px;text-align:left;color:#475569;width:160px;border-bottom:2px solid #e2e8f0;">Localization</th>
+                            <th style="padding:12px 10px;text-align:left;color:#475569;width:160px;border-bottom:2px solid #e2e8f0;">Ciliopathy</th>
+                            <th style="padding:12px 10px;text-align:left;color:#475569;width:110px;border-bottom:2px solid #e2e8f0;">Mouse</th>
+                            <th style="padding:12px 10px;text-align:center;color:#475569;width:90px;border-bottom:2px solid #e2e8f0;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gs-tbody"></tbody>
+                </table>
+            </div>
+        </div>`;
+    var tbody = document.getElementById('gs-tbody');
+    var fragment = document.createDocumentFragment();
+    allGenes.forEach(function(g) {
+        var tr = document.createElement('tr');
+        tr.className = 'gs-row';
+        tr.style.borderBottom = '1px solid #f1f5f9';
+        var desc = g['Gene.Description'] || '-';
+        var loc  = g.Localization || '-';
+        var mouse = g.Ortholog_Mouse || '-';
+        var disease = '-';
+        if (Array.isArray(g.Ciliopathies)) disease = g.Ciliopathies.join('; ');
+        else if (g.Ciliopathy) disease = g.Ciliopathy;
+        tr.innerHTML = `
+            <td style="padding:8px 10px;font-weight:700;color:#005b96;vertical-align:top;overflow:hidden;text-overflow:ellipsis;">${g.Gene}</td>
+            <td style="padding:8px 10px;color:#475569;line-height:1.4;vertical-align:top;">${desc}</td>
+            <td style="padding:8px 10px;color:#334155;vertical-align:top;">${loc}</td>
+            <td style="padding:8px 10px;color:#be185d;vertical-align:top;">${disease}</td>
+            <td style="padding:8px 10px;font-style:italic;color:#64748b;vertical-align:top;">${mouse}</td>
+            <td style="padding:8px 10px;text-align:center;vertical-align:top;">
+                <div style="display:flex;gap:8px;justify-content:center;">
+                    <button onclick="window.displayFullGeneInfo('${g.Gene}')" title="View Details" style="cursor:pointer;border:none;background:#e0f2fe;color:#005b96;width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <button onclick="window.renderUMAPPlot('${g.Gene}', ['${g.Gene}'])" title="Visualize Expression" style="cursor:pointer;border:none;background:#f0fdf4;color:#166534;width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;pointer-events:none;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    </button>
+                </div>
+            </td>`;
+        fragment.appendChild(tr);
+    });
+    tbody.appendChild(fragment);
+    document.getElementById('current-viz-title').textContent = 'Database: Ciliary Gene Inventory';
+};
+
+window.CiliAI = window.CiliAI || {};
+Object.assign(window.CiliAI, {
+    activeDataset: window.CiliAI.activeDataset || 'lung',
+    datasets: window.CiliAI.datasets || {},
+    data: window.CiliAI.data || { umap: [] },
+    masterData: window.CiliAI.masterData || [],
+    ready: window.CiliAI.ready || false,
+    lookups: window.CiliAI.lookups || { geneMap: {}, umapByGene: {}, goMap: {}, pfamByGene: {} },
+    cellDataCache: window.CiliAI.cellDataCache || {},
+    lastQueryContext: window.CiliAI.lastQueryContext || { type: null, data: [], term: null },
+    zoomStateByGene: window.CiliAI.zoomStateByGene || {},
+    activeGeneContext: window.CiliAI.activeGeneContext || null,
+    CiliAI_UMAP: window.CiliAI.CiliAI_UMAP || null,
+    currentPlot: window.CiliAI.currentPlot || null
+});
+
+window.SpatialManager = {
+    locMap: {
+        'transition zone':'transition-zone','tz':'transition-zone','gate':'transition-zone',
+        'axoneme':'axoneme','microtubule':'axoneme','doublet':'axoneme',
+        'basal body':'basal-body','centriole':'basal-body','mother centriole':'basal-body',
+        'centrosome':'basal-body','centrosomal':'basal-body','pericentriolar':'basal-body',
+        'ciliary tip':'ciliary-tip','tip':'ciliary-tip','cap':'ciliary-tip',
+        'membrane':'ciliary-membrane','sheath':'ciliary-membrane',
+        'distal appendage':'distal-appendage','fiber':'distal-appendage',
+        'nucleus':'nucleus','cytosol':'cell-body','cell body':'cell-body','cytoplasm':'cell-body'
+    },
+    normalizeLocKey: function(term) { return String(term||'').toLowerCase().replace(/[^a-z0-9]/g,''); },
+    mapLocalizationTerm: function(locTerm) {
+        if (!locTerm) return null;
+        var normalized = this.normalizeLocKey(locTerm);
+        if (!normalized) return null;
+        if (!this._locMapNormalized) {
+            this._locMapNormalized = {};
+            Object.keys(this.locMap).forEach(function(key) {
+                this._locMapNormalized[this.normalizeLocKey(key)] = this.locMap[key];
+            }, this);
+        }
+        if (this._locMapNormalized[normalized]) return this._locMapNormalized[normalized];
+        var matchKey = Object.keys(this._locMapNormalized).find(function(k){ return normalized.includes(k); });
+        if (matchKey) return this._locMapNormalized[matchKey];
+        if (normalized.includes('cilia')) return 'ciliary-membrane';
+        return null;
+    },
+    highlight: function(locTerm, gene) {
+        if (!locTerm) return false;
+        window.switchView('diagram');
+        var targetId = this.mapLocalizationTerm(locTerm);
+        if (!targetId) { console.warn('SpatialManager: No map for "'+locTerm+'"'); return false; }
+        var el = document.getElementById(targetId);
+        if (!el) { window.generateAndInjectSVG(); var self=this; return setTimeout(function(){ self.highlight(locTerm,gene); }, 100); }
+        document.querySelectorAll('.cilia-part').forEach(function(p){ p.classList.remove('active-highlight'); });
+        el.classList.add('active-highlight');
+        this.zoomTo(el);
+        var tooltip = document.getElementById('cilium-tooltip');
+        if (tooltip) { tooltip.textContent = (gene||'Structure')+': '+locTerm; tooltip.style.opacity=1; setTimeout(function(){ tooltip.style.opacity=0; }, 3000); }
+        return true;
+    },
+    zoomTo: function(element) {
+        var viewport = document.getElementById('viewport-group');
+        if (!viewport || !element.getBBox) return;
+        try {
+            var box = element.getBBox();
+            var cx = box.x + box.width/2, cy = box.y + box.height/2;
+            var dx = 150-cx, dy = 250-cy;
+            viewport.style.transition = 'transform 1s cubic-bezier(0.2,0.8,0.2,1)';
+            viewport.style.transform = 'translate('+dx+'px,'+dy+'px) scale(1.8)';
+        } catch(e) { console.warn('Zoom error:',e); }
+    },
+    resetZoom: function() {
+        var viewport = document.getElementById('viewport-group');
+        if (viewport) { viewport.style.transition='transform 0.6s cubic-bezier(0.4,0,0.2,1)'; viewport.style.transform='translate(0,0) scale(1)'; }
+        document.querySelectorAll('.cilia-part').forEach(function(p){ p.classList.remove('active-highlight'); });
+    },
+    clearOverlays: function() {
+        document.querySelectorAll('.heatmap-overlay, .multi-overlay').forEach(function(el){ el.remove(); });
+        this.resetZoom();
+    }
+};
+
+window.highlightCiliumLocation = function(locTerm, gene) { return window.SpatialManager.highlight(locTerm, gene); };
+
+window.generateAndInjectSVG = function() {
+    var container = document.getElementById('cilia-svg');
+    if (!container) return;
+    var titleEl = document.getElementById('current-viz-title');
+    if (titleEl) titleEl.textContent = 'Diagram: Active IFT Transport';
+    var styleId = 'cilia-transport-styles';
+    var oldStyle = document.getElementById(styleId);
+    if (oldStyle) oldStyle.remove();
+    var style = document.createElement('style');
+    style.id = styleId;
+    style.innerHTML = `
+        @keyframes driveUp { 0%{transform:translateY(0);opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{transform:translateY(-120px);opacity:0} }
+        @keyframes driveDown { 0%{transform:translateY(-120px);opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{transform:translateY(0);opacity:0} }
+        .transport-group{pointer-events:none}
+        .motor-kinesin{fill:#4ade80;animation:driveUp 4s linear infinite}
+        .cargo-ift-b{fill:#22d3ee;animation:driveUp 4s linear infinite}
+        .cargo-bbsome-up{fill:#facc15;animation:driveUp 4s linear infinite}
+        .motor-dynein{fill:#fb923c;animation:driveDown 4s linear infinite}
+        .cargo-ift-a{fill:#60a5fa;animation:driveDown 4s linear infinite}
+        .cargo-bbsome-down{fill:#facc15;animation:driveDown 4s linear infinite}
+        .delay-0{animation-delay:0s}.delay-1{animation-delay:1.33s}.delay-2{animation-delay:2.66s}
+        .cilia-part{cursor:pointer;transition:all 0.2s ease}
+        .cilia-part:hover{filter:brightness(1.1);stroke:#2b6cb0}
+        .cilia-part.active-highlight{opacity:1!important;stroke:#d97706!important;stroke-width:3px!important;filter:drop-shadow(0 0 8px rgba(251,191,36,0.8));z-index:100}
+        #cilium-tooltip{position:absolute;background:rgba(15,23,42,0.95);color:white;padding:5px 10px;border-radius:4px;font-size:11px;pointer-events:none;opacity:0;transition:opacity 0.2s;z-index:2000;border:1px solid #475569;white-space:nowrap}`;
+    document.head.appendChild(style);
+    container.innerHTML = `
+        <div class="cilia-container" style="position:relative;width:100%;height:100%;display:flex;justify-content:center;align-items:center;">
+            <div id="cilium-tooltip"></div>
+            <svg id="cilia-diagram" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="height:100%;width:100%;">
+                <defs>
+                    <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#F8FAFC"/><stop offset="100%" style="stop-color:#F1F5F9"/></linearGradient>
+                    <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:#E2E8F0"/><stop offset="100%" style="stop-color:#CBD5E1"/></radialGradient>
+                    <linearGradient id="pcm1Gradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#5b21b6"/><stop offset="100%" style="stop-color:#4c1d95"/></linearGradient>
+                    <linearGradient id="tmem17Gradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#475569"/><stop offset="100%" style="stop-color:#334155"/></linearGradient>
+                    <linearGradient id="arl13bGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#0891b2"/><stop offset="100%" style="stop-color:#0e7490"/></linearGradient>
+                    <linearGradient id="tubulinGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#2563eb"/><stop offset="100%" style="stop-color:#1d4ed8"/></linearGradient>
+                </defs>
+                <g id="viewport-group" transform="translate(0,0)">
+                    <path id="cell-body" class="cilia-part" d="M 40,350 C -30,270 10,170 140,170 C 270,170 310,270 240,350 Z" fill="url(#cytosolGradient)" stroke="#E2E8F0" stroke-width="2"/>
+                    <circle id="nucleus" class="cilia-part" cx="140" cy="290" r="35" fill="url(#nucleusGradient)" stroke="#CBD5E1" stroke-width="2"/>
+                    <rect id="basal-body" class="cilia-part" x="130" y="165" width="20" height="15" rx="2" fill="url(#pcm1Gradient)" stroke="#5b21b6" stroke-width="1.5"/>
+                    <path id="transition-zone" class="cilia-part" d="M 132,165 L 128,150 L 152,150 L 148,165 Z" fill="url(#tmem17Gradient)" stroke="#475569" stroke-width="1.5"/>
+                    <path id="ciliary-membrane" class="cilia-part" d="M 128,150 L 135,30 L 145,30 L 152,150 Z" fill="none" stroke="url(#arl13bGradient)" stroke-width="2.5" stroke-dasharray="4,4"/>
+                    <path id="axoneme" class="cilia-part" d="M 135,150 L 138,35 L 142,35 L 145,150 Z" fill="none" stroke="url(#tubulinGradient)" stroke-width="2.5"/>
+                    <g id="transport-system" class="transport-group">
+                        <g transform="translate(0,160)">
+                            <circle class="motor-kinesin delay-0" cx="132" cy="0" r="2.5"/><rect class="cargo-ift-b delay-0" x="130" y="3" width="4" height="6"/><circle class="cargo-bbsome-up delay-0" cx="132" cy="11" r="2"/>
+                            <circle class="motor-kinesin delay-1" cx="132" cy="0" r="2.5"/><rect class="cargo-ift-b delay-1" x="130" y="3" width="4" height="6"/><circle class="cargo-bbsome-up delay-1" cx="132" cy="11" r="2"/>
+                            <circle class="motor-kinesin delay-2" cx="132" cy="0" r="2.5"/><rect class="cargo-ift-b delay-2" x="130" y="3" width="4" height="6"/><circle class="cargo-bbsome-up delay-2" cx="132" cy="11" r="2"/>
+                        </g>
+                        <g transform="translate(0,160)">
+                            <circle class="cargo-bbsome-down delay-0" cx="148" cy="-11" r="2"/><rect class="cargo-ift-a delay-0" x="146" y="-9" width="4" height="6"/><circle class="motor-dynein delay-0" cx="148" cy="0" r="3"/>
+                            <circle class="cargo-bbsome-down delay-1" cx="148" cy="-11" r="2"/><rect class="cargo-ift-a delay-1" x="146" y="-9" width="4" height="6"/><circle class="motor-dynein delay-1" cx="148" cy="0" r="3"/>
+                            <circle class="cargo-bbsome-down delay-2" cx="148" cy="-11" r="2"/><rect class="cargo-ift-a delay-2" x="146" y="-9" width="4" height="6"/><circle class="motor-dynein delay-2" cx="148" cy="0" r="3"/>
+                        </g>
+                    </g>
+                    <g class="cilia-labels" style="pointer-events:none;opacity:0;transition:opacity 0.3s ease;">
+                        <text x="140" y="195" text-anchor="middle" font-size="11" font-weight="700" fill="#5b21b6">Basal Body (PCM1)</text>
+                        <text x="140" y="160" text-anchor="middle" font-size="11" font-weight="700" fill="#475569">Transition Zone</text>
+                        <text x="165" y="85" text-anchor="start" font-size="11" font-weight="700" fill="#0891b2">Membrane</text>
+                        <text x="115" y="55" text-anchor="end" font-size="11" font-weight="700" fill="#2563eb">Axoneme</text>
+                    </g>
+                </g>
+            </svg>
+        </div>`;
+    var tooltip = document.getElementById('cilium-tooltip');
+    var compNames = {
+        'basal-body':'Basal Body (Mother Centriole)','transition-zone':'Transition Zone (Gatekeeper)',
+        'axoneme':'Axoneme (Microtubule Core)','ciliary-membrane':'Ciliary Membrane',
+        'nucleus':'Nucleus','cell-body':'Cytoplasm'
+    };
+    container.querySelectorAll('.cilia-part').forEach(function(part) {
+        part.addEventListener('mousemove', function(e) {
+            if (tooltip) { tooltip.textContent=compNames[part.id]||part.id; tooltip.style.left=(e.offsetX+10)+'px'; tooltip.style.top=(e.offsetY+10)+'px'; tooltip.style.opacity='1'; }
+        });
+        part.addEventListener('mouseleave', function() { if (tooltip) tooltip.style.opacity='0'; });
+        part.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (window.SpatialManager && window.SpatialManager.zoomTo) window.SpatialManager.zoomTo(part);
+            document.querySelectorAll('.cilia-part').forEach(function(el){ el.classList.remove('active-highlight'); });
+            part.classList.add('active-highlight');
+            var labels = container.querySelector('.cilia-labels');
+            if (labels) labels.style.opacity='1';
+        });
+    });
+    container.querySelector('svg').addEventListener('click', function(e) {
+        if (e.target.id==='cilia-diagram'||e.target.id==='viewport-group') {
+            if (window.SpatialManager && window.SpatialManager.resetZoom) window.SpatialManager.resetZoom();
+            var labels = container.querySelector('.cilia-labels');
+            if (labels) labels.style.opacity='0';
+        }
+    });
+};
+
+window.addChatMessage = function(html, isUser) {
+    var messages = document.getElementById('messages');
+    if (!messages) return;
+    var msg = document.createElement('div');
+    msg.className = 'ciliai-message ' + (isUser ? 'user' : 'assistant');
+    msg.innerHTML = '<div class="ciliai-message-content">' + html + '</div>';
+    messages.appendChild(msg);
+    messages.scrollTop = messages.scrollHeight;
+};
+window.updateStatus = function(text, state) {
+    var statusEl = document.getElementById('dataStatus');
+    if (statusEl) { statusEl.textContent=text; statusEl.className='status-badge status '+(state||'normal'); }
+};
+/* v5.9 FIX: install the chat-status patch SYNCHRONOUSLY right here, 
+ * before any code can call updateStatus(). Eliminates the race 
+ * condition where initCiliAI's updateStatus('Ready', 'ready') call 
+ * fires before the original setTimeout(patchUpdateStatus, 800ms) 
+ * has had a chance to install the patch. */
+if (typeof patchUpdateStatus === 'function') {
+    try { patchUpdateStatus(); } catch(e) { console.warn('[CiliaHub] sync patch install failed:', e); }
+}
+window.showPlot = function(plotData, title) {
+    document.getElementById('cilia-svg').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+    document.getElementById('compare-umap-container').style.display = 'none';
+    var plotContainer = document.getElementById('plotly-container');
+    plotContainer.style.display = 'block';
+    document.getElementById('current-viz-title').textContent = title || 'Gene Expression UMAP';
+    plotContainer.innerHTML = '';
+    var vizCard = document.querySelector('.viz-card');
+    var vizHeader = document.querySelector('.viz-header');
+    var availableHeight = (vizCard && vizHeader) ? (vizCard.clientHeight - vizHeader.clientHeight - 40) : 500;
+    var availableWidth  = vizCard ? (vizCard.clientWidth - 40) : 600;
+    var layout = Object.assign({}, plotData.layout||{}, {
+        autosize:true, width:availableWidth, height:availableHeight,
+        margin:{l:60,r:30,b:60,t:50,pad:10},
+        paper_bgcolor:'white', plot_bgcolor:'white',
+        font:{size:11}, showlegend:true,
+        legend:{x:1.02,y:1,xanchor:'left',yanchor:'top',bgcolor:'rgba(255,255,255,0.8)',bordercolor:'#e1e8ed',borderwidth:1,font:{size:10}}
+    });
+    Plotly.newPlot('plotly-container', plotData.data, layout, {responsive:true,displayModeBar:true,displaylogo:false,scrollZoom:false}).then(function(gd) {
+        window.CiliAI.currentPlot = gd;
+        gd.on('plotly_click', function(e) {
+            var loc = e.points && e.points[0] && e.points[0].customdata && e.points[0].customdata.localization;
+            if (!loc) return;
+            window.showDiagram();
+            if (window.SpatialManager) window.SpatialManager.highlight(loc, window.CiliAI.activeGeneContext);
+        });
+    });
+    window.addEventListener('resize', function() {
+        var c = document.getElementById('plotly-container');
+        if (window.CiliAI.currentPlot && c && c.offsetParent !== null) {
+            setTimeout(function(){ Plotly.Plots.resize(window.CiliAI.currentPlot); }, 50);
+        }
+    });
+};
+window.showDiagram = function() {
+    document.getElementById('plotly-container').style.display = 'none';
+    document.getElementById('domain-viewer').style.display = 'none';
+    document.getElementById('compare-umap-container').style.display = 'none';
+    document.getElementById('cilia-svg').style.display = 'flex';
+    document.getElementById('current-viz-title').textContent = 'Diagram: Spatial Intelligence';
+    window.CiliAI.currentPlot = null;
+};
+window.showDomainViewer = function(gene) {
+    document.getElementById('cilia-svg').style.display = 'none';
+    document.getElementById('plotly-container').style.display = 'none';
+    document.getElementById('compare-umap-container').style.display = 'none';
+    var domainContainer = document.getElementById('domain-viewer');
+    domainContainer.style.display = 'flex'; domainContainer.innerHTML = '';
+    document.getElementById('current-viz-title').textContent = 'Pfam Domains: ' + gene;
+    var pfamLookup = (window.CiliAI.lookups && window.CiliAI.lookups.pfamByGene) || {};
+    var pfam = pfamLookup[gene.toUpperCase()] || [];
+    if (!pfam.length) {
+        var geneData = window.CiliAI.lookups.geneMap[gene.toUpperCase()];
+        if (geneData && (geneData.PFAM_IDs || geneData.Domain_Descriptions)) {
+            var desc = geneData.Domain_Descriptions || geneData.PFAM_IDs || '';
+            var parts = desc.split(/[;,]/).filter(function(s){ return s.trim().length>0; });
+            if (parts.length > 0) {
+                var domains = parts.map(function(part,i){ return {id:'DOM_'+(i+1),name:part.trim(),start:(i*200)+50,end:(i*200)+150}; });
+                if (!window.CiliAI.lookups.pfamByGene) window.CiliAI.lookups.pfamByGene = {};
+                window.CiliAI.lookups.pfamByGene[gene.toUpperCase()] = domains;
+                window.showDomainViewer(gene); return;
+            }
+        }
+        domainContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#666;">No Pfam domain data available.</div>'; return;
+    }
+    var seqLength = Math.max.apply(null, pfam.map(function(d){ return d.end; }).concat([1000]));
+    var svgWidth = 1000;
+    var scale = function(val){ return (val/seqLength)*(svgWidth-100)+50; };
+    var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox','0 0 '+svgWidth+' 200'); svg.setAttribute('width','100%'); svg.setAttribute('height','100%');
+    var natureColors = ['#E64B35','#4DBBD5','#00A087','#3C5488','#F39B7F','#8491B4','#91D1C2','#DC0000','#7E6148','#B09C85'];
+    var lineY = 100;
+    var line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1','50'); line.setAttribute('y1',lineY); line.setAttribute('x2',svgWidth-50); line.setAttribute('y2',lineY);
+    line.setAttribute('stroke','#333'); line.setAttribute('stroke-width','4'); line.setAttribute('stroke-linecap','round');
+    svg.appendChild(line);
+    pfam.forEach(function(domain,index) {
+        var group = document.createElementNS('http://www.w3.org/2000/svg','g');
+        var xStart=scale(domain.start), xEnd=scale(domain.end), width=Math.max(xEnd-xStart,10);
+        var rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        rect.setAttribute('x',xStart); rect.setAttribute('y',lineY-20); rect.setAttribute('width',width); rect.setAttribute('height','40');
+        rect.setAttribute('rx','6'); rect.setAttribute('fill',natureColors[index%natureColors.length]);
+        rect.setAttribute('stroke','#fff'); rect.setAttribute('stroke-width','1'); rect.setAttribute('opacity','0.9');
+        var title = document.createElementNS('http://www.w3.org/2000/svg','title');
+        title.textContent = (domain.name||domain.id)+' ('+domain.start+'-'+domain.end+')';
+        rect.appendChild(title); group.appendChild(rect);
+        var labelY = (index%2===0) ? 40 : 65;
+        var conn = document.createElementNS('http://www.w3.org/2000/svg','line');
+        conn.setAttribute('x1',xStart+width/2); conn.setAttribute('y1',labelY+5); conn.setAttribute('x2',xStart+width/2); conn.setAttribute('y2',lineY-20);
+        conn.setAttribute('stroke','#ccc'); conn.setAttribute('stroke-width','1'); group.appendChild(conn);
+        var text = document.createElementNS('http://www.w3.org/2000/svg','text');
+        text.setAttribute('x',xStart+width/2); text.setAttribute('y',labelY); text.setAttribute('text-anchor','middle');
+        text.setAttribute('font-size','11'); text.setAttribute('font-weight','600'); text.setAttribute('fill','#2c3e50');
+        text.textContent = domain.name||domain.id; group.appendChild(text); svg.appendChild(group);
+    });
+    domainContainer.appendChild(svg);
+};
+/* ══════════════════════════════════════════════════════════════════════════
+ * showCompareUMAP — N independent UMAP panels, one per gene.
+ *
+ * Strategy: call renderUMAPPlot normally (it draws into #plotly-container).
+ * Poll for the Plotly chart to appear there, then clone its data+layout into
+ * our cell div using Plotly.newPlot. This avoids all showPlot/switchView
+ * conflicts — we never touch the render pipeline, just copy the result.
+ * ════════════════════════════════════════════════════════════════════════*/
+window.showCompareUMAP = function(genes, colorMap) {
+    if (!genes || !genes.length) return;
+    colorMap = colorMap || {};
+    var GENE_COLORS = ['#e63946','#2a9d8f','#e9c46a','#6a4c93','#f77f00','#0077b6'];
+    genes.forEach(function(s,i){ if (!colorMap[s]) colorMap[s] = GENE_COLORS[i % GENE_COLORS.length]; });
+
+    /* Compute panel sizes from the viz-card BEFORE hiding anything */
+    var vizCard = document.querySelector('.viz-card');
+    var vizHdr  = document.querySelector('.viz-header');
+    var totalH  = vizCard ? vizCard.clientHeight : (window.innerHeight - 60);
+    var hdrH    = vizHdr  ? vizHdr.clientHeight  : 50;
+    var totalW  = vizCard ? vizCard.clientWidth  : (window.innerWidth * 0.6);
+    var LEGEND_H = 38, CELL_HDR = 32;
+    var availH  = Math.max(totalH - hdrH - LEGEND_H - 8, 300);
+    var availW  = Math.max(totalW - 8, 400);
+    var panelW  = Math.floor((availW - (genes.length - 1) * 2) / genes.length);
+    var panelH  = Math.max(availH - CELL_HDR - 4, 240);
+
+    /* Build the compare container structure (hidden until we have data) */
+    var outer = document.getElementById('compare-umap-container');
+    if (!outer) return;
+    outer.innerHTML = '';
+    /* Don't show the outer container yet — renderUMAPPlot needs #plotly-container visible */
+
+    /* Legend header */
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'flex-shrink:0;height:'+LEGEND_H+'px;display:flex;align-items:center;'
+        +'padding:0 16px;gap:16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;';
+    genes.forEach(function(sym, i) {
+        var c = colorMap[sym];
+        var it = document.createElement('div');
+        it.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#334155;';
+        it.innerHTML = '<span style="width:11px;height:11px;border-radius:50%;background:'+c+';display:inline-block;"></span>'+sym;
+        hdr.appendChild(it);
+    });
+    var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
+    var dsInf = (window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey]) || {};
+    var badge = document.createElement('span');
+    badge.style.cssText = 'margin-left:auto;font-size:10px;color:#94a3b8;';
+    badge.textContent = (dsInf.icon||'') + ' ' + (dsInf.name || dsKey);
+    hdr.appendChild(badge);
+    outer.appendChild(hdr);
+
+    /* Row of panels */
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-direction:row;flex:1;gap:2px;background:#e2e8f0;overflow:hidden;';
+    outer.appendChild(row);
+
+    /* Build cell divs */
+    var plotDivs = [];
+    genes.forEach(function(sym, i) {
+        var col = colorMap[sym];
+        var panel = document.createElement('div');
+        panel.style.cssText = 'display:flex;flex-direction:column;background:white;'
+            +'width:'+panelW+'px;flex-shrink:0;overflow:hidden;';
+
+        var ph = document.createElement('div');
+        ph.style.cssText = 'height:'+CELL_HDR+'px;display:flex;align-items:center;gap:6px;'
+            +'padding:0 10px;border-bottom:3px solid '+col+';flex-shrink:0;';
+        ph.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:'+col+';display:inline-block;"></span>'
+                     + '<span style="color:'+col+';font-weight:700;font-size:13px;">'+sym+'</span>';
+        var xb = document.createElement('button');
+        xb.textContent = '⤢ Single view';
+        xb.style.cssText = 'margin-left:auto;background:none;border:1px solid #e2e8f0;'
+            +'border-radius:5px;padding:2px 8px;font-size:10px;color:#64748b;cursor:pointer;';
+        xb.addEventListener('click', (function(s){ return function(){
+            if (window.CiliAI) window.CiliAI.activeGeneContext = s;
+            if (window.renderUMAPPlot) window.renderUMAPPlot(s,[s]);
+        };})(sym));
+        ph.appendChild(xb);
+        panel.appendChild(ph);
+
+        var pd = document.createElement('div');
+        pd.style.cssText = 'width:'+panelW+'px;height:'+panelH+'px;flex-shrink:0;';
+        pd.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;'
+            +'color:#94a3b8;font-size:12px;">Loading '+sym+'…</div>';
+        panel.appendChild(pd);
+        row.appendChild(panel);
+        plotDivs.push({ el: pd, gene: sym, color: col });
+    });
+
+    /* ── SEQUENTIAL CLONE RENDERER ──────────────────────────────────────────
+     * For each gene:
+     *   1. Call renderUMAPPlot — it draws into #plotly-container
+     *   2. Poll until window.CiliAI.currentPlot appears (Plotly resolves)
+     *   3. Clone plotData.data + layout into our cell div via Plotly.newPlot
+     *   4. Restore compare view (hide #plotly-container, show #compare-umap-container)
+     *   5. Move to next gene
+     */
+    var SOURCE_ID = 'plotly-container';
+    var rendered  = 0;
+    var _retried  = {};  /* track genes already retried so we don't loop */
+
+    /* Wait for the active dataset to finish loading before rendering.
+     * renderUMAPPlot triggers a dataset load internally — if we poll too
+     * early we time out before any data arrives. Waiting here means the
+     * poll only starts once data is actually available.                  */
+    function waitForDataset(callback) {
+        var dsKey = (window.CiliAI && window.CiliAI.activeDataset) || 'lung';
+        var ds    = window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey];
+        if (ds && ds._loaded) { callback(); return; }
+        /* Dataset is loading — poll until _loaded is set (max 45s) */
+        var w = 0;
+        var t = setInterval(function() {
+            w += 300;
+            var ds2 = window.CiliAI && window.CiliAI.datasets && window.CiliAI.datasets[dsKey];
+            if ((ds2 && ds2._loaded) || w >= 45000) {
+                clearInterval(t);
+                callback();
+            }
+        }, 300);
+    }
+
+    function cloneGene(idx) {
+        if (idx >= plotDivs.length) {
+            showCompareView();
+            return;
+        }
+        var item   = plotDivs[idx];
+        var sym    = item.gene;
+        var col    = item.color;
+        var target = item.el;
+
+        /* Show loading state */
+        target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+            +'height:100%;color:#94a3b8;font-size:12px;">Loading '+sym+'…</div>';
+
+        /* Make #plotly-container visible so renderUMAPPlot can draw into it */
+        ['cilia-svg','domain-viewer','compare-umap-container'].forEach(function(id){
+            var el = document.getElementById(id); if (el) el.style.display = 'none';
+        });
+        var src = document.getElementById(SOURCE_ID);
+        if (src) { src.style.display = 'block'; src.innerHTML = ''; }
+        if (window.CiliAI) { window.CiliAI.currentPlot = null; window.CiliAI.activeGeneContext = sym; }
+
+        if (!window.renderUMAPPlot) {
+            target.innerHTML = '<div style="padding:20px;color:#94a3b8;font-size:12px;">renderUMAPPlot not available</div>';
+            cloneGene(idx + 1);
+            return;
+        }
+
+        /* Trigger the render — this starts the dataset load if not cached */
+        window.renderUMAPPlot(sym, [sym]);
+
+        /* Poll for Plotly to finish.
+         * First gene: up to 45s (triggers cold dataset download ~10-30s).
+         * Subsequent genes: up to 20s (dataset already cached).           */
+        var isFirstGene = (idx === 0 && !_retried[sym]);
+        var maxWait = isFirstGene ? 45000 : 20000;
+        var waited  = 0;
+
+        var poll = setInterval(function() {
+            waited += 200;
+            var srcEl   = document.getElementById(SOURCE_ID);
+            var hasPlot = !!(srcEl && srcEl._fullData && srcEl._fullData.length > 0)
+                       || !!(srcEl && srcEl.data && srcEl.data.length > 0)
+                       || !!(window.CiliAI && window.CiliAI.currentPlot);
+
+            if (!hasPlot && waited >= maxWait) {
+                clearInterval(poll);
+                console.warn('[CiliAI Compare] Timeout waiting for '+sym+' UMAP after '+maxWait+'ms');
+
+                /* If we haven't retried this gene yet, push it to the end of the queue
+                 * so it gets another chance after remaining genes warm the cache.     */
+                if (!_retried[sym]) {
+                    _retried[sym] = true;
+                    plotDivs.push(item);  /* re-queue at end */
+                    target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+                        +'height:100%;flex-direction:column;gap:6px;color:#94a3b8;font-size:12px;">'
+                        +'<span>'+sym+' — retrying after others…</span></div>';
+                } else {
+                    target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+                        +'height:100%;color:#94a3b8;font-size:12px;">'+sym+' — no expression data in this dataset</div>';
+                }
+                cloneGene(idx + 1);
+                return;
+            }
+
+            if (hasPlot) {
+                clearInterval(poll);
+
+                /* Extract the Plotly traces from the rendered element */
+                var srcEl2   = document.getElementById(SOURCE_ID);
+                var traces   = [];
+                var srcLayout = {};
+                try {
+                    var plotEl = (srcEl2 && srcEl2.data && srcEl2.data.length) ? srcEl2
+                               : (window.CiliAI && window.CiliAI.currentPlot) || srcEl2;
+                    if (plotEl && plotEl.data) traces = JSON.parse(JSON.stringify(plotEl.data));
+                    if (plotEl && plotEl.layout) srcLayout = plotEl.layout;
+                } catch(e) { console.warn('[CiliAI Compare] Clone parse error:', e); }
+
+                if (!traces.length) {
+                    target.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+                        +'height:100%;color:#94a3b8;font-size:12px;">'+sym+' — empty plot</div>';
+                    cloneGene(idx + 1);
+                    return;
+                }
+
+                var layout = {
+                    width:  panelW,
+                    height: panelH,
+                    margin: {l:20, r:20, t:28, b:20, pad:2},
+                    paper_bgcolor: 'white',
+                    plot_bgcolor:  srcLayout.plot_bgcolor || '#f8fafc',
+                    autosize: false,
+                    showlegend: true,
+                    legend: {x:1.01, y:1, xanchor:'left', font:{size:9}},
+                    font: {size:9},
+                    xaxis: Object.assign({}, srcLayout.xaxis || {}, {title:''}),
+                    yaxis: Object.assign({}, srcLayout.yaxis || {}, {title:''}),
+                    annotations: [{
+                        text: sym,
+                        xref:'paper', yref:'paper', x:0.02, y:0.98,
+                        xanchor:'left', yanchor:'top', showarrow:false,
+                        font:{size:12, color:col, family:'Inter,sans-serif'},
+                        bgcolor:'rgba(255,255,255,0.85)', borderpad:3
+                    }]
+                };
+
+                Plotly.newPlot(target, traces, layout, {
+                    responsive:false, displayModeBar:false, staticPlot:false
+                }).then(function() {
+                    console.log('[CiliAI Compare] Panel rendered: '+sym);
+                    rendered++;
+                    setTimeout(function(){ cloneGene(idx + 1); }, 200);
+                }).catch(function(e) {
+                    console.warn('[CiliAI Compare] Plotly error for '+sym+':', e);
+                    cloneGene(idx + 1);
+                });
+            }
+        }, 200);
+    }
+
+    function showCompareView() {
+        /* Hide plotly-container, show the compare panels */
+        ['cilia-svg','plotly-container','domain-viewer'].forEach(function(id){
+            var el = document.getElementById(id); if (el) el.style.display = 'none';
+        });
+        outer.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;'
+            +'width:100%;height:100%;background:white;overflow:hidden;';
+        document.querySelectorAll('.view-tab').forEach(function(t){ t.classList.remove('active'); });
+        var tp = document.getElementById('tab-plot');
+        if (tp) tp.classList.add('active');
+        var te = document.getElementById('current-viz-title');
+        if (te) te.textContent = 'Expression: '+genes.join(' vs ');
+    }
+
+    /* Trigger the dataset load immediately by calling renderUMAPPlot for gene 0.
+     * Then wait for the dataset to be fully loaded before starting the clone sequence.
+     * This means gene 0 doesn't time out — we wait as long as needed for the download. */
+    if (window.renderUMAPPlot && plotDivs.length) {
+        var firstSym = plotDivs[0].gene;
+        /* Show #plotly-container so renderUMAPPlot can work */
+        ['cilia-svg','domain-viewer','compare-umap-container'].forEach(function(id){
+            var el = document.getElementById(id); if (el) el.style.display = 'none';
+        });
+        var srcEl0 = document.getElementById(SOURCE_ID);
+        if (srcEl0) { srcEl0.style.display = 'block'; srcEl0.innerHTML = ''; }
+        if (window.CiliAI) { window.CiliAI.currentPlot = null; window.CiliAI.activeGeneContext = firstSym; }
+        window.renderUMAPPlot(firstSym, [firstSym]);  /* triggers dataset download */
+    }
+
+    /* Now wait for dataset to be _loaded, then start the clone sequence */
+    waitForDataset(function() {
+        console.log('[CiliAI Compare] Dataset ready — starting compare render for: '+genes.join(', '));
+        /* Reset plotly-container for a clean render */
+        if (window.CiliAI) window.CiliAI.currentPlot = null;
+        var srcEl0 = document.getElementById(SOURCE_ID);
+        if (srcEl0) srcEl0.innerHTML = '';
+        cloneGene(0);  /* re-renders gene 0 cleanly, then continues with 1, 2, ... */
+    });
+};
+
+window.downloadCurrentVisualization = function() {
+    if (window.CiliAI.currentPlot) {
+        Plotly.downloadImage(window.CiliAI.currentPlot,{format:'png',filename:'ciliai-umap-plot',width:1200,height:800,scale:2});
+    } else {
+        var svgEl = document.getElementById('domain-viewer').style.display!=='none'
+            ? document.getElementById('domain-viewer').querySelector('svg')
+            : document.getElementById('cilia-diagram');
+        if (svgEl) {
+            var blob = new Blob([new XMLSerializer().serializeToString(svgEl)],{type:'image/svg+xml'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a'); a.href=url; a.download='ciliai-diagram.svg';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+    }
+};
+window.downloadJournalSVG = window.downloadCurrentVisualization;
+
+window.parseTsvData = function(tsvText) {
+    if (!tsvText||typeof tsvText!=='string') return [];
+    var lines = tsvText.trim().split(/\r?\n/);
+    if (lines.length<2) return [];
+    var headers = lines[0].split('\t').map(function(h){ return h.trim(); });
+    return lines.slice(1).map(function(line) {
+        var values=line.split('\t'), row={};
+        headers.forEach(function(h,i){ row[h]=values[i]&&values[i].trim()||''; }); return row;
+    });
+};
+
+
+window.switchView = function(viewType, forceGene) {
+    ['diagram','plot','domain'].forEach(function(v){
+        var t = document.getElementById('tab-'+v); if (t) t.classList.remove('active');
+    });
+    // Resolve gene: explicit arg → search box → activeGeneContext → silent no-op
+    var gene = forceGene
+        || (document.getElementById('geneSearch') && document.getElementById('geneSearch').value.trim())
+        || (window.CiliAI && window.CiliAI.activeGeneContext)
+        || '';
+    if (viewType === 'diagram') {
+        var t = document.getElementById('tab-diagram'); if (t) t.classList.add('active');
+        window.showDiagram();                              // diagram never needs a gene
+    } else if (viewType === 'plot') {
+        var t = document.getElementById('tab-plot'); if (t) t.classList.add('active');
+        if (!gene) return;                                 // silent no-op, no alert
+        if (window.renderUMAPPlot) window.renderUMAPPlot(gene, [gene]);
+    } else if (viewType === 'domain') {
+        var t = document.getElementById('tab-domain'); if (t) t.classList.add('active');
+        if (!gene) return;                                 // silent no-op, no alert
+        if (window.showDomainViewer) window.showDomainViewer(gene);
+    }
+};
+window.zoomIn = function() { var v=document.getElementById('viewport-group'); if(!v)return; var m=v.style.transform.match(/scale\(([\d.]+)\)/); var s=(m?parseFloat(m[1]):1)*1.2; v.style.transition='transform 0.3s ease'; v.style.transform=(v.style.transform||'').replace(/scale\([\d.]+\)/,'scale('+s+')')||'scale('+s+')'; };
+window.zoomOut = function() { var v=document.getElementById('viewport-group'); if(!v)return; var m=v.style.transform.match(/scale\(([\d.]+)\)/); var s=Math.max(0.5,(m?parseFloat(m[1]):1)*0.8); v.style.transition='transform 0.3s ease'; v.style.transform=(v.style.transform||'').replace(/scale\([\d.]+\)/,'scale('+s+')')||'scale('+s+')'; };
+window.toggleLabels = function(checkbox) { var c=document.getElementById('cilia-svg'); if(checkbox.checked)c.classList.add('labels-visible'); else c.classList.remove('labels-visible'); };
+window.toggleFullscreen = function() { var c=document.querySelector('.viz-card'); if(!document.fullscreenElement)c.requestFullscreen().catch(function(e){console.log(e);}); else document.exitFullscreen(); };
+
+window.handleUserSend = function() {
+    var input = document.getElementById('chatInput');
+    var query = input && input.value.trim();
+    if (!query) return;
+    input.value = '';
+    if (input.tagName === 'TEXTAREA') { input.style.height = 'auto'; }
+    hideWelcome();
+    if (window.CiliAI && window.CiliAI.Router && window.CiliAI.Router.dispatchAction) {
+        window.CiliAI.Router.dispatchAction({source:'manual',intent:'raw',text:query,echo:true});
+    } else {
+        window.addChatMessage(query, true);
+        window.handleAIQuery && window.handleAIQuery(query);
+    }
+};
+window.sendQuery = function(query) {
+    if (!query) return;
+    hideWelcome();
+    if (window.CiliAI && window.CiliAI.Router && window.CiliAI.Router.dispatchAction) {
+        window.CiliAI.Router.dispatchAction({source:'preset',intent:'raw',text:query,echo:true});
+    } else {
+        window.addChatMessage(query, true);
+        window.handleAIQuery && window.handleAIQuery(query);
+    }
+};
+/* Live search — shows gene + disease + functional category suggestions */
+window.liveSearch = function(q) {
+    var box = document.getElementById('search-suggestions');
+    if (!box) return;
+    q = (q||'').trim();
+    if (q.length < 2) { box.style.display='none'; return; }
+    var results = [];
+    var qUp = q.toUpperCase();
+    var qLo = q.toLowerCase();
+
+    /* 1. Gene symbol matches from masterData */
+    if (window.CiliAI && window.CiliAI.masterData) {
+        window.CiliAI.masterData.forEach(function(g) {
+            if (!g.Gene) return;
+            var sym = g.Gene.toUpperCase();
+            if (sym.startsWith(qUp) || sym.includes(qUp)) {
+                results.push({ type:'gene', label: g.Gene,
+                    sub: g['Gene.Description'] ? g['Gene.Description'].substring(0,50) : '',
+                    action: function(s){ window.searchGene(s); } });
+            }
+        });
+    }
+
+    /* 2. Disease matches from ciliopathyData */
+    if (window.CiliAI && window.CiliAI.ciliopathyData) {
+        var seen = new Set();
+        Object.values(window.CiliAI.ciliopathyData).forEach(function(rec) {
+            (rec.diseases||[]).forEach(function(d) {
+                if (!seen.has(d) && d.toLowerCase().includes(qLo)) {
+                    seen.add(d);
+                    var gc = Object.values(window.CiliAI.ciliopathyData)
+                        .filter(function(r){ return (r.diseases||[]).includes(d) && !r.candidate; }).length;
+                    results.push({ type:'disease', label: d, sub: gc + ' genes',
+                        action: function(name){ window.searchDisease(name); } });
+                }
+            });
+        });
+    }
+
+    /* 3. Functional category matches from ciliarygeneData */
+    if (window.CiliAI && window.CiliAI.ciliarygeneData) {
+        var catSeen = new Set();
+        Object.values(window.CiliAI.ciliarygeneData).forEach(function(rec) {
+            (rec.functional_category||[]).forEach(function(cat) {
+                if (!catSeen.has(cat) && cat.toLowerCase().includes(qLo)) {
+                    catSeen.add(cat);
+                    results.push({ type:'function', label: cat, sub: 'Functional category',
+                        action: function(c){ window.searchFunction(c); } });
+                }
+            });
+        });
+    }
+
+    results = results.slice(0,12);
+    if (!results.length) { box.style.display='none'; return; }
+
+    /* v5.4 — render suggestions in the same style as ciliahub.html's
+     * autocomplete: rich rows with sub-info (synonyms, ciliopathies, screen
+     * count) below the gene name. For gene-type suggestions, the type pill
+     * on the right is replaced by the evidence-tier pill (Gold gradient or
+     * Cilia-Assoc gradient). Disease/function suggestions keep the simple
+     * blue type pill. */
+    var tierApi = (window.CiliaHub && window.CiliaHub.tier) ? window.CiliaHub.tier : null;
+    var TYPE_LABELS = { gene:'Gene', disease:'Disease', function:'Function' };
+
+    box.innerHTML = results.map(function(r, i) {
+        /* Right-side pill: tier for genes, type label for others */
+        var rightPill;
+        if (r.type === 'gene' && tierApi) {
+            var tierName = tierApi.of(r.label);
+            if (tierName === 'Gold Standard Ciliary Genes') {
+                rightPill = '<span style="font-size:0.7rem;background:linear-gradient(135deg,#b45309,#d4a017);color:#fff;padding:3px 9px;border-radius:10px;font-weight:700;letter-spacing:.2px;white-space:nowrap;" title="Gold Standard Ciliary Genes">Gold</span>';
+            } else if (tierName === 'Cilia-Associated Genes') {
+                rightPill = '<span style="font-size:0.7rem;background:linear-gradient(135deg,#185FA5,#378ADD);color:#fff;padding:3px 9px;border-radius:10px;font-weight:700;letter-spacing:.2px;white-space:nowrap;" title="Cilia-Associated Genes">Cilia-Assoc.</span>';
+            } else {
+                rightPill = '<span style="font-size:0.7rem;background:#e3f2fd;color:#1976d2;padding:2px 6px;border-radius:10px;white-space:nowrap;">Gene</span>';
+            }
+        } else {
+            rightPill = '<span style="font-size:0.7rem;background:#e3f2fd;color:#1976d2;padding:2px 6px;border-radius:10px;white-space:nowrap;">' + (TYPE_LABELS[r.type] || r.type) + '</span>';
+        }
+
+        /* Sub-info: pull from masterData record if it's a gene */
+        var subSynonyms = '', subCiliopathies = '', subScreens = '';
+        if (r.type === 'gene' && window.CiliAI && window.CiliAI.lookups && window.CiliAI.lookups.geneMap) {
+            var rec = window.CiliAI.lookups.geneMap[String(r.label).toUpperCase()];
+            if (rec) {
+                var syns = rec.Synonyms;
+                if (Array.isArray(syns)) syns = syns.join(', ');
+                if (typeof syns === 'string' && syns.trim() && syns !== r.label) {
+                    subSynonyms = '<div style="font-size:0.85rem;color:#666;margin-top:0.25rem;">Synonyms: ' + syns + '</div>';
+                }
+                var cilios = rec.Ciliopathies;
+                if (Array.isArray(cilios) && cilios.length) {
+                    subCiliopathies = '<div style="font-size:0.85rem;color:#c2185b;margin-top:0.25rem;">Ciliopathies: ' + cilios.slice(0,3).join('; ') + (cilios.length>3?'…':'') + '</div>';
+                }
+                var screens = rec.screens;
+                if (Array.isArray(screens) && screens.length) {
+                    subScreens = '<div style="font-size:0.8rem;color:#1976d2;margin-top:0.25rem;">' + screens.length + ' screen(s)</div>';
+                }
+            }
+        } else if (r.sub) {
+            subSynonyms = '<div style="font-size:0.85rem;color:#666;margin-top:0.25rem;">' + r.sub + '</div>';
+        }
+
+        return '<div class="suggestion-item" data-idx="' + i + '" style="padding:10px 15px;cursor:pointer;border-bottom:1px solid #f0f0f0;transition:background 0.2s;" '+
+               'onmousedown="window._searchSuggestionClick(' + i + ')" '+
+               'onmouseover="this.style.background=&quot;#f8fafc&quot;" onmouseout="this.style.background=&quot;&quot;">' +
+                 '<div style="font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+                   '<span>' + r.label + '</span>' +
+                   rightPill +
+                 '</div>' +
+                 subSynonyms + subCiliopathies + subScreens +
+               '</div>';
+    }).join('');
+    window._searchResults = results;
+    box.style.display = 'block';
+};
+
+window._searchSuggestionClick = function(i) {
+    var r = (window._searchResults||[])[i];
+    if (!r) return;
+    document.getElementById('geneSearch').value = r.label;
+    document.getElementById('search-suggestions').style.display='none';
+    r.action(r.label);
+};
+
+window.searchDisease = function(disease) {
+    if (window.CiliAI && window.CiliAI.Router) {
+        window.CiliAI.Router.dispatchAction({
+            source:'search', intent:'disease_genes',
+            disease: disease, echo:true
+        });
+    }
+};
+
+window.searchFunction = function(func) {
+    if (window.CiliAI && window.CiliAI.Router) {
+        window.CiliAI.Router.dispatchAction({
+            source:'search', intent:'functional_category',
+            category: func, echo:true
+        });
+    }
+};
+
+/* Close suggestions on outside click */
+document.addEventListener('click', function(e) {
+    var box = document.getElementById('search-suggestions');
+    if (box && !box.contains(e.target) && e.target.id !== 'geneSearch') {
+        box.style.display = 'none';
+    }
+});
+
+window.searchGene = function(geneArg) {
+    var gene = (geneArg || (document.getElementById('geneSearch') && document.getElementById('geneSearch').value) || '').trim().toUpperCase();
+    document.getElementById('search-suggestions').style.display='none';
+    if (!gene) return;
+    if (window.CiliAI) window.CiliAI.activeGeneContext = gene;
+    var _cgInp = document.getElementById('geneSearch');
+    if (_cgInp && !_cgInp.value.trim()) _cgInp.value = gene;
+    if (window.CiliAI && window.CiliAI.Router && window.CiliAI.Router.dispatchAction) {
+        window.CiliAI.Router.dispatchAction({source:'search', intent:'gene_overview', gene:gene, echo:true});
+    } else {
+        window.addChatMessage('What is '+gene+'?', true);
+        window.handleAIQuery && window.handleAIQuery('What is '+gene+'?');
+    }
+};
+
+window.calculateAndDisplayStatistics = function() {
+    /* CILIAI_STATS_LOOKUP_FIX: counts derived directly from the master's
+     * authoritative lookups (diseaseToClassification + byClassification).
+     * Secondary diseases — and any future class whose name contains
+     * "secondary" — are excluded from both the disease and gene totals. */
+    if (!window.CiliAI || !window.CiliAI.masterData || !window.CiliAI.masterData.length) return;
+
+    var L     = (window.CiliAI && window.CiliAI.lookups) || {};
+    var d2c   = L.diseaseToClassification || {};
+    var byCls = L.byClassification || {};
+    var isSecondary = function(cls){ return /secondary/i.test(String(cls || '')); };
+
+    /* Confirmed ciliopathy DISEASES: every classified disease except Secondary. */
+    var diseaseCount = 0;
+    Object.keys(d2c).forEach(function(dis){ if (!isSecondary(d2c[dis])) diseaseCount++; });
+
+    /* Confirmed ciliopathy GENES: union across all non-secondary classes, so a
+     * secondary-only gene is dropped while a multi-class gene still counts once. */
+    var ciliopathyGenes = new Set();
+    Object.keys(byCls).forEach(function(cls){
+        if (isSecondary(cls)) return;
+        (byCls[cls] || []).forEach(function(sym){ if (sym) ciliopathyGenes.add(sym); });
+    });
+
+    var ciliaryGeneCount = (window.CiliAI.meta && window.CiliAI.meta.total_genes) || window.CiliAI.masterData.length;
+
+    var eg = document.getElementById('stat-genes'),
+        ed = document.getElementById('stat-ciliopathys'),
+        ec = document.getElementById('stat-ciliopathy-genes');
+    if (eg) eg.textContent = ciliaryGeneCount.toLocaleString();
+    if (ed) ed.textContent = diseaseCount.toLocaleString();
+    if (ec) ec.textContent = ciliopathyGenes.size.toLocaleString();
+
+    /* Refresh the "Database update" banner from master.meta (unchanged). */
+    try { if (window.CiliaHub && window.CiliaHub.refreshUpdateBanner) window.CiliaHub.refreshUpdateBanner(); } catch(e) { console.warn('[banner]', e); }
+};
+
+
+window.initCiliAI = async function() {
+    if (window.updateStatus) window.updateStatus('Syncing Merged Database...', 'loading');
+    if (window.generateAndInjectSVG) window.generateAndInjectSVG();
+
+    try {
+        // Load everything from the single source of truth via data.js
+        const loaded = await window.loadCiliAIData();
+
+        if (loaded && window.CiliAI && window.CiliAI.ready) {
+            // Map merged data to legacy internal variables for UI compatibility
+            window.CiliAI.ciliarygeneData = window.CiliAI.lookups.geneMap;
+            window.CiliAI.ciliopathyData = window.CiliAI.lookups.byCiliopathy;
+            
+            // Recalculate stats using the newly merged data
+            if (window.calculateAndDisplayStatistics) {
+                window.calculateAndDisplayStatistics();
+            }
+
+            const count = window.CiliAI.masterData.length;
+            if (window.updateStatus) {
+                window.updateStatus('Ready', 'ready');
+            }
+            console.log('[CiliaHub] System initialized with Merged Master.');
+
+            /* v5.4: handle URL params for cross-page navigation. When a user
+             * is redirected here from ciliahub.html or plots.html (e.g. they
+             * clicked a tissue dot or "View Phylogenetic Heatmap"), the URL
+             * carries ?gene=X with optional &tissue=Y or &view=phylogenetics.
+             * Dispatch to the appropriate handler so the user lands on the
+             * exact view they wanted. */
+            try {
+                var params = new URLSearchParams(window.location.search);
+                var paramGene = params.get('gene');
+                if (paramGene) {
+                    paramGene = paramGene.trim().toUpperCase();
+                    setTimeout(function() {
+                        var view = params.get('view');
+                        var tissue = params.get('tissue');
+                        if (view === 'phylogenetics' && window.CG_PhyloHeatmap) {
+                            if (window.DEFAULT_PHYLO_GENES && window.DEFAULT_PHYLO_GENES.indexOf(paramGene) === -1) {
+                                window.DEFAULT_PHYLO_GENES = [paramGene].concat(window.DEFAULT_PHYLO_GENES);
+                            }
+                            window.CG_PhyloHeatmap.open();
+                        } else if (tissue && window.renderUMAPPlot) {
+                            window.CiliAI.activeGeneContext = paramGene;
+                            window.CiliAI.activeDataset = tissue;
+                            if (window.switchView) window.switchView('plot', paramGene);
+                            window.renderUMAPPlot(paramGene, [paramGene]);
+                        } else {
+                            /* Default: open the gene card in the left panel */
+                            if (window.searchGene) window.searchGene(paramGene);
+                            else if (window.displayFullGeneInfo) window.displayFullGeneInfo(paramGene);
+                        }
+                    }, 600);
+                }
+            } catch (e) {
+                console.warn('[CiliaHub] URL param dispatch failed:', e);
+            }
+        } else {
+            throw new Error("Data layer failed to initialize.");
+        }
+    } catch (e) {
+        console.error('[CiliaHub] Initialization Error:', e);
+        if (window.updateStatus) window.updateStatus('Load failed', 'error');
+        window.addChatMessage('⚠️ Failed to load data. Please refresh the page.', false);
+    }
+};
+
+/* CiliaHub patch: gene-card opens from table always set activeGeneContext */
+(function() {
+    var _t = 0;
+    function _patch() {
+        _t++;
+        if (window.displayFullGeneInfo && !window.displayFullGeneInfo.__cgPatched) {
+            var _orig = window.displayFullGeneInfo;
+            window.displayFullGeneInfo = function(gene) {
+                if (gene && window.CiliAI) {
+                    var sym = String(gene).trim().toUpperCase();
+                    window.CiliAI.activeGeneContext = sym;
+                    var el = document.getElementById('geneSearch');
+                    if (el && !el.value.trim()) el.value = sym;
+                }
+                return _orig.apply(this, arguments);
+            };
+            window.displayFullGeneInfo.__cgPatched = true;
+        } else if (_t < 25) {
+            setTimeout(_patch, 300);
+        }
+    }
+    _patch();
+})();
+
+window.initCiliAI();
+</script>
+<script>window.DEFAULT_PHYLO_GENES=["ZC2HC1A","CEP41","BBS1","BBS2","BBS5","ZNF474","IFT81","BBS7"];</script>
+<script src="/js/phylo-heatmap.js"></script>
+
+<script>
+/* Gene of the Day — deterministic daily selection from quality-filtered pool.
+ * Runs once master data is loaded; picks today's gene by UTC date hash. */
+(function() {
+    'use strict';
+
+    function todaySeed() {
+        var now = new Date();
+        var y = now.getUTCFullYear();
+        var m = String(now.getUTCMonth() + 1).padStart(2, '0');
+        var d = String(now.getUTCDate()).padStart(2, '0');
+        var s = y + '-' + m + '-' + d;
+        /* Simple deterministic hash: djb2 */
+        var h = 5381;
+        for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+        return h;
+    }
+
+    function asArray(v) {
+        if (!v) return [];
+        if (Array.isArray(v)) return v;
+        if (typeof v === 'string') {
+            return v.split(/[;,|]/).map(function(s){ return s.trim(); }).filter(Boolean);
+        }
+        return [];
+    }
+
+    function isQualityGene(rec) {
+        var loc = rec.Localization || rec.localization;
+        var cil = rec.Ciliopathies || rec.ciliopathies;
+        var sum = rec.Summary || rec.functional_summary || '';
+        var locArr = asArray(loc);
+        var cilArr = asArray(cil);
+        if (locArr.length === 0) return false;
+        if (cilArr.length === 0) return false;
+        if (typeof sum !== 'string' || sum.trim().length < 30) return false;
+        return true;
+    }
+
+    function buildPool() {
+        var data = (window.CiliAI && window.CiliAI.masterData) || [];
+        if (!Array.isArray(data) || data.length === 0) return [];
+        var pool = [];
+        for (var i = 0; i < data.length; i++) {
+            var r = data[i];
+            if (!r || !r.Gene) continue;
+            if (isQualityGene(r)) pool.push(r);
+        }
+        /* Sort by gene symbol so the daily index is stable across page loads */
+        pool.sort(function(a, b) { return String(a.Gene).localeCompare(String(b.Gene)); });
+        return pool;
+    }
+
+    function classToPillClass(cls) {
+        var s = (cls || '').toLowerCase();
+        if (s.indexOf('primary') !== -1)   return 'primary';
+        if (s.indexOf('motile') !== -1)    return 'motile';
+        if (s.indexOf('idio') !== -1)      return 'idio';
+        if (s.indexOf('secondary') !== -1) return 'secondary';
+        return '';
+    }
+
+    function render(rec) {
+        var card = document.getElementById('geneOfDayCard');
+        if (!card || !rec) return;
+
+        var locArr = asArray(rec.Localization || rec.localization);
+        var locStr = locArr.slice(0, 4).join(', ');
+
+        var cilArr = asArray(rec.Ciliopathies || rec.ciliopathies);
+        var clsArr = asArray(rec.ciliopathy_classification);
+        var cilStr = cilArr.slice(0, 2).join(', ');
+
+        document.getElementById('godName').textContent = rec.Gene;
+        document.getElementById('godLoc').textContent  = locStr || '—';
+
+        var statusEl = document.getElementById('godStatus');
+        statusEl.textContent = '';
+        var statusText = document.createTextNode(cilStr || 'N/A');
+        statusEl.appendChild(statusText);
+        if (clsArr.length > 0) {
+            var pill = document.createElement('span');
+            pill.className = 'gene-of-day-pill ' + classToPillClass(clsArr[0]);
+            pill.textContent = clsArr[0];
+            statusEl.appendChild(pill);
+        }
+
+        var summaryRow = document.getElementById('godSummaryRow');
+        var sum = rec.Summary || rec.functional_summary || '';
+        if (typeof sum === 'string' && sum.trim()) {
+            var trimmed = sum.trim();
+            if (trimmed.length > 180) trimmed = trimmed.slice(0, 177) + '…';
+            summaryRow.textContent = trimmed;
+            summaryRow.style.display = '';
+        } else {
+            summaryRow.style.display = 'none';
+        }
+
+        var btn = document.getElementById('godAction');
+        btn.onclick = function() {
+            if (typeof window.searchGene === 'function') {
+                window.searchGene(rec.Gene);
+            } else if (typeof window.addChatMessage === 'function') {
+                window.addChatMessage('What is ' + rec.Gene + '?', true);
+                if (typeof window.handleAIQuery === 'function') {
+                    window.handleAIQuery('What is ' + rec.Gene + '?');
+                }
+            }
+        };
+
+        card.hidden = false;
+    }
+
+    function init() {
+        var pool = buildPool();
+        if (pool.length === 0) return false;
+        var idx = todaySeed() % pool.length;
+        render(pool[idx]);
+        console.log('[GeneOfDay] pool=' + pool.length + ' picked=' + pool[idx].Gene);
+        return true;
+    }
+
+    /* Wait for master data to load. Try every 500ms for up to ~30s. */
+    var attempts = 0;
+    function tryInit() {
+        if (init()) return;
+        if (++attempts < 60) setTimeout(tryInit, 500);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryInit);
+    } else {
+        tryInit();
+    }
+})();
+</script>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────────
+ * FIX: gene search → full gene card (parity with ciliahub.html)
+ *
+ * Previously, searching/selecting a gene on this page routed the query to
+ * the CiliAI assistant ("What is GENE?"), which returned an incomplete
+ * view. This override renders the COMPLETE gene card via the shared
+ * GeneCard API (window.CiliAI.GeneCard.renderInLeftPanel → #cilia-svg) —
+ * the exact renderer ciliahub.html uses — so every section displays:
+ * localization, ciliopathies, functional effects, screens, phylogenetics,
+ * scRNA, domains, complexes, STRING, CilioGenics, publications.
+ * Non-gene queries (disease / function / free text) fall through to the
+ * original assistant behaviour unchanged.
+ * ──────────────────────────────────────────────────────────────────── */
+(function () {
+    var _assistantSearchGene = window.searchGene;   // preserve original (AI) path
+
+    function knownGene(sym) {
+        var map = window.CiliAI && window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
+        return (map && map[sym]) ? sym : null;
+    }
+
+    window.searchGene = function (geneArg) {
+        var inputEl = document.getElementById('geneSearch');
+        var raw = geneArg || (inputEl && inputEl.value) || '';
+        var sym = String(raw).trim().toUpperCase();
+        var box = document.getElementById('search-suggestions');
+        if (box) box.style.display = 'none';
+        if (!sym) return;
+
+        var GC = window.CiliAI && window.CiliAI.GeneCard;
+        if (knownGene(sym) && GC && typeof GC.renderInLeftPanel === 'function') {
+            if (window.CiliAI) window.CiliAI.activeGeneContext = sym;
+            if (inputEl) inputEl.value = sym;
+            /* Highlight the panel tab that hosts #cilia-svg (no diagram re-inject) */
+            ['diagram', 'plot', 'domain'].forEach(function (v) {
+                var t = document.getElementById('tab-' + v); if (t) t.classList.remove('active');
+            });
+            var dt = document.getElementById('tab-diagram'); if (dt) dt.classList.add('active');
+            try {
+                GC.renderInLeftPanel(sym);   // full card into #cilia-svg
+            } catch (e) {
+                console.warn('[searchGene] card render failed, falling back to assistant:', e);
+                if (typeof _assistantSearchGene === 'function') _assistantSearchGene.call(window, sym);
+            }
+            return;
+        }
+        /* Not a known gene → original assistant behaviour */
+        if (typeof _assistantSearchGene === 'function') return _assistantSearchGene.apply(this, arguments);
+    };
+})();
+</script>
+
+<script>
+/* Hybrid workspace canvas controller. Reuses the existing #viz-stage panel and
+   runtime — no DOM replacement, no routing changes. Heavy visuals auto-expand
+   the canvas by wrapping the existing switchView / renderUMAPPlot. */
+(function (win, doc) {
+    'use strict';
+    var STORAGE_KEY = 'ciliai_canvas_state';
+    var ready = false;  // gate auto-expand until the saved preference has been applied
+    function appEl() { return doc.querySelector('.app-container'); }
+    function save(v) { try { localStorage.setItem(STORAGE_KEY, v); } catch (e) {} }
+
+    var Controller = {
+        // persist === false → transient (leave the saved preference untouched)
+        collapse: function (persist) {
+            var a = appEl(); if (!a) return;
+            a.classList.add('canvas-collapsed');
+            if (persist !== false) save('collapsed');
+        },
+        expand: function (persist) {
+            var a = appEl(); if (!a) return;
+            var wasCollapsed = a.classList.contains('canvas-collapsed');
+            if (wasCollapsed) a.classList.remove('canvas-collapsed');
+            if (persist !== false) save('expanded');
+            // let Plotly / SVG re-fit once the column has width again
+            if (wasCollapsed) setTimeout(function () { try { win.dispatchEvent(new Event('resize')); } catch (e) {} }, 340);
+        },
+        toggle: function () {
+            var a = appEl();
+            if (a && a.classList.contains('canvas-collapsed')) this.expand(); else this.collapse();
+        },
+        // system-triggered open from a heavy visual: transient, and never before init
+        autoExpand: function () { if (ready) this.expand(false); },
+        initPreference: function () {
+            // Never collapse inside the embed popup — it shows only the plot panel.
+            if (doc.documentElement.classList.contains('embed-mode')) { ready = true; return; }
+            var saved = null;
+            try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+            if (saved === 'collapsed') this.collapse(false);   // honor prior choice; default = expanded
+            ready = true;
+        }
+    };
+    win.CiliaCanvasController = Controller;
+
+    // Heavy visuals auto-open the canvas — transient only, so they never overwrite the
+    // user's saved preference. Skip entirely in embed mode.
+    if (!doc.documentElement.classList.contains('embed-mode')) {
+        var sv = win.switchView;
+        if (typeof sv === 'function') {
+            win.switchView = function () { var r = sv.apply(this, arguments); Controller.autoExpand(); return r; };
+        }
+        var ru = win.renderUMAPPlot;
+        if (typeof ru === 'function') {
+            win.renderUMAPPlot = function () { Controller.autoExpand(); return ru.apply(this, arguments); };
+        }
+    }
+
+    // Apply the saved layout preference once the DOM is stable (default: expanded).
+    if (doc.readyState === 'loading') {
+        doc.addEventListener('DOMContentLoaded', function () { Controller.initPreference(); });
+    } else {
+        Controller.initPreference();
+    }
+})(window, document);
+</script>
+<script>
+/* Typing indicator for the chat. Watches the #messages list directly (no runtime
+   hooks): a user bubble appearing → show the animated dots; the next assistant
+   bubble (or any rendered visual) → remove them. Reuses the existing .thinking-bubble
+   CSS. Safety timeout guarantees the dots never hang. Disabled in embed mode. */
+(function (win, doc) {
+    'use strict';
+    if (doc.documentElement.classList.contains('embed-mode')) return;
+    var TID = 'ciliai-typing-indicator';
+    var safety = null;
+
+    function show() {
+        var c = doc.getElementById('messages');
+        if (!c || doc.getElementById(TID)) return;
+        var node = doc.createElement('div');
+        node.className = 'ciliai-message assistant';
+        node.id = TID;
+        node.setAttribute('aria-label', 'CiliAI is thinking');
+        node.innerHTML = '<div class="thinking-bubble"><span class="thinking-dot"></span>' +
+                         '<span class="thinking-dot"></span><span class="thinking-dot"></span></div>';
+        c.appendChild(node);
+        c.scrollTop = c.scrollHeight;
+        clearTimeout(safety);
+        safety = setTimeout(hide, 15000);   // never let the dots hang
+    }
+    function hide() {
+        clearTimeout(safety);
+        var n = doc.getElementById(TID);
+        if (n && n.parentNode) n.parentNode.removeChild(n);
+    }
+    win.CiliaTyping = { show: show, hide: hide };
+
+    function start() {
+        var c = doc.getElementById('messages');
+        if (!c || typeof MutationObserver === 'undefined') return false;
+        new MutationObserver(function (muts) {
+            for (var i = 0; i < muts.length; i++) {
+                var added = muts[i].addedNodes;
+                for (var j = 0; j < added.length; j++) {
+                    var node = added[j];
+                    if (!node || node.nodeType !== 1 || node.id === TID) continue;
+                    if (node.classList && node.classList.contains('ciliai-message')) {
+                        if (node.classList.contains('user')) show();
+                        else if (node.classList.contains('assistant')) hide();
+                    }
+                }
+            }
+        }).observe(c, { childList: true });
+
+        // A rendered visual also means the answer arrived → clear the dots.
+        ['switchView', 'renderUMAPPlot', 'showPlot', 'showDiagram'].forEach(function (fn) {
+            var orig = win[fn];
+            if (typeof orig === 'function' && !orig.__typingHide) {
+                win[fn] = function () { hide(); return orig.apply(this, arguments); };
+                win[fn].__typingHide = true;
+            }
+        });
+        return true;
+    }
+
+    var tries = 0;
+    (function go() { if (start()) return; if (++tries < 80) setTimeout(go, 250); })();
+})(window, document);
+</script>
+</body>
+</html>

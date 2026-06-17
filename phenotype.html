@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CiliaHub Phenotype Database</title>
+<!-- Build: cilia_db v2 / S5 v19 / 2026-05-24 / 77 diseases · 479 genes · 6,868 records · 272 concepts -->
+<meta name="description" content="Search ciliopathy genes, diseases, and symptoms with structured tables. Predict novel candidate genes from phenotype combinations. Primary multisystem, primary tissue-specific, and motile ciliopathies only.">
+<link rel="canonical" href="https://ciliahub.org/phenotype.html">
+<link rel="icon" type="image/png" href="assets/CiliaHub_Logo_web.png">
+
+<style>
+:root {
+  --bg: #f8fafc;
+  --panel-bg: #ffffff;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --text: #0f172a;
+  --text-soft: #475569;
+  --text-mute: #64748b;
+  --text-dim: #94a3b8;
+  --accent: #185FA5;
+  --accent-strong: #0a1f3d;
+  --primary-multi: #1d4ed8;
+  --primary-multi-bg: #dbeafe;
+  --primary-tissue: #15803d;
+  --primary-tissue-bg: #dcfce7;
+  --motile: #b45309;
+  --motile-bg: #fef3c7;
+  --unclass: #525252;
+  --unclass-bg: #f5f5f5;
+  --predict: #0e7490;
+  --predict-bg: #ecfeff;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+  margin: 0; background: var(--bg); color: var(--text);
+  font-size: 14px; line-height: 1.55;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Top header / banner ───────────────────────────────────────── */
+.page-header {
+  background: #ffffff;
+  padding: 30px 24px 22px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.page-header h1 {
+  margin: 0 0 6px 0; font-size: 26px; color: var(--accent-strong);
+  font-weight: 800; letter-spacing: -.02em;
+}
+.page-header .lead {
+  font-size: 14px; color: var(--text-soft); max-width: 880px; margin: 0;
+}
+.banner-stats {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px;
+  font-size: 12px;
+}
+.banner-pill {
+  padding: 6px 14px; background: #eef5fb;
+  border: 1px solid #d6e6f5; border-radius: 16px;
+  font-weight: 700; color: var(--accent);
+}
+.banner-note {
+  margin-top: 12px; font-size: 11.5px; color: var(--text-mute);
+  background: #f8fafc; border: 1px solid var(--border);
+  padding: 7px 12px; border-radius: 6px; display: inline-block;
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex; gap: 0; background: white;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  position: sticky; top: 60px; z-index: 10;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  overflow-x: auto;
+}
+.tab {
+  padding: 14px 18px; font-size: 13.5px; font-weight: 600;
+  color: var(--text-mute); cursor: pointer;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap; user-select: none;
+  transition: color .12s, border-color .12s;
+  background: none; border-left: none; border-right: none; border-top: none;
+  font-family: inherit;
+}
+.tab:hover { color: var(--text); background: #f8fafc; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); background: #f4f9fe; }
+.tab .tab-emoji { margin-right: 6px; }
+.tab.tab-predict.active { color: var(--predict); border-bottom-color: var(--predict); }
+
+/* Predict tab gets a vertical bar to visually separate from curated lookups */
+.tab.tab-predict { border-left: 1px solid var(--border); margin-left: 12px; padding-left: 22px; }
+
+/* ── Tab panels ────────────────────────────────────────────────── */
+.tab-panel {
+  display: none; padding: 24px;
+  max-width: 1400px; margin: 0 auto;
+}
+.tab-panel.active { display: block; }
+
+.panel-header { margin-bottom: 18px; }
+.panel-header h2 {
+  margin: 0 0 4px 0; font-size: 18px; color: var(--text);
+  font-weight: 700;
+}
+.panel-header .desc {
+  margin: 0; font-size: 13px; color: var(--text-mute);
+}
+
+/* ── Search input ──────────────────────────────────────────────── */
+.search-bar { margin-bottom: 16px; position: relative; }
+.search-textarea, .search-input {
+  width: 100%; padding: 12px 14px; font-size: 14px;
+  font-family: inherit; line-height: 1.5;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: white; resize: vertical;
+}
+.search-textarea { min-height: 70px; }
+.search-textarea:focus, .search-input:focus {
+  outline: 2px solid var(--accent); outline-offset: -1px;
+}
+.search-helper {
+  font-size: 11.5px; color: var(--text-mute); margin: 6px 0 0 2px;
+}
+.search-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  padding: 7px 14px; font-size: 12.5px; font-weight: 600;
+  font-family: inherit; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--border); background: white; color: var(--text);
+}
+.btn:hover { background: #f8fafc; }
+.btn-primary {
+  background: var(--accent); border-color: var(--accent); color: white;
+}
+.btn-primary:hover { background: #0a4a8c; }
+.btn-predict {
+  background: var(--predict); border-color: var(--predict); color: white;
+}
+.btn-predict:hover { background: #155e75; }
+.btn-soft {
+  background: #f1f5f9; color: var(--text-soft); border: 1px solid var(--border-light);
+}
+.btn-soft:hover { background: #e2e8f0; }
+
+/* ── Autocomplete dropdown (kept simple) ──────────────────────── */
+.ac-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0;
+  background: white; border: 1px solid var(--border);
+  border-top: none; border-radius: 0 0 8px 8px;
+  max-height: 320px; overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  z-index: 20;
+}
+.ac-section {
+  padding: 6px 12px; font-size: 10.5px; font-weight: 700;
+  color: var(--text-mute); text-transform: uppercase;
+  letter-spacing: .05em; background: #f8fafc;
+  border-bottom: 1px solid var(--border-light);
+}
+.ac-item {
+  padding: 8px 12px; font-size: 13px; cursor: pointer;
+  border-bottom: 1px solid var(--border-light);
+}
+.ac-item:hover, .ac-item.active { background: #eff6ff; }
+.ac-item .secondary {
+  font-size: 11px; color: var(--text-mute); margin-top: 2px;
+}
+.ac-item.hidden { display: none; }
+
+/* ── Class badge ───────────────────────────────────────────────── */
+.class-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 5px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+  white-space: nowrap;
+}
+.class-badge.primary-multi { background: var(--primary-multi-bg); color: var(--primary-multi); }
+.class-badge.primary-tissue { background: var(--primary-tissue-bg); color: var(--primary-tissue); }
+.class-badge.motile { background: var(--motile-bg); color: var(--motile); }
+.class-badge.unclass { background: var(--unclass-bg); color: var(--unclass); }
+.class-badge.predict { background: var(--predict-bg); color: var(--predict); }
+
+/* ── Filter row ────────────────────────────────────────────────── */
+.filter-row {
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  padding: 10px 12px; background: white;
+  border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 14px; font-size: 12.5px;
+}
+.filter-row .filter-label {
+  font-size: 11px; font-weight: 700; color: var(--text-mute);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.filter-row label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
+.filter-row input[type=checkbox] { cursor: pointer; }
+
+/* ── Results table ─────────────────────────────────────────────── */
+.results-info {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; flex-wrap: wrap; gap: 12px;
+}
+.results-count { font-size: 13px; color: var(--text-soft); }
+.results-count strong { color: var(--text); }
+.results-actions { display: flex; gap: 6px; }
+
+.table-wrap {
+  background: white; border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+}
+.results-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.results-table th {
+  background: #f8fafc; text-align: left; padding: 10px 12px;
+  font-size: 11px; font-weight: 700; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: .04em;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
+.results-table th:hover { background: #f1f5f9; }
+.results-table th .sort-arrow { font-size: 9px; margin-left: 3px; opacity: .5; }
+.results-table th.sort-asc .sort-arrow,
+.results-table th.sort-desc .sort-arrow { opacity: 1; color: var(--accent); }
+.results-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border-light);
+  vertical-align: top;
+}
+.results-table tbody tr:hover { background: #f8fafc; }
+.results-table tbody tr:last-child td { border-bottom: none; }
+.results-table .col-link {
+  font-weight: 600; color: var(--accent);
+}
+.results-table .col-list {
+  color: var(--text-mute); font-size: 12px;
+}
+.results-table .col-num {
+  font-variant-numeric: tabular-nums; text-align: right;
+  font-family: 'SF Mono', Monaco, monospace; font-size: 12.5px;
+}
+
+.empty-state {
+  padding: 60px 24px; text-align: center;
+  color: var(--text-mute); font-size: 13px;
+}
+.empty-state .icon {
+  font-size: 32px; margin-bottom: 8px; opacity: .5;
+}
+
+/* ── Selected items / chips ────────────────────────────────────── */
+.chips {
+  margin-top: 10px; min-height: 28px;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; margin: 2px 4px 2px 0;
+  background: var(--predict-bg); color: var(--predict);
+  border-radius: 14px; font-size: 12px; font-weight: 600;
+}
+.chip .remove {
+  cursor: pointer; opacity: .7; font-weight: 700;
+}
+.chip .remove:hover { opacity: 1; }
+
+/* ── Predict section special styling ───────────────────────────── */
+.predict-disclaimer {
+  background: var(--predict-bg); border: 1px solid #a5dee5;
+  border-left: 4px solid var(--predict);
+  padding: 14px 16px; border-radius: 7px;
+  margin-bottom: 16px;
+}
+.predict-disclaimer .title {
+  font-weight: 700; color: var(--predict);
+  font-size: 13.5px; margin-bottom: 4px;
+}
+.predict-disclaimer .body {
+  font-size: 12.5px; color: var(--text-soft); line-height: 1.5;
+}
+.predict-mode { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.pmode {
+  font: inherit; font-size: 13px; font-weight: 600; padding: 7px 16px;
+  border-radius: 999px; border: 1px solid var(--predict); background: #fff;
+  color: var(--predict); cursor: pointer; transition: background .15s, color .15s;
+}
+.pmode:hover { background: var(--predict-bg); }
+.pmode.active { background: var(--predict); color: #fff; }
+.predict-status { font-weight: 600; }
+.predict-status.novel { color: var(--predict); }
+.predict-status.curated { color: var(--text-mute); }
+
+/* ── Browse cards ──────────────────────────────────────────────── */
+.disease-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px; margin-top: 14px;
+}
+.disease-card {
+  background: white; border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px;
+  transition: border-color .12s, box-shadow .12s;
+}
+.disease-card:hover {
+  border-color: var(--accent); box-shadow: var(--shadow);
+}
+.disease-card .name {
+  font-size: 14px; font-weight: 600; color: var(--accent);
+  margin-bottom: 4px; line-height: 1.35;
+}
+.disease-card .meta {
+  font-size: 12px; color: var(--text-mute);
+}
+
+.detail-card {
+  background: white; border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.detail-card h3 {
+  margin: 0 0 8px 0; font-size: 15px; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+.detail-card .row {
+  font-size: 12.5px; color: var(--text-soft);
+  display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.detail-card .row strong { color: var(--text); }
+.detail-card .deep-link {
+  display: inline-block; margin-top: 6px;
+  font-size: 12px; font-weight: 600;
+}
+
+/* ── Loading / footer ──────────────────────────────────────────── */
+.loading-bar {
+  padding: 40px 24px; text-align: center; color: var(--text-mute);
+}
+footer {
+  margin-top: 48px; padding: 20px 24px;
+  font-size: 11.5px; color: var(--text-dim); text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 700px) {
+  .page-header { padding: 20px 16px; }
+  .page-header h1 { font-size: 22px; }
+  .tab { padding: 12px 12px; font-size: 12.5px; }
+  .tab-panel { padding: 16px; }
+  .results-table { font-size: 12px; }
+  .results-table th, .results-table td { padding: 8px; }
+}
+
+/* ── CiliaHub site-wide top navigation ──────────────────────────── */
+.top-navbar {
+    background: #185FA5;
+    color: white;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    padding: 0 28px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    position: sticky;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+    box-sizing: border-box;
+}
+.top-navbar .nav-container {
+    display: flex; align-items: center;
+    height: 100%; width: 100%;
+}
+.top-navbar .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 17px;
+    padding-right: 24px; margin-right: 8px;
+    border-right: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
+    color: white;
+    text-decoration: none;
+}
+.top-navbar .brand img { height: 36px; border-radius: 6px; }
+.top-navbar .brand-text {
+    display: flex; flex-direction: column; line-height: 1.15;
+}
+.top-navbar .brand-subtitle {
+    font-size: 10px; opacity: 0.8; font-weight: 400;
+}
+.top-navbar .nav-links {
+    display: flex; list-style: none; gap: 2px;
+    height: 100%; margin-left: 8px; padding: 0;
+}
+.top-navbar .nav-links a {
+    color: rgba(255,255,255,0.8); text-decoration: none;
+    padding: 0 16px; height: 100%;
+    display: flex; align-items: center;
+    font-size: 15px; font-weight: 500;
+    transition: color 0.2s, background-color 0.2s;
+    position: relative;
+}
+.top-navbar .nav-links a::after {
+    content: ''; position: absolute; bottom: 0;
+    left: 12px; right: 12px; height: 3px;
+    background: white; border-radius: 3px 3px 0 0;
+    transform: scaleX(0); transition: transform 0.2s ease;
+}
+.top-navbar .nav-links a:hover {
+    color: white; background-color: rgba(255,255,255,0.08);
+}
+.top-navbar .nav-links a:hover::after { transform: scaleX(1); }
+.top-navbar .nav-links a.active {
+    color: white; font-weight: 600;
+    background-color: rgba(255,255,255,0.12);
+}
+.top-navbar .nav-links a.active::after { transform: scaleX(1); }
+
+</style>
+<style id="ch-pro-redesign">
+/* ════════════════════════════════════════════════════════════════
+ * Professional redesign — match the CiliaHub home-page look
+ * (navy hero card, pill mode selector, centered shell, home-style
+ *  search fields + autocomplete). Layered on top; logic untouched.
+ * ════════════════════════════════════════════════════════════════ */
+body { background: #f4f7fb; }
+
+/* ── Hero (navy gradient card, like the home page) ── */
+.page-header {
+  max-width: 1180px; margin: 28px auto 0;
+  background: linear-gradient(135deg, #005b96 0%, #00406d 100%);
+  color: #fff; border-radius: 18px; border-bottom: none;
+  padding: 2.4rem 2.6rem;
+  box-shadow: 0 12px 32px rgba(0,64,109,0.22);
+}
+.page-header h1 { color: #fff; font-size: 2.4rem; font-weight: 800; letter-spacing: -0.5px; }
+.page-header .lead { color: rgba(255,255,255,0.95); max-width: 820px; }
+.banner-stats { gap: 10px; margin-top: 18px; }
+.banner-pill {
+  background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.28);
+  color: #fff; border-radius: 14px; padding: 8px 16px; font-weight: 700;
+}
+.banner-note {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.92);
+}
+
+/* ── Mode selector (former tab bar → pills) ── */
+.tab-bar {
+  max-width: 1180px; margin: 20px auto 0; padding: 0 24px;
+  background: transparent; border: none; box-shadow: none;
+  position: static; gap: 8px; flex-wrap: wrap; overflow: visible;
+}
+.tab {
+  border: 1px solid #d6e2ee; border-bottom: 1px solid #d6e2ee;
+  border-radius: 999px; background: #fff; color: #33506e;
+  padding: 9px 18px; font-weight: 600;
+}
+.tab:hover { background: #eef5fb; color: #00406d; }
+.tab.active, .tab.tab-predict.active {
+  background: #005b96; color: #fff; border-color: #005b96;
+}
+.tab.tab-predict { border-left: 1px solid #d6e2ee; margin-left: 8px; padding-left: 18px; }
+
+/* ── Centered content shell ── */
+.tab-panel { max-width: 1180px; margin: 0 auto; padding: 26px 24px 64px; }
+.panel-header h2 {
+  color: #00406d; font-size: 1.5rem; font-weight: 800;
+  border-bottom: 2px solid #e3eef8; padding-bottom: 10px; margin-bottom: 10px;
+}
+.panel-header .desc { color: #6b7785; }
+
+/* ── Search fields + buttons (home style) ── */
+.search-bar {
+  background: #fff; border: 1px solid #e6edf5; border-radius: 16px;
+  padding: 18px; box-shadow: var(--shadow); margin-bottom: 18px;
+}
+.search-textarea, .search-input {
+  border: 1px solid #cfdbe8; border-radius: 12px; padding: 14px 18px;
+  font-size: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.search-textarea:focus, .search-input:focus { outline: 2px solid #99c2e2; border-color: #99c2e2; }
+.btn { border-radius: 10px; padding: 9px 18px; }
+.btn-primary { background: #005b96; border-color: #005b96; color: #fff; }
+.btn-primary:hover { background: #00406d; }
+.btn-predict { background: #0e7490; border-color: #0e7490; color: #fff; }
+.btn-predict:hover { background: #0b5563; }
+
+/* ── Autocomplete dropdown — match home's ch-suggest ── */
+.ac-dropdown {
+  border: 1px solid #e6edf5; border-top: 1px solid #e6edf5; border-radius: 12px;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.18); margin-top: 6px; overflow: hidden;
+  z-index: 200; background: #fff;
+}
+.ac-item:hover, .ac-item.active { background: #eef5fb; }
+
+/* ── Browse cards — home card style ── */
+.predict-disclaimer { border-radius: 12px; }
+.disease-card {
+  background: #fff; border: 1px solid #e6edf5; border-radius: 12px;
+  box-shadow: var(--shadow); transition: transform .15s, box-shadow .2s, border-color .2s;
+}
+.disease-card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(0,64,109,0.14); border-color: #b9d4ec; }
+.disease-card .name a { color: #005b96; font-weight: 800; }
+
+/* ── Results tables sit on clean white cards ── */
+.results-info { color: #33506e; }
+@media (max-width: 700px) {
+  .page-header { margin: 16px 12px 0; padding: 1.6rem 1.4rem; border-radius: 14px; }
+  .page-header h1 { font-size: 1.8rem; }
+  .tab-bar { padding: 0 12px; }
+  .tab-panel { padding: 18px 12px 48px; }
+}
+</style>
+</head>
+<body>
+<nav class="top-navbar">
+    <div class="nav-container">
+        <a href="index.html" class="brand">
+            <img src="assets/CiliaHub_Logo_web.png" alt="CiliaHub Logo">
+            <div class="brand-text">
+                <div>CiliaHub</div>
+                <div class="brand-subtitle">Ciliary Gene Database</div>
+            </div>
+        </a>
+        <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="plots.html">Cilia Analysis</a></li>
+                <li><a href="ciliai.html">CiliAI</a></li>
+                <li><a href="phenotype.html" class="active">Ciliopathy</a></li>
+                <li><a href="api.html">API</a></li>
+                <li><a href="about.html">About</a></li>
+            </ul>
+    </div>
+</nav>
+
+
+<header class="page-header">
+  <h1>CiliaHub Phenotype Database</h1>
+  <p class="lead">
+    Bidirectional disease–gene–symptom search across primary multisystem ciliopathies,
+    primary tissue-specific ciliopathies, and motile ciliopathies (PCD-related).
+    Secondary / non-ciliary disorders are excluded.
+  </p>
+  <div class="banner-stats" id="banner-stats">
+    <span class="banner-pill" id="stat-diseases">… diseases</span>
+    <span class="banner-pill" id="stat-genes">… genes</span>
+    <span class="banner-pill" id="stat-concepts">… symptoms</span>
+    <span class="banner-pill" id="stat-records">… records</span>
+  </div>
+  <div class="banner-note">
+    Search results below contain <strong>curated, evidence-backed data only</strong>.
+    Predictions are clearly separated in the Predict tab.
+  </div>
+</header>
+
+<nav class="tab-bar" role="tablist">
+  <button class="tab active" data-tab="gene" role="tab"><span class="tab-emoji">🧬</span>Gene search</button>
+  <button class="tab"        data-tab="disease" role="tab"><span class="tab-emoji">🦠</span>Disease search</button>
+  <button class="tab"        data-tab="symptom" role="tab"><span class="tab-emoji">🩺</span>Symptom search</button>
+  <button class="tab"        data-tab="browse" role="tab"><span class="tab-emoji">📋</span>Browse</button>
+  <button class="tab tab-predict" data-tab="predict" role="tab"><span class="tab-emoji">🔭</span>Predict candidates</button>
+</nav>
+
+<!-- ════════════════════════════════════════════════ GENE TAB ════ -->
+<section class="tab-panel active" id="panel-gene" role="tabpanel">
+  <div class="panel-header">
+    <h2>Gene → Diseases</h2>
+    <p class="desc">Enter one or more gene symbols (separated by commas, semicolons, spaces, or newlines).
+       Returns every curated ciliopathy disease associated with the gene(s).</p>
+  </div>
+  <div class="search-bar">
+    <textarea class="search-textarea" id="gene-input"
+      placeholder="e.g.  BBS1, IFT172, ARL13B"></textarea>
+    <div class="search-helper">Tip: paste a list of any size. Unknown symbols are reported below the results.</div>
+    <div class="search-actions">
+      <button class="btn btn-primary" onclick="runSearch('gene')">Search</button>
+      <button class="btn btn-soft" onclick="clearTab('gene')">Clear</button>
+      <button class="btn btn-soft" onclick="loadExample('gene')">Example</button>
+    </div>
+  </div>
+  <div id="gene-results"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════ DISEASE TAB ════ -->
+<section class="tab-panel" id="panel-disease" role="tabpanel">
+  <div class="panel-header">
+    <h2>Disease → Genes & Symptoms</h2>
+    <p class="desc">Enter one or more disease names (or acronyms like BBS, NEDMABA, JBTS).
+       Returns associated genes and the disease's symptom profile.</p>
+  </div>
+  <div class="search-bar" style="position:relative;">
+    <textarea class="search-textarea" id="disease-input"
+      placeholder="e.g.  Joubert Syndrome; Bardet-Biedl"></textarea>
+    <div class="search-helper">Acronyms work: BBS · MKS · PCD · JBTS · NEDMABA · D-BPD · LCA</div>
+    <div class="search-actions">
+      <button class="btn btn-primary" onclick="runSearch('disease')">Search</button>
+      <button class="btn btn-soft" onclick="clearTab('disease')">Clear</button>
+      <button class="btn btn-soft" onclick="loadExample('disease')">Example</button>
+    </div>
+  </div>
+  <div id="disease-results"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════ SYMPTOM TAB ════ -->
+<section class="tab-panel" id="panel-symptom" role="tabpanel">
+  <div class="panel-header">
+    <h2>Symptom → Genes & Diseases</h2>
+    <p class="desc">Enter one or more symptoms (HPO IDs, canonical symptom names, or
+       natural-language phrases like "extra fingers" or "small head").</p>
+  </div>
+  <div class="search-bar">
+    <textarea class="search-textarea" id="symptom-input"
+      placeholder='e.g.  polydactyly, retinal dystrophy, HP:0001249, "small head"'></textarea>
+    <div class="search-helper">Natural-language synonyms supported: "extra fingers", "kidney cysts", "vision loss", "club feet"…</div>
+    <div class="search-actions">
+      <button class="btn btn-primary" onclick="runSearch('symptom')">Search</button>
+      <button class="btn btn-soft" onclick="clearTab('symptom')">Clear</button>
+      <button class="btn btn-soft" onclick="loadExample('symptom')">Example</button>
+    </div>
+  </div>
+  <div id="symptom-results"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════ BROWSE TAB ════ -->
+<section class="tab-panel" id="panel-browse" role="tabpanel">
+  <div class="panel-header">
+    <h2>Browse all diseases</h2>
+    <p class="desc">Filter by class. Click any disease to open its detail page.</p>
+  </div>
+  <div class="filter-row" id="browse-filters">
+    <span class="filter-label">Class:</span>
+    <label><input type="checkbox" data-class="Primary multisystem" checked> Primary multisystem</label>
+    <label><input type="checkbox" data-class="Primary tissue-specific" checked> Primary tissue-specific</label>
+    <label><input type="checkbox" data-class="Motile" checked> Motile</label>
+    <label><input type="checkbox" data-class="Unclassified"> Unclassified</label>
+  </div>
+  <div id="browse-results"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════ PREDICT TAB ════ -->
+<section class="tab-panel" id="panel-predict" role="tabpanel">
+  <div class="panel-header">
+    <h2>Predict novel candidate genes</h2>
+    <p class="desc">Rank candidate genes by phenotypic overlap, starting from a
+       <strong>symptom combination</strong>, a <strong>gene</strong> (other genes resembling its
+       curated disease profile), or a <strong>disease</strong> (genes outside its curated set,
+       flagged as novel candidates).</p>
+  </div>
+
+  <div class="predict-disclaimer">
+    <div class="title">⚠ This is prediction, not curated data</div>
+    <div class="body">
+      Results in this tab are <strong>computational candidates</strong> for follow-up investigation.
+      They are not part of the curated disease–gene catalogue and should be treated as hypotheses.
+      For the curated, evidence-backed gene–disease relationships, use the
+      <strong>Gene</strong>, <strong>Disease</strong>, or <strong>Symptom</strong> tabs above.
+    </div>
+  </div>
+
+  <div class="predict-mode" id="predict-mode">
+    <button type="button" class="pmode active" data-pmode="symptom" onclick="setPredictMode('symptom')">By symptoms</button>
+    <button type="button" class="pmode" data-pmode="gene" onclick="setPredictMode('gene')">By gene</button>
+    <button type="button" class="pmode" data-pmode="disease" onclick="setPredictMode('disease')">By disease</button>
+  </div>
+
+  <div class="search-bar" style="position:relative;">
+    <div class="pinput" data-pinput="symptom">
+      <textarea class="search-textarea" id="predict-input"
+        placeholder='Enter multiple symptoms. e.g.  polydactyly, retinitis pigmentosa, obesity, intellectual disability'></textarea>
+      <div class="search-helper">Two or more symptoms required. Secondary diseases are excluded from prediction.</div>
+    </div>
+    <div class="pinput" data-pinput="gene" style="display:none;">
+      <input type="text" class="search-input" id="predict-gene-input" autocomplete="off"
+        placeholder='Enter one gene. e.g.  BBS1'>
+      <div class="search-helper">Ranks other genes by phenotypic overlap with this gene's curated disease profile.</div>
+    </div>
+    <div class="pinput" data-pinput="disease" style="display:none;">
+      <input type="text" class="search-input" id="predict-disease-input" autocomplete="off"
+        placeholder='Enter one disease. e.g.  Joubert Syndrome'>
+      <div class="search-helper">Genes outside the disease's curated gene set are flagged as novel candidates.</div>
+    </div>
+    <div class="search-actions">
+      <button class="btn btn-predict" onclick="runSearch('predict')">Predict candidates</button>
+      <button class="btn btn-soft" onclick="clearTab('predict')">Clear</button>
+      <button class="btn btn-soft" onclick="loadExample('predict')">Example</button>
+    </div>
+  </div>
+  <div id="predict-results"></div>
+</section>
+
+<footer>
+  CiliaHub Phenotype Database · v2 · <a href="/api.html">API</a> · <a href="/">Home</a>
+</footer>
+
+<script src="js/ciliahub-ui.js"></script>
+<script>
+'use strict';
+
+/* ── Global state ─────────────────────────────────────────────── */
+let DB = null;  // The whole cilia_db.json
+let synonyms = {};  // phrase -> canonical concept
+
+/* ── Class-badge helpers ───────────────────────────────────────── */
+const CLASS_KEYS = {
+  'Primary multisystem': 'primary-multi',
+  'Primary tissue-specific': 'primary-tissue',
+  'Motile': 'motile',
+  'Unclassified': 'unclass',
+};
+function classBadge(cls) {
+  const key = CLASS_KEYS[cls] || 'unclass';
+  return '<span class="class-badge ' + key + '">' + escapeHtml(cls) + '</span>';
+}
+
+/* ── Utility ───────────────────────────────────────────────────── */
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+function $(id) { return document.getElementById(id); }
+function diseaseLink(name, slug) {
+  return '<a href="/disease/' + encodeURIComponent(slug) + '">' + escapeHtml(name) + '</a>';
+}
+function geneLink(g) {
+  return '<a href="/gene/' + encodeURIComponent(g) + '">' + escapeHtml(g) + '</a>';
+}
+
+/* Token splitter — handles commas, semicolons, newlines.
+ * Preserves quoted phrases like "small head" as one token. */
+function splitInput(raw) {
+  if (!raw) return [];
+  // Pull out quoted phrases first
+  const quoted = [];
+  raw = raw.replace(/"([^"]+)"|'([^']+)'/g, (m, a, b) => {
+    quoted.push((a || b).trim()); return '\x00';  // placeholder
+  });
+  const parts = raw.split(/[,;\n]+/).map(t => t.trim()).filter(Boolean);
+  const out = [];
+  for (const p of parts) {
+    if (p.includes('\x00')) {
+      // The placeholder got merged into a chunk; restore quoted tokens
+      const splits = p.split('\x00').filter(Boolean);
+      splits.forEach(s => { if (s.trim()) out.push(s.trim()); });
+    } else {
+      out.push(p);
+    }
+  }
+  // Add back the quoted tokens
+  return out.concat(quoted);
+}
+
+/* Resolve a free-text symptom token to a canonical concept name. */
+function resolveSymptomToken(token) {
+  const t = token.trim();
+  if (!t) return null;
+  const tLower = t.toLowerCase();
+  // HPO ID
+  const m = t.match(/^HP:?\d+$/i);
+  if (m) {
+    const id = (t.toUpperCase().startsWith('HP:') ? t.toUpperCase() : 'HP:' + t.toUpperCase().replace(/^HP/, ''));
+    // Find concept by HPO ID
+    for (const [c, info] of Object.entries(DB.concepts)) {
+      if (info.hpo_ids.includes(id)) return c;
+    }
+    return null;
+  }
+  // Exact concept match
+  if (DB.concepts[t]) return t;
+  for (const c of Object.keys(DB.concepts)) {
+    if (c.toLowerCase() === tLower) return c;
+  }
+  // Synonym (phrase or shorthand)
+  if (synonyms[tLower]) return synonyms[tLower];
+  // Substring on canonical names
+  for (const c of Object.keys(DB.concepts)) {
+    if (c.toLowerCase().includes(tLower)) return c;
+  }
+  // Substring on aliases
+  for (const [phrase, concept] of Object.entries(synonyms)) {
+    if (phrase.includes(tLower)) return concept;
+  }
+  return null;
+}
+
+/* Resolve a free-text token to a gene symbol. */
+function resolveGeneToken(token) {
+  if (!token) return null;
+  const t = token.trim().toUpperCase();
+  if (DB.genes[t]) return t;
+  // try as-typed (in case of mixed case keys)
+  for (const g of Object.keys(DB.genes)) {
+    if (g.toUpperCase() === t) return g;
+  }
+  return null;
+}
+
+/* Resolve a free-text token to a disease name. */
+function resolveDiseaseToken(token) {
+  const t = token.trim();
+  if (!t) return null;
+  const tLower = t.toLowerCase();
+  if (DB.diseases[t]) return t;
+  for (const d of Object.keys(DB.diseases)) {
+    if (d.toLowerCase() === tLower) return d;
+  }
+  // alias / acronym
+  for (const [d, prof] of Object.entries(DB.diseases)) {
+    if ((prof.search_aliases || []).some(a => a.toLowerCase() === tLower)) return d;
+  }
+  // substring
+  for (const d of Object.keys(DB.diseases)) {
+    if (d.toLowerCase().includes(tLower)) return d;
+  }
+  for (const [d, prof] of Object.entries(DB.diseases)) {
+    if ((prof.search_aliases || []).some(a => a.toLowerCase().includes(tLower))) return d;
+  }
+  return null;
+}
+
+/* ── Initialise ────────────────────────────────────────────────── */
+async function init() {
+  // Loading state in all panels
+  ['gene','disease','symptom','browse','predict'].forEach(t => {
+    const el = $(t + '-results');
+    if (el) el.innerHTML = '<div class="loading-bar">Loading database…</div>';
+  });
+  try {
+    const r = await fetch('data/phenotype/cilia_db.json');
+    if (!r.ok) throw new Error('Failed to fetch cilia_db.json: ' + r.status);
+    DB = await r.json();
+    synonyms = DB.synonyms || {};
+  } catch (e) {
+    console.error(e);
+    if (window.CiliaHubUI) {
+      CiliaHubUI.showErrorToast('Data Loading Error',
+        'Failed to load the ciliopathy database (cilia_db.json). Try a hard reload (Ctrl/Cmd+Shift+R).');
+    } else {
+      document.body.insertAdjacentHTML('beforeend',
+        '<div style="padding:20px;color:#dc2626;">Failed to load database: ' + escapeHtml(e.message) + '</div>');
+    }
+    return;
+  }
+
+  // Banner
+  $('stat-diseases').textContent = DB.stats.n_diseases + ' diseases';
+  $('stat-genes').textContent    = DB.stats.n_genes + ' genes';
+  $('stat-concepts').textContent = DB.stats.n_concepts + ' symptoms';
+  $('stat-records').textContent  = DB.stats.n_records.toLocaleString() + ' records';
+
+  // Clear results placeholders
+  ['gene','disease','symptom','predict'].forEach(t => $(t + '-results').innerHTML = '');
+
+  // Wire tab bar
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Browse: render diseases + filter wiring
+  renderBrowse();
+  document.querySelectorAll('#browse-filters input').forEach(cb => {
+    cb.addEventListener('change', renderBrowse);
+  });
+
+  // Hash routing (e.g. #predict)
+  if (location.hash) {
+    const tab = location.hash.slice(1);
+    if (['gene','disease','symptom','browse','predict'].includes(tab)) switchTab(tab);
+  }
+
+  // URL params: ?disease=NAME or ?gene=SYM or ?symptom=phrase
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('disease')) {
+    switchTab('disease');
+    $('disease-input').value = qs.get('disease');
+    runSearch('disease');
+  } else if (qs.get('gene')) {
+    switchTab('gene');
+    $('gene-input').value = qs.get('gene');
+    runSearch('gene');
+  } else if (qs.get('symptom') || qs.get('hpo')) {
+    switchTab('symptom');
+    $('symptom-input').value = qs.get('symptom') || qs.get('hpo');
+    runSearch('symptom');
+  }
+}
+window.addEventListener('DOMContentLoaded', init);
+
+/* ── Tab switching ─────────────────────────────────────────────── */
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+  history.replaceState(null, '', '#' + tab + location.search.slice(location.search.length > 0 ? 0 : 0));
+  if (tab === 'browse' && DB) renderBrowse();
+}
+window.switchTab = switchTab;
+
+/* ── Clear / examples ──────────────────────────────────────────── */
+function clearTab(tab) {
+  if (tab === 'predict') {
+    ['predict-input', 'predict-gene-input', 'predict-disease-input'].forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+  } else {
+    $(tab + '-input').value = '';
+  }
+  $(tab + '-results').innerHTML = '';
+}
+window.clearTab = clearTab;
+
+function loadExample(tab) {
+  const examples = {
+    gene: 'BBS1, BBS2, IFT172, CEP290',
+    disease: 'Joubert Syndrome; Bardet-Biedl Syndrome; Primary Ciliary Dyskinesia',
+    symptom: 'polydactyly, retinal dystrophy, obesity, intellectual disability',
+    predict: 'polydactyly, retinitis pigmentosa, obesity, intellectual disability, kidney cysts',
+  };
+  if (tab === 'predict') {
+    if (_predictMode === 'gene') $('predict-gene-input').value = 'CEP290';
+    else if (_predictMode === 'disease') $('predict-disease-input').value = 'Joubert Syndrome';
+    else $('predict-input').value = examples.predict;
+    runSearch('predict');
+    return;
+  }
+  $(tab + '-input').value = examples[tab] || '';
+  runSearch(tab);
+}
+window.loadExample = loadExample;
+
+/* ── Search dispatch ───────────────────────────────────────────── */
+function runSearch(tab) {
+  if (!DB) return;
+  if (tab === 'gene')    return searchGene();
+  if (tab === 'disease') return searchDisease();
+  if (tab === 'symptom') return searchSymptom();
+  if (tab === 'predict') return runPredict();
+}
+window.runSearch = runSearch;
+
+/* ── GENE search ───────────────────────────────────────────────── */
+function searchGene() {
+  const tokens = splitInput($('gene-input').value);
+  if (tokens.length === 0) { $('gene-results').innerHTML = ''; return; }
+  const matched = [], unmatched = [];
+  tokens.forEach(t => {
+    const g = resolveGeneToken(t);
+    if (g) matched.push(g); else unmatched.push(t);
+  });
+  if (matched.length === 0) {
+    $('gene-results').innerHTML = noResults('No matching genes', 'Try standard HGNC symbols (e.g. BBS1, IFT172). Unknown: ' + escapeHtml(unmatched.join(', ')));
+    return;
+  }
+  // Build rows
+  const rows = [];
+  matched.forEach(g => {
+    const info = DB.genes[g];
+    if (!info || info.diseases.length === 0) {
+      rows.push({
+        gene: g, disease: '—', disease_slug: null,
+        cls: 'Unclassified', subtype: '—',
+        inheritance: '—', evidence: 0,
+      });
+      return;
+    }
+    info.diseases.forEach(d => {
+      const prof = DB.diseases[d.name] || {};
+      rows.push({
+        gene: g, disease: d.name, disease_slug: d.slug,
+        cls: d.class, subtype: d.subtype,
+        inheritance: prof.inheritance || '—',
+        evidence: d.evidence_count || prof.n_records || 0,
+      });
+    });
+  });
+
+  const headers = [
+    {key: 'gene', label: 'Gene'},
+    {key: 'disease', label: 'Disease'},
+    {key: 'cls', label: 'Class'},
+    {key: 'inheritance', label: 'Inheritance'},
+    {key: 'evidence', label: 'Evidence', num: true},
+  ];
+  const cellFns = {
+    gene: r => '<span class="col-link">' + geneLink(r.gene) + '</span>',
+    disease: r => r.disease_slug ? diseaseLink(r.disease, r.disease_slug) : '—',
+    cls: r => classBadge(r.cls),
+    inheritance: r => escapeHtml(r.inheritance),
+    evidence: r => '<span class="col-num">' + r.evidence + '</span>',
+  };
+  renderTable('gene-results', rows, headers, cellFns, 'gene_search_results', unmatched);
+}
+
+/* ── DISEASE search ────────────────────────────────────────────── */
+function searchDisease() {
+  const tokens = splitInput($('disease-input').value);
+  if (tokens.length === 0) { $('disease-results').innerHTML = ''; return; }
+  const matched = [], unmatched = [];
+  tokens.forEach(t => {
+    const d = resolveDiseaseToken(t);
+    if (d) matched.push(d); else unmatched.push(t);
+  });
+  if (matched.length === 0) {
+    $('disease-results').innerHTML = noResults('No matching diseases', 'Try a canonical disease name or an acronym like BBS, NEDMABA, JBTS. Unknown: ' + escapeHtml(unmatched.join(', ')));
+    return;
+  }
+  // Detail cards for each disease
+  let html = '';
+  matched.forEach(d => {
+    const prof = DB.diseases[d];
+    html += '<div class="detail-card">';
+    html += '<h3>' + escapeHtml(d) + ' ' + classBadge(prof.class) + '</h3>';
+    html += '<div class="row">';
+    html += '<span><strong>' + prof.n_records + '</strong> records</span>';
+    html += '<span><strong>' + prof.n_hpo + '</strong> HPO terms</span>';
+    html += '<span><strong>' + prof.genes.length + '</strong> gene(s)</span>';
+    if (prof.inheritance) html += '<span><strong>Inheritance:</strong> ' + escapeHtml(prof.inheritance) + '</span>';
+    if (prof.search_aliases && prof.search_aliases.length) {
+      html += '<span><strong>Aliases:</strong> ' + escapeHtml(prof.search_aliases.join('; ')) + '</span>';
+    }
+    html += '</div>';
+    html += '<a class="deep-link" href="/disease/' + encodeURIComponent(prof.slug) + '">View full disease page →</a>';
+    html += '</div>';
+  });
+
+  // Then combined gene+symptoms table (rows = gene × disease)
+  const rows = [];
+  matched.forEach(d => {
+    const prof = DB.diseases[d];
+    if (prof.genes.length === 0) {
+      rows.push({ disease: d, disease_slug: prof.slug, gene: '—', cls: prof.class, subtype: prof.subtype, evidence: prof.n_records, top_symptoms: prof.symptoms.slice(0,3).map(s => s.concept).join('; ') });
+      return;
+    }
+    prof.genes.forEach(g => {
+      rows.push({
+        disease: d, disease_slug: prof.slug,
+        gene: g, cls: prof.class, subtype: prof.subtype,
+        evidence: prof.n_records,
+        top_symptoms: prof.symptoms.slice(0,3).map(s => s.concept).join('; '),
+      });
+    });
+  });
+  const headers = [
+    {key: 'disease', label: 'Disease'},
+    {key: 'gene', label: 'Gene'},
+    {key: 'cls', label: 'Class'},
+    {key: 'subtype', label: 'Subtype'},
+    {key: 'top_symptoms', label: 'Top symptoms'},
+    {key: 'evidence', label: 'Records', num: true},
+  ];
+  const cellFns = {
+    disease: r => diseaseLink(r.disease, r.disease_slug),
+    gene: r => r.gene === '—' ? '—' : geneLink(r.gene),
+    cls: r => classBadge(r.cls),
+    subtype: r => '<span class="col-list">' + escapeHtml(r.subtype) + '</span>',
+    top_symptoms: r => '<span class="col-list">' + escapeHtml(r.top_symptoms) + '</span>',
+    evidence: r => '<span class="col-num">' + r.evidence + '</span>',
+  };
+  html += '<div class="results-info" style="margin-top:18px;"><div class="results-count"><strong>' + rows.length + '</strong> gene–disease association(s)</div></div>';
+  $('disease-results').innerHTML = html;
+  renderTable('disease-results', rows, headers, cellFns, 'disease_search_results', unmatched, /*append=*/true);
+}
+
+/* ── SYMPTOM search ────────────────────────────────────────────── */
+function searchSymptom() {
+  const tokens = splitInput($('symptom-input').value);
+  if (tokens.length === 0) { $('symptom-results').innerHTML = ''; return; }
+  const matched = [], unmatched = [];
+  tokens.forEach(t => {
+    const c = resolveSymptomToken(t);
+    if (c) matched.push({ input: t, concept: c });
+    else   unmatched.push(t);
+  });
+  if (matched.length === 0) {
+    $('symptom-results').innerHTML = noResults('No matching symptoms', 'Try an HPO ID (HP:0001249), a canonical symptom name, or a natural-language phrase. Unknown: ' + escapeHtml(unmatched.join(', ')));
+    return;
+  }
+
+  // For each matched concept, expand to all (concept, disease, genes) rows
+  const rows = [];
+  matched.forEach(m => {
+    const info = DB.concepts[m.concept] || { diseases: [], genes: [] };
+    if (info.diseases.length === 0) {
+      rows.push({ symptom: m.concept, hpo: (info.hpo_ids||[])[0]||'—', organ: info.organ||'—', disease: '—', disease_slug: null, gene: '—', cls: 'Unclassified', evidence: 0 });
+      return;
+    }
+    info.diseases.forEach(d => {
+      const prof = DB.diseases[d.name] || {};
+      if (prof.genes && prof.genes.length) {
+        prof.genes.forEach(g => {
+          rows.push({
+            symptom: m.concept, hpo: (info.hpo_ids||[])[0]||'—', organ: info.organ||'—',
+            disease: d.name, disease_slug: d.slug,
+            gene: g, cls: d.class, evidence: d.evidence_count,
+          });
+        });
+      } else {
+        rows.push({
+          symptom: m.concept, hpo: (info.hpo_ids||[])[0]||'—', organ: info.organ||'—',
+          disease: d.name, disease_slug: d.slug,
+          gene: '—', cls: d.class, evidence: d.evidence_count,
+        });
+      }
+    });
+  });
+
+  const headers = [
+    {key: 'symptom', label: 'Symptom'},
+    {key: 'hpo', label: 'HPO'},
+    {key: 'organ', label: 'Organ'},
+    {key: 'disease', label: 'Disease'},
+    {key: 'gene', label: 'Gene'},
+    {key: 'cls', label: 'Class'},
+    {key: 'evidence', label: 'Records', num: true},
+  ];
+  const cellFns = {
+    symptom: r => escapeHtml(r.symptom),
+    hpo: r => r.hpo === '—' ? '—' : '<span class="col-list">' + escapeHtml(r.hpo) + '</span>',
+    organ: r => '<span class="col-list">' + escapeHtml(r.organ) + '</span>',
+    disease: r => r.disease_slug ? diseaseLink(r.disease, r.disease_slug) : '—',
+    gene: r => r.gene === '—' ? '—' : geneLink(r.gene),
+    cls: r => classBadge(r.cls),
+    evidence: r => '<span class="col-num">' + r.evidence + '</span>',
+  };
+  renderTable('symptom-results', rows, headers, cellFns, 'symptom_search_results', unmatched);
+}
+
+/* ── BROWSE ────────────────────────────────────────────────────── */
+function renderBrowse() {
+  if (!DB) return;
+  const enabled = new Set();
+  document.querySelectorAll('#browse-filters input:checked').forEach(cb => enabled.add(cb.dataset.class));
+  const diseases = Object.entries(DB.diseases)
+    .filter(([_, p]) => enabled.has(p.class))
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  let html = '<div class="results-info"><div class="results-count"><strong>' + diseases.length + '</strong> disease(s)</div></div>';
+  html += '<div class="disease-grid">';
+  diseases.forEach(([name, prof]) => {
+    html += '<div class="disease-card">';
+    html += '<div class="name"><a href="/disease/' + encodeURIComponent(prof.slug) + '">' + escapeHtml(name) + '</a></div>';
+    html += '<div class="meta">' + classBadge(prof.class) + ' · ' + prof.n_records + ' records · ' + prof.genes.length + ' gene(s)</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  $('browse-results').innerHTML = html;
+}
+
+/* ── PREDICT (multi-mode candidate scoring) ──────────────────── */
+var _predictMode = 'symptom';
+function setPredictMode(mode) {
+  _predictMode = mode;
+  document.querySelectorAll('#predict-mode .pmode').forEach(function (b) {
+    b.classList.toggle('active', b.dataset.pmode === mode);
+  });
+  document.querySelectorAll('#panel-predict .pinput').forEach(function (p) {
+    p.style.display = (p.dataset.pinput === mode) ? '' : 'none';
+  });
+  $('predict-results').innerHTML = '';
+  var id = mode === 'gene' ? 'predict-gene-input' : mode === 'disease' ? 'predict-disease-input' : 'predict-input';
+  var el = $(id); if (el) el.focus();
+}
+window.setPredictMode = setPredictMode;
+
+// HPO id -> information content (from its concept), built once.
+var _hpoIC = null;
+function buildHpoIC() {
+  _hpoIC = {};
+  for (var c in DB.concepts) {
+    var ci = DB.concepts[c], ic = ci.ic || 0;
+    (ci.hpo_ids || []).forEach(function (h) { if (_hpoIC[h] === undefined) _hpoIC[h] = ic; });
+  }
+}
+
+// Rank every gene by IC-weighted HPO overlap of the input set with the
+// gene's best-matching curated disease profile.
+function scoreGenesByHpo(inputHpos, excludeGene) {
+  if (!_hpoIC) buildHpoIC();
+  var inputArr = Array.from(inputHpos), out = [];
+  Object.entries(DB.genes).forEach(function (entry) {
+    var gene = entry[0], info = entry[1];
+    if (gene === excludeGene) return;
+    var best = null;
+    info.diseases.forEach(function (d) {
+      var prof = DB.diseases[d.name];
+      if (!prof) return;
+      var dHpos = new Set(prof.hpo_ids), inter = [];
+      inputHpos.forEach(function (h) { if (dHpos.has(h)) inter.push(h); });
+      if (inter.length === 0) return;
+      var union = new Set(inputArr.concat(prof.hpo_ids)).size;
+      var jaccard = inter.length / union, ic = 0;
+      inter.forEach(function (h) { ic += (_hpoIC[h] || 0); });
+      if (!best || ic > best.ic) best = { disease: d.name, slug: d.slug, cls: d.class, ic: ic, jaccard: jaccard, hits: inter.length };
+    });
+    if (best) out.push(Object.assign({ gene: gene }, best));
+  });
+  out.sort(function (a, b) { return b.ic - a.ic; });
+  return out;
+}
+
+function _predictTable(ranked, opts) {
+  opts = opts || {};
+  var headers = [
+    { key: 'gene', label: 'Gene' },
+    { key: 'disease', label: 'Best matching disease' },
+    { key: 'cls', label: 'Class' },
+    { key: 'hits', label: 'HPO hits', num: true },
+    { key: 'ic', label: 'IC score', num: true },
+    { key: 'jaccard', label: 'Jaccard', num: true },
+  ];
+  var cellFns = {
+    gene: function (r) { return geneLink(r.gene); },
+    disease: function (r) { return r.slug ? diseaseLink(r.disease, r.slug) : escapeHtml(r.disease); },
+    cls: function (r) { return classBadge(r.cls); },
+    hits: function (r) { return '<span class="col-num">' + r.hits + '</span>'; },
+    ic: function (r) { return '<span class="col-num">' + r.ic.toFixed(2) + '</span>'; },
+    jaccard: function (r) { return '<span class="col-num">' + r.jaccard.toFixed(3) + '</span>'; },
+  };
+  if (opts.statusFn) { headers.splice(1, 0, { key: 'status', label: 'Status' }); cellFns.status = opts.statusFn; }
+  $('predict-results').innerHTML = opts.banner || '';
+  renderTable('predict-results', ranked, headers, cellFns, 'predict_candidates', [], /*append=*/true);
+}
+
+function runPredict() {
+  if (!DB) return;
+  if (_predictMode === 'gene') return predictByGene();
+  if (_predictMode === 'disease') return predictByDisease();
+  return predictBySymptoms();
+}
+
+function predictBySymptoms() {
+  var tokens = splitInput($('predict-input').value);
+  if (tokens.length < 2) {
+    $('predict-results').innerHTML = noResults('Need \u22652 symptoms', 'Prediction requires multiple symptoms to compute meaningful overlap.');
+    return;
+  }
+  var matched = [], unmatched = [];
+  tokens.forEach(function (t) { var c = resolveSymptomToken(t); if (c) matched.push(c); else unmatched.push(t); });
+  if (matched.length < 2) {
+    $('predict-results').innerHTML = noResults('Need \u22652 recognised symptoms', 'Could not match enough symptoms. Unknown: ' + escapeHtml(unmatched.join(', ')));
+    return;
+  }
+  var inputHpos = new Set();
+  matched.forEach(function (c) { ((DB.concepts[c] && DB.concepts[c].hpo_ids) || []).forEach(function (h) { inputHpos.add(h); }); });
+  if (inputHpos.size === 0) {
+    $('predict-results').innerHTML = noResults('No HPO IDs found', 'The symptoms you entered do not have HPO IDs in the database.');
+    return;
+  }
+  var ranked = scoreGenesByHpo(inputHpos, null).slice(0, 100);
+  if (ranked.length === 0) {
+    $('predict-results').innerHTML = noResults('No candidate genes scored', 'Try a different combination of symptoms.');
+    return;
+  }
+  var banner = '';
+  if (unmatched.length) banner = '<div class="search-helper" style="color:#b45309;">Unrecognised tokens (ignored): ' + escapeHtml(unmatched.join(', ')) + '</div>';
+  _predictTable(ranked, { banner: banner });
+}
+
+function predictByGene() {
+  var raw = splitInput($('predict-gene-input').value)[0] || '';
+  var gene = resolveGeneToken(raw);
+  if (!gene) {
+    $('predict-results').innerHTML = noResults('Gene not recognised', 'Enter a single HGNC symbol present in CiliaHub (e.g. BBS1, IFT172, CEP290).');
+    return;
+  }
+  var info = DB.genes[gene];
+  var seedDiseases = (info.diseases || []).map(function (d) { return d.name; });
+  if (seedDiseases.length === 0) {
+    $('predict-results').innerHTML = noResults('No curated disease for ' + escapeHtml(gene), 'This gene has no curated disease profile to seed a prediction.');
+    return;
+  }
+  var inputHpos = new Set();
+  seedDiseases.forEach(function (dn) { ((DB.diseases[dn] && DB.diseases[dn].hpo_ids) || []).forEach(function (h) { inputHpos.add(h); }); });
+  var seedSet = new Set(seedDiseases);
+  var ranked = scoreGenesByHpo(inputHpos, gene).slice(0, 100);
+  if (ranked.length === 0) {
+    $('predict-results').innerHTML = noResults('No candidates scored', 'No other genes overlap the phenotype profile of ' + escapeHtml(gene) + '.');
+    return;
+  }
+  var banner = '<div class="search-helper"><strong>' + escapeHtml(gene) + '</strong> is curated for: ' +
+    escapeHtml(seedDiseases.join('; ')) + '. Genes below are ranked by phenotypic overlap with that profile; ' +
+    '"novel candidate" = shares no curated disease with ' + escapeHtml(gene) + '.</div>';
+  var statusFn = function (r) {
+    var shares = (DB.genes[r.gene].diseases || []).some(function (d) { return seedSet.has(d.name); });
+    return shares ? '<span class="predict-status curated">shared disease</span>'
+                  : '<span class="predict-status novel">novel candidate</span>';
+  };
+  _predictTable(ranked, { banner: banner, statusFn: statusFn });
+}
+
+function predictByDisease() {
+  var raw = splitInput($('predict-disease-input').value)[0] || '';
+  var disease = resolveDiseaseToken(raw);
+  if (!disease) {
+    $('predict-results').innerHTML = noResults('Disease not recognised', 'Enter a curated disease name or acronym (e.g. Joubert Syndrome, BBS, PCD).');
+    return;
+  }
+  var prof = DB.diseases[disease];
+  var inputHpos = new Set(prof.hpo_ids || []);
+  if (inputHpos.size === 0) {
+    $('predict-results').innerHTML = noResults('No HPO profile', escapeHtml(disease) + ' has no HPO terms to seed a prediction.');
+    return;
+  }
+  var curated = new Set(prof.genes || []);
+  var ranked = scoreGenesByHpo(inputHpos, null).slice(0, 100);
+  if (ranked.length === 0) {
+    $('predict-results').innerHTML = noResults('No candidates scored', 'No genes overlap the phenotype profile of ' + escapeHtml(disease) + '.');
+    return;
+  }
+  var nNovel = ranked.filter(function (r) { return !curated.has(r.gene); }).length;
+  var banner = '<div class="search-helper"><strong>' + escapeHtml(disease) + '</strong> has <strong>' +
+    curated.size + '</strong> curated gene(s). Ranking all genes by phenotypic overlap with its profile \u2014 <strong>' +
+    nNovel + '</strong> ranked gene(s) lie outside the curated set (novel candidates).</div>';
+  var statusFn = function (r) {
+    return curated.has(r.gene) ? '<span class="predict-status curated">curated</span>'
+                               : '<span class="predict-status novel">novel candidate</span>';
+  };
+  _predictTable(ranked, { banner: banner, statusFn: statusFn });
+}
+
+/* ── Table rendering (shared) ─────────────────────────────────── */
+let _sortState = {};  // {containerId: {key, dir}}
+
+function renderTable(containerId, rows, headers, cellFns, exportName, unmatched, append) {
+  if (rows.length === 0) {
+    const empty = noResults('No results', '');
+    if (append) {
+      $(containerId).insertAdjacentHTML('beforeend', empty);
+    } else {
+      $(containerId).innerHTML = empty;
+    }
+    return;
+  }
+
+  let html = '';
+  if (!append) html += '';
+
+  html += '<div class="results-info">';
+  html += '<div class="results-count"><strong>' + rows.length + '</strong> row(s)</div>';
+  html += '<div class="results-actions">';
+  html += '<button class="btn btn-soft" onclick="exportTable(\'' + containerId + '\', \'csv\', \'' + exportName + '\')">⤓ CSV</button>';
+  html += '<button class="btn btn-soft" onclick="exportTable(\'' + containerId + '\', \'tsv\', \'' + exportName + '\')">⤓ TSV</button>';
+  html += '<button class="btn btn-soft" onclick="exportTable(\'' + containerId + '\', \'json\', \'' + exportName + '\')">⤓ JSON</button>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="table-wrap"><table class="results-table" data-headers=\'' + escapeHtml(JSON.stringify(headers)) + '\'>';
+  html += '<thead><tr>';
+  headers.forEach((h, i) => {
+    html += '<th data-col="' + h.key + '" data-num="' + (h.num ? '1' : '') + '" onclick="sortTable(\'' + containerId + '\', ' + i + ')">' +
+            escapeHtml(h.label) + ' <span class="sort-arrow">▾</span></th>';
+  });
+  html += '</tr></thead>';
+  html += '<tbody>';
+  rows.forEach(r => {
+    html += '<tr>';
+    headers.forEach(h => {
+      html += '<td>' + cellFns[h.key](r) + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  if (unmatched && unmatched.length) {
+    html += '<div class="search-helper" style="color:#b45309;margin-top:10px;">Unrecognised tokens (ignored): ' + escapeHtml(unmatched.join(', ')) + '</div>';
+  }
+
+  if (append) {
+    $(containerId).insertAdjacentHTML('beforeend', html);
+  } else {
+    $(containerId).innerHTML = html;
+  }
+  // Stash rows on the container for export & sort
+  $(containerId)._tableData = { rows, headers, cellFns };
+}
+
+function noResults(title, body) {
+  return '<div class="empty-state"><div class="icon">🔍</div>' +
+         '<div><strong>' + escapeHtml(title) + '</strong></div>' +
+         (body ? '<div style="margin-top:6px;">' + escapeHtml(body) + '</div>' : '') +
+         '</div>';
+}
+
+function sortTable(containerId, colIdx) {
+  const c = $(containerId);
+  const data = c._tableData;
+  if (!data) return;
+  const key = data.headers[colIdx].key;
+  const num = data.headers[colIdx].num;
+  const s = _sortState[containerId] || {};
+  const dir = (s.key === key && s.dir === 'asc') ? 'desc' : 'asc';
+  data.rows.sort((a, b) => {
+    let va = a[key], vb = b[key];
+    if (num) { va = +va || 0; vb = +vb || 0; return dir === 'asc' ? va - vb : vb - va; }
+    va = String(va || '').toLowerCase(); vb = String(vb || '').toLowerCase();
+    return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+  _sortState[containerId] = { key, dir };
+  // Re-render the table only (keep the info bar)
+  renderTable(containerId, data.rows, data.headers, data.cellFns, containerId + '_export', null);
+}
+window.sortTable = sortTable;
+
+function exportTable(containerId, fmt, baseName) {
+  const c = $(containerId);
+  const data = c._tableData;
+  if (!data) return;
+  const { rows, headers } = data;
+  const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  const filename = 'ciliahub-' + baseName + '-' + ts + '.' + fmt;
+  let content = '';
+  if (fmt === 'json') {
+    content = JSON.stringify(rows.map(r => {
+      const o = {};
+      headers.forEach(h => o[h.key] = r[h.key]);
+      return o;
+    }), null, 2);
+  } else {
+    const sep = fmt === 'tsv' ? '\t' : ',';
+    const lines = [headers.map(h => h.label).join(sep)];
+    rows.forEach(r => {
+      lines.push(headers.map(h => {
+        let v = r[h.key]; if (v == null) v = '';
+        v = String(v);
+        if (fmt === 'csv' && /[",\n]/.test(v)) v = '"' + v.replace(/"/g, '""') + '"';
+        else if (fmt === 'tsv') v = v.replace(/[\t\n\r]/g, ' ');
+        return v;
+      }).join(sep));
+    });
+    content = lines.join('\n') + '\n';
+  }
+  const mime = fmt === 'json' ? 'application/json' : (fmt === 'tsv' ? 'text/tab-separated-values' : 'text/csv');
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+window.exportTable = exportTable;
+
+/* ── Autocomplete (restored) ──────────────────────────────────────
+ * Live suggestions for every search box, driven by the loaded DB.
+ * Works token-by-token inside the textareas: type ≥2 chars of the
+ * current token and pick a canonical gene / disease / symptom.
+ * ──────────────────────────────────────────────────────────────── */
+function _acCurrentToken(val) {
+  var idx = Math.max(val.lastIndexOf(','), val.lastIndexOf(';'), val.lastIndexOf('\n'));
+  return { head: idx >= 0 ? val.slice(0, idx + 1) + ' ' : '', token: val.slice(idx + 1).trim() };
+}
+function _acSource(kind, q) {
+  q = q.toLowerCase();
+  var out = [], k;
+  if (kind === 'gene') {
+    for (k in DB.genes) {
+      if (k.toLowerCase().indexOf(q) === 0) out.push({ label: k, sub: ((DB.genes[k].diseases || []).length) + ' disease(s)' });
+      if (out.length >= 12) break;
+    }
+  } else if (kind === 'disease') {
+    for (k in DB.diseases) {
+      var p = DB.diseases[k];
+      if (k.toLowerCase().indexOf(q) !== -1 ||
+          (p.search_aliases || []).some(function (a) { return a.toLowerCase().indexOf(q) === 0; })) {
+        out.push({ label: k, sub: (p.class || '') });
+      }
+      if (out.length >= 12) break;
+    }
+  } else { /* symptom */
+    for (k in DB.concepts) {
+      if (k.toLowerCase().indexOf(q) !== -1) out.push({ label: k, sub: (DB.concepts[k].hpo_ids || [])[0] || '' });
+      if (out.length >= 12) break;
+    }
+    if (out.length < 12) {
+      for (var phrase in synonyms) {
+        if (phrase.indexOf(q) === 0 && !out.some(function (o) { return o.label === synonyms[phrase]; }))
+          out.push({ label: synonyms[phrase], sub: 'via "' + phrase + '"' });
+        if (out.length >= 12) break;
+      }
+    }
+  }
+  return out;
+}
+function _wireAutocomplete(id, kind) {
+  var ta = $(id);
+  if (!ta || ta._acWired) return;
+  ta._acWired = true;
+  var wrap = document.createElement('div');
+  wrap.style.position = 'relative';
+  ta.parentNode.insertBefore(wrap, ta);
+  wrap.appendChild(ta);
+  var dd = document.createElement('div');
+  dd.className = 'ac-dropdown';
+  dd.style.display = 'none';
+  wrap.appendChild(dd);
+  var items = [], active = -1;
+
+  function close() { dd.style.display = 'none'; active = -1; }
+  function choose(label) {
+    var cur = _acCurrentToken(ta.value);
+    ta.value = cur.head + label + ', ';
+    close(); ta.focus();
+  }
+  function render(list) {
+    items = list; active = -1;
+    if (!list.length) { close(); return; }
+    dd.innerHTML = list.map(function (it, i) {
+      return '<div class="ac-item" data-i="' + i + '">' + escapeHtml(it.label) +
+        (it.sub ? '<div class="secondary">' + escapeHtml(it.sub) + '</div>' : '') + '</div>';
+    }).join('');
+    Array.prototype.forEach.call(dd.querySelectorAll('.ac-item'), function (el) {
+      el.addEventListener('mousedown', function (e) { e.preventDefault(); choose(items[+el.dataset.i].label); });
+    });
+    dd.style.display = 'block';
+  }
+  ta.addEventListener('input', function () {
+    if (!DB) return;
+    var q = _acCurrentToken(ta.value).token;
+    if (q.length < 2) { close(); return; }
+    render(_acSource(kind, q));
+  });
+  ta.addEventListener('keydown', function (e) {
+    if (dd.style.display === 'none') return;
+    var els = dd.querySelectorAll('.ac-item');
+    if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, els.length - 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); }
+    else if (e.key === 'Enter') { if (active >= 0 && items[active]) { e.preventDefault(); choose(items[active].label); } return; }
+    else if (e.key === 'Escape') { close(); return; }
+    else return;
+    Array.prototype.forEach.call(els, function (el, i) { el.classList.toggle('active', i === active); });
+    if (els[active]) els[active].scrollIntoView({ block: 'nearest' });
+  });
+  ta.addEventListener('blur', function () { setTimeout(close, 150); });
+}
+function setupAutocomplete() {
+  _wireAutocomplete('gene-input', 'gene');
+  _wireAutocomplete('disease-input', 'disease');
+  _wireAutocomplete('symptom-input', 'symptom');
+  _wireAutocomplete('predict-input', 'symptom');
+  _wireAutocomplete('predict-gene-input', 'gene');
+  _wireAutocomplete('predict-disease-input', 'disease');
+}
+/* Wait for the database to finish loading, then attach suggestions. */
+document.addEventListener('DOMContentLoaded', function _acReady() {
+  if (!DB) { return void setTimeout(_acReady, 150); }
+  setupAutocomplete();
+});
+</script>
+</body>
+</html>
