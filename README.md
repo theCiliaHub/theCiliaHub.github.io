@@ -15,10 +15,10 @@ four-class ciliopathy framework.
 
 ## What's in the catalogue
 
-- **2,790** human ciliary and cilia-associated genes.
-- **2,148** designated **gold-standard** (confirmed localization to the cilium, transition
-  zone, basal body, or flagellum) and **642** cilia-associated.
-- **88** ciliopathies linked to **542** disease genes, organized into a four-class
+- **2,785** human ciliary and cilia-associated genes.
+- **2,179** designated **gold-standard** (confirmed localization to the cilium, transition
+  zone, basal body, or flagellum) and **606** cilia-associated.
+- **92** ciliopathies linked to **498** disease genes, organized into a four-class
   framework: **Primary**, **Motile**, **Tissue-restricted**, and **Secondary**
   (the last catalogued separately as non-ciliary disorders).
 - Orthologs across **five** model organisms (mouse, *Xenopus*, zebrafish, *Drosophila*,
@@ -141,7 +141,7 @@ If you use CiliaHub, please cite the Application Note and the archived software 
 > Yenisert, F., Cevik, S., Kaplan, O.I. (2026) CiliaHub: an updated gold-standard catalogue of ciliary genes with
 > integrated ciliopathy data. (submitted).
 
-Software archive: Zenodo DOI `10.5281/zenodo.20696641` *(fill in on release)*.
+Software archive: Zenodo DOI `10.5281/zenodo.23257334` *(3 October 2026)*.
 Machine-readable citation metadata is in `CITATION.cff`.
 
 ---
