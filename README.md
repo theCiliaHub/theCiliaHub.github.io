@@ -18,9 +18,11 @@ four-class ciliopathy framework.
 - **2,785** human ciliary and cilia-associated genes.
 - **2,179** designated **gold-standard** (confirmed localization to the cilium, transition
   zone, basal body, or flagellum) and **606** cilia-associated.
-- **92** ciliopathies linked to **498** disease genes, organized into a four-class
-  framework: **Primary**, **Motile**, **Tissue-restricted**, and **Secondary**
-  (the last catalogued separately as non-ciliary disorders).
+- **106** disease entities: **92** ciliopathies (43 primary, 4 motile, 45 tissue-restricted)
+  linked to **498** disease genes, plus **14** secondary non-ciliary disorders; **537**
+  disease genes in total. Organized into a four-class framework: **Primary**, **Motile**,
+  **Tissue-restricted**, and **Secondary** (the last catalogued separately as non-ciliary
+  disorders).
 - Orthologs across **five** model organisms (mouse, *Xenopus*, zebrafish, *Drosophila*,
   *C. elegans*).
 
@@ -53,6 +55,17 @@ https://ciliahub.org/data/phenotype/gene_to_diseases.json       # gene → disea
 ```
 
 Per-gene pages: `https://ciliahub.org/gene/<SYMBOL>` (e.g. `/gene/BBS1`).
+
+The frozen release (**v9.2**, freeze date 3 October 2026, 2,785 genes) is also kept in this
+repository:
+
+| File | Content |
+| ---- | ------- |
+| `data/genes/ciliahub_master_merged.json` | Full gene catalogue (`meta`, `genes`, `lookups`) |
+| `ciliahub_data.json` | Same v9.2 master, read by the site scripts |
+| `data/exports/ciliahub_v9_2_genes.csv` | Flat table (one row per gene, 49 columns); nested fields such as ClinVar variants, Pfam domains, screens and publications are only in the JSON |
+
+Archived release: <https://doi.org/10.5281/zenodo.23257334>.
 
 ---
 
@@ -93,16 +106,21 @@ The proxy worker lives in `serverless/cloudflare-worker.js`.
 
 ## Data-build pipeline
 
-The catalogue and derived JSON are regenerated from curated source tables:
+The source of truth is the frozen master `data/genes/ciliahub_master_merged.json` (v9.2).
+The flat CSV is regenerated from it with:
 
 ```bash
-python3 scripts/sync_genes.py          # source tables -> generated JSON datasets
-python3 scripts/build_site_jsons.py    # site-facing JSON (called by sync_genes.py)
+python3 scripts/export_flat_csv.py     # master JSON -> data/exports/ciliahub_v9_2_genes.csv
 ```
 
-The phenotype data is regenerated from Supplementary Tables S1 (gene catalogue),
-S2 (disease catalogue), and S5 (symptom classification). A GitHub Actions workflow
-(`.github/workflows/sync-genes.yml`) reruns the pipeline when the source tables change.
+The earlier Excel-based pipeline (`scripts/sync_genes.py`, `scripts/build_site_jsons.py`,
+`data/source/genes.xlsx`) belongs to a previous release lineage (2,588 genes). It no longer
+runs automatically; `.github/workflows/sync-genes.yml` can only be started manually, and
+its outputs (`data/generated/`, `data/hub/`, `data/genes/ciliAI_*.json`) are not part of
+v9.2 and are not used by the live site.
+
+The phenotype data is built from Supplementary Tables S1 (gene catalogue),
+S2 (disease catalogue), and S5 (symptom classification).
 
 ---
 
@@ -141,7 +159,9 @@ If you use CiliaHub, please cite the Application Note and the archived software 
 > Yenisert, F., Cevik, S., Kaplan, O.I. (2026) CiliaHub: an updated gold-standard catalogue of ciliary genes with
 > integrated ciliopathy data. (submitted).
 
-Software archive: Zenodo DOI `10.5281/zenodo.23257334` *(3 October 2026)*.
+Software archive: Zenodo DOI `10.5281/zenodo.23257334` (version v3, published 9 October 2026;
+dataset v9.2, freeze date 3 October 2026). The DOI `10.5281/zenodo.20696640` always resolves to
+the latest version.
 Machine-readable citation metadata is in `CITATION.cff`.
 
 ---
